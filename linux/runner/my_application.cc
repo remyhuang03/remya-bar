@@ -3,6 +3,7 @@
 #include <flutter_linux/flutter_linux.h>
 #include <gtk-layer-shell.h>
 
+#include "bar_popup.h"
 #include "flutter/generated_plugin_registrant.h"
 
 struct _MyApplication {
@@ -22,6 +23,9 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
                       g_object_ref(window));
   gtk_window_set_title(window, "Remy'a Bar");
   gtk_window_set_decorated(window, FALSE);
+  gtk_widget_set_app_paintable(GTK_WIDGET(window), TRUE);
+  GdkVisual* visual = gdk_screen_get_rgba_visual(gtk_window_get_screen(window));
+  if (visual != nullptr) gtk_widget_set_visual(GTK_WIDGET(window), visual);
   gtk_widget_set_size_request(GTK_WIDGET(window), -1, 40);
 
   gtk_layer_init_for_window(window);
@@ -39,7 +43,26 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
       project, self->dart_entrypoint_arguments);
 
   FlView* view = fl_view_new(project);
+  const GdkRGBA transparent = {0, 0, 0, 0};
+  fl_view_set_background_color(view, &transparent);
+  register_bar_popup(view);
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
+  g_autoptr(FlStandardMethodCodec) paths_codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) paths_channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)), "top.remya.paths",
+      FL_METHOD_CODEC(paths_codec));
+  fl_method_channel_set_method_call_handler(
+      paths_channel,
+      [](FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
+        if (g_strcmp0(fl_method_call_get_name(call), "repositoryDirectory") == 0) {
+          g_autoptr(FlValue) root = fl_value_new_string(REMYA_REPOSITORY_DIR);
+          fl_method_call_respond_success(call, root, nullptr);
+        } else {
+          fl_method_call_respond_not_implemented(call, nullptr);
+        }
+      },
+      nullptr, nullptr);
+
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
   gtk_widget_show_all(GTK_WIDGET(window));
 }

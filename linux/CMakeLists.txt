@@ -7,7 +7,7 @@ project(runner LANGUAGES CXX)
 set(BINARY_NAME "remya_bar")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
-set(APPLICATION_ID "top.remya.remya_bar")
+set(APPLICATION_ID "top.remya.bar")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -75,6 +75,23 @@ set_target_properties(${BINARY_NAME}
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+find_program(CARGO_EXECUTABLE cargo REQUIRED)
+set(RUST_WORKSPACE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(RUST_PROFILE "debug")
+  set(RUST_PROFILE_ARGS "")
+else()
+  set(RUST_PROFILE "release")
+  set(RUST_PROFILE_ARGS "--release")
+endif()
+set(RUST_HYPRLAND_LIBRARY "${RUST_WORKSPACE_DIR}/target/${RUST_PROFILE}/libremya_bar_hyprland.so")
+add_custom_target(rust_hyprland ALL
+  COMMAND "${CARGO_EXECUTABLE}" build --locked --package remya_bar_hyprland ${RUST_PROFILE_ARGS}
+  WORKING_DIRECTORY "${RUST_WORKSPACE_DIR}"
+  BYPRODUCTS "${RUST_HYPRLAND_LIBRARY}"
+  COMMENT "Building Rust Hyprland backend")
+add_dependencies(${BINARY_NAME} rust_hyprland)
+
 
 # === Installation ===
 # By default, "installing" just makes a relocatable bundle in the build
@@ -91,6 +108,9 @@ install(CODE "
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+install(FILES "${RUST_HYPRLAND_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/top.remya.bar.desktop"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications" COMPONENT Runtime)
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)

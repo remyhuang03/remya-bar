@@ -1,0 +1,6 @@
+# Optional debug theme override. Installed bars read Remya Settings' XDG config.
+version = 1
+
+[theme]
+style_variant = "tonal_spot"
+theme_mode = "light"

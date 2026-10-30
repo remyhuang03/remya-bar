@@ -56,3 +56,6 @@ app.*.map.json
 .env.*
 !.env.example
 config/*.local.toml
+
+# Python development tools
+__pycache__/

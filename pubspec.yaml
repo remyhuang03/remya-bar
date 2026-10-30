@@ -10,6 +10,9 @@ dependencies:
   flutter:
     sdk: flutter
   material_ui: ^1.5.0
+  flutter_rust_bridge: 2.13.0
+  remya_settings_client:
+    path: ../remya_settings/packages/remya_settings_client
 
 dev_dependencies:
   flutter_test:
@@ -20,3 +23,4 @@ flutter:
   uses-material-design: true
   assets:
     - LICENSE
+    - assets/licenses/rust-dependencies.txt

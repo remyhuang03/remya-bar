@@ -4,7 +4,7 @@ A desktop bar project for **Hyprland on Linux**, using **Flutter**, **Material D
 
 ## Current milestone
 
-The bar displays `Hello, world!` in a 40-logical-pixel strip across the top of every connected output. It uses the top layer, reserves space for normal windows, has no title bar, and does not take keyboard focus. GDK display events create and destroy bars when outputs change, using monitor objects rather than persistent display indices. The application stays alive when no outputs are connected. System modules and Hyprland IPC integrations are not implemented yet. The application does not read or change system settings.
+The bar is a 40-logical-pixel capsule across the top of every connected output, with a settings icon that opens Remya Settings. It uses the top layer, reserves space for normal windows, has no title bar, and does not take keyboard focus. GDK display events create and destroy bars when outputs change, using monitor objects rather than persistent display indices. The application stays alive when no outputs are connected. Rust provides Hyprland request/reply IPC and a process-wide live event subscription. The installed bar follows Remya Settings' effective MD3E theme through D-Bus. Other system modules are not implemented; Bar does not write settings itself.
 
 Window behavior uses the existing [gtk-layer-shell](https://github.com/wmww/gtk-layer-shell) system library through the native GTK runner. Each output gets a separate GTK window and Flutter view. A Wayland compositor supporting layer-shell, such as Hyprland, is required; unsupported sessions exit with an error.
 
@@ -15,13 +15,35 @@ Cargo.toml                Root Rust workspace
 lib/
   main.dart               Flutter startup and license registration
   app.dart                Application composition and theme
-  features/               Add feature directories when needed
-  src/rust/core/          Empty future backend crate
+  features/               Hyprland adapter and Settings button/debug lookup
+  src/rust/core/          Empty backend crate
+  src/rust/hyprland/      Hyprland transport and generated Rust bridge
+  src/rust/hyprland_bridge/ Generated Dart bridge
 linux/                    GTK layer-shell runner and output enumeration
 test/                     Widget and live Hyprland smoke tests
 ```
 
-Flutter stays at the repository root. Rust crates live under `lib/src/rust/` and are registered in the root workspace. Add `flutter_rust_bridge` when the first backend API is needed.
+Flutter stays at the repository root. Rust crates live under `lib/src/rust/` and are registered in the root workspace. The Hyprland feature uses `flutter_rust_bridge` 2.13.0. Regenerate bindings with the matching generator and `flutter_rust_bridge.yaml`.
+
+## Settings dependency and installation
+
+Application ID: `top.remya.bar`; executable: `remya_bar`. Build Settings and Bar
+independently with their pinned toolchains. Keep the Settings checkout adjacent
+when building Bar: its public client package is a local source dependency.
+Installed bundles need no source checkout.
+
+Install Settings first, then from this repository run:
+
+```bash
+fvm flutter build linux --release
+python tool/install.py
+```
+
+The installer follows XDG_DATA_HOME, registers the desktop entry, and creates
+`~/.local/bin/remya_bar`. Configuration policy, debug overrides, IPC behavior,
+and dependency boundaries are documented in [backend integration](docs/backend.md).
+See [Settings' complete CLI/D-Bus API](../remya_settings/docs/public-api.md) and
+[the shared XDG layout](../remya_settings/docs/xdg-layout.md).
 
 ## Development
 
@@ -30,6 +52,8 @@ Install FVM, Rust via rustup, and Linux Flutter build prerequisites (Clang, CMak
 ```bash
 fvm install
 fvm flutter pub get
+# Build the sibling Settings debug bundle once for the gear button.
+# Run fvm flutter build linux --debug from ../remya_settings.
 fvm flutter run -d linux --no-start-paused
 ```
 

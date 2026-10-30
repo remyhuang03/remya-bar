@@ -27,7 +27,7 @@ def check_bars(process, before):
         width = monitor['height'] if monitor['transform'] % 2 else monitor['width']
         assert level == '2' and bar['h'] == 40, bar
         assert abs(bar['w'] - width / monitor['scale']) <= 1, bar
-        assert bar['namespace'] == 'top.remya.remya_bar', bar
+        assert bar['namespace'] == 'top.remya.bar', bar
         assert bar['x'] == monitor['x'], bar
         assert bar['y'] == monitor['y'] + before[monitor['name']][1], bar
         assert monitor['reserved'][1] == before[monitor['name']][1] + 40

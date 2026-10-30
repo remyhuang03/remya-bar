@@ -1,22 +1,117 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/app.dart';
+import 'package:remya_settings_client/remya_settings_client.dart';
 
 void main() {
-  testWidgets('shows Hello, world! in a 40-pixel Material 3 bar', (
+  testWidgets('settings button fits the 40-pixel bar and opens settings', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1920, 40);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(const RemyaBarApp());
-
-    expect(find.text('Hello, world!'), findsOneWidget);
-    expect(find.byType(AppBar), findsNothing);
+    final preferences = SettingsThemeController(
+      () => File('/nonexistent/theme.toml'),
+    );
+    var opened = 0;
+    await tester.pumpWidget(
+      RemyaBarApp(
+        preferences: preferences,
+        onOpenSettings: () async {
+          opened++;
+        },
+      ),
+    );
+    expect(find.byIcon(Icons.settings_rounded), findsOneWidget);
     expect(tester.getSize(find.byType(Scaffold)).height, 40);
-    final scaffold = tester.element(find.byType(Scaffold));
-    expect(Theme.of(scaffold).useMaterial3, isTrue);
+    await tester.tap(find.byType(IconButton));
+    await tester.pump();
+    expect(opened, 1);
+    final context = tester.element(find.byType(Scaffold));
+    expect(Theme.of(context).useMaterial3, isTrue);
+    expect(
+      Theme.of(context).colorScheme,
+      preferences.theme.theme(.light).colorScheme,
+    );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('launch failure is visible and can be retried', (tester) async {
+    tester.view.physicalSize = const Size(300, 40);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final preferences = SettingsThemeController(
+      () => File('/nonexistent/theme.toml'),
+    );
+    var attempts = 0;
+    await tester.pumpWidget(
+      RemyaBarApp(
+        preferences: preferences,
+        onOpenSettings: () async {
+          if (attempts++ == 0) throw const ProcessException('settings', []);
+        },
+      ),
+    );
+    await tester.tap(find.byType(IconButton));
+    await tester.pump();
+    expect(find.byIcon(Icons.error_outline_rounded), findsOneWidget);
+    await tester.tap(find.byType(IconButton));
+    await tester.pump();
+    expect(find.byIcon(Icons.settings_rounded), findsOneWidget);
+    expect(attempts, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('startup widths do not overflow with a settings warning', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final preferences = SettingsThemeController(
+      () => File('/nonexistent/theme.toml'),
+    )..error = 'Invalid debug configuration';
+    for (final width in [1.0, 39.0, 40.0, 59.0, 60.0, 1920.0]) {
+      tester.view.physicalSize = Size(width, 40);
+      await tester.pumpWidget(
+        RemyaBarApp(preferences: preferences, onOpenSettings: () async {}),
+      );
+      expect(tester.takeException(), isNull, reason: 'width $width');
+      expect(
+        find.byType(IconButton),
+        width < 40 ? findsNothing : findsOneWidget,
+      );
+    }
+  });
+
+  test('atomic theme updates apply and malformed files retain the last valid theme', () async {
+    final directory = Directory.systemTemp.createTempSync('remya-bar-theme-');
+    addTearDown(() => directory.deleteSync(recursive: true));
+    final file = File('${directory.path}/config.toml');
+    final preferences = SettingsThemeController(() => file);
+    addTearDown(preferences.dispose);
+    await preferences.reload();
+    expect(preferences.error, isNull);
+    file.writeAsStringSync(
+      'version = 1\n[theme]\nstyle_variant = "vibrant"\ntheme_mode = "dark"\n',
+    );
+    await preferences.reload();
+    expect(preferences.theme.mode, ThemeMode.dark);
+    expect(preferences.theme.styleVariant, DynamicSchemeVariant.vibrant);
+    final previous = preferences.theme;
+    file.writeAsStringSync('invalid');
+    await preferences.reload();
+    expect(preferences.theme, same(previous));
+    expect(preferences.error, isNotNull);
+    final replacement = File('${directory.path}/new.toml')
+      ..writeAsStringSync('version = 1\n');
+    replacement.renameSync(file.path);
+    await preferences.reload();
+    expect(preferences.theme.styleVariant, DynamicSchemeVariant.tonalSpot);
+    expect(preferences.error, isNull);
   });
 }

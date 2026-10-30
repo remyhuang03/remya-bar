@@ -1,0 +1,12 @@
+rust_input: crate::api
+rust_root: lib/src/rust/hyprland
+rust_output: lib/src/rust/hyprland/src/frb_generated.rs
+dart_output: lib/src/rust/hyprland_bridge
+dart_entrypoint_class_name: HyprlandRustLib
+web: false
+dart_format: false
+dart_fix: false
+auto_upgrade_dependency: false
+stop_on_error: true
+rust_format: false
+add_mod_to_lib: false
