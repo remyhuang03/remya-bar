@@ -117,3 +117,13 @@ remains 40 pixels tall. Tooltip hover waits 500 ms and closes on pointer exit or
 widget disposal. Popup resources are destroyed with their owning output view.
 GTK 3 still supplies the platform surface's integer scale; this change unifies
 text rendering with Flutter and does not change desktop scale or font settings.
+
+## Clock
+
+`lib/features/clock/bar_clock.dart` displays the local system date and time at the
+geometric center of each output. It reads the real wall clock on every tick,
+aligns updates to second boundaries, and cancels its timer when an output view
+is removed. Only the clock widget rebuilds. It does not call Settings or spawn
+processes for each tick; time and time zone writes remain owned by Settings.
+The initial date/time format is deliberately fixed, with no formatting preference.
+Very narrow transitional surfaces omit the clock so the Settings launcher remains usable.

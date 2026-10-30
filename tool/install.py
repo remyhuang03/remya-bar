@@ -73,6 +73,11 @@ def install(root, environment):
     # env lets Gio validate the launcher before expanding literal %% in path arguments.
     entry = entry.replace(f"Exec={APP_ID}", f"Exec=/usr/bin/env {desktop_quote(destination / APP_ID)}")
     (applications / f"{PACKAGE}.desktop").write_text(entry)
+    icons = data / "icons/hicolor/scalable/apps"
+    icons.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(root / "assets/icons/bar.svg", icons / f"{PACKAGE}.svg")
+    if shutil.which("gtk-update-icon-cache"):
+        subprocess.run(["gtk-update-icon-cache", "-f", "-t", str(data / "icons/hicolor")], check=True)
     command.parent.mkdir(parents=True, exist_ok=True)
     if not command.is_symlink():
         command.symlink_to(destination / APP_ID)

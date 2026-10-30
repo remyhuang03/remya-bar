@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/app.dart';
+import 'package:remya_bar/features/clock/bar_clock.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 void main() {
@@ -36,6 +37,37 @@ void main() {
       Theme.of(context).colorScheme,
       preferences.theme.theme(.light).colorScheme,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('clock is centered, follows real time and releases its timer', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 40);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      RemyaBarApp(
+        preferences: SettingsThemeController(
+          () => File('/nonexistent/theme.toml'),
+        ),
+      ),
+    );
+    final clock = find.descendant(
+      of: find.byType(BarClock),
+      matching: find.byType(Text),
+    );
+    final before = tester.widget<Text>(clock).data!;
+    expect(before, matches(RegExp(r'^\d{4}-\d{2}-\d{2}  \d{2}:\d{2}:\d{2}$')));
+    expect(tester.getCenter(clock), const Offset(960, 20));
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 1100)),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.widget<Text>(clock).data, isNot(before));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 2));
     expect(tester.takeException(), isNull);
   });
 

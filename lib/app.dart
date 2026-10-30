@@ -1,10 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
+import 'features/clock/bar_clock.dart';
 import 'features/hyprland/hyprland_backend.dart';
+import 'features/popups/bar_popup.dart';
 import 'features/settings/settings_button.dart';
 import 'widgets/bar_tooltip.dart';
-import 'features/popups/bar_popup.dart';
 
 class RemyaBarApp extends StatefulWidget {
   const RemyaBarApp({
@@ -68,15 +69,29 @@ class _BarContent extends StatelessWidget {
     builder: (context, constraints) {
       // Layer-shell may configure a temporary 1-pixel width during startup.
       if (constraints.maxWidth < 40) return const SizedBox.shrink();
-      return Row(
-        mainAxisAlignment: .end,
+      return Stack(
+        fit: .expand,
         children: [
-          if (error != null && constraints.maxWidth >= 60)
-            BarTooltip(
-              message: 'Theme unavailable',
-              child: const Icon(Icons.warning_amber_rounded, size: 20),
+          if (constraints.maxWidth >= 200)
+            Positioned.fill(
+              left: error == null ? 40 : 60,
+              right: error == null ? 40 : 60,
+              child: const Center(child: BarClock()),
             ),
-          SettingsButton(onOpen: onOpenSettings),
+          Align(
+            alignment: .centerRight,
+            child: Row(
+              mainAxisSize: .min,
+              children: [
+                if (error != null && constraints.maxWidth >= 60)
+                  BarTooltip(
+                    message: 'Theme unavailable',
+                    child: const Icon(Icons.warning_amber_rounded, size: 20),
+                  ),
+                SettingsButton(onOpen: onOpenSettings),
+              ],
+            ),
+          ),
         ],
       );
     },

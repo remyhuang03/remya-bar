@@ -111,6 +111,9 @@ set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
 install(FILES "${RUST_HYPRLAND_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/top.remya.bar.desktop"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications" COMPONENT Runtime)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../assets/icons/bar.svg"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps"
+  RENAME "top.remya.bar.svg" COMPONENT Runtime)
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)

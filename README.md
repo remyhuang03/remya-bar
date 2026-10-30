@@ -1,3 +1,5 @@
+<img src="assets/icons/bar.svg" alt="" width="96" height="96">
+
 # Remy'a Bar
 
 A desktop bar project for **Hyprland on Linux**, using **Flutter**, **Material Design 3 Expressive**, and a **Rust workspace**. Development practices follow `../remya_settings`.
@@ -39,8 +41,8 @@ fvm flutter build linux --release
 python tool/install.py
 ```
 
-The installer follows XDG_DATA_HOME, registers the desktop entry, and creates
-`~/.local/bin/remya_bar`. Configuration policy, debug overrides, IPC behavior,
+The installer follows XDG_DATA_HOME, registers the desktop entry and icon, and
+creates `~/.local/bin/remya_bar`. Configuration policy, debug overrides, IPC behavior,
 and dependency boundaries are documented in [backend integration](docs/backend.md).
 See [Settings' complete CLI/D-Bus API](../remya_settings/docs/public-api.md) and
 [the shared XDG layout](../remya_settings/docs/xdg-layout.md).
