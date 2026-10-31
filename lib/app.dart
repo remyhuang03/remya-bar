@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
+import 'bar_theme.dart';
 import 'features/clock/bar_clock.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/popups/bar_popup.dart';
@@ -40,8 +41,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         child: MaterialApp(
           title: "Remy'a Bar",
           debugShowCheckedModeBanner: false,
-          theme: widget.preferences.theme.theme(.light),
-          darkTheme: widget.preferences.theme.theme(.dark),
+          theme: barTheme(widget.preferences.theme.theme(.light)),
+          darkTheme: barTheme(widget.preferences.theme.theme(.dark)),
           themeMode: widget.preferences.theme.mode,
           home: ClipRRect(
             borderRadius: .circular(20),

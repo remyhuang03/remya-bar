@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
+import '../../../bar_theme.dart';
 import 'bar_popup.dart';
 
 class BarPopupApp extends StatefulWidget {
@@ -42,8 +43,8 @@ class _BarPopupAppState extends State<BarPopupApp> {
     final data = content['data'] as Map;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: theme.theme(.light),
-      darkTheme: theme.theme(.dark),
+      theme: barTheme(theme.theme(.light)),
+      darkTheme: barTheme(theme.theme(.dark)),
       themeMode: theme.mode,
       home: switch (content['kind']) {
         'tooltip' => _TooltipContent(

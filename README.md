@@ -6,7 +6,7 @@ A desktop bar project for **Hyprland on Linux**, using **Flutter**, **Material D
 
 ## Current milestone
 
-The bar is a 40-logical-pixel capsule across the top of every connected output, with a settings icon that opens Remya Settings. It uses the top layer, reserves space for normal windows, has no title bar, and does not take keyboard focus. GDK display events create and destroy bars when outputs change, using monitor objects rather than persistent display indices. The application stays alive when no outputs are connected. Rust provides Hyprland request/reply IPC and a process-wide live event subscription. The installed bar follows Remya Settings' effective MD3E theme through D-Bus. Other system modules are not implemented; Bar does not write settings itself.
+The bar is a 40-logical-pixel capsule across the top of every connected output, with a settings icon that opens Remya Settings. It uses the top layer, reserves space for normal windows, has no title bar, and does not take keyboard focus. GDK display events create and destroy bars when outputs change, using monitor objects rather than persistent display indices. The application stays alive when no outputs are connected. Rust provides Hyprland request/reply IPC and a process-wide live event subscription. The installed bar follows Remya Settings' effective MD3E theme through D-Bus. Bar text and Flutter popups use the system Roboto Flex font; font files are not bundled, and the installer checks this runtime dependency. Other system modules are not implemented; Bar does not write settings itself.
 
 Window behavior uses the existing [gtk-layer-shell](https://github.com/wmww/gtk-layer-shell) system library through the native GTK runner. Each output gets a separate GTK window and Flutter view. A Wayland compositor supporting layer-shell, such as Hyprland, is required; unsupported sessions exit with an error.
 
@@ -49,7 +49,7 @@ See [Settings' complete CLI/D-Bus API](../remya_settings/docs/public-api.md) and
 
 ## Development
 
-Install FVM, Rust via rustup, and Linux Flutter build prerequisites (Clang, CMake, Ninja, pkg-config, GTK 3 development libraries, and gtk-layer-shell). On Arch Linux, the layer-shell package is `gtk-layer-shell`; Debian/Ubuntu need `libgtk-layer-shell-dev` for building and `libgtk-layer-shell0` at runtime. Keep gtk-layer-shell installed when running the bundle: it is dynamically linked under LGPL-3.0-or-later. From the repository root:
+Install the **Roboto Flex system font** (Arch: `sudo pacman -S ttf-roboto-flex`), fontconfig, FVM, Rust via rustup, and Linux Flutter build prerequisites (Clang, CMake, Ninja, pkg-config, GTK 3 development libraries, and gtk-layer-shell). On Arch Linux, the layer-shell package is `gtk-layer-shell`; Debian/Ubuntu need `libgtk-layer-shell-dev` for building and `libgtk-layer-shell0` at runtime. Keep gtk-layer-shell installed when running the bundle: it is dynamically linked under LGPL-3.0-or-later. From the repository root:
 
 ```bash
 fvm install
