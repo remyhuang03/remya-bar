@@ -129,3 +129,12 @@ is removed. Only the clock widget rebuilds. It does not call Settings or spawn
 processes for each tick; time and time zone writes remain owned by Settings.
 The initial date/time format is deliberately fixed, with no formatting preference.
 Very narrow transitional surfaces omit the clock so the Settings launcher remains usable.
+
+
+## Battery indicator
+
+The main bar reads system batteries from Linux sysfs through the Rust bridge.
+Peripheral batteries are excluded. The first system battery is shown when its
+charge is available, and only the kernel status `Charging` shows a bolt. Charge at
+or below 20% takes color precedence over energy saver. The saver color follows the
+live `system.profile` from Settings' public `Get power` operation.

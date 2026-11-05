@@ -14,9 +14,9 @@ metadata = json.loads(subprocess.check_output([
 ], cwd=root, text=True))
 packages = {package["id"]: package for package in metadata["packages"]}
 nodes = {node["id"]: node for node in metadata["resolve"]["nodes"]}
-backend = next(package["id"] for package in packages.values()
-               if package["name"] == "remya_bar_hyprland")
-pending, included = [backend], set()
+backends = {package["id"] for package in packages.values()
+            if package["name"] in {"remya_bar_hyprland", "remya_bar_system"}}
+pending, included = list(backends), set()
 while pending:
     package_id = pending.pop()
     if package_id in included:
@@ -32,7 +32,7 @@ notices = ["Rust backend third-party notices\n",
            "gtk-layer-shell/GLib/GIO/GObject are dynamically linked system libraries, not copied into the bundle.\n"
            "Their LGPL notices are supplied by the operating system packages.\n"]
 count = 0
-for package in sorted((packages[item] for item in included if item != backend),
+for package in sorted((packages[item] for item in included - backends),
                       key=lambda item: (item["name"], item["version"])):
     # This release declares license-file rather than an SPDX expression.
     reviewed_file_licenses = {('allo-isolate', '0.1.27'): 'Apache-2.0'}

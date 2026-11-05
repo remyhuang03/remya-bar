@@ -2,6 +2,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 import 'bar_theme.dart';
+import 'features/battery/bar_battery.dart';
+import 'features/system/system_backend.dart';
 import 'features/clock/bar_clock.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/popups/bar_popup.dart';
@@ -13,11 +15,13 @@ class RemyaBarApp extends StatefulWidget {
     super.key,
     required this.preferences,
     this.hyprland,
+    this.system,
     this.onOpenSettings = openRemyaSettings,
   });
 
   final SettingsThemeController preferences;
   final HyprlandBackend? hyprland;
+  final SystemBackend? system;
   final Future<void> Function() onOpenSettings;
 
   @override
@@ -29,13 +33,14 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   void dispose() {
     widget.preferences.dispose();
     widget.hyprland?.dispose();
+    widget.system?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: widget.preferences,
+      listenable: Listenable.merge([widget.preferences, widget.system]),
       builder: (context, _) => BarPopupScope(
         theme: widget.preferences.theme,
         child: MaterialApp(
@@ -49,6 +54,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
             child: Scaffold(
               body: _BarContent(
                 error: widget.preferences.error,
+                system: widget.system,
                 onOpenSettings: widget.onOpenSettings,
               ),
             ),
@@ -60,9 +66,14 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 }
 
 class _BarContent extends StatelessWidget {
-  const _BarContent({required this.error, required this.onOpenSettings});
+  const _BarContent({
+    required this.error,
+    required this.onOpenSettings,
+    this.system,
+  });
 
   final String? error;
+  final SystemBackend? system;
   final Future<void> Function() onOpenSettings;
 
   @override
@@ -88,6 +99,15 @@ class _BarContent extends StatelessWidget {
                   BarTooltip(
                     message: 'Theme unavailable',
                     child: const Icon(Icons.warning_amber_rounded, size: 20),
+                  ),
+                if (constraints.maxWidth >= 440 &&
+                    system?.battery?.percent != null)
+                  Padding(
+                    padding: const .only(right: 4),
+                    child: BarBattery(
+                      battery: system?.battery,
+                      isPowerSaver: system?.isPowerSaver,
+                    ),
                   ),
                 SettingsButton(onOpen: onOpenSettings),
               ],

@@ -1,5 +1,5 @@
 [workspace]
-members = ["lib/src/rust/core", "lib/src/rust/hyprland"]
+members = ["lib/src/rust/core", "lib/src/rust/hyprland", "lib/src/rust/system"]
 resolver = "3"
 
 [workspace.package]

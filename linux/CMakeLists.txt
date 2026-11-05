@@ -91,6 +91,13 @@ add_custom_target(rust_hyprland ALL
   BYPRODUCTS "${RUST_HYPRLAND_LIBRARY}"
   COMMENT "Building Rust Hyprland backend")
 add_dependencies(${BINARY_NAME} rust_hyprland)
+set(RUST_SYSTEM_LIBRARY "${RUST_WORKSPACE_DIR}/target/${RUST_PROFILE}/libremya_bar_system.so")
+add_custom_target(rust_system ALL
+  COMMAND "${CARGO_EXECUTABLE}" build --locked --package remya_bar_system ${RUST_PROFILE_ARGS}
+  WORKING_DIRECTORY "${RUST_WORKSPACE_DIR}"
+  BYPRODUCTS "${RUST_SYSTEM_LIBRARY}"
+  COMMENT "Building Rust system backend")
+add_dependencies(${BINARY_NAME} rust_system)
 
 
 # === Installation ===
@@ -109,6 +116,7 @@ install(CODE "
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
 install(FILES "${RUST_HYPRLAND_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+install(FILES "${RUST_SYSTEM_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/top.remya.bar.desktop"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications" COMPONENT Runtime)
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../assets/icons/bar.svg"

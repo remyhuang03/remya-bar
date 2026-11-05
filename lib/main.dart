@@ -9,6 +9,7 @@ import 'app.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/settings/bar_theme_controller.dart';
 import 'features/popups/popup_app.dart';
+import 'features/system/system_backend.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,8 @@ Future<void> main(List<String> arguments) async {
       : SettingsThemeController.service();
   await preferences.start();
   await HyprlandBackend.initialize();
+  await SystemBackend.initialize();
+  final system = SystemBackend()..start();
   final hyprland = HyprlandBackend()..start();
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks([
@@ -43,6 +46,7 @@ Future<void> main(List<String> arguments) async {
     RemyaBarApp(
       preferences: preferences,
       hyprland: hyprland,
+      system: system,
       onOpenSettings: () => openRemyaSettings(
         debugExecutable: root == null
             ? null
