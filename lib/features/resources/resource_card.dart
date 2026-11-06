@@ -56,7 +56,6 @@ class ResourceCard extends StatelessWidget {
                 child: Text(
                   'System',
                   style: theme.textTheme.titleLarge!.copyWith(
-                    fontFamily: 'Inter',
                     fontSize: 24,
                     fontWeight: .w700,
                     color: colors.brightness == .dark
@@ -176,7 +175,6 @@ TextStyle _textStyle(BuildContext context, double size) {
   final theme = Theme.of(context);
   return theme.textTheme.bodySmall!.copyWith(
     color: theme.colorScheme.onSurfaceVariant,
-    fontFamily: 'Inter',
     fontSize: size,
     height: 1.25,
     letterSpacing: 0,

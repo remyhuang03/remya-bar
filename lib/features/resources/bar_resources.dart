@@ -218,7 +218,6 @@ TextStyle _valueStyle(BuildContext context) => Theme.of(context)
     .textTheme
     .labelMedium!
     .copyWith(
-      fontFamily: 'Inter',
       fontSize: 14,
       height: 18 / 14,
       fontWeight: .w500,
@@ -286,7 +285,6 @@ class _PillSegment extends StatelessWidget {
                   Text(
                     caption,
                     style: theme.textTheme.labelSmall!.copyWith(
-                      fontFamily: 'Inter',
                       fontSize: 10,
                       height: 1.2,
                       letterSpacing: .4,
