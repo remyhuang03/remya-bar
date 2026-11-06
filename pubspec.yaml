@@ -26,3 +26,4 @@ flutter:
     - assets/licenses/rust-dependencies.txt
     - assets/icons/media-artwork.png
     - assets/icons/media-live-dot.png
+    - assets/icons/battery-card-status.png

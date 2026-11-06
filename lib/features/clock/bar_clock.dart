@@ -2,8 +2,12 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
+import 'clock_capsule.dart';
+
 class BarClock extends StatefulWidget {
-  const BarClock({super.key});
+  const BarClock({super.key, this.showSeconds = true});
+
+  final bool showSeconds;
 
   @override
   State<BarClock> createState() => _BarClockState();
@@ -37,12 +41,6 @@ class _BarClockState extends State<BarClock> {
   }
 
   @override
-  Widget build(BuildContext context) => Text(
-    _now.toIso8601String().substring(0, 19).replaceFirst('T', '  '),
-    maxLines: 1,
-    overflow: .ellipsis,
-    textAlign: .center,
-    style: Theme.of(context).textTheme.labelLarge
-        ?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
-  );
+  Widget build(BuildContext context) =>
+      ClockCapsule(time: _now, showSeconds: widget.showSeconds);
 }

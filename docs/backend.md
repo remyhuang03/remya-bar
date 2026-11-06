@@ -147,3 +147,17 @@ The hover card sends transport and seek commands to that player. Rust checks
 capabilities and validates the unique owner and track ID before seeking.
 The output slider reads the default device via Settings' public Sound API
 and writes the named device through `sound.output-volume`.
+
+## Clock and battery
+
+The clock capsule shows local time and the date. Bar reads
+`remya-bar.clock-seconds` from the public Settings service and follows its
+change notifications, with periodic reconciliation and a default of showing
+seconds.
+
+The battery card reads charge, estimated time, draw, health and cycle count
+from the system battery when those fields are available. It reads and changes
+the power profile and automatic Energy Saver through the public Settings Power
+API. Settings owns the threshold and restores the last nonzero threshold when
+automatic Energy Saver is enabled. Settings continues to validate and apply
+power writes, and the card displays the returned state.

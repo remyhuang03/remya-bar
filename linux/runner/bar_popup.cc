@@ -48,6 +48,11 @@ const char* kind_of(FlValue* content) {
       ? fl_value_get_string(kind) : "";
 }
 
+bool is_interactive(FlValue* content) {
+  const char* kind = kind_of(content);
+  return g_strcmp0(kind, "media") == 0 || g_strcmp0(kind, "battery") == 0;
+}
+
 void send_content(BarPopup* state) {
   if (state->ready && state->visible && state->content != nullptr) {
     fl_method_channel_invoke_method(state->channel, "content", state->content,
@@ -72,13 +77,13 @@ void popup_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
     state->ready = true;
     fl_method_call_respond_success(call, nullptr, nullptr);
     send_content(state);
-  } else if (g_strcmp0(kind_of(state->content), "media") == 0 &&
+  } else if (is_interactive(state->content) &&
              (g_strcmp0(method, "enter") == 0 || g_strcmp0(method, "leave") == 0)) {
     if (g_strcmp0(method, "enter") == 0) state->cancel_hide();
     else schedule_hide(state);
     fl_method_call_respond_success(call, nullptr, nullptr);
   } else if (g_strcmp0(method, "action") == 0 && state->visible &&
-             g_strcmp0(kind_of(state->content), "media") == 0) {
+             is_interactive(state->content)) {
     FlValue* args = fl_method_call_get_args(call);
     fl_method_channel_invoke_method(state->owner_channel, "action", args, nullptr,
         [](GObject* channel, GAsyncResult* result, gpointer data) {

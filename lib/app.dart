@@ -11,6 +11,9 @@ import 'features/hyprland/hyprland_backend.dart';
 import 'features/popups/bar_popup.dart';
 import 'features/settings/settings_button.dart';
 import 'widgets/bar_tooltip.dart';
+import 'widgets/bar_hover_card.dart';
+
+Future<void> _openPowerSettings() => openRemyaSettings(page: 'power');
 
 class RemyaBarApp extends StatefulWidget {
   const RemyaBarApp({
@@ -19,12 +22,14 @@ class RemyaBarApp extends StatefulWidget {
     this.hyprland,
     this.system,
     this.onOpenSettings = openRemyaSettings,
+    this.onOpenPowerSettings = _openPowerSettings,
   });
 
   final SettingsThemeController preferences;
   final HyprlandBackend? hyprland;
   final SystemBackend? system;
   final Future<void> Function() onOpenSettings;
+  final Future<void> Function() onOpenPowerSettings;
 
   @override
   State<RemyaBarApp> createState() => _RemyaBarAppState();
@@ -68,8 +73,15 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       } else {
         await system.mediaAction(player, action.substring(6));
       }
+    } else if (action == 'battery.settings') {
+      await widget.onOpenPowerSettings();
+      await BarPopup.hide(kind: 'battery');
+    } else if (action == 'battery.profile' || action == 'battery.autoSaver') {
+      final system = widget.system;
+      if (system == null) throw StateError('Power controls unavailable');
+      await system.setBatteryPower(action as String, args['value']);
     } else {
-      throw const FormatException('Invalid media action');
+      throw const FormatException('Invalid popup action');
     }
   }
 
@@ -133,7 +145,9 @@ class _BarContent extends StatelessWidget {
             Positioned.fill(
               left: error == null ? 40 : 60,
               right: error == null ? 40 : 60,
-              child: const Center(child: BarClock()),
+              child: Center(
+                child: BarClock(showSeconds: system?.showClockSeconds ?? true),
+              ),
             ),
           if (system case final backend?
               when constraints.maxWidth >= 720 && backend.players.isNotEmpty)
@@ -162,10 +176,7 @@ class _BarContent extends StatelessWidget {
                     system?.battery?.percent != null)
                   Padding(
                     padding: const .only(right: 4),
-                    child: BarBattery(
-                      battery: system?.battery,
-                      isPowerSaver: system?.isPowerSaver,
-                    ),
+                    child: _BatteryWithCard(system: system!),
                   ),
                 SettingsButton(onOpen: onOpenSettings),
               ],
@@ -175,4 +186,30 @@ class _BarContent extends StatelessWidget {
       );
     },
   );
+}
+
+class _BatteryWithCard extends StatelessWidget {
+  const _BatteryWithCard({required this.system});
+
+  final SystemBackend system;
+
+  @override
+  Widget build(BuildContext context) {
+    final battery = system.battery;
+    return BarHoverCard(
+      kind: 'battery',
+      size: const Size(420, 506),
+      data: {
+        'present': battery != null,
+        'percent': battery?.percent,
+        'status': battery?.state,
+        'secondsRemaining': battery?.remainingSeconds,
+        'powerWatts': battery?.powerWatts,
+        'healthPercent': battery?.healthPercent,
+        'cycleCount': battery?.cycleCount,
+        'power': system.batteryPower,
+      },
+      child: BarBattery(battery: battery, isPowerSaver: system.isPowerSaver),
+    );
+  }
 }

@@ -7,7 +7,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `percentage`, `read_number`
+// These functions are ignored because they are not marked as `pub`: `percentage`, `read_number`, `remaining_seconds`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `fmt`, `fmt`
 
 Future<List<BatterySnapshot>> batteries() =>
@@ -36,15 +36,30 @@ class BatterySnapshot {
   final String name;
   final double? percent;
   final String state;
+  final double? remainingSeconds;
+  final double? powerWatts;
+  final double? healthPercent;
+  final int? cycleCount;
 
   const BatterySnapshot({
     required this.name,
     this.percent,
     required this.state,
+    this.remainingSeconds,
+    this.powerWatts,
+    this.healthPercent,
+    this.cycleCount,
   });
 
   @override
-  int get hashCode => name.hashCode ^ percent.hashCode ^ state.hashCode;
+  int get hashCode =>
+      name.hashCode ^
+      percent.hashCode ^
+      state.hashCode ^
+      remainingSeconds.hashCode ^
+      powerWatts.hashCode ^
+      healthPercent.hashCode ^
+      cycleCount.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -53,7 +68,11 @@ class BatterySnapshot {
           runtimeType == other.runtimeType &&
           name == other.name &&
           percent == other.percent &&
-          state == other.state;
+          state == other.state &&
+          remainingSeconds == other.remainingSeconds &&
+          powerWatts == other.powerWatts &&
+          healthPercent == other.healthPercent &&
+          cycleCount == other.cycleCount;
 }
 
 class MediaPlayerSnapshot {

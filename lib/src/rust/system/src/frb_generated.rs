@@ -207,10 +207,18 @@ impl SseDecode for crate::api::BatterySnapshot {
         let mut var_name = <String>::sse_decode(deserializer);
         let mut var_percent = <Option<f64>>::sse_decode(deserializer);
         let mut var_state = <String>::sse_decode(deserializer);
+        let mut var_remainingSeconds = <Option<f64>>::sse_decode(deserializer);
+        let mut var_powerWatts = <Option<f64>>::sse_decode(deserializer);
+        let mut var_healthPercent = <Option<f64>>::sse_decode(deserializer);
+        let mut var_cycleCount = <Option<i32>>::sse_decode(deserializer);
         return crate::api::BatterySnapshot {
             name: var_name,
             percent: var_percent,
             state: var_state,
+            remaining_seconds: var_remainingSeconds,
+            power_watts: var_powerWatts,
+            health_percent: var_healthPercent,
+            cycle_count: var_cycleCount,
         };
     }
 }
@@ -226,6 +234,13 @@ impl SseDecode for f64 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_f64::<NativeEndian>().unwrap()
+    }
+}
+
+impl SseDecode for i32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_i32::<NativeEndian>().unwrap()
     }
 }
 
@@ -325,6 +340,17 @@ impl SseDecode for Option<f64> {
     }
 }
 
+impl SseDecode for Option<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<i32>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for u8 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -335,13 +361,6 @@ impl SseDecode for u8 {
 impl SseDecode for () {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {}
-}
-
-impl SseDecode for i32 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        deserializer.cursor.read_i32::<NativeEndian>().unwrap()
-    }
 }
 
 fn pde_ffi_dispatcher_primary_impl(
@@ -382,6 +401,10 @@ impl flutter_rust_bridge::IntoDart for crate::api::BatterySnapshot {
             self.name.into_into_dart().into_dart(),
             self.percent.into_into_dart().into_dart(),
             self.state.into_into_dart().into_dart(),
+            self.remaining_seconds.into_into_dart().into_dart(),
+            self.power_watts.into_into_dart().into_dart(),
+            self.health_percent.into_into_dart().into_dart(),
+            self.cycle_count.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -442,6 +465,10 @@ impl SseEncode for crate::api::BatterySnapshot {
         <String>::sse_encode(self.name, serializer);
         <Option<f64>>::sse_encode(self.percent, serializer);
         <String>::sse_encode(self.state, serializer);
+        <Option<f64>>::sse_encode(self.remaining_seconds, serializer);
+        <Option<f64>>::sse_encode(self.power_watts, serializer);
+        <Option<f64>>::sse_encode(self.health_percent, serializer);
+        <Option<i32>>::sse_encode(self.cycle_count, serializer);
     }
 }
 
@@ -456,6 +483,13 @@ impl SseEncode for f64 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_f64::<NativeEndian>(self).unwrap();
+    }
+}
+
+impl SseEncode for i32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_i32::<NativeEndian>(self).unwrap();
     }
 }
 
@@ -530,6 +564,16 @@ impl SseEncode for Option<f64> {
     }
 }
 
+impl SseEncode for Option<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <i32>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for u8 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -540,13 +584,6 @@ impl SseEncode for u8 {
 impl SseEncode for () {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {}
-}
-
-impl SseEncode for i32 {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        serializer.cursor.write_i32::<NativeEndian>(self).unwrap();
-    }
 }
 
 #[cfg(not(target_family = "wasm"))]

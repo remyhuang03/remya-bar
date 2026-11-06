@@ -42,18 +42,19 @@ Future<void> main(List<String> arguments) async {
       'Rust backend dependencies',
     ], await rootBundle.loadString('assets/licenses/rust-dependencies.txt'));
   });
+  final debugSettings = root == null
+      ? null
+      : File(
+          '${Directory(root).parent.path}/remya_settings/build/linux/x64/debug/bundle/remya_settings',
+        );
   runApp(
     RemyaBarApp(
       preferences: preferences,
       hyprland: hyprland,
       system: system,
-      onOpenSettings: () => openRemyaSettings(
-        debugExecutable: root == null
-            ? null
-            : File(
-                '${Directory(root).parent.path}/remya_settings/build/linux/x64/debug/bundle/remya_settings',
-              ),
-      ),
+      onOpenSettings: () => openRemyaSettings(debugExecutable: debugSettings),
+      onOpenPowerSettings: () =>
+          openRemyaSettings(debugExecutable: debugSettings, page: 'power'),
     ),
   );
 }

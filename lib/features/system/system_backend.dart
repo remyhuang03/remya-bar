@@ -24,6 +24,12 @@ class SystemBackend extends ChangeNotifier {
   Map<String, Object?> mediaOutput = const {};
   List<api.MediaPlayerSnapshot> players = const [];
   bool _refreshingMedia = false;
+  StreamSubscription<SettingsChange>? _settingsChanges;
+  bool _writingPower = false;
+  int _powerRevision = 0;
+  bool _refreshingClock = false;
+  bool showClockSeconds = true;
+  Map<String, Object?> batteryPower = const {};
   bool isPowerSaver = false;
   api.BatterySnapshot? battery;
 
@@ -35,10 +41,21 @@ class SystemBackend extends ChangeNotifier {
 
   void start() {
     if (_disposed || _timer != null) return;
+    _settingsChanges = _settings.changes.listen((change) {
+      switch (change.topic) {
+        case barClockSecondsSettingId:
+          unawaited(_refreshClockPreference());
+        case 'power':
+          unawaited(_refreshPower());
+        case 'sound':
+          unawaited(_refreshSound(force: true));
+      }
+    }, onError: (Object error) => debugPrint('Settings changes: $error'));
     void refresh() {
       unawaited(_refresh());
       unawaited(_refreshMedia());
       unawaited(_refreshPower());
+      unawaited(_refreshClockPreference());
     }
 
     refresh();
@@ -61,23 +78,88 @@ class SystemBackend extends ChangeNotifier {
     }
   }
 
-  Future<void> _refreshPower() async {
-    if (_disposed || _refreshingPower) return;
-    _refreshingPower = true;
+  Future<void> _refreshClockPreference() async {
+    if (_disposed || _refreshingClock) return;
+    _refreshingClock = true;
     try {
-      final power = await _settings.readPower();
-      final system = power['system'];
-      if (_disposed || power['available'] != true || system is! Map) return;
-      final profile = system['profile'];
-      if (profile is! String) return;
-      final next = profile == 'power-saver';
-      if (next == isPowerSaver) return;
-      isPowerSaver = next;
+      final next = await _settings.readBarClockSeconds();
+      if (_disposed || next == showClockSeconds) return;
+      showClockSeconds = next;
       notifyListeners();
     } catch (failure) {
+      if (!_disposed) debugPrint('Settings clock: $failure');
+    } finally {
+      _refreshingClock = false;
+    }
+  }
+
+  Future<void> _refreshPower() async {
+    if (_disposed || _refreshingPower || _writingPower) return;
+    _refreshingPower = true;
+    final revision = _powerRevision;
+    try {
+      final power = await _settings.readPower();
+      if (revision == _powerRevision) _applyPower(power);
+    } catch (failure) {
+      if (revision == _powerRevision) _applyPower(const {});
       if (!_disposed) debugPrint('Settings power: $failure');
     } finally {
       _refreshingPower = false;
+    }
+  }
+
+  void _applyPower(Map<String, Object?> power) {
+    if (_disposed) return;
+    final system = power['system'];
+    final saved = power['saved'];
+    final profile = system is Map ? system['profile'] : null;
+    final rawProfiles = system is Map ? system['profiles'] : null;
+    final profiles = rawProfiles is List
+        ? rawProfiles.whereType<String>().toList()
+        : const <String>[];
+    final previousProfiles = batteryPower['profiles'] as List<String>?;
+    final battery = system is Map ? system['battery'] : null;
+    final next = <String, Object?>{
+      'available': power['available'] == true,
+      'conflict': power['conflict'] == true,
+      'profile': profile,
+      'profiles': listEquals(profiles, previousProfiles)
+          ? previousProfiles
+          : profiles,
+      'onBattery': battery is Map ? battery['on_battery'] : null,
+      'threshold': saved is Map ? saved['threshold'] : null,
+    };
+    if (mapEquals(next, batteryPower)) return;
+    batteryPower = next;
+    if (power['available'] == true && profile is String) {
+      isPowerSaver = profile == 'power-saver';
+    }
+    notifyListeners();
+  }
+
+  Future<void> setBatteryPower(String action, Object? value) async {
+    if (_disposed || _writingPower) throw StateError('Power controls busy');
+    if (batteryPower['available'] != true || batteryPower['conflict'] == true) {
+      throw StateError('Power controls unavailable');
+    }
+    final profiles = batteryPower['profiles'] as List<String>;
+    final (setting, requested) = switch (action) {
+      'battery.profile' when value is String && profiles.contains(value) => (
+        'power.5a4f0131',
+        value,
+      ),
+      'battery.autoSaver' when value is bool => (
+        energySaverOnThresholdId,
+        value,
+      ),
+      _ => throw const FormatException('Invalid battery power action'),
+    };
+    _writingPower = true;
+    _powerRevision++;
+    try {
+      _applyPower(await _settings.setPower(setting, requested));
+    } finally {
+      _writingPower = false;
     }
   }
 
@@ -201,6 +283,7 @@ class SystemBackend extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    unawaited(_settingsChanges?.cancel());
     unawaited(_settings.close());
     super.dispose();
   }

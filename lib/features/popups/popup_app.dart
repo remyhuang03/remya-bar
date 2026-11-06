@@ -4,6 +4,8 @@ import 'package:remya_settings_client/remya_settings_client.dart';
 
 import '../../bar_theme.dart';
 import '../media/media_preview.dart';
+import '../battery/battery_card.dart';
+import 'bar_card_surface.dart';
 import 'bar_popup.dart';
 
 class BarPopupApp extends StatefulWidget {
@@ -17,16 +19,22 @@ class _BarPopupAppState extends State<BarPopupApp> {
   final _navigator = GlobalKey<NavigatorState>();
   Map<Object?, Object?>? _content;
   String? _actionError;
+  bool _batteryActionPending = false;
 
   Future<void> _action(Map<String, Object?> action) async {
+    final battery = _content?['kind'] == 'battery';
+    if (battery && _batteryActionPending) return;
+    if (battery) setState(() => _batteryActionPending = true);
     try {
       await BarPopup.action(action);
       if (mounted) setState(() => _actionError = null);
     } catch (error) {
-      debugPrint('Media action: $error');
+      debugPrint('Popup action: $error');
       if (mounted) {
         setState(() => _actionError = 'Action failed. Please try again.');
       }
+    } finally {
+      if (battery && mounted) setState(() => _batteryActionPending = false);
     }
   }
 
@@ -68,16 +76,17 @@ class _BarPopupAppState extends State<BarPopupApp> {
             seedColor: seed,
           );
     final data = content['data'] as Map;
+    final kind = content['kind'] as String;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigator,
-      builder: (context, child) => content['kind'] != 'media'
+      builder: (context, child) => kind == 'tooltip'
           ? child!
           : MouseRegion(
-              onEnter: (_) => BarPopup.enter(kind: 'media'),
+              onEnter: (_) => BarPopup.enter(kind: kind),
               onExit: (_) {
                 _navigator.currentState?.popUntil((route) => route.isFirst);
-                BarPopup.leave(kind: 'media');
+                BarPopup.leave(kind: kind);
               },
               child: MediaQuery(
                 data: MediaQuery.of(context).copyWith(
@@ -94,6 +103,16 @@ class _BarPopupAppState extends State<BarPopupApp> {
           data: {...Map<String, Object?>.from(data), 'error': ?_actionError},
           onAction: _action,
           styleVariant: theme.styleVariant,
+        ),
+        'battery' => BarCardSurface(
+          child: BatteryCard(
+            data: {
+              ...Map<String, Object?>.from(data),
+              'error': ?_actionError,
+              'pending': _batteryActionPending,
+            },
+            onAction: _action,
+          ),
         ),
         'tooltip' => _TooltipContent(
           message: data['message'] as String,

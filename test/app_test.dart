@@ -56,16 +56,19 @@ void main() {
     );
     final clock = find.descendant(
       of: find.byType(BarClock),
-      matching: find.byType(Text),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Text && widget.textSpan != null,
+      ),
     );
-    final before = tester.widget<Text>(clock).data!;
-    expect(before, matches(RegExp(r'^\d{4}-\d{2}-\d{2}  \d{2}:\d{2}:\d{2}$')));
-    expect(tester.getCenter(clock), const Offset(960, 20));
+    String time() => tester.widget<Text>(clock).textSpan!.toPlainText();
+    final before = time();
+    expect(before, matches(RegExp(r'^\d{2}:\d{2}:\d{2}$')));
+    expect(tester.getCenter(find.byType(BarClock)), const Offset(960, 20));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 1100)),
     );
     await tester.pump(const Duration(seconds: 2));
-    expect(tester.widget<Text>(clock).data, isNot(before));
+    expect(time(), isNot(before));
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 2));
     expect(tester.takeException(), isNull);

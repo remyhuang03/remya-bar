@@ -244,12 +244,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   BatterySnapshot dco_decode_battery_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return BatterySnapshot(
       name: dco_decode_String(arr[0]),
       percent: dco_decode_opt_box_autoadd_f_64(arr[1]),
       state: dco_decode_String(arr[2]),
+      remainingSeconds: dco_decode_opt_box_autoadd_f_64(arr[3]),
+      powerWatts: dco_decode_opt_box_autoadd_f_64(arr[4]),
+      healthPercent: dco_decode_opt_box_autoadd_f_64(arr[5]),
+      cycleCount: dco_decode_opt_box_autoadd_i_32(arr[6]),
     );
   }
 
@@ -266,9 +270,21 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  int dco_decode_box_autoadd_i_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
   double dco_decode_f_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as double;
+  }
+
+  @protected
+  int dco_decode_i_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
   }
 
   @protected
@@ -329,6 +345,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  int? dco_decode_opt_box_autoadd_i_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_i_32(raw);
+  }
+
+  @protected
   int dco_decode_u_8(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -353,10 +375,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     var var_name = sse_decode_String(deserializer);
     var var_percent = sse_decode_opt_box_autoadd_f_64(deserializer);
     var var_state = sse_decode_String(deserializer);
+    var var_remainingSeconds = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_powerWatts = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_healthPercent = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_cycleCount = sse_decode_opt_box_autoadd_i_32(deserializer);
     return BatterySnapshot(
       name: var_name,
       percent: var_percent,
       state: var_state,
+      remainingSeconds: var_remainingSeconds,
+      powerWatts: var_powerWatts,
+      healthPercent: var_healthPercent,
+      cycleCount: var_cycleCount,
     );
   }
 
@@ -373,9 +403,21 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  int sse_decode_box_autoadd_i_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_i_32(deserializer));
+  }
+
+  @protected
   double sse_decode_f_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getFloat64();
+  }
+
+  @protected
+  int sse_decode_i_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getInt32();
   }
 
   @protected
@@ -475,6 +517,17 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_i_32(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   int sse_decode_u_8(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8();
@@ -483,12 +536,6 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   @protected
   void sse_decode_unit(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-  }
-
-  @protected
-  int sse_decode_i_32(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getInt32();
   }
 
   @protected
@@ -506,6 +553,10 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_String(self.name, serializer);
     sse_encode_opt_box_autoadd_f_64(self.percent, serializer);
     sse_encode_String(self.state, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.remainingSeconds, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.powerWatts, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.healthPercent, serializer);
+    sse_encode_opt_box_autoadd_i_32(self.cycleCount, serializer);
   }
 
   @protected
@@ -521,9 +572,21 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self, serializer);
+  }
+
+  @protected
   void sse_encode_f_64(double self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putFloat64(self);
+  }
+
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putInt32(self);
   }
 
   @protected
@@ -604,6 +667,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_i_32(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_u_8(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self);
@@ -612,11 +685,5 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   @protected
   void sse_encode_unit(void self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-  }
-
-  @protected
-  void sse_encode_i_32(int self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putInt32(self);
   }
 }
