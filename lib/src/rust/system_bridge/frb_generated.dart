@@ -73,7 +73,7 @@ class SystemRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -683611409;
+  int get rustContentHash => -789352983;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -99,6 +99,10 @@ abstract class SystemRustLibApi extends BaseApi {
     required String track,
     required double seconds,
   });
+
+  Future<ResourceDetails> crateApiResourceDetailsDefault();
+
+  Future<SystemSnapshot> crateApiResourceSnapshot();
 
   Future<void> crateApiTrayAction({
     required String id,
@@ -254,6 +258,60 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   );
 
   @override
+  Future<ResourceDetails> crateApiResourceDetailsDefault() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 5,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_resource_details,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiResourceDetailsDefaultConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiResourceDetailsDefaultConstMeta =>
+      const TaskConstMeta(debugName: "resource_details_default", argNames: []);
+
+  @override
+  Future<SystemSnapshot> crateApiResourceSnapshot() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 6,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_system_snapshot,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiResourceSnapshotConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiResourceSnapshotConstMeta =>
+      const TaskConstMeta(debugName: "resource_snapshot", argNames: []);
+
+  @override
   Future<void> crateApiTrayAction({
     required String id,
     required String action,
@@ -269,7 +327,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 7,
             port: port_,
           );
         },
@@ -298,7 +356,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 8,
             port: port_,
           );
         },
@@ -330,7 +388,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 9,
             port: port_,
           );
         },
@@ -364,7 +422,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 10,
             port: port_,
           );
         },
@@ -426,9 +484,43 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  NetworkOverview dco_decode_box_autoadd_network_overview(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_network_overview(raw);
+  }
+
+  @protected
+  ResourceDetails dco_decode_box_autoadd_resource_details(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_resource_details(raw);
+  }
+
+  @protected
+  int dco_decode_box_autoadd_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
   double dco_decode_f_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as double;
+  }
+
+  @protected
+  GpuSnapshot dco_decode_gpu_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return GpuSnapshot(
+      id: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      utilizationPercent: dco_decode_opt_box_autoadd_f_64(arr[2]),
+      memoryUsedBytes: dco_decode_opt_box_autoadd_f_64(arr[3]),
+      memoryTotalBytes: dco_decode_opt_box_autoadd_f_64(arr[4]),
+      temperatureCelsius: dco_decode_opt_box_autoadd_f_64(arr[5]),
+    );
   }
 
   @protected
@@ -444,11 +536,23 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  List<GpuSnapshot> dco_decode_list_gpu_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_gpu_snapshot).toList();
+  }
+
+  @protected
   List<MediaPlayerSnapshot> dco_decode_list_media_player_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>)
         .map(dco_decode_media_player_snapshot)
         .toList();
+  }
+
+  @protected
+  List<double?> dco_decode_list_opt_box_autoadd_f_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_opt_box_autoadd_f_64).toList();
   }
 
   @protected
@@ -495,6 +599,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  NetworkOverview dco_decode_network_overview(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return NetworkOverview(
+      downloadBytesPerSecond: dco_decode_opt_box_autoadd_f_64(arr[0]),
+      uploadBytesPerSecond: dco_decode_opt_box_autoadd_f_64(arr[1]),
+    );
+  }
+
+  @protected
   String? dco_decode_opt_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_String(raw);
@@ -510,6 +626,66 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_i_32(raw);
+  }
+
+  @protected
+  NetworkOverview? dco_decode_opt_box_autoadd_network_overview(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_network_overview(raw);
+  }
+
+  @protected
+  ResourceDetails? dco_decode_opt_box_autoadd_resource_details(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_resource_details(raw);
+  }
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_u_32(raw);
+  }
+
+  @protected
+  ResourceDetails dco_decode_resource_details(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 14)
+      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
+    return ResourceDetails(
+      cpuCores: dco_decode_opt_box_autoadd_u_32(arr[0]),
+      cpuFrequencyGhz: dco_decode_opt_box_autoadd_f_64(arr[1]),
+      cpuTemperatureCelsius: dco_decode_opt_box_autoadd_f_64(arr[2]),
+      gpuId: dco_decode_opt_String(arr[3]),
+      memoryCachedBytes: dco_decode_opt_box_autoadd_f_64(arr[4]),
+      memoryFreeBytes: dco_decode_opt_box_autoadd_f_64(arr[5]),
+      networkLabel: dco_decode_String(arr[6]),
+      networkTodayDownloadBytes: dco_decode_opt_box_autoadd_f_64(arr[7]),
+      networkTodayUploadBytes: dco_decode_opt_box_autoadd_f_64(arr[8]),
+      networkTodayPartial: dco_decode_bool(arr[9]),
+      cpuHistory: dco_decode_list_opt_box_autoadd_f_64(arr[10]),
+      gpuHistory: dco_decode_list_opt_box_autoadd_f_64(arr[11]),
+      downloadHistory: dco_decode_list_opt_box_autoadd_f_64(arr[12]),
+      uploadHistory: dco_decode_list_opt_box_autoadd_f_64(arr[13]),
+    );
+  }
+
+  @protected
+  SystemSnapshot dco_decode_system_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return SystemSnapshot(
+      cpuPercent: dco_decode_opt_box_autoadd_f_64(arr[0]),
+      memoryUsedBytes: dco_decode_opt_box_autoadd_f_64(arr[1]),
+      memoryTotalBytes: dco_decode_opt_box_autoadd_f_64(arr[2]),
+      swapUsedBytes: dco_decode_opt_box_autoadd_f_64(arr[3]),
+      swapTotalBytes: dco_decode_opt_box_autoadd_f_64(arr[4]),
+      gpus: dco_decode_list_gpu_snapshot(arr[5]),
+      networkOverview: dco_decode_opt_box_autoadd_network_overview(arr[6]),
+      resources: dco_decode_opt_box_autoadd_resource_details(arr[7]),
+    );
   }
 
   @protected
@@ -617,9 +793,50 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  NetworkOverview sse_decode_box_autoadd_network_overview(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_network_overview(deserializer));
+  }
+
+  @protected
+  ResourceDetails sse_decode_box_autoadd_resource_details(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_resource_details(deserializer));
+  }
+
+  @protected
+  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_u_32(deserializer));
+  }
+
+  @protected
   double sse_decode_f_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getFloat64();
+  }
+
+  @protected
+  GpuSnapshot sse_decode_gpu_snapshot(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_utilizationPercent = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_memoryUsedBytes = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_memoryTotalBytes = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_temperatureCelsius = sse_decode_opt_box_autoadd_f_64(deserializer);
+    return GpuSnapshot(
+      id: var_id,
+      name: var_name,
+      utilizationPercent: var_utilizationPercent,
+      memoryUsedBytes: var_memoryUsedBytes,
+      memoryTotalBytes: var_memoryTotalBytes,
+      temperatureCelsius: var_temperatureCelsius,
+    );
   }
 
   @protected
@@ -643,6 +860,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  List<GpuSnapshot> sse_decode_list_gpu_snapshot(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <GpuSnapshot>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_gpu_snapshot(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<MediaPlayerSnapshot> sse_decode_list_media_player_snapshot(
     SseDeserializer deserializer,
   ) {
@@ -652,6 +881,20 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     var ans_ = <MediaPlayerSnapshot>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_media_player_snapshot(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<double?> sse_decode_list_opt_box_autoadd_f_64(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <double?>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_opt_box_autoadd_f_64(deserializer));
     }
     return ans_;
   }
@@ -729,6 +972,21 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  NetworkOverview sse_decode_network_overview(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_downloadBytesPerSecond = sse_decode_opt_box_autoadd_f_64(
+      deserializer,
+    );
+    var var_uploadBytesPerSecond = sse_decode_opt_box_autoadd_f_64(
+      deserializer,
+    );
+    return NetworkOverview(
+      downloadBytesPerSecond: var_downloadBytesPerSecond,
+      uploadBytesPerSecond: var_uploadBytesPerSecond,
+    );
+  }
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -759,6 +1017,113 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     } else {
       return null;
     }
+  }
+
+  @protected
+  NetworkOverview? sse_decode_opt_box_autoadd_network_overview(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_network_overview(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ResourceDetails? sse_decode_opt_box_autoadd_resource_details(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_resource_details(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_u_32(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ResourceDetails sse_decode_resource_details(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_cpuCores = sse_decode_opt_box_autoadd_u_32(deserializer);
+    var var_cpuFrequencyGhz = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_cpuTemperatureCelsius = sse_decode_opt_box_autoadd_f_64(
+      deserializer,
+    );
+    var var_gpuId = sse_decode_opt_String(deserializer);
+    var var_memoryCachedBytes = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_memoryFreeBytes = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_networkLabel = sse_decode_String(deserializer);
+    var var_networkTodayDownloadBytes = sse_decode_opt_box_autoadd_f_64(
+      deserializer,
+    );
+    var var_networkTodayUploadBytes = sse_decode_opt_box_autoadd_f_64(
+      deserializer,
+    );
+    var var_networkTodayPartial = sse_decode_bool(deserializer);
+    var var_cpuHistory = sse_decode_list_opt_box_autoadd_f_64(deserializer);
+    var var_gpuHistory = sse_decode_list_opt_box_autoadd_f_64(deserializer);
+    var var_downloadHistory = sse_decode_list_opt_box_autoadd_f_64(
+      deserializer,
+    );
+    var var_uploadHistory = sse_decode_list_opt_box_autoadd_f_64(deserializer);
+    return ResourceDetails(
+      cpuCores: var_cpuCores,
+      cpuFrequencyGhz: var_cpuFrequencyGhz,
+      cpuTemperatureCelsius: var_cpuTemperatureCelsius,
+      gpuId: var_gpuId,
+      memoryCachedBytes: var_memoryCachedBytes,
+      memoryFreeBytes: var_memoryFreeBytes,
+      networkLabel: var_networkLabel,
+      networkTodayDownloadBytes: var_networkTodayDownloadBytes,
+      networkTodayUploadBytes: var_networkTodayUploadBytes,
+      networkTodayPartial: var_networkTodayPartial,
+      cpuHistory: var_cpuHistory,
+      gpuHistory: var_gpuHistory,
+      downloadHistory: var_downloadHistory,
+      uploadHistory: var_uploadHistory,
+    );
+  }
+
+  @protected
+  SystemSnapshot sse_decode_system_snapshot(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_cpuPercent = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_memoryUsedBytes = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_memoryTotalBytes = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_swapUsedBytes = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_swapTotalBytes = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_gpus = sse_decode_list_gpu_snapshot(deserializer);
+    var var_networkOverview = sse_decode_opt_box_autoadd_network_overview(
+      deserializer,
+    );
+    var var_resources = sse_decode_opt_box_autoadd_resource_details(
+      deserializer,
+    );
+    return SystemSnapshot(
+      cpuPercent: var_cpuPercent,
+      memoryUsedBytes: var_memoryUsedBytes,
+      memoryTotalBytes: var_memoryTotalBytes,
+      swapUsedBytes: var_swapUsedBytes,
+      swapTotalBytes: var_swapTotalBytes,
+      gpus: var_gpus,
+      networkOverview: var_networkOverview,
+      resources: var_resources,
+    );
   }
 
   @protected
@@ -872,9 +1237,44 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_box_autoadd_network_overview(
+    NetworkOverview self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_network_overview(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_resource_details(
+    ResourceDetails self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_resource_details(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self, serializer);
+  }
+
+  @protected
   void sse_encode_f_64(double self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putFloat64(self);
+  }
+
+  @protected
+  void sse_encode_gpu_snapshot(GpuSnapshot self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.utilizationPercent, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.memoryUsedBytes, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.memoryTotalBytes, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.temperatureCelsius, serializer);
   }
 
   @protected
@@ -896,6 +1296,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_list_gpu_snapshot(
+    List<GpuSnapshot> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_gpu_snapshot(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_media_player_snapshot(
     List<MediaPlayerSnapshot> self,
     SseSerializer serializer,
@@ -904,6 +1316,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_media_player_snapshot(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_opt_box_autoadd_f_64(
+    List<double?> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_opt_box_autoadd_f_64(item, serializer);
     }
   }
 
@@ -965,6 +1389,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_network_overview(
+    NetworkOverview self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_f_64(self.downloadBytesPerSecond, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.uploadBytesPerSecond, serializer);
+  }
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -992,6 +1426,83 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     if (self != null) {
       sse_encode_box_autoadd_i_32(self, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_network_overview(
+    NetworkOverview? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_network_overview(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_resource_details(
+    ResourceDetails? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_resource_details(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_u_32(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_resource_details(
+    ResourceDetails self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_u_32(self.cpuCores, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.cpuFrequencyGhz, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.cpuTemperatureCelsius, serializer);
+    sse_encode_opt_String(self.gpuId, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.memoryCachedBytes, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.memoryFreeBytes, serializer);
+    sse_encode_String(self.networkLabel, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.networkTodayDownloadBytes, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.networkTodayUploadBytes, serializer);
+    sse_encode_bool(self.networkTodayPartial, serializer);
+    sse_encode_list_opt_box_autoadd_f_64(self.cpuHistory, serializer);
+    sse_encode_list_opt_box_autoadd_f_64(self.gpuHistory, serializer);
+    sse_encode_list_opt_box_autoadd_f_64(self.downloadHistory, serializer);
+    sse_encode_list_opt_box_autoadd_f_64(self.uploadHistory, serializer);
+  }
+
+  @protected
+  void sse_encode_system_snapshot(
+    SystemSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_f_64(self.cpuPercent, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.memoryUsedBytes, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.memoryTotalBytes, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.swapUsedBytes, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.swapTotalBytes, serializer);
+    sse_encode_list_gpu_snapshot(self.gpus, serializer);
+    sse_encode_opt_box_autoadd_network_overview(
+      self.networkOverview,
+      serializer,
+    );
+    sse_encode_opt_box_autoadd_resource_details(self.resources, serializer);
   }
 
   @protected

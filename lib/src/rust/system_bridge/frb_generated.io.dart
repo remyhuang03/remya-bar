@@ -38,7 +38,19 @@ abstract class SystemRustLibApiImplPlatform
   int dco_decode_box_autoadd_i_32(dynamic raw);
 
   @protected
+  NetworkOverview dco_decode_box_autoadd_network_overview(dynamic raw);
+
+  @protected
+  ResourceDetails dco_decode_box_autoadd_resource_details(dynamic raw);
+
+  @protected
+  int dco_decode_box_autoadd_u_32(dynamic raw);
+
+  @protected
   double dco_decode_f_64(dynamic raw);
+
+  @protected
+  GpuSnapshot dco_decode_gpu_snapshot(dynamic raw);
 
   @protected
   int dco_decode_i_32(dynamic raw);
@@ -47,7 +59,13 @@ abstract class SystemRustLibApiImplPlatform
   List<BatterySnapshot> dco_decode_list_battery_snapshot(dynamic raw);
 
   @protected
+  List<GpuSnapshot> dco_decode_list_gpu_snapshot(dynamic raw);
+
+  @protected
   List<MediaPlayerSnapshot> dco_decode_list_media_player_snapshot(dynamic raw);
+
+  @protected
+  List<double?> dco_decode_list_opt_box_autoadd_f_64(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -62,6 +80,9 @@ abstract class SystemRustLibApiImplPlatform
   MediaPlayerSnapshot dco_decode_media_player_snapshot(dynamic raw);
 
   @protected
+  NetworkOverview dco_decode_network_overview(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
@@ -69,6 +90,21 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw);
+
+  @protected
+  NetworkOverview? dco_decode_opt_box_autoadd_network_overview(dynamic raw);
+
+  @protected
+  ResourceDetails? dco_decode_opt_box_autoadd_resource_details(dynamic raw);
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
+
+  @protected
+  ResourceDetails dco_decode_resource_details(dynamic raw);
+
+  @protected
+  SystemSnapshot dco_decode_system_snapshot(dynamic raw);
 
   @protected
   TrayItem dco_decode_tray_item(dynamic raw);
@@ -101,7 +137,23 @@ abstract class SystemRustLibApiImplPlatform
   int sse_decode_box_autoadd_i_32(SseDeserializer deserializer);
 
   @protected
+  NetworkOverview sse_decode_box_autoadd_network_overview(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ResourceDetails sse_decode_box_autoadd_resource_details(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   double sse_decode_f_64(SseDeserializer deserializer);
+
+  @protected
+  GpuSnapshot sse_decode_gpu_snapshot(SseDeserializer deserializer);
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
@@ -112,7 +164,15 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  List<GpuSnapshot> sse_decode_list_gpu_snapshot(SseDeserializer deserializer);
+
+  @protected
   List<MediaPlayerSnapshot> sse_decode_list_media_player_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<double?> sse_decode_list_opt_box_autoadd_f_64(
     SseDeserializer deserializer,
   );
 
@@ -133,6 +193,9 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  NetworkOverview sse_decode_network_overview(SseDeserializer deserializer);
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
@@ -140,6 +203,25 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer);
+
+  @protected
+  NetworkOverview? sse_decode_opt_box_autoadd_network_overview(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ResourceDetails? sse_decode_opt_box_autoadd_resource_details(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
+  ResourceDetails sse_decode_resource_details(SseDeserializer deserializer);
+
+  @protected
+  SystemSnapshot sse_decode_system_snapshot(SseDeserializer deserializer);
 
   @protected
   TrayItem sse_decode_tray_item(SseDeserializer deserializer);
@@ -175,7 +257,25 @@ abstract class SystemRustLibApiImplPlatform
   void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_network_overview(
+    NetworkOverview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_resource_details(
+    ResourceDetails self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_f_64(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_gpu_snapshot(GpuSnapshot self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
@@ -187,8 +287,20 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  void sse_encode_list_gpu_snapshot(
+    List<GpuSnapshot> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_media_player_snapshot(
     List<MediaPlayerSnapshot> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_opt_box_autoadd_f_64(
+    List<double?> self,
     SseSerializer serializer,
   );
 
@@ -214,6 +326,12 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  void sse_encode_network_overview(
+    NetworkOverview self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
@@ -221,6 +339,33 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_network_overview(
+    NetworkOverview? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_resource_details(
+    ResourceDetails? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_resource_details(
+    ResourceDetails self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_system_snapshot(
+    SystemSnapshot self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_tray_item(TrayItem self, SseSerializer serializer);

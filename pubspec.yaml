@@ -11,6 +11,8 @@ dependencies:
     sdk: flutter
   material_ui: ^1.5.0
   flutter_rust_bridge: 2.13.0
+  flutter_svg: ^2.3.0
+  material_color_utilities: ^0.13.0
   remya_settings_client:
     path: ../remya_settings/packages/remya_settings_client
 
@@ -27,3 +29,4 @@ flutter:
     - assets/icons/media-artwork.png
     - assets/icons/media-live-dot.png
     - assets/icons/battery-card-status.png
+    - assets/icons/resources/

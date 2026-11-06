@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 use std::{fs, path::Path};
 
 #[derive(Clone, Debug)]
@@ -192,4 +194,88 @@ pub async fn tray_menu(id: String, parent: i32) -> Result<Vec<TrayMenuEntry>, St
 }
 pub async fn tray_menu_action(id: String, parent: i32, entry: i32) -> Result<(), String> {
     crate::tray::menu_action(&id, parent, entry).await
+}
+
+#[derive(Clone, Debug)]
+pub struct SystemSnapshot {
+    pub cpu_percent: Option<f64>,
+    pub memory_used_bytes: Option<f64>,
+    pub memory_total_bytes: Option<f64>,
+    pub swap_used_bytes: Option<f64>,
+    pub swap_total_bytes: Option<f64>,
+    pub gpus: Vec<GpuSnapshot>,
+    pub network_overview: Option<NetworkOverview>,
+    pub resources: Option<ResourceDetails>,
+}
+
+#[derive(Clone, Debug)]
+pub struct GpuSnapshot {
+    pub id: String,
+    pub name: String,
+    pub utilization_percent: Option<f64>,
+    pub memory_used_bytes: Option<f64>,
+    pub memory_total_bytes: Option<f64>,
+    pub temperature_celsius: Option<f64>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct ResourceDetails {
+    pub cpu_cores: Option<u32>,
+    pub cpu_frequency_ghz: Option<f64>,
+    pub cpu_temperature_celsius: Option<f64>,
+    pub gpu_id: Option<String>,
+    pub memory_cached_bytes: Option<f64>,
+    pub memory_free_bytes: Option<f64>,
+    pub network_label: String,
+    pub network_today_download_bytes: Option<f64>,
+    pub network_today_upload_bytes: Option<f64>,
+    pub network_today_partial: bool,
+    pub cpu_history: Vec<Option<f64>>,
+    pub gpu_history: Vec<Option<f64>>,
+    pub download_history: Vec<Option<f64>>,
+    pub upload_history: Vec<Option<f64>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct NetworkOverview {
+    pub download_bytes_per_second: Option<f64>,
+    pub upload_bytes_per_second: Option<f64>,
+}
+
+/// All output engines share one sample and one set of CPU/network baselines.
+pub async fn resource_snapshot() -> Result<SystemSnapshot, String> {
+    #[derive(Default)]
+    struct Cache {
+        updated: Option<Instant>,
+        snapshot: Option<SystemSnapshot>,
+        resources: crate::resources::History,
+    }
+    static CACHE: OnceLock<tokio::sync::Mutex<Cache>> = OnceLock::new();
+    static SAMPLER: OnceLock<std::sync::Mutex<crate::metrics::Sampler>> = OnceLock::new();
+    let mut cache = CACHE.get_or_init(Default::default).lock().await;
+    if cache
+        .updated
+        .is_some_and(|time| time.elapsed() < Duration::from_millis(900))
+    {
+        return Ok(cache.snapshot.as_ref().unwrap().clone());
+    }
+    let (sampled_at, mut snapshot) = tokio::task::spawn_blocking(|| {
+        SAMPLER
+            .get_or_init(Default::default)
+            .lock()
+            .map_err(|error| error.to_string())?
+            .sample()
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    let gpus = crate::metrics::nvidia_gpus().await;
+    if let Ok(gpus) = gpus {
+        // The NVIDIA tool provides a richer identity than the matching DRM entry.
+        snapshot.gpus.retain(|gpu| !gpu.id.starts_with("nvidia:"));
+        snapshot.gpus.extend(gpus);
+    }
+    cache.resources.record(sampled_at, &mut snapshot);
+    cache.updated = Some(Instant::now());
+    cache.snapshot = Some(snapshot.clone());
+    Ok(snapshot)
 }

@@ -9,6 +9,7 @@ import '../battery/battery_card.dart';
 import 'bar_card_surface.dart';
 import '../tray/tray_menu_popup.dart';
 import 'bar_popup.dart';
+import '../resources/resource_card.dart';
 
 class BarPopupApp extends StatefulWidget {
   const BarPopupApp({super.key});
@@ -38,6 +39,7 @@ class _BarPopupAppState extends State<BarPopupApp> {
           arguments['data'] is! Map ||
           !const {
             'tooltip',
+            'resources',
             'media',
             'battery',
             'tray-menu',
@@ -191,6 +193,13 @@ class _BarPopupAppState extends State<BarPopupApp> {
             data: details,
             onAction: _action,
             styleVariant: _theme!.styleVariant,
+          ),
+          'resources' => BarCardSurface(
+            child: ResourceCard(
+              data: details,
+              onOpenMonitor: () =>
+                  _action(const {'action': 'resources.monitor'}),
+            ),
           ),
           'battery' => BarCardSurface(
             child: BatteryCard(data: details, onAction: _action),

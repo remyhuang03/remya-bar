@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
@@ -9,6 +11,8 @@ import 'features/system/system_backend.dart';
 import 'features/clock/bar_clock.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/popups/bar_popup.dart';
+import 'features/resources/bar_resources.dart';
+import 'features/resources/resource_data.dart';
 import 'features/tray/bar_tray.dart';
 import 'features/settings/settings_button.dart';
 import 'widgets/bar_tooltip.dart';
@@ -39,11 +43,30 @@ class RemyaBarApp extends StatefulWidget {
 }
 
 class _RemyaBarAppState extends State<RemyaBarApp> {
+  SystemSnapshot? _pillSnapshot;
+  Timer? _pillRefresh;
   final _tray = GlobalKey<BarTrayState>();
   @override
   void initState() {
     super.initState();
+    if (widget.system case final system?) {
+      _pillSnapshot = system.resourceSnapshot;
+      system.addListener(_showFirstResourceSample);
+      _pillRefresh = Timer.periodic(const Duration(seconds: 3), (_) {
+        final next = system.resourceSnapshot;
+        if (!identical(_pillSnapshot, next)) {
+          setState(() => _pillSnapshot = next);
+        }
+      });
+    }
     BarPopup.channel.setMethodCallHandler(_popupAction);
+  }
+
+  void _showFirstResourceSample() {
+    final next = widget.system?.resourceSnapshot;
+    if (!BarResources.hasData(_pillSnapshot) && BarResources.hasData(next)) {
+      setState(() => _pillSnapshot = next);
+    }
   }
 
   Future<void> _popupAction(MethodCall call) async {
@@ -79,6 +102,9 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       }
     } else if (action is String && action.startsWith('tray.')) {
       await _tray.currentState?.popupAction(args);
+    } else if (action == 'resources.monitor') {
+      await openSystemMonitor();
+      await BarPopup.hide(kind: 'resources');
     } else if (action == 'battery.settings') {
       await widget.onOpenPowerSettings();
       await BarPopup.hide(kind: 'battery');
@@ -93,6 +119,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 
   @override
   void dispose() {
+    _pillRefresh?.cancel();
+    widget.system?.removeListener(_showFirstResourceSample);
     BarPopup.channel.setMethodCallHandler(null);
     widget.preferences.dispose();
     widget.hyprland?.dispose();
@@ -118,6 +146,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
               body: _BarContent(
                 error: widget.preferences.error,
                 system: widget.system,
+                pillSnapshot: _pillSnapshot,
                 tray: widget.showTray ? BarTray(key: _tray) : null,
                 onOpenSettings: widget.onOpenSettings,
               ),
@@ -133,11 +162,13 @@ class _BarContent extends StatelessWidget {
   const _BarContent({
     required this.error,
     required this.onOpenSettings,
+    required this.pillSnapshot,
     this.system,
     this.tray,
   });
 
   final String? error;
+  final SystemSnapshot? pillSnapshot;
   final SystemBackend? system;
   final Widget? tray;
   final Future<void> Function() onOpenSettings;
@@ -147,6 +178,20 @@ class _BarContent extends StatelessWidget {
     builder: (context, constraints) {
       // Layer-shell may configure a temporary 1-pixel width during startup.
       if (constraints.maxWidth < 40) return const SizedBox.shrink();
+      final showMedia =
+          constraints.maxWidth >= 720 && system?.players.isNotEmpty == true;
+      final resourceBudget =
+          constraints.maxWidth / 2 - 128 - (showMedia ? BarMedia.width + 4 : 0);
+      final compact =
+          BarResources.widthFor(context, snapshot: pillSnapshot) >
+          resourceBudget;
+      final resourceWidth = BarResources.widthFor(
+        context,
+        compact: compact,
+        snapshot: pillSnapshot,
+      );
+      final showResources =
+          resourceWidth > 0 && resourceWidth <= resourceBudget;
       return Stack(
         fit: .expand,
         children: [
@@ -158,17 +203,32 @@ class _BarContent extends StatelessWidget {
                 child: BarClock(showSeconds: system?.showClockSeconds ?? true),
               ),
             ),
-          if (system case final backend?
-              when constraints.maxWidth >= 720 && backend.players.isNotEmpty)
+          if (showMedia || showResources)
             Align(
               alignment: .centerLeft,
-              child: SizedBox(
-                width: BarMedia.width,
-                child: BarMedia(
-                  players: backend.players,
-                  output: backend.mediaOutput,
-                  onAction: backend.mediaAction,
-                ),
+              child: Row(
+                mainAxisSize: .min,
+                spacing: 4,
+                children: [
+                  if (showMedia)
+                    SizedBox(
+                      width: BarMedia.width,
+                      child: BarMedia(
+                        players: system!.players,
+                        output: system!.mediaOutput,
+                        onAction: system!.mediaAction,
+                      ),
+                    ),
+                  if (showResources)
+                    SizedBox(
+                      width: resourceWidth,
+                      child: BarResources(
+                        snapshot: pillSnapshot,
+                        cardSnapshot: system?.resourceSnapshot,
+                        compact: compact,
+                      ),
+                    ),
+                ],
               ),
             ),
           Align(

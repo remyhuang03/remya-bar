@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -683611409;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -789352983;
 
 // Section: executor
 
@@ -182,6 +182,73 @@ fn wire__crate__api__media_seek_impl(
                     (move || async move {
                         let output_ok =
                             crate::api::media_seek(api_bus_name, api_track, api_seconds).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__resource_details_default_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "resource_details_default",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::ResourceDetails::default())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__resource_snapshot_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "resource_snapshot",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::resource_snapshot().await?;
                         std::result::Result::Ok(output_ok)
                     })()
                     .await,
@@ -387,6 +454,26 @@ impl SseDecode for f64 {
     }
 }
 
+impl SseDecode for crate::api::GpuSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_utilizationPercent = <Option<f64>>::sse_decode(deserializer);
+        let mut var_memoryUsedBytes = <Option<f64>>::sse_decode(deserializer);
+        let mut var_memoryTotalBytes = <Option<f64>>::sse_decode(deserializer);
+        let mut var_temperatureCelsius = <Option<f64>>::sse_decode(deserializer);
+        return crate::api::GpuSnapshot {
+            id: var_id,
+            name: var_name,
+            utilization_percent: var_utilizationPercent,
+            memory_used_bytes: var_memoryUsedBytes,
+            memory_total_bytes: var_memoryTotalBytes,
+            temperature_celsius: var_temperatureCelsius,
+        };
+    }
+}
+
 impl SseDecode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -406,6 +493,18 @@ impl SseDecode for Vec<crate::api::BatterySnapshot> {
     }
 }
 
+impl SseDecode for Vec<crate::api::GpuSnapshot> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::GpuSnapshot>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::MediaPlayerSnapshot> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -413,6 +512,18 @@ impl SseDecode for Vec<crate::api::MediaPlayerSnapshot> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::MediaPlayerSnapshot>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<Option<f64>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<Option<f64>>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -492,6 +603,18 @@ impl SseDecode for crate::api::MediaPlayerSnapshot {
     }
 }
 
+impl SseDecode for crate::api::NetworkOverview {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_downloadBytesPerSecond = <Option<f64>>::sse_decode(deserializer);
+        let mut var_uploadBytesPerSecond = <Option<f64>>::sse_decode(deserializer);
+        return crate::api::NetworkOverview {
+            download_bytes_per_second: var_downloadBytesPerSecond,
+            upload_bytes_per_second: var_uploadBytesPerSecond,
+        };
+    }
+}
+
 impl SseDecode for Option<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -522,6 +645,100 @@ impl SseDecode for Option<i32> {
         } else {
             return None;
         }
+    }
+}
+
+impl SseDecode for Option<crate::api::NetworkOverview> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::NetworkOverview>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::ResourceDetails> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::ResourceDetails>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<u32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<u32>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for crate::api::ResourceDetails {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_cpuCores = <Option<u32>>::sse_decode(deserializer);
+        let mut var_cpuFrequencyGhz = <Option<f64>>::sse_decode(deserializer);
+        let mut var_cpuTemperatureCelsius = <Option<f64>>::sse_decode(deserializer);
+        let mut var_gpuId = <Option<String>>::sse_decode(deserializer);
+        let mut var_memoryCachedBytes = <Option<f64>>::sse_decode(deserializer);
+        let mut var_memoryFreeBytes = <Option<f64>>::sse_decode(deserializer);
+        let mut var_networkLabel = <String>::sse_decode(deserializer);
+        let mut var_networkTodayDownloadBytes = <Option<f64>>::sse_decode(deserializer);
+        let mut var_networkTodayUploadBytes = <Option<f64>>::sse_decode(deserializer);
+        let mut var_networkTodayPartial = <bool>::sse_decode(deserializer);
+        let mut var_cpuHistory = <Vec<Option<f64>>>::sse_decode(deserializer);
+        let mut var_gpuHistory = <Vec<Option<f64>>>::sse_decode(deserializer);
+        let mut var_downloadHistory = <Vec<Option<f64>>>::sse_decode(deserializer);
+        let mut var_uploadHistory = <Vec<Option<f64>>>::sse_decode(deserializer);
+        return crate::api::ResourceDetails {
+            cpu_cores: var_cpuCores,
+            cpu_frequency_ghz: var_cpuFrequencyGhz,
+            cpu_temperature_celsius: var_cpuTemperatureCelsius,
+            gpu_id: var_gpuId,
+            memory_cached_bytes: var_memoryCachedBytes,
+            memory_free_bytes: var_memoryFreeBytes,
+            network_label: var_networkLabel,
+            network_today_download_bytes: var_networkTodayDownloadBytes,
+            network_today_upload_bytes: var_networkTodayUploadBytes,
+            network_today_partial: var_networkTodayPartial,
+            cpu_history: var_cpuHistory,
+            gpu_history: var_gpuHistory,
+            download_history: var_downloadHistory,
+            upload_history: var_uploadHistory,
+        };
+    }
+}
+
+impl SseDecode for crate::api::SystemSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_cpuPercent = <Option<f64>>::sse_decode(deserializer);
+        let mut var_memoryUsedBytes = <Option<f64>>::sse_decode(deserializer);
+        let mut var_memoryTotalBytes = <Option<f64>>::sse_decode(deserializer);
+        let mut var_swapUsedBytes = <Option<f64>>::sse_decode(deserializer);
+        let mut var_swapTotalBytes = <Option<f64>>::sse_decode(deserializer);
+        let mut var_gpus = <Vec<crate::api::GpuSnapshot>>::sse_decode(deserializer);
+        let mut var_networkOverview =
+            <Option<crate::api::NetworkOverview>>::sse_decode(deserializer);
+        let mut var_resources = <Option<crate::api::ResourceDetails>>::sse_decode(deserializer);
+        return crate::api::SystemSnapshot {
+            cpu_percent: var_cpuPercent,
+            memory_used_bytes: var_memoryUsedBytes,
+            memory_total_bytes: var_memoryTotalBytes,
+            swap_used_bytes: var_swapUsedBytes,
+            swap_total_bytes: var_swapTotalBytes,
+            gpus: var_gpus,
+            network_overview: var_networkOverview,
+            resources: var_resources,
+        };
     }
 }
 
@@ -613,10 +830,12 @@ fn pde_ffi_dispatcher_primary_impl(
         2 => wire__crate__api__media_action_impl(port, ptr, rust_vec_len, data_len),
         3 => wire__crate__api__media_players_impl(port, ptr, rust_vec_len, data_len),
         4 => wire__crate__api__media_seek_impl(port, ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__tray_action_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__tray_items_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__tray_menu_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__tray_menu_action_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__resource_details_default_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__resource_snapshot_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__tray_action_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__tray_items_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__tray_menu_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__tray_menu_action_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -659,6 +878,26 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::BatterySnapshot>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::GpuSnapshot {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.utilization_percent.into_into_dart().into_dart(),
+            self.memory_used_bytes.into_into_dart().into_dart(),
+            self.memory_total_bytes.into_into_dart().into_dart(),
+            self.temperature_celsius.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::GpuSnapshot {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::GpuSnapshot> for crate::api::GpuSnapshot {
+    fn into_into_dart(self) -> crate::api::GpuSnapshot {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::MediaPlayerSnapshot {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -689,6 +928,78 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::MediaPlayerSnapshot>
     for crate::api::MediaPlayerSnapshot
 {
     fn into_into_dart(self) -> crate::api::MediaPlayerSnapshot {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::NetworkOverview {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.download_bytes_per_second.into_into_dart().into_dart(),
+            self.upload_bytes_per_second.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::NetworkOverview {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::NetworkOverview>
+    for crate::api::NetworkOverview
+{
+    fn into_into_dart(self) -> crate::api::NetworkOverview {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ResourceDetails {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.cpu_cores.into_into_dart().into_dart(),
+            self.cpu_frequency_ghz.into_into_dart().into_dart(),
+            self.cpu_temperature_celsius.into_into_dart().into_dart(),
+            self.gpu_id.into_into_dart().into_dart(),
+            self.memory_cached_bytes.into_into_dart().into_dart(),
+            self.memory_free_bytes.into_into_dart().into_dart(),
+            self.network_label.into_into_dart().into_dart(),
+            self.network_today_download_bytes
+                .into_into_dart()
+                .into_dart(),
+            self.network_today_upload_bytes.into_into_dart().into_dart(),
+            self.network_today_partial.into_into_dart().into_dart(),
+            self.cpu_history.into_into_dart().into_dart(),
+            self.gpu_history.into_into_dart().into_dart(),
+            self.download_history.into_into_dart().into_dart(),
+            self.upload_history.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::ResourceDetails {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ResourceDetails>
+    for crate::api::ResourceDetails
+{
+    fn into_into_dart(self) -> crate::api::ResourceDetails {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::SystemSnapshot {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.cpu_percent.into_into_dart().into_dart(),
+            self.memory_used_bytes.into_into_dart().into_dart(),
+            self.memory_total_bytes.into_into_dart().into_dart(),
+            self.swap_used_bytes.into_into_dart().into_dart(),
+            self.swap_total_bytes.into_into_dart().into_dart(),
+            self.gpus.into_into_dart().into_dart(),
+            self.network_overview.into_into_dart().into_dart(),
+            self.resources.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::SystemSnapshot {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::SystemSnapshot> for crate::api::SystemSnapshot {
+    fn into_into_dart(self) -> crate::api::SystemSnapshot {
         self
     }
 }
@@ -775,6 +1086,18 @@ impl SseEncode for f64 {
     }
 }
 
+impl SseEncode for crate::api::GpuSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <Option<f64>>::sse_encode(self.utilization_percent, serializer);
+        <Option<f64>>::sse_encode(self.memory_used_bytes, serializer);
+        <Option<f64>>::sse_encode(self.memory_total_bytes, serializer);
+        <Option<f64>>::sse_encode(self.temperature_celsius, serializer);
+    }
+}
+
 impl SseEncode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -792,12 +1115,32 @@ impl SseEncode for Vec<crate::api::BatterySnapshot> {
     }
 }
 
+impl SseEncode for Vec<crate::api::GpuSnapshot> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::GpuSnapshot>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::MediaPlayerSnapshot> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::MediaPlayerSnapshot>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<Option<f64>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <Option<f64>>::sse_encode(item, serializer);
         }
     }
 }
@@ -853,6 +1196,14 @@ impl SseEncode for crate::api::MediaPlayerSnapshot {
     }
 }
 
+impl SseEncode for crate::api::NetworkOverview {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<f64>>::sse_encode(self.download_bytes_per_second, serializer);
+        <Option<f64>>::sse_encode(self.upload_bytes_per_second, serializer);
+    }
+}
+
 impl SseEncode for Option<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -880,6 +1231,70 @@ impl SseEncode for Option<i32> {
         if let Some(value) = self {
             <i32>::sse_encode(value, serializer);
         }
+    }
+}
+
+impl SseEncode for Option<crate::api::NetworkOverview> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::NetworkOverview>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::ResourceDetails> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::ResourceDetails>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<u32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <u32>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for crate::api::ResourceDetails {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<u32>>::sse_encode(self.cpu_cores, serializer);
+        <Option<f64>>::sse_encode(self.cpu_frequency_ghz, serializer);
+        <Option<f64>>::sse_encode(self.cpu_temperature_celsius, serializer);
+        <Option<String>>::sse_encode(self.gpu_id, serializer);
+        <Option<f64>>::sse_encode(self.memory_cached_bytes, serializer);
+        <Option<f64>>::sse_encode(self.memory_free_bytes, serializer);
+        <String>::sse_encode(self.network_label, serializer);
+        <Option<f64>>::sse_encode(self.network_today_download_bytes, serializer);
+        <Option<f64>>::sse_encode(self.network_today_upload_bytes, serializer);
+        <bool>::sse_encode(self.network_today_partial, serializer);
+        <Vec<Option<f64>>>::sse_encode(self.cpu_history, serializer);
+        <Vec<Option<f64>>>::sse_encode(self.gpu_history, serializer);
+        <Vec<Option<f64>>>::sse_encode(self.download_history, serializer);
+        <Vec<Option<f64>>>::sse_encode(self.upload_history, serializer);
+    }
+}
+
+impl SseEncode for crate::api::SystemSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<f64>>::sse_encode(self.cpu_percent, serializer);
+        <Option<f64>>::sse_encode(self.memory_used_bytes, serializer);
+        <Option<f64>>::sse_encode(self.memory_total_bytes, serializer);
+        <Option<f64>>::sse_encode(self.swap_used_bytes, serializer);
+        <Option<f64>>::sse_encode(self.swap_total_bytes, serializer);
+        <Vec<crate::api::GpuSnapshot>>::sse_encode(self.gpus, serializer);
+        <Option<crate::api::NetworkOverview>>::sse_encode(self.network_overview, serializer);
+        <Option<crate::api::ResourceDetails>>::sse_encode(self.resources, serializer);
     }
 }
 

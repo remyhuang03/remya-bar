@@ -8,7 +8,7 @@ import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `percentage`, `read_number`, `remaining_seconds`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Future<List<BatterySnapshot>> batteries() =>
     SystemRustLib.instance.api.crateApiBatteries();
@@ -60,6 +60,10 @@ Future<void> trayMenuAction({
   entry: entry,
 );
 
+/// All output engines share one sample and one set of CPU/network baselines.
+Future<SystemSnapshot> resourceSnapshot() =>
+    SystemRustLib.instance.api.crateApiResourceSnapshot();
+
 class BatterySnapshot {
   final String name;
   final double? percent;
@@ -101,6 +105,45 @@ class BatterySnapshot {
           powerWatts == other.powerWatts &&
           healthPercent == other.healthPercent &&
           cycleCount == other.cycleCount;
+}
+
+class GpuSnapshot {
+  final String id;
+  final String name;
+  final double? utilizationPercent;
+  final double? memoryUsedBytes;
+  final double? memoryTotalBytes;
+  final double? temperatureCelsius;
+
+  const GpuSnapshot({
+    required this.id,
+    required this.name,
+    this.utilizationPercent,
+    this.memoryUsedBytes,
+    this.memoryTotalBytes,
+    this.temperatureCelsius,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      utilizationPercent.hashCode ^
+      memoryUsedBytes.hashCode ^
+      memoryTotalBytes.hashCode ^
+      temperatureCelsius.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is GpuSnapshot &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          utilizationPercent == other.utilizationPercent &&
+          memoryUsedBytes == other.memoryUsedBytes &&
+          memoryTotalBytes == other.memoryTotalBytes &&
+          temperatureCelsius == other.temperatureCelsius;
 }
 
 class MediaPlayerSnapshot {
@@ -176,6 +219,149 @@ class MediaPlayerSnapshot {
           seekToken == other.seekToken &&
           positionSeconds == other.positionSeconds &&
           lengthSeconds == other.lengthSeconds;
+}
+
+class NetworkOverview {
+  final double? downloadBytesPerSecond;
+  final double? uploadBytesPerSecond;
+
+  const NetworkOverview({
+    this.downloadBytesPerSecond,
+    this.uploadBytesPerSecond,
+  });
+
+  @override
+  int get hashCode =>
+      downloadBytesPerSecond.hashCode ^ uploadBytesPerSecond.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetworkOverview &&
+          runtimeType == other.runtimeType &&
+          downloadBytesPerSecond == other.downloadBytesPerSecond &&
+          uploadBytesPerSecond == other.uploadBytesPerSecond;
+}
+
+class ResourceDetails {
+  final int? cpuCores;
+  final double? cpuFrequencyGhz;
+  final double? cpuTemperatureCelsius;
+  final String? gpuId;
+  final double? memoryCachedBytes;
+  final double? memoryFreeBytes;
+  final String networkLabel;
+  final double? networkTodayDownloadBytes;
+  final double? networkTodayUploadBytes;
+  final bool networkTodayPartial;
+  final List<double?> cpuHistory;
+  final List<double?> gpuHistory;
+  final List<double?> downloadHistory;
+  final List<double?> uploadHistory;
+
+  const ResourceDetails({
+    this.cpuCores,
+    this.cpuFrequencyGhz,
+    this.cpuTemperatureCelsius,
+    this.gpuId,
+    this.memoryCachedBytes,
+    this.memoryFreeBytes,
+    required this.networkLabel,
+    this.networkTodayDownloadBytes,
+    this.networkTodayUploadBytes,
+    required this.networkTodayPartial,
+    required this.cpuHistory,
+    required this.gpuHistory,
+    required this.downloadHistory,
+    required this.uploadHistory,
+  });
+
+  static Future<ResourceDetails> default_() =>
+      SystemRustLib.instance.api.crateApiResourceDetailsDefault();
+
+  @override
+  int get hashCode =>
+      cpuCores.hashCode ^
+      cpuFrequencyGhz.hashCode ^
+      cpuTemperatureCelsius.hashCode ^
+      gpuId.hashCode ^
+      memoryCachedBytes.hashCode ^
+      memoryFreeBytes.hashCode ^
+      networkLabel.hashCode ^
+      networkTodayDownloadBytes.hashCode ^
+      networkTodayUploadBytes.hashCode ^
+      networkTodayPartial.hashCode ^
+      cpuHistory.hashCode ^
+      gpuHistory.hashCode ^
+      downloadHistory.hashCode ^
+      uploadHistory.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ResourceDetails &&
+          runtimeType == other.runtimeType &&
+          cpuCores == other.cpuCores &&
+          cpuFrequencyGhz == other.cpuFrequencyGhz &&
+          cpuTemperatureCelsius == other.cpuTemperatureCelsius &&
+          gpuId == other.gpuId &&
+          memoryCachedBytes == other.memoryCachedBytes &&
+          memoryFreeBytes == other.memoryFreeBytes &&
+          networkLabel == other.networkLabel &&
+          networkTodayDownloadBytes == other.networkTodayDownloadBytes &&
+          networkTodayUploadBytes == other.networkTodayUploadBytes &&
+          networkTodayPartial == other.networkTodayPartial &&
+          cpuHistory == other.cpuHistory &&
+          gpuHistory == other.gpuHistory &&
+          downloadHistory == other.downloadHistory &&
+          uploadHistory == other.uploadHistory;
+}
+
+class SystemSnapshot {
+  final double? cpuPercent;
+  final double? memoryUsedBytes;
+  final double? memoryTotalBytes;
+  final double? swapUsedBytes;
+  final double? swapTotalBytes;
+  final List<GpuSnapshot> gpus;
+  final NetworkOverview? networkOverview;
+  final ResourceDetails? resources;
+
+  const SystemSnapshot({
+    this.cpuPercent,
+    this.memoryUsedBytes,
+    this.memoryTotalBytes,
+    this.swapUsedBytes,
+    this.swapTotalBytes,
+    required this.gpus,
+    this.networkOverview,
+    this.resources,
+  });
+
+  @override
+  int get hashCode =>
+      cpuPercent.hashCode ^
+      memoryUsedBytes.hashCode ^
+      memoryTotalBytes.hashCode ^
+      swapUsedBytes.hashCode ^
+      swapTotalBytes.hashCode ^
+      gpus.hashCode ^
+      networkOverview.hashCode ^
+      resources.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SystemSnapshot &&
+          runtimeType == other.runtimeType &&
+          cpuPercent == other.cpuPercent &&
+          memoryUsedBytes == other.memoryUsedBytes &&
+          memoryTotalBytes == other.memoryTotalBytes &&
+          swapUsedBytes == other.swapUsedBytes &&
+          swapTotalBytes == other.swapTotalBytes &&
+          gpus == other.gpus &&
+          networkOverview == other.networkOverview &&
+          resources == other.resources;
 }
 
 class TrayItem {

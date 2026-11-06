@@ -187,3 +187,16 @@ Bar identifies apps by SNI ID with the executable name when available, since
 different Chromium-based apps can export the same ID. All outputs read the
 same Settings preference and reconcile on change. Appearance → Remya Bar
 in Settings lists folded IDs and can pin them again, even while the app is closed.
+
+## System Resources
+
+The Rust system bridge samples CPU, memory, GPU and network once per second
+using a cache shared by the output engines. The pill displays the latest
+sample at three-second intervals. Its hover card receives live samples and
+plots 60 seconds of CPU, GPU and network history. Missing sensors stay
+unavailable. Network totals cover observations for the current local date,
+with partial coverage marked in the card.
+
+The System card uses a zero-exclusive-zone layer-shell surface on the pill's
+output. The popup stays open as the pointer moves between the pill and card.
+Its monitor button opens a supported desktop system monitor.
