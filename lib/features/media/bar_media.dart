@@ -2,19 +2,21 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/bar_hover_card.dart';
 import '../system/system_backend.dart';
-import 'media_popup_data.dart';
+import '../system/system_popup_data.dart';
 
 class BarMedia extends StatelessWidget {
   const BarMedia({
     super.key,
     required this.players,
     this.output = const {},
+    this.error,
     this.onAction,
   });
 
   static const width = 204.0;
   final List<MediaPlayerSnapshot> players;
   final Map<String, Object?> output;
+  final String? error;
   final Future<void> Function(String player, String action)? onAction;
 
   @override
@@ -26,7 +28,10 @@ class BarMedia extends StatelessWidget {
     return BarHoverCard(
       kind: 'media',
       size: const Size(420, 505),
-      data: {...mediaPopupData(players), 'output': output},
+      data: {
+        ...mediaPopupData(players, error: error),
+        'output': output,
+      },
       child: _MediaPill(
         title: player.title.isEmpty ? player.identity : player.title,
         playing: playing,

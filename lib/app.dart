@@ -419,6 +419,7 @@ class _BarContent extends StatelessWidget {
                       child: BarMedia(
                         players: system!.players,
                         output: system!.mediaOutput,
+                        error: system!.mediaError,
                         onAction: system!.mediaAction,
                       ),
                     ),

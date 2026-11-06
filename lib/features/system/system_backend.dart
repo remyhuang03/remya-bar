@@ -24,6 +24,7 @@ class SystemBackend extends ChangeNotifier {
   Map<String, Object?> mediaOutput = const {};
   List<api.MediaPlayerSnapshot> players = const [];
   bool _refreshingMedia = false;
+  String? mediaError;
   StreamSubscription<SettingsChange>? _settingsChanges;
   bool _writingPower = false;
   int _powerRevision = 0;
@@ -169,14 +170,16 @@ class SystemBackend extends ChangeNotifier {
     try {
       final next = await api.mediaPlayers();
       if (_disposed) return;
-      if (!listEquals(players, next)) {
+      if (!listEquals(players, next) || mediaError != null) {
         players = next;
+        mediaError = null;
         notifyListeners();
       }
       unawaited(_refreshSound());
     } catch (error) {
-      if (!_disposed && players.isNotEmpty) {
-        players = const [];
+      if (!_disposed && mediaError == null) {
+        mediaError = 'Media status unavailable';
+        debugPrint('Media status: $error');
         notifyListeners();
       }
     } finally {

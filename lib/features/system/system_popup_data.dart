@@ -1,6 +1,10 @@
-import '../system/system_backend.dart';
+import 'system_backend.dart';
 
-Map<String, Object?> mediaPopupData(List<MediaPlayerSnapshot> players) => {
+Map<String, Object?> mediaPopupData(
+  List<MediaPlayerSnapshot> players, {
+  String? error,
+}) => {
+  'error': error,
   'players': [
     for (final player in players)
       {
