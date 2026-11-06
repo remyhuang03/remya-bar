@@ -359,28 +359,50 @@ class _BarContent extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       // Layer-shell may configure a temporary 1-pixel width during startup.
-      if (constraints.maxWidth < 40) return const SizedBox.shrink();
-      final showMedia =
-          constraints.maxWidth >= 720 && system?.players.isNotEmpty == true;
-      final resourceBudget =
-          constraints.maxWidth / 2 - 128 - (showMedia ? BarMedia.width + 4 : 0);
-      final compact =
-          BarResources.widthFor(context, snapshot: pillSnapshot) >
-          resourceBudget;
-      final resourceWidth = BarResources.widthFor(
+      final width = constraints.maxWidth;
+      if (width < 40) return const SizedBox.shrink();
+      final warningWidth = error != null && width >= 60 ? 20.0 : 0.0;
+      final showSidebar = width >= 80 + warningWidth;
+      final buttonsWidth = 40 + warningWidth + (showSidebar ? 40 : 0);
+      final textScale = MediaQuery.textScalerOf(context).scale(1);
+      final clockWidth = (width - 2 * buttonsWidth).clamp(
+        0.0,
+        176 + (textScale - 1).clamp(0.0, 2.0) * 80,
+      );
+      final showClock = width >= 200 && clockWidth >= 60;
+      final sideWidth = showClock ? (width - clockWidth) / 2 : width;
+      final leftBudget = showClock ? sideWidth - 4 : 0.0;
+      final hasMedia = system?.players.isNotEmpty == true;
+      final fullResourcesWidth = BarResources.widthFor(
         context,
-        compact: compact,
         snapshot: pillSnapshot,
       );
-      final showResources =
-          resourceWidth > 0 && resourceWidth <= resourceBudget;
+      final compact = fullResourcesWidth + (hasMedia ? 116 : 0) > leftBudget;
+      final resourceWidth = compact
+          ? BarResources.widthFor(
+              context,
+              compact: true,
+              snapshot: pillSnapshot,
+            )
+          : fullResourcesWidth;
+      final showResources = resourceWidth > 0 && resourceWidth <= leftBudget;
+      final mediaBudget = leftBudget - (showResources ? resourceWidth + 4 : 0);
+      final showMedia = hasMedia && mediaBudget >= 112;
+      final mediaWidth = mediaBudget.clamp(0.0, BarMedia.width);
+
+      final rightBudget = sideWidth - buttonsWidth;
+      final showBattery = system?.battery?.percent != null && rightBudget >= 56;
+      final trayWidth = (rightBudget - (showBattery ? 52 : 0) - 4).clamp(
+        0.0,
+        290.0,
+      );
       return Stack(
         fit: .expand,
         children: [
-          if (constraints.maxWidth >= 200)
+          if (showClock)
             Positioned.fill(
-              left: error == null ? 40 : 60,
-              right: error == null ? 40 : 60,
+              left: sideWidth,
+              right: sideWidth,
               child: Center(
                 child: BarClock(showSeconds: system?.showClockSeconds ?? true),
               ),
@@ -394,7 +416,7 @@ class _BarContent extends StatelessWidget {
                 children: [
                   if (showMedia)
                     SizedBox(
-                      width: BarMedia.width,
+                      width: mediaWidth,
                       child: BarMedia(
                         players: system!.players,
                         output: system!.mediaOutput,
@@ -418,27 +440,23 @@ class _BarContent extends StatelessWidget {
             child: Row(
               mainAxisSize: .min,
               children: [
-                if (error != null && constraints.maxWidth >= 60)
+                if (warningWidth > 0)
                   BarTooltip(
                     message: 'Theme unavailable',
                     child: const Icon(Icons.warning_amber_rounded, size: 20),
                   ),
-                if (constraints.maxWidth >= 440 &&
-                    system?.battery?.percent != null)
+                if (showBattery)
                   Padding(
                     padding: const .only(right: 4),
                     child: _BatteryWithCard(system: system!),
                   ),
-                if (tray != null && constraints.maxWidth >= 700)
+                if (tray != null && trayWidth >= 44)
                   ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: (constraints.maxWidth / 2 - 225).clamp(44, 290),
-                    ),
+                    constraints: BoxConstraints(maxWidth: trayWidth),
                     child: tray,
                   ),
                 SettingsButton(onOpen: onOpenSettings),
-                if (constraints.maxWidth >= (error == null ? 80 : 100))
-                  BarSidebarButton(onToggle: onToggleSidebar),
+                if (showSidebar) BarSidebarButton(onToggle: onToggleSidebar),
               ],
             ),
           ),

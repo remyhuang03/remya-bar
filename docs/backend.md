@@ -243,3 +243,7 @@ when the compositor fullscreen bit is set. GTK closes the output's popups and
 releases the bar's exclusive zone while hidden. Leaving fullscreen restores the
 40-pixel reservation and the existing Flutter view. Hyprland events trigger a
 refresh, with periodic reconciliation for missed events.
+
+The main bar budgets each side from the centered clock's available width.
+Resource spacing compacts and the media title yields space before a component
+is omitted. On the right, the launchers and battery get space before the tray.

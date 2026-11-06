@@ -6,6 +6,9 @@ import 'package:remya_bar/features/settings/settings_button.dart';
 import 'package:remya_bar/features/sidebar/right_sidebar.dart';
 import 'package:remya_bar/app.dart';
 import 'package:remya_bar/features/clock/bar_clock.dart';
+import 'package:remya_bar/features/media/bar_media.dart';
+import 'package:remya_bar/features/resources/bar_resources.dart';
+import 'package:remya_bar/features/system/system_backend.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 void main() {
@@ -127,6 +130,60 @@ void main() {
         find.byType(BarSidebarButton),
         width < 100 ? findsNothing : findsOneWidget,
       );
+    }
+  });
+
+  testWidgets('media and resources fit their lane as output width changes', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1200, 40);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final system = SystemBackend()
+      ..resourceSnapshot = const SystemSnapshot(cpuPercent: 42, gpus: [])
+      ..players = const [
+        MediaPlayerSnapshot(
+          busName: 'org.mpris.MediaPlayer2.test',
+          identity: 'Test',
+          title: 'A long media title',
+          artist: '',
+          album: '',
+          artUrl: '',
+          playbackStatus: 'Playing',
+          canControl: false,
+          canGoNext: false,
+          canGoPrevious: false,
+          canPlay: false,
+          canPause: false,
+        ),
+      ];
+    await tester.pumpWidget(
+      RemyaBarApp(
+        preferences: SettingsThemeController(
+          () => File('/nonexistent/theme.toml'),
+        ),
+        system: system,
+      ),
+    );
+    for (final width in [1200.0, 650.0, 280.0]) {
+      tester.view.physicalSize = Size(width, 40);
+      await tester.pump();
+      final clock = tester.getRect(find.byType(BarClock));
+      expect(clock.center.dx, width / 2);
+      if (width >= 650) {
+        final media = tester.getRect(find.byType(BarMedia));
+        final resources = tester.getRect(find.byType(BarResources));
+        expect(media.right, lessThanOrEqualTo(resources.left));
+        expect(resources.right, lessThanOrEqualTo(clock.left));
+        expect(
+          media.width,
+          width == 1200 ? BarMedia.width : lessThan(BarMedia.width),
+        );
+      } else {
+        expect(find.byType(BarMedia), findsNothing);
+      }
+      expect(tester.takeException(), isNull);
     }
   });
 
