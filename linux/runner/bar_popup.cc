@@ -484,3 +484,20 @@ bool close_bar_sidebar(FlView* owner) {
   root->sidebar_popup->hide();
   return true;
 }
+
+void hide_bar_popup(FlView* owner) {
+  auto* state = static_cast<BarPopup*>(g_object_get_data(G_OBJECT(owner), "remya-popup"));
+  if (state != nullptr) {
+    state->hide();
+    if (state->sidebar_popup != nullptr) state->sidebar_popup->hide();
+    if (state->tray_popup != nullptr) state->tray_popup->hide();
+    if (state->resources_popup != nullptr) state->resources_popup->hide();
+    if (state->tooltip_popup != nullptr) state->tooltip_popup->hide();
+    if (state->tray_overflow != nullptr && !state->tray_overflow->dismiss_windows.empty()) {
+      g_autoptr(FlValue) args = fl_value_new_map();
+      fl_value_set_string_take(args, "action", fl_value_new_string("tray.outside"));
+      fl_method_channel_invoke_method(state->owner_channel, "action", args, nullptr, nullptr, nullptr);
+      state->tray_overflow->hide();
+    }
+  }
+}

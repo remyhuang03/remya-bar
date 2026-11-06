@@ -234,3 +234,12 @@ hl.bind("SUPER + A", hl.dsp.exec_cmd(
 
 Replace any existing binding for that chord when adopting it. Bar listens only
 to the signal for its own Hyprland instance and opens on the focused output.
+
+## Fullscreen output visibility
+
+Each bar resolves its GDK output against Hyprland monitor coordinates. Mapped,
+visible clients on the active or open special workspace hide that output's bar
+when the compositor fullscreen bit is set. GTK closes the output's popups and
+releases the bar's exclusive zone while hidden. Leaving fullscreen restores the
+40-pixel reservation and the existing Flutter view. Hyprland events trigger a
+refresh, with periodic reconciliation for missed events.

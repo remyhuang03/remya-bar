@@ -73,7 +73,7 @@ class HyprlandRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 682746519;
+  int get rustContentHash => -1770362681;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -85,6 +85,11 @@ class HyprlandRustLib
 }
 
 abstract class HyprlandRustLibApi extends BaseApi {
+  Future<bool> crateApiHyprlandOutputFullscreen({
+    required int x,
+    required int y,
+  });
+
   Future<String> crateApiHyprlandRequest({required String command});
 
   Stream<HyprlandUpdate> crateApiSubscribeHyprland();
@@ -100,6 +105,41 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   });
 
   @override
+  Future<bool> crateApiHyprlandOutputFullscreen({
+    required int x,
+    required int y,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_i_32(x, serializer);
+          sse_encode_i_32(y, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 1,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHyprlandOutputFullscreenConstMeta,
+        argValues: [x, y],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHyprlandOutputFullscreenConstMeta =>
+      const TaskConstMeta(
+        debugName: "hyprland_output_fullscreen",
+        argNames: ["x", "y"],
+      );
+
+  @override
   Future<String> crateApiHyprlandRequest({required String command}) {
     return handler.executeNormal(
       NormalTask(
@@ -109,7 +149,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 1,
+            funcId: 2,
             port: port_,
           );
         },
@@ -139,7 +179,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 2,
+              funcId: 3,
               port: port_,
             );
           },
@@ -180,6 +220,12 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   }
 
   @protected
+  bool dco_decode_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as bool;
+  }
+
+  @protected
   HyprlandUpdate dco_decode_hyprland_update(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -190,6 +236,12 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
       name: dco_decode_String(arr[1]),
       data: dco_decode_String(arr[2]),
     );
+  }
+
+  @protected
+  int dco_decode_i_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
   }
 
   @protected
@@ -233,12 +285,24 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   }
 
   @protected
+  bool sse_decode_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
   HyprlandUpdate sse_decode_hyprland_update(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_kind = sse_decode_String(deserializer);
     var var_name = sse_decode_String(deserializer);
     var var_data = sse_decode_String(deserializer);
     return HyprlandUpdate(kind: var_kind, name: var_name, data: var_data);
+  }
+
+  @protected
+  int sse_decode_i_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getInt32();
   }
 
   @protected
@@ -257,18 +321,6 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   @protected
   void sse_decode_unit(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-  }
-
-  @protected
-  int sse_decode_i_32(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getInt32();
-  }
-
-  @protected
-  bool sse_decode_bool(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getUint8() != 0;
   }
 
   @protected
@@ -304,6 +356,12 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint8(self ? 1 : 0);
+  }
+
+  @protected
   void sse_encode_hyprland_update(
     HyprlandUpdate self,
     SseSerializer serializer,
@@ -312,6 +370,12 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
     sse_encode_String(self.kind, serializer);
     sse_encode_String(self.name, serializer);
     sse_encode_String(self.data, serializer);
+  }
+
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putInt32(self);
   }
 
   @protected
@@ -333,17 +397,5 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   @protected
   void sse_encode_unit(void self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-  }
-
-  @protected
-  void sse_encode_i_32(int self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putInt32(self);
-  }
-
-  @protected
-  void sse_encode_bool(bool self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putUint8(self ? 1 : 0);
   }
 }

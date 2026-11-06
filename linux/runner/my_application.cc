@@ -28,6 +28,19 @@ static FlValue* output_geometry(GdkMonitor* monitor) {
   return result;
 }
 
+static void set_bar_fullscreen(GtkWindow* window, bool fullscreen) {
+  if (fullscreen == (g_object_get_data(G_OBJECT(window), "fullscreen") != nullptr)) return;
+  g_object_set_data(G_OBJECT(window), "fullscreen", fullscreen ? GINT_TO_POINTER(1) : nullptr);
+  if (fullscreen) {
+    hide_bar_popup(FL_VIEW(gtk_bin_get_child(GTK_BIN(window))));
+    gtk_layer_set_exclusive_zone(window, 0);
+    gtk_widget_hide(GTK_WIDGET(window));
+  } else {
+    gtk_layer_auto_exclusive_zone_enable(window);
+    gtk_widget_show(GTK_WIDGET(window));
+  }
+}
+
 static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   if (g_hash_table_contains(self->bar_windows, monitor)) return;
 
@@ -75,11 +88,22 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
         if (g_strcmp0(method, "output") == 0) {
           g_autoptr(FlValue) geometry = output_geometry(monitor);
           fl_method_call_respond_success(call, geometry, nullptr);
+        } else if (g_strcmp0(method, "setFullscreen") == 0) {
+          FlValue* value = fl_method_call_get_args(call);
+          if (fl_value_get_type(value) != FL_VALUE_TYPE_BOOL) {
+            fl_method_call_respond_error(call, "invalid-arguments", "Expected fullscreen boolean", nullptr, nullptr);
+            return;
+          }
+          auto* view = GTK_WIDGET(g_object_get_data(G_OBJECT(channel), "owner"));
+          auto* window = GTK_WINDOW(gtk_widget_get_toplevel(view));
+          set_bar_fullscreen(window, fl_value_get_bool(value));
+          fl_method_call_respond_success(call, nullptr, nullptr);
         } else {
           fl_method_call_respond_not_implemented(call, nullptr);
         }
       },
       g_object_ref(monitor), g_object_unref);
+  g_object_set_data(G_OBJECT(window_channel), "owner", view);
   g_autoptr(FlStandardMethodCodec) paths_codec = fl_standard_method_codec_new();
   g_autoptr(FlMethodChannel) paths_channel = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)), "top.remya.paths",

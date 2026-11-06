@@ -56,6 +56,39 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   final _tray = GlobalKey<BarTrayState>();
   SidebarBackend? _sidebar;
   bool _sidebarOpen = false;
+  bool _fullscreen = false;
+  bool _checkingFullscreen = false;
+  Timer? _fullscreenCheck;
+  Timer? _fullscreenReconcile;
+
+  void _scheduleFullscreenCheck() {
+    _fullscreenCheck ??= Timer(const Duration(milliseconds: 50), () {
+      _fullscreenCheck = null;
+      unawaited(_checkFullscreen());
+    });
+  }
+
+  Future<void> _checkFullscreen() async {
+    if (_checkingFullscreen || !mounted) return;
+    _checkingFullscreen = true;
+    try {
+      final geometry = await _window.invokeMapMethod<String, int>('output');
+      if (geometry == null || !mounted) return;
+      final hidden = await widget.hyprland!.isOutputFullscreen(
+        geometry['x']!,
+        geometry['y']!,
+      );
+      if (mounted && hidden != _fullscreen) {
+        await _window.invokeMethod<void>('setFullscreen', hidden);
+        _fullscreen = hidden;
+      }
+    } catch (error) {
+      debugPrint('Bar fullscreen state: $error');
+    } finally {
+      _checkingFullscreen = false;
+    }
+  }
+
   String? _sidebarOutput;
 
   Map<String, Object?> get _sidebarData => {
@@ -68,6 +101,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     double scale, {
     String? focusedOutput,
   }) async {
+    if (_fullscreen) return;
     if (_sidebarOpen) {
       _sidebarOpen = false;
       _sidebar?.close();
@@ -148,6 +182,14 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
           setState(() => _pillSnapshot = next);
         }
       });
+    }
+    if (widget.hyprland case final hyprland?) {
+      hyprland.addListener(_scheduleFullscreenCheck);
+      _fullscreenReconcile = Timer.periodic(
+        const Duration(seconds: 2),
+        (_) => _checkFullscreen(),
+      );
+      _scheduleFullscreenCheck();
     }
     widget.account?.addListener(_updateSidebar);
     widget.preferences.addListener(_updateSidebar);
@@ -248,6 +290,9 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 
   @override
   void dispose() {
+    _fullscreenCheck?.cancel();
+    _fullscreenReconcile?.cancel();
+    widget.hyprland?.removeListener(_scheduleFullscreenCheck);
     _pillRefresh?.cancel();
     _sidebar?.dispose();
     widget.account?.removeListener(_updateSidebar);

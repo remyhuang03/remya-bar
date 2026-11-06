@@ -7,6 +7,8 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These functions are ignored because they are not marked as `pub`: `output_fullscreen`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Hub`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `eq`, `fmt`
 
 Future<String> hyprlandRequest({required String command}) =>
@@ -15,8 +17,11 @@ Future<String> hyprlandRequest({required String command}) =>
 Stream<HyprlandUpdate> subscribeHyprland() =>
     HyprlandRustLib.instance.api.crateApiSubscribeHyprland();
 
+Future<bool> hyprlandOutputFullscreen({required int x, required int y}) =>
+    HyprlandRustLib.instance.api.crateApiHyprlandOutputFullscreen(x: x, y: y);
+
 class HyprlandUpdate {
-  /// connected, disconnected, event, or heartbeat.
+  /// connected, disconnected, event, resync, or heartbeat.
   final String kind;
   final String name;
 

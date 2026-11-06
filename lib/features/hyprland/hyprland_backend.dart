@@ -40,6 +40,9 @@ class HyprlandBackend extends ChangeNotifier {
     );
   }
 
+  Future<bool> isOutputFullscreen(int x, int y) =>
+      hyprlandOutputFullscreen(x: x, y: y);
+
   Future<String> request(String command) => hyprlandRequest(command: command);
 
   @override
