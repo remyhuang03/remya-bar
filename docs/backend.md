@@ -148,6 +148,14 @@ capabilities and validates the unique owner and track ID before seeking.
 The output slider reads the default device via Settings' public Sound API
 and writes the named device through `sound.output-volume`.
 
+## Datetime card
+
+Hover or click the clock to see local time with seconds, the UTC offset,
+ISO week, day of year, UTC time, and a Monday-first calendar. The calendar
+can browse months independently of live clock updates. Date markers have
+a visual component only. The `datetime.settings` action opens the Date and
+time page through the public Settings opener.
+
 ## Clock and battery
 
 The clock capsule shows local time and the date. Bar reads

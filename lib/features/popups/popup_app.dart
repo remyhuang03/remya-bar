@@ -41,6 +41,7 @@ class _BarPopupAppState extends State<BarPopupApp> {
             'resources',
             'media',
             'battery',
+            'datetime',
             'tray-menu',
           }.contains(arguments['kind'])) {
         throw PlatformException(

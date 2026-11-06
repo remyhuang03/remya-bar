@@ -275,6 +275,11 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     } else if (action == 'resources.monitor') {
       await openSystemMonitor();
       await BarPopup.hide(kind: 'resources');
+    } else if (action == 'datetime.settings') {
+      const page = 'date-time';
+      await (widget.onOpenSettingsPage ??
+          (page) => openRemyaSettings(page: page))(page);
+      await BarPopup.hide(kind: 'datetime');
     } else if (action == 'battery.settings') {
       await widget.onOpenPowerSettings();
       await BarPopup.hide(kind: 'battery');

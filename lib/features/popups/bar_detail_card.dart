@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../battery/battery_card.dart';
+import '../clock/datetime_card.dart';
 import '../media/media_preview.dart';
 import '../resources/resource_card.dart';
 import 'bar_card_surface.dart';
@@ -41,6 +42,10 @@ class BarDetailCard extends StatelessWidget {
                   onAction(const {'action': 'resources.monitor'}),
             ),
             'battery' => BatteryCard(data: data, onAction: onAction),
+            'datetime' => DatetimeCard(
+              data: data,
+              onSettings: () => onAction(const {'action': 'datetime.settings'}),
+            ),
             _ => const Text('Unavailable'),
           },
         );

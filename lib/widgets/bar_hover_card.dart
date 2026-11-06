@@ -14,6 +14,7 @@ class BarHoverCard extends StatefulWidget {
     required this.data,
     required this.child,
     this.onTap,
+    this.openOnTap = false,
     this.seedColor,
   });
 
@@ -22,6 +23,7 @@ class BarHoverCard extends StatefulWidget {
   final Map<String, Object?> data;
   final Widget child;
   final VoidCallback? onTap;
+  final bool openOnTap;
   final Color? seedColor;
 
   @override
@@ -37,9 +39,11 @@ class _BarHoverCardState extends State<BarHoverCard> {
     request.catchError((Object error) => debugPrint('Bar card: $error'));
   }
 
-  void _show({bool update = false}) {
+  void _show({bool update = false, bool activated = false}) {
     final box = context.findRenderObject() as RenderBox?;
-    if ((!update && !_hovered) || box == null || !box.hasSize) return;
+    if ((!update && !activated && !_hovered) || box == null || !box.hasSize) {
+      return;
+    }
     final request = update ? BarPopup.update : BarPopup.show;
     _shown = true;
     _send(
@@ -59,6 +63,11 @@ class _BarHoverCardState extends State<BarHoverCard> {
         theme: BarPopupScope.themeOf(context),
       ),
     );
+  }
+
+  void _activate() {
+    _timer?.cancel();
+    _show(activated: true);
   }
 
   void _refresh() {
@@ -100,8 +109,11 @@ class _BarHoverCardState extends State<BarHoverCard> {
       _timer?.cancel();
       if (_shown) _send(BarPopup.leave(kind: widget.kind));
     },
-    child: widget.onTap == null
+    child: widget.onTap == null && !widget.openOnTap
         ? widget.child
-        : InkWell(onTap: widget.onTap, child: widget.child),
+        : InkWell(
+            onTap: widget.openOnTap ? _activate : widget.onTap,
+            child: widget.child,
+          ),
   );
 }
