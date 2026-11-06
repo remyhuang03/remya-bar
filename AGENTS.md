@@ -71,7 +71,7 @@
   ```
 - Run `fvm flutter pub get` after dependency changes. Use `fvm flutter run -d linux --no-start-paused` for interactive verification so all per-output engines render. Run release builds when release behavior changes.
 - After development and verification, stop all bar instances started for the task and confirm their layer surfaces and reserved space are released. Do not leave development bars running or stop unrelated desktop bars.
-- Keep durable tests for non-trivial logic and regressions; remove temporary UI inspection tests after verification and avoid duplicate coverage.
+- Keep durable tests for non-trivial logic and regressions. Before committing, remove obsolete, duplicate, and temporary test files, including UI control inspection tests whose verification is complete.
 - Keep debug and release builds/tests sequential within this repository because Flutter shares ephemeral native engine files between modes.
 - A successful build does not verify desktop behavior. Check affected window behavior and interactions on the real desktop; report untested boundaries.
 - Validate configuration input, preserve the last valid state on errors, and use atomic persistence when writing configuration is introduced. Never commit secrets or machine-specific configuration.

@@ -2,7 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
-import '../../../bar_theme.dart';
+import '../../bar_theme.dart';
+import '../media/media_preview.dart';
 import 'bar_popup.dart';
 
 class BarPopupApp extends StatefulWidget {
@@ -13,7 +14,21 @@ class BarPopupApp extends StatefulWidget {
 }
 
 class _BarPopupAppState extends State<BarPopupApp> {
+  final _navigator = GlobalKey<NavigatorState>();
   Map<Object?, Object?>? _content;
+  String? _actionError;
+
+  Future<void> _action(Map<String, Object?> action) async {
+    try {
+      await BarPopup.action(action);
+      if (mounted) setState(() => _actionError = null);
+    } catch (error) {
+      debugPrint('Media action: $error');
+      if (mounted) {
+        setState(() => _actionError = 'Action failed. Please try again.');
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -21,7 +36,11 @@ class _BarPopupAppState extends State<BarPopupApp> {
     BarPopup.channel.setMethodCallHandler((call) async {
       if (call.method != 'content') throw MissingPluginException();
       if (mounted) {
-        setState(() => _content = call.arguments as Map<Object?, Object?>);
+        setState(() {
+          final next = call.arguments as Map<Object?, Object?>;
+          if (_content?['kind'] != next['kind']) _actionError = null;
+          _content = next;
+        });
       }
     });
     BarPopup.channel.invokeMethod<void>('ready');
@@ -37,16 +56,45 @@ class _BarPopupAppState extends State<BarPopupApp> {
   Widget build(BuildContext context) {
     final content = _content;
     if (content == null) return const SizedBox.shrink();
-    final theme = RemyaTheme.fromMap(
+    final baseTheme = RemyaTheme.fromMap(
       Map<String, dynamic>.from(content['theme'] as Map),
     );
+    final seed = _seedColor(content['seed']);
+    final theme = seed == null
+        ? baseTheme
+        : RemyaTheme(
+            styleVariant: baseTheme.styleVariant,
+            mode: baseTheme.mode,
+            seedColor: seed,
+          );
     final data = content['data'] as Map;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      navigatorKey: _navigator,
+      builder: (context, child) => content['kind'] != 'media'
+          ? child!
+          : MouseRegion(
+              onEnter: (_) => BarPopup.enter(kind: 'media'),
+              onExit: (_) {
+                _navigator.currentState?.popUntil((route) => route.isFirst);
+                BarPopup.leave(kind: 'media');
+              },
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: .linear((data['scale'] as num?)?.toDouble() ?? 1),
+                ),
+                child: child!,
+              ),
+            ),
       theme: barTheme(theme.theme(.light)),
       darkTheme: barTheme(theme.theme(.dark)),
       themeMode: theme.mode,
       home: switch (content['kind']) {
+        'media' => MediaPreview(
+          data: {...Map<String, Object?>.from(data), 'error': ?_actionError},
+          onAction: _action,
+          styleVariant: theme.styleVariant,
+        ),
         'tooltip' => _TooltipContent(
           message: data['message'] as String,
           scale: (data['scale'] as num).toDouble(),
@@ -56,6 +104,9 @@ class _BarPopupAppState extends State<BarPopupApp> {
     );
   }
 }
+
+Color? _seedColor(Object? rgb) =>
+    rgb is int && rgb >= 0 && rgb <= 0xFFFFFF ? Color(0xFF000000 | rgb) : null;
 
 class _TooltipContent extends StatelessWidget {
   const _TooltipContent({required this.message, required this.scale});

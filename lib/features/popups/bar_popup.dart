@@ -23,7 +23,38 @@ abstract final class BarPopup {
     required Size size,
     required Map<String, Object?> data,
     required RemyaTheme theme,
-  }) => channel.invokeMethod<void>('show', {
+  }) => _send(
+    'show',
+    kind: kind,
+    anchor: anchor,
+    size: size,
+    data: data,
+    theme: theme,
+  );
+
+  static Future<void> update({
+    required String kind,
+    required Rect anchor,
+    required Size size,
+    required Map<String, Object?> data,
+    required RemyaTheme theme,
+  }) => _send(
+    'update',
+    kind: kind,
+    anchor: anchor,
+    size: size,
+    data: data,
+    theme: theme,
+  );
+
+  static Future<void> _send(
+    String method, {
+    required String kind,
+    required Rect anchor,
+    required Size size,
+    required Map<String, Object?> data,
+    required RemyaTheme theme,
+  }) => channel.invokeMethod<void>(method, {
     'kind': kind,
     'anchor': [
       anchor.left.floor(),
@@ -33,11 +64,20 @@ abstract final class BarPopup {
     ],
     'size': [size.width.ceil(), size.height.ceil()],
     'data': data,
+    'seed': theme.seedColor.toARGB32() & 0xFFFFFF,
     'theme': ThemeConfig(
       styleVariant: theme.styleVariant.configKey,
       mode: theme.mode.name,
     ).toMap(),
   });
 
-  static Future<void> hide() => channel.invokeMethod<void>('hide');
+  static Future<void> hide({String? kind}) =>
+      channel.invokeMethod<void>('hide', kind == null ? null : {'kind': kind});
+
+  static Future<void> enter({String? kind}) =>
+      channel.invokeMethod<void>('enter', kind == null ? null : {'kind': kind});
+  static Future<void> leave({String? kind}) =>
+      channel.invokeMethod<void>('leave', kind == null ? null : {'kind': kind});
+  static Future<void> action(Map<String, Object?> action) =>
+      channel.invokeMethod<void>('action', action);
 }

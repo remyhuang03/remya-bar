@@ -73,7 +73,7 @@ class SystemRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -2063801198;
+  int get rustContentHash => -1724791273;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -86,6 +86,19 @@ class SystemRustLib
 
 abstract class SystemRustLibApi extends BaseApi {
   Future<List<BatterySnapshot>> crateApiBatteries();
+
+  Future<void> crateApiMediaAction({
+    required String busName,
+    required String action,
+  });
+
+  Future<List<MediaPlayerSnapshot>> crateApiMediaPlayers();
+
+  Future<void> crateApiMediaSeek({
+    required String busName,
+    required String track,
+    required double seconds,
+  });
 }
 
 class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
@@ -124,6 +137,103 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   TaskConstMeta get kCrateApiBatteriesConstMeta =>
       const TaskConstMeta(debugName: "batteries", argNames: []);
 
+  @override
+  Future<void> crateApiMediaAction({
+    required String busName,
+    required String action,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(busName, serializer);
+          sse_encode_String(action, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 2,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiMediaActionConstMeta,
+        argValues: [busName, action],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMediaActionConstMeta => const TaskConstMeta(
+    debugName: "media_action",
+    argNames: ["busName", "action"],
+  );
+
+  @override
+  Future<List<MediaPlayerSnapshot>> crateApiMediaPlayers() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 3,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_media_player_snapshot,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiMediaPlayersConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMediaPlayersConstMeta =>
+      const TaskConstMeta(debugName: "media_players", argNames: []);
+
+  @override
+  Future<void> crateApiMediaSeek({
+    required String busName,
+    required String track,
+    required double seconds,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(busName, serializer);
+          sse_encode_String(track, serializer);
+          sse_encode_f_64(seconds, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 4,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiMediaSeekConstMeta,
+        argValues: [busName, track, seconds],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiMediaSeekConstMeta => const TaskConstMeta(
+    debugName: "media_seek",
+    argNames: ["busName", "track", "seconds"],
+  );
+
   @protected
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -141,6 +251,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       percent: dco_decode_opt_box_autoadd_f_64(arr[1]),
       state: dco_decode_String(arr[2]),
     );
+  }
+
+  @protected
+  bool dco_decode_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as bool;
   }
 
   @protected
@@ -162,9 +278,48 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  List<MediaPlayerSnapshot> dco_decode_list_media_player_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_media_player_snapshot)
+        .toList();
+  }
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
+  }
+
+  @protected
+  MediaPlayerSnapshot dco_decode_media_player_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 15)
+      throw Exception('unexpected arr length: expect 15 but see ${arr.length}');
+    return MediaPlayerSnapshot(
+      busName: dco_decode_String(arr[0]),
+      identity: dco_decode_String(arr[1]),
+      title: dco_decode_String(arr[2]),
+      artist: dco_decode_String(arr[3]),
+      album: dco_decode_String(arr[4]),
+      artUrl: dco_decode_String(arr[5]),
+      playbackStatus: dco_decode_String(arr[6]),
+      canControl: dco_decode_bool(arr[7]),
+      canGoNext: dco_decode_bool(arr[8]),
+      canGoPrevious: dco_decode_bool(arr[9]),
+      canPlay: dco_decode_bool(arr[10]),
+      canPause: dco_decode_bool(arr[11]),
+      seekToken: dco_decode_opt_String(arr[12]),
+      positionSeconds: dco_decode_opt_box_autoadd_f_64(arr[13]),
+      lengthSeconds: dco_decode_opt_box_autoadd_f_64(arr[14]),
+    );
+  }
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_String(raw);
   }
 
   @protected
@@ -206,6 +361,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  bool sse_decode_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
   double sse_decode_box_autoadd_f_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_f_64(deserializer));
@@ -232,10 +393,74 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  List<MediaPlayerSnapshot> sse_decode_list_media_player_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <MediaPlayerSnapshot>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_media_player_snapshot(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
+  MediaPlayerSnapshot sse_decode_media_player_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_busName = sse_decode_String(deserializer);
+    var var_identity = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_artist = sse_decode_String(deserializer);
+    var var_album = sse_decode_String(deserializer);
+    var var_artUrl = sse_decode_String(deserializer);
+    var var_playbackStatus = sse_decode_String(deserializer);
+    var var_canControl = sse_decode_bool(deserializer);
+    var var_canGoNext = sse_decode_bool(deserializer);
+    var var_canGoPrevious = sse_decode_bool(deserializer);
+    var var_canPlay = sse_decode_bool(deserializer);
+    var var_canPause = sse_decode_bool(deserializer);
+    var var_seekToken = sse_decode_opt_String(deserializer);
+    var var_positionSeconds = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_lengthSeconds = sse_decode_opt_box_autoadd_f_64(deserializer);
+    return MediaPlayerSnapshot(
+      busName: var_busName,
+      identity: var_identity,
+      title: var_title,
+      artist: var_artist,
+      album: var_album,
+      artUrl: var_artUrl,
+      playbackStatus: var_playbackStatus,
+      canControl: var_canControl,
+      canGoNext: var_canGoNext,
+      canGoPrevious: var_canGoPrevious,
+      canPlay: var_canPlay,
+      canPause: var_canPause,
+      seekToken: var_seekToken,
+      positionSeconds: var_positionSeconds,
+      lengthSeconds: var_lengthSeconds,
+    );
+  }
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_String(deserializer));
+    } else {
+      return null;
+    }
   }
 
   @protected
@@ -267,12 +492,6 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
-  bool sse_decode_bool(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getUint8() != 0;
-  }
-
-  @protected
   void sse_encode_String(String self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer);
@@ -287,6 +506,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_String(self.name, serializer);
     sse_encode_opt_box_autoadd_f_64(self.percent, serializer);
     sse_encode_String(self.state, serializer);
+  }
+
+  @protected
+  void sse_encode_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint8(self ? 1 : 0);
   }
 
   @protected
@@ -314,6 +539,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_list_media_player_snapshot(
+    List<MediaPlayerSnapshot> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_media_player_snapshot(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -321,6 +558,39 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
+  }
+
+  @protected
+  void sse_encode_media_player_snapshot(
+    MediaPlayerSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.busName, serializer);
+    sse_encode_String(self.identity, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_String(self.artist, serializer);
+    sse_encode_String(self.album, serializer);
+    sse_encode_String(self.artUrl, serializer);
+    sse_encode_String(self.playbackStatus, serializer);
+    sse_encode_bool(self.canControl, serializer);
+    sse_encode_bool(self.canGoNext, serializer);
+    sse_encode_bool(self.canGoPrevious, serializer);
+    sse_encode_bool(self.canPlay, serializer);
+    sse_encode_bool(self.canPause, serializer);
+    sse_encode_opt_String(self.seekToken, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.positionSeconds, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.lengthSeconds, serializer);
+  }
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_String(self, serializer);
+    }
   }
 
   @protected
@@ -348,11 +618,5 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
-  }
-
-  @protected
-  void sse_encode_bool(bool self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putUint8(self ? 1 : 0);
   }
 }

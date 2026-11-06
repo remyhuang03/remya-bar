@@ -61,3 +61,34 @@ fn percentage(value: Option<f64>, total: Option<f64>) -> Option<f64> {
     let total = total.filter(|v| *v > 0.0)?;
     Some(value? / total * 100.0)
 }
+
+#[derive(Clone, Debug)]
+pub struct MediaPlayerSnapshot {
+    pub bus_name: String,
+    pub identity: String,
+    pub title: String,
+    pub artist: String,
+    pub album: String,
+    pub art_url: String,
+    pub playback_status: String,
+    pub can_control: bool,
+    pub can_go_next: bool,
+    pub can_go_previous: bool,
+    pub can_play: bool,
+    pub can_pause: bool,
+    pub seek_token: Option<String>,
+    pub position_seconds: Option<f64>,
+    pub length_seconds: Option<f64>,
+}
+
+pub async fn media_players() -> Result<Vec<MediaPlayerSnapshot>, String> {
+    crate::media::players().await
+}
+
+pub async fn media_action(bus_name: String, action: String) -> Result<(), String> {
+    crate::media::action(&bus_name, &action, None).await
+}
+
+pub async fn media_seek(bus_name: String, track: String, seconds: f64) -> Result<(), String> {
+    crate::media::action(&bus_name, "seek", Some((&track, seconds))).await
+}

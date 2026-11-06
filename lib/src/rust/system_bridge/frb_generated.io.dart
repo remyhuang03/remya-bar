@@ -29,6 +29,9 @@ abstract class SystemRustLibApiImplPlatform
   BatterySnapshot dco_decode_battery_snapshot(dynamic raw);
 
   @protected
+  bool dco_decode_bool(dynamic raw);
+
+  @protected
   double dco_decode_box_autoadd_f_64(dynamic raw);
 
   @protected
@@ -38,7 +41,16 @@ abstract class SystemRustLibApiImplPlatform
   List<BatterySnapshot> dco_decode_list_battery_snapshot(dynamic raw);
 
   @protected
+  List<MediaPlayerSnapshot> dco_decode_list_media_player_snapshot(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  MediaPlayerSnapshot dco_decode_media_player_snapshot(dynamic raw);
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw);
 
   @protected
   double? dco_decode_opt_box_autoadd_f_64(dynamic raw);
@@ -56,6 +68,9 @@ abstract class SystemRustLibApiImplPlatform
   BatterySnapshot sse_decode_battery_snapshot(SseDeserializer deserializer);
 
   @protected
+  bool sse_decode_bool(SseDeserializer deserializer);
+
+  @protected
   double sse_decode_box_autoadd_f_64(SseDeserializer deserializer);
 
   @protected
@@ -67,7 +82,20 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  List<MediaPlayerSnapshot> sse_decode_list_media_player_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  MediaPlayerSnapshot sse_decode_media_player_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
   double? sse_decode_opt_box_autoadd_f_64(SseDeserializer deserializer);
@@ -82,9 +110,6 @@ abstract class SystemRustLibApiImplPlatform
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
-  bool sse_decode_bool(SseDeserializer deserializer);
-
-  @protected
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
@@ -92,6 +117,9 @@ abstract class SystemRustLibApiImplPlatform
     BatterySnapshot self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_f_64(double self, SseSerializer serializer);
@@ -106,10 +134,25 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  void sse_encode_list_media_player_snapshot(
+    List<MediaPlayerSnapshot> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_media_player_snapshot(
+    MediaPlayerSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_f_64(double? self, SseSerializer serializer);
@@ -122,9 +165,6 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_bool(bool self, SseSerializer serializer);
 }
 
 // Section: wire_class

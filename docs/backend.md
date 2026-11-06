@@ -138,3 +138,12 @@ Peripheral batteries are excluded. The first system battery is shown when its
 charge is available, and only the kernel status `Charging` shows a bolt. Charge at
 or below 20% takes color precedence over energy saver. The saver color follows the
 live `system.profile` from Settings' public `Get power` operation.
+
+## Media control
+
+The Bar polls MPRIS on the session bus and shares its Rust player selection
+across outputs. The pill uses the selected player's position and duration.
+The hover card sends transport and seek commands to that player. Rust checks
+capabilities and validates the unique owner and track ID before seeking.
+The output slider reads the default device via Settings' public Sound API
+and writes the named device through `sound.output-volume`.

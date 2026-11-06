@@ -8,10 +8,29 @@ import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `percentage`, `read_number`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `fmt`, `fmt`
 
 Future<List<BatterySnapshot>> batteries() =>
     SystemRustLib.instance.api.crateApiBatteries();
+
+Future<List<MediaPlayerSnapshot>> mediaPlayers() =>
+    SystemRustLib.instance.api.crateApiMediaPlayers();
+
+Future<void> mediaAction({required String busName, required String action}) =>
+    SystemRustLib.instance.api.crateApiMediaAction(
+      busName: busName,
+      action: action,
+    );
+
+Future<void> mediaSeek({
+  required String busName,
+  required String track,
+  required double seconds,
+}) => SystemRustLib.instance.api.crateApiMediaSeek(
+  busName: busName,
+  track: track,
+  seconds: seconds,
+);
 
 class BatterySnapshot {
   final String name;
@@ -35,4 +54,79 @@ class BatterySnapshot {
           name == other.name &&
           percent == other.percent &&
           state == other.state;
+}
+
+class MediaPlayerSnapshot {
+  final String busName;
+  final String identity;
+  final String title;
+  final String artist;
+  final String album;
+  final String artUrl;
+  final String playbackStatus;
+  final bool canControl;
+  final bool canGoNext;
+  final bool canGoPrevious;
+  final bool canPlay;
+  final bool canPause;
+  final String? seekToken;
+  final double? positionSeconds;
+  final double? lengthSeconds;
+
+  const MediaPlayerSnapshot({
+    required this.busName,
+    required this.identity,
+    required this.title,
+    required this.artist,
+    required this.album,
+    required this.artUrl,
+    required this.playbackStatus,
+    required this.canControl,
+    required this.canGoNext,
+    required this.canGoPrevious,
+    required this.canPlay,
+    required this.canPause,
+    this.seekToken,
+    this.positionSeconds,
+    this.lengthSeconds,
+  });
+
+  @override
+  int get hashCode =>
+      busName.hashCode ^
+      identity.hashCode ^
+      title.hashCode ^
+      artist.hashCode ^
+      album.hashCode ^
+      artUrl.hashCode ^
+      playbackStatus.hashCode ^
+      canControl.hashCode ^
+      canGoNext.hashCode ^
+      canGoPrevious.hashCode ^
+      canPlay.hashCode ^
+      canPause.hashCode ^
+      seekToken.hashCode ^
+      positionSeconds.hashCode ^
+      lengthSeconds.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MediaPlayerSnapshot &&
+          runtimeType == other.runtimeType &&
+          busName == other.busName &&
+          identity == other.identity &&
+          title == other.title &&
+          artist == other.artist &&
+          album == other.album &&
+          artUrl == other.artUrl &&
+          playbackStatus == other.playbackStatus &&
+          canControl == other.canControl &&
+          canGoNext == other.canGoNext &&
+          canGoPrevious == other.canGoPrevious &&
+          canPlay == other.canPlay &&
+          canPause == other.canPause &&
+          seekToken == other.seekToken &&
+          positionSeconds == other.positionSeconds &&
+          lengthSeconds == other.lengthSeconds;
 }

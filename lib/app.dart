@@ -1,8 +1,10 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 import 'bar_theme.dart';
 import 'features/battery/bar_battery.dart';
+import 'features/media/bar_media.dart';
 import 'features/system/system_backend.dart';
 import 'features/clock/bar_clock.dart';
 import 'features/hyprland/hyprland_backend.dart';
@@ -30,7 +32,50 @@ class RemyaBarApp extends StatefulWidget {
 
 class _RemyaBarAppState extends State<RemyaBarApp> {
   @override
+  void initState() {
+    super.initState();
+    BarPopup.channel.setMethodCallHandler(_popupAction);
+  }
+
+  Future<void> _popupAction(MethodCall call) async {
+    if (call.method != 'action') throw MissingPluginException();
+    final args = call.arguments;
+    if (args is! Map) throw const FormatException('Invalid popup action');
+    final action = args['action'];
+    if (action == 'media.volume' &&
+        args['output'] is String &&
+        args['percent'] is num) {
+      final system = widget.system;
+      if (system == null) throw StateError('Audio output unavailable');
+      await system.setMediaVolume(
+        args['output'] as String,
+        (args['percent'] as num).toDouble(),
+      );
+    } else if (action is String &&
+        action.startsWith('media.') &&
+        args['player'] is String) {
+      final system = widget.system;
+      if (system == null) throw StateError('Media unavailable');
+      final player = args['player'] as String;
+      if (action == 'media.seek' &&
+          args['track'] is String &&
+          args['seconds'] is num) {
+        await system.mediaSeek(
+          player,
+          args['track'] as String,
+          (args['seconds'] as num).toDouble(),
+        );
+      } else {
+        await system.mediaAction(player, action.substring(6));
+      }
+    } else {
+      throw const FormatException('Invalid media action');
+    }
+  }
+
+  @override
   void dispose() {
+    BarPopup.channel.setMethodCallHandler(null);
     widget.preferences.dispose();
     widget.hyprland?.dispose();
     widget.system?.dispose();
@@ -89,6 +134,19 @@ class _BarContent extends StatelessWidget {
               left: error == null ? 40 : 60,
               right: error == null ? 40 : 60,
               child: const Center(child: BarClock()),
+            ),
+          if (system case final backend?
+              when constraints.maxWidth >= 720 && backend.players.isNotEmpty)
+            Align(
+              alignment: .centerLeft,
+              child: SizedBox(
+                width: BarMedia.width,
+                child: BarMedia(
+                  players: backend.players,
+                  output: backend.mediaOutput,
+                  onAction: backend.mediaAction,
+                ),
+              ),
             ),
           Align(
             alignment: .centerRight,

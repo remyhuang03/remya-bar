@@ -32,7 +32,7 @@ notices = ["Rust backend third-party notices\n",
            "gtk-layer-shell/GLib/GIO/GObject are dynamically linked system libraries, not copied into the bundle.\n"
            "Their LGPL notices are supplied by the operating system packages.\n"]
 count = 0
-for package in sorted((packages[item] for item in included - backends),
+for package in sorted((packages[item] for item in included if item not in backends),
                       key=lambda item: (item["name"], item["version"])):
     # This release declares license-file rather than an SPDX expression.
     reviewed_file_licenses = {('allo-isolate', '0.1.27'): 'Apache-2.0'}
@@ -65,5 +65,6 @@ for package in sorted((packages[item] for item in included - backends),
         notices.append(f"\n{file.name}\n{text}\n")
     count += 1
 assert count > 0
-(root / 'assets/licenses/rust-dependencies.txt').write_text(''.join(notices).rstrip() + '\n')
+(root / 'assets/licenses/rust-dependencies.txt').write_text(
+    '\n'.join(line.rstrip() for line in ''.join(notices).splitlines()).rstrip() + '\n')
 print(f"Bundled notices for {count} Rust dependencies")

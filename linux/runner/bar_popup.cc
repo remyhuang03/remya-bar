@@ -1,4 +1,5 @@
 #include "bar_popup.h"
+#include <gtk-layer-shell.h>
 
 #include <cstdint>
 
@@ -12,18 +13,40 @@ struct BarPopup {
   FlView* view = nullptr;
   FlMethodChannel* channel = nullptr;
   FlValue* content = nullptr;
+  FlMethodChannel* owner_channel = nullptr;
+  guint hide_timer = 0;
   bool ready = false;
   bool visible = false;
 
+  void cancel_hide() {
+    if (hide_timer != 0) g_source_remove(hide_timer);
+    hide_timer = 0;
+  }
+
+  void hide() {
+    cancel_hide();
+    visible = false;
+    if (window != nullptr) gtk_widget_hide(window);
+  }
+
   ~BarPopup() {
+    cancel_hide();
     if (window != nullptr) {
       gtk_widget_destroy(window);
       g_object_unref(window);
     }
     g_clear_object(&channel);
+    g_clear_object(&owner_channel);
     g_clear_pointer(&content, fl_value_unref);
   }
 };
+
+const char* kind_of(FlValue* content) {
+  if (content == nullptr || fl_value_get_type(content) != FL_VALUE_TYPE_MAP) return "";
+  FlValue* kind = fl_value_lookup_string(content, "kind");
+  return kind != nullptr && fl_value_get_type(kind) == FL_VALUE_TYPE_STRING
+      ? fl_value_get_string(kind) : "";
+}
 
 void send_content(BarPopup* state) {
   if (state->ready && state->visible && state->content != nullptr) {
@@ -32,15 +55,43 @@ void send_content(BarPopup* state) {
   }
 }
 
+void schedule_hide(BarPopup* state) {
+  state->cancel_hide();
+  state->hide_timer = g_timeout_add(180, [](gpointer data) -> gboolean {
+    auto* state = static_cast<BarPopup*>(data);
+    state->hide_timer = 0;
+    state->hide();
+    return G_SOURCE_REMOVE;
+  }, state);
+}
+
 void popup_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   auto* state = static_cast<BarPopup*>(data);
-  if (g_strcmp0(fl_method_call_get_name(call), "ready") != 0) {
+  const char* method = fl_method_call_get_name(call);
+  if (g_strcmp0(method, "ready") == 0) {
+    state->ready = true;
+    fl_method_call_respond_success(call, nullptr, nullptr);
+    send_content(state);
+  } else if (g_strcmp0(kind_of(state->content), "media") == 0 &&
+             (g_strcmp0(method, "enter") == 0 || g_strcmp0(method, "leave") == 0)) {
+    if (g_strcmp0(method, "enter") == 0) state->cancel_hide();
+    else schedule_hide(state);
+    fl_method_call_respond_success(call, nullptr, nullptr);
+  } else if (g_strcmp0(method, "action") == 0 && state->visible &&
+             g_strcmp0(kind_of(state->content), "media") == 0) {
+    FlValue* args = fl_method_call_get_args(call);
+    fl_method_channel_invoke_method(state->owner_channel, "action", args, nullptr,
+        [](GObject* channel, GAsyncResult* result, gpointer data) {
+          g_autoptr(FlMethodCall) call = FL_METHOD_CALL(data);
+          g_autoptr(GError) error = nullptr;
+          g_autoptr(FlMethodResponse) response = fl_method_channel_invoke_method_finish(
+              FL_METHOD_CHANNEL(channel), result, &error);
+          if (response != nullptr) fl_method_call_respond(call, response, nullptr);
+          else fl_method_call_respond_error(call, "action-failed", error->message, nullptr, nullptr);
+        }, g_object_ref(call));
+  } else {
     fl_method_call_respond_not_implemented(call, nullptr);
-    return;
   }
-  state->ready = true;
-  fl_method_call_respond_success(call, nullptr, nullptr);
-  send_content(state);
 }
 
 void create_popup(BarPopup* state) {
@@ -86,9 +137,21 @@ bool int_at(FlValue* list, size_t index, int64_t minimum, int64_t maximum, int* 
 void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   auto* state = static_cast<BarPopup*>(data);
   const char* method = fl_method_call_get_name(call);
-  if (g_strcmp0(method, "hide") == 0) {
-    state->visible = false;
-    if (state->window != nullptr) gtk_widget_hide(state->window);
+  FlValue* args = fl_method_call_get_args(call);
+  const char* kind = kind_of(args);
+  const bool matches = kind[0] == '\0' || g_strcmp0(kind, kind_of(state->content)) == 0;
+  if (g_strcmp0(method, "hide") == 0 || g_strcmp0(method, "enter") == 0 ||
+      g_strcmp0(method, "leave") == 0 || g_strcmp0(method, "update") == 0) {
+    if (matches) {
+      if (g_strcmp0(method, "hide") == 0) state->hide();
+      else if (g_strcmp0(method, "enter") == 0) state->cancel_hide();
+      else if (g_strcmp0(method, "leave") == 0) schedule_hide(state);
+      else if (state->visible) {
+        g_clear_pointer(&state->content, fl_value_unref);
+        state->content = fl_value_ref(args);
+        send_content(state);
+      }
+    }
     fl_method_call_respond_success(call, nullptr, nullptr);
     return;
   }
@@ -96,7 +159,6 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
     fl_method_call_respond_not_implemented(call, nullptr);
     return;
   }
-  FlValue* args = fl_method_call_get_args(call);
   FlValue* anchor = fl_value_get_type(args) == FL_VALUE_TYPE_MAP
                         ? fl_value_lookup_string(args, "anchor") : nullptr;
   FlValue* size = fl_value_get_type(args) == FL_VALUE_TYPE_MAP
@@ -117,7 +179,15 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   if (state->window == nullptr) create_popup(state);
   g_clear_pointer(&state->content, fl_value_unref);
   state->content = fl_value_ref(args);
+  state->cancel_hide();
   state->visible = true;
+  auto* owner = GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(state->owner)));
+  if (auto* monitor = gtk_layer_get_monitor(owner); monitor != nullptr) {
+    GdkRectangle bounds;
+    gdk_monitor_get_geometry(monitor, &bounds);
+    width = MIN(width, MAX(1, bounds.width - 16));
+    height = MIN(height, MAX(1, bounds.height - 56));
+  }
   gtk_widget_set_size_request(GTK_WIDGET(state->view), width, height);
   gtk_window_resize(GTK_WINDOW(state->window), width, height);
   gtk_widget_realize(state->window);
@@ -141,5 +211,6 @@ void register_bar_popup(FlView* owner) {
   g_autoptr(FlMethodChannel) channel = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(owner)),
       "top.remya.bar/popup", FL_METHOD_CODEC(codec));
+  state->owner_channel = FL_METHOD_CHANNEL(g_object_ref(channel));
   fl_method_channel_set_method_call_handler(channel, owner_method, state, nullptr);
 }
