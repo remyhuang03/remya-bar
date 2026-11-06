@@ -3,14 +3,11 @@ import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 import '../../bar_theme.dart';
-import '../media/media_preview.dart';
-import '../battery/battery_card.dart';
-import 'bar_card_surface.dart';
 import '../tray/tray_menu_popup.dart';
+import 'bar_detail_card.dart';
 import 'bar_popup.dart';
 import 'popup_measure.dart';
 import '../sidebar/right_sidebar.dart';
-import '../resources/resource_card.dart';
 
 class BarPopupApp extends StatefulWidget {
   const BarPopupApp({super.key});
@@ -215,22 +212,13 @@ class _BarPopupAppState extends State<BarPopupApp> {
             data: details,
             onAction: _action,
           ),
-          'media' => MediaPreview(
+          _ => BarDetailCard(
+            kind: _kind!,
             data: details,
             onAction: _action,
             styleVariant: _theme!.styleVariant,
+            seedColor: _seedColor(details['cardSeed']),
           ),
-          'resources' => BarCardSurface(
-            child: ResourceCard(
-              data: details,
-              onOpenMonitor: () =>
-                  _action(const {'action': 'resources.monitor'}),
-            ),
-          ),
-          'battery' => BarCardSurface(
-            child: BatteryCard(data: details, onAction: _action),
-          ),
-          _ => const SizedBox.shrink(),
         },
       ),
     ],

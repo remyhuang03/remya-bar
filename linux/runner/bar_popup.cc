@@ -223,6 +223,14 @@ void create_popup(BarPopup* state, bool sidebar, bool tray, bool resources, bool
   } else {
     gtk_window_set_type_hint(window, GDK_WINDOW_TYPE_HINT_TOOLTIP);
   }
+  if (resources) {
+    g_signal_connect(window, "key-press-event",
+        G_CALLBACK(+[](GtkWidget*, GdkEventKey* event, gpointer data) -> gboolean {
+          if (event->keyval != GDK_KEY_Escape) return FALSE;
+          static_cast<BarPopup*>(data)->hide();
+          return TRUE;
+        }), state);
+  }
   gtk_widget_set_app_paintable(state->window, TRUE);
   GdkVisual* visual = gdk_screen_get_rgba_visual(gtk_window_get_screen(window));
   if (visual != nullptr) gtk_widget_set_visual(GTK_WIDGET(window), visual);
@@ -409,6 +417,12 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   if (state->window == nullptr) create_popup(state, sidebar, tray, resources, tooltip);
   if (sidebar || tray || resources || tooltip) root->hide();
   if ((sidebar || tray) && root->resources_popup != nullptr) root->resources_popup->hide();
+  if (resources && root->tray_overflow != nullptr && !root->tray_overflow->dismiss_windows.empty()) {
+    g_autoptr(FlValue) args = fl_value_new_map();
+    fl_value_set_string_take(args, "action", fl_value_new_string("tray.outside"));
+    fl_method_channel_invoke_method(root->owner_channel, "action", args, nullptr, nullptr, nullptr);
+    root->tray_overflow->hide();
+  }
   if (!tooltip && root->tooltip_popup != nullptr) root->tooltip_popup->hide();
   if (sidebar) {
     if (root->tray_popup != nullptr) root->tray_popup->hide();

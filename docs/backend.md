@@ -23,8 +23,8 @@ the public opener launches the sibling repository's
 activation file is unnecessary. Build that Settings debug bundle first. Failed launches show
 an error tooltip/icon and remain retryable. The bar never writes settings files
 or applies desktop appearance itself. Bar and popup typography use the system
-Roboto Flex font, while preserving the shared CJK fallback list. Roboto Flex is a runtime
-dependency (`ttf-roboto-flex` on Arch), checked by the installer; no font files are bundled.
+Inter font, while preserving the shared CJK fallback list. Inter is a runtime
+dependency (`inter-font` on Arch), checked by the installer; no font files are bundled.
 
 Both apps use the same seed color, DynamicSchemeVariant mapping, typography
 fallback, Material 3 mode, and expressive icon style. Invalid updates retain the
@@ -247,3 +247,9 @@ refresh, with periodic reconciliation for missed events.
 The main bar budgets each side from the centered clock's available width.
 Resource spacing compacts and the media title yields space before a component
 is omitted. On the right, the launchers and battery get space before the tray.
+
+
+Battery and resource data share one cached hardware sample across outputs. Media
+discovery keeps its own refresh and retains its last successful player list if a
+read fails. The resource card closes on Escape and dismisses the tray overflow
+when it opens.
