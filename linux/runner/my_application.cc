@@ -104,6 +104,11 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
       },
       g_object_ref(monitor), g_object_unref);
   g_object_set_data(G_OBJECT(window_channel), "owner", view);
+  g_signal_connect_object(monitor, "notify::geometry",
+      G_CALLBACK(+[](GdkMonitor* monitor, GParamSpec*, FlMethodChannel* channel) {
+        g_autoptr(FlValue) geometry = output_geometry(monitor);
+        fl_method_channel_invoke_method(channel, "outputChanged", geometry, nullptr, nullptr, nullptr);
+      }), window_channel, G_CONNECT_DEFAULT);
   g_autoptr(FlStandardMethodCodec) paths_codec = fl_standard_method_codec_new();
   g_autoptr(FlMethodChannel) paths_channel = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)), "top.remya.paths",

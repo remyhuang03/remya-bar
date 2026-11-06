@@ -27,6 +27,7 @@ add_definitions(-DREMYA_REPOSITORY_DIR="${REMYA_REPOSITORY_DIR}")
 target_link_libraries(${BINARY_NAME} PRIVATE flutter)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK_LAYER_SHELL)
+target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GIO_UNIX)
 
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
@@ -34,13 +35,12 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 add_executable(bar_lifecycle_test EXCLUDE_FROM_ALL
   "../../test/bar_lifecycle_test.cc"
   "bar_popup.cc"
-  "bar_icons.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 apply_standard_settings(bar_lifecycle_test)
 target_include_directories(bar_lifecycle_test PRIVATE "${CMAKE_SOURCE_DIR}")
 target_link_libraries(bar_lifecycle_test PRIVATE
-  flutter PkgConfig::GTK PkgConfig::GTK_LAYER_SHELL
+  flutter PkgConfig::GTK PkgConfig::GTK_LAYER_SHELL PkgConfig::GIO_UNIX
 )
 set_target_properties(bar_lifecycle_test PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bundle"

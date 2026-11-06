@@ -18,7 +18,9 @@ import 'features/popups/bar_popup.dart';
 import 'features/resources/bar_resources.dart';
 import 'features/resources/resource_data.dart';
 import 'features/tray/bar_tray.dart';
-import 'features/settings/settings_button.dart';
+import 'features/window/bar_active_window.dart';
+import 'features/workspaces/bar_workspaces.dart';
+import 'widgets/bar_group.dart';
 import 'widgets/bar_tooltip.dart';
 
 Future<void> _openPowerSettings() => openRemyaSettings(page: 'power');
@@ -193,6 +195,11 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     widget.account?.addListener(_updateSidebar);
     widget.preferences.addListener(_updateSidebar);
     _window.setMethodCallHandler((call) async {
+      if (call.method == 'outputChanged') {
+        final geometry = Map<String, int>.from(call.arguments as Map);
+        widget.hyprland?.updateOutput(x: geometry['x']!, y: geometry['y']!);
+        return;
+      }
       if (call.method != 'toggleSidebar') throw MissingPluginException();
       final hyprland = widget.hyprland;
       if (hyprland == null) return;
@@ -275,6 +282,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     } else if (action == 'resources.monitor') {
       await openSystemMonitor();
       await BarPopup.hide(kind: 'resources');
+    } else if (action == 'settings') {
+      await widget.onOpenSettings();
     } else if (action == 'datetime.settings') {
       const page = 'date-time';
       await (widget.onOpenSettingsPage ??
@@ -314,7 +323,11 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([widget.preferences, widget.system]),
+      listenable: Listenable.merge([
+        widget.preferences,
+        widget.hyprland,
+        widget.system,
+      ]),
       builder: (context, _) => BarPopupScope(
         theme: widget.preferences.theme,
         child: MaterialApp(
@@ -328,10 +341,10 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
             child: Scaffold(
               body: _BarContent(
                 error: widget.preferences.error,
+                hyprland: widget.hyprland,
                 system: widget.system,
                 pillSnapshot: _pillSnapshot,
                 tray: widget.showTray ? BarTray(key: _tray) : null,
-                onOpenSettings: widget.onOpenSettings,
                 onToggleSidebar: _toggleSidebar,
               ),
             ),
@@ -345,18 +358,18 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 class _BarContent extends StatelessWidget {
   const _BarContent({
     required this.error,
-    required this.onOpenSettings,
     required this.onToggleSidebar,
     required this.pillSnapshot,
+    this.hyprland,
     this.system,
     this.tray,
   });
 
   final String? error;
   final SystemSnapshot? pillSnapshot;
+  final HyprlandBackend? hyprland;
   final SystemBackend? system;
   final Widget? tray;
-  final Future<void> Function() onOpenSettings;
   final Future<void> Function(Rect, double) onToggleSidebar;
 
   @override
@@ -365,107 +378,149 @@ class _BarContent extends StatelessWidget {
       // Layer-shell may configure a temporary 1-pixel width during startup.
       final width = constraints.maxWidth;
       if (width < 40) return const SizedBox.shrink();
-      final warningWidth = error != null && width >= 60 ? 20.0 : 0.0;
-      final showSidebar = width >= 80 + warningWidth;
-      final buttonsWidth = 40 + warningWidth + (showSidebar ? 40 : 0);
-      final textScale = MediaQuery.textScalerOf(context).scale(1);
-      final clockWidth = (width - 2 * buttonsWidth).clamp(
-        0.0,
-        176 + (textScale - 1).clamp(0.0, 2.0) * 80,
-      );
-      final showClock = width >= 200 && clockWidth >= 60;
-      final sideWidth = showClock ? (width - clockWidth) / 2 : width;
-      final leftBudget = showClock ? sideWidth - 4 : 0.0;
-      final hasMedia = system?.players.isNotEmpty == true;
-      final fullResourcesWidth = BarResources.widthFor(
-        context,
-        snapshot: pillSnapshot,
-      );
-      final compact = fullResourcesWidth + (hasMedia ? 116 : 0) > leftBudget;
-      final resourceWidth = compact
+      final scaledWidth = width / MediaQuery.textScalerOf(context).scale(1);
+      final wide = scaledWidth >= 700;
+      final window = hyprland?.currentWindow;
+      final hasWindow =
+          hyprland?.error == null &&
+          window != null &&
+          (window.title.isNotEmpty || window.appId.isNotEmpty);
+      final workspaceWidth =
+          wide &&
+              hyprland?.connected == true &&
+              hyprland?.error == null &&
+              hyprland!.workspaceSlots.isNotEmpty
+          ? BarWorkspaces.width + 16
+          : 0.0;
+      final workspaceLeft = (width - workspaceWidth) / 2;
+      final budget = workspaceLeft - 4;
+      final hasResources = BarResources.hasData(pillSnapshot);
+      final fullResourcesWidth = hasResources
+          ? BarResources.widthFor(context, snapshot: pillSnapshot)
+          : 0.0;
+      final compactResources = fullResourcesWidth + 112 > budget;
+      final resourcesWidth = hasResources && compactResources
           ? BarResources.widthFor(
               context,
               compact: true,
               snapshot: pillSnapshot,
             )
           : fullResourcesWidth;
-      final showResources = resourceWidth > 0 && resourceWidth <= leftBudget;
-      final mediaBudget = leftBudget - (showResources ? resourceWidth + 4 : 0);
-      final showMedia = hasMedia && mediaBudget >= 112;
-      final mediaWidth = mediaBudget.clamp(0.0, BarMedia.width);
-
-      final rightBudget = sideWidth - buttonsWidth;
-      final showBattery = system?.battery?.percent != null && rightBudget >= 56;
-      final trayWidth = (rightBudget - (showBattery ? 52 : 0) - 4).clamp(
-        0.0,
-        290.0,
-      );
+      final leadingReserve = hasWindow
+          ? (budget - resourcesWidth - 116).clamp(0.0, 72.0)
+          : 0.0;
+      final showResources =
+          hasResources && resourcesWidth + leadingReserve <= budget;
+      final remaining =
+          budget - leadingReserve - (showResources ? resourcesWidth + 4 : 0);
+      final mediaWidth =
+          system?.players.isNotEmpty == true &&
+              scaledWidth >= 1100 &&
+              remaining >= 112
+          ? remaining.clamp(112.0, BarMedia.width).toDouble()
+          : 0.0;
+      final leftWidth =
+          (showResources ? resourcesWidth : 0.0) +
+          (mediaWidth > 0 ? mediaWidth + (showResources ? 4 : 0) : 0.0);
+      final leftStart = workspaceLeft - 4 - leftWidth;
+      final trayWidth = wide && tray != null
+          ? (budget - 232 - 108).clamp(0.0, 290.0)
+          : 0.0;
+      final rightWidth = (budget - trayWidth - 108).clamp(0.0, 360.0);
+      final showBattery =
+          system?.battery?.percent?.isFinite == true && rightWidth >= 232;
+      final clock = BarClock(showSeconds: system?.showClockSeconds ?? true);
       return Stack(
         fit: .expand,
         children: [
-          if (showClock)
-            Positioned.fill(
-              left: sideWidth,
-              right: sideWidth,
-              child: Center(
-                child: BarClock(showSeconds: system?.showClockSeconds ?? true),
+          if (wide) ...[
+            if (workspaceWidth > 0)
+              Positioned(
+                left: workspaceLeft,
+                width: workspaceWidth,
+                top: 0,
+                bottom: 0,
+                child: BarGroup(child: BarWorkspaces(backend: hyprland)),
               ),
-            ),
-          if (showMedia || showResources)
-            Align(
-              alignment: .centerLeft,
+            if (leftWidth > 0)
+              Positioned(
+                left: leftStart,
+                width: leftWidth,
+                top: 0,
+                bottom: 0,
+                child: Row(
+                  spacing: 4,
+                  children: [
+                    if (showResources)
+                      SizedBox(
+                        width: resourcesWidth,
+                        child: BarResources(
+                          snapshot: pillSnapshot,
+                          cardSnapshot: system?.resourceSnapshot,
+                          compact: compactResources,
+                        ),
+                      ),
+                    if (mediaWidth > 0)
+                      SizedBox(
+                        width: mediaWidth,
+                        child: BarMedia(
+                          players: system!.players,
+                          output: system!.mediaOutput,
+                          error: system!.mediaError,
+                          onAction: system!.mediaAction,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            Positioned(
+              left: workspaceLeft + workspaceWidth + 4,
+              width: rightWidth,
+              top: 0,
+              bottom: 0,
               child: Row(
-                mainAxisSize: .min,
                 spacing: 4,
                 children: [
-                  if (showMedia)
-                    SizedBox(
-                      width: mediaWidth,
-                      child: BarMedia(
-                        players: system!.players,
-                        output: system!.mediaOutput,
-                        error: system!.mediaError,
-                        onAction: system!.mediaAction,
-                      ),
-                    ),
-                  if (showResources)
-                    SizedBox(
-                      width: resourceWidth,
-                      child: BarResources(
-                        snapshot: pillSnapshot,
-                        cardSnapshot: system?.resourceSnapshot,
-                        compact: compact,
-                      ),
+                  Flexible(child: clock),
+                  if (showBattery)
+                    BarBattery(
+                      battery: system!.battery,
+                      isPowerSaver: system!.isPowerSaver,
+                      power: system!.batteryPower,
                     ),
                 ],
               ),
+            ),
+            if (hasWindow && leftStart >= 64)
+              Positioned(
+                left: 12,
+                width: leftStart - 24,
+                top: 0,
+                bottom: 0,
+                child: BarActiveWindow(backend: hyprland),
+              ),
+          ] else if (width >= 200)
+            Positioned.fill(
+              left: error == null ? 40 : 60,
+              right: error == null ? 40 : 60,
+              child: Center(child: clock),
             ),
           Align(
             alignment: .centerRight,
             child: Row(
               mainAxisSize: .min,
               children: [
-                if (warningWidth > 0)
-                  BarTooltip(
+                if (error != null && width >= 60)
+                  const BarTooltip(
                     message: 'Theme unavailable',
-                    child: const Icon(Icons.warning_amber_rounded, size: 20),
+                    child: Icon(Icons.warning_amber_rounded, size: 20),
                   ),
-                if (showBattery)
-                  Padding(
-                    padding: const .only(right: 4),
-                    child: BarBattery(
-                      battery: system!.battery,
-                      isPowerSaver: system!.isPowerSaver,
-                      power: system!.batteryPower,
-                    ),
-                  ),
-                if (tray != null && trayWidth >= 44)
+                if (trayWidth >= 44)
                   ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: trayWidth),
                     child: tray,
                   ),
-                SettingsButton(onOpen: onOpenSettings),
-                if (showSidebar) BarSidebarButton(onToggle: onToggleSidebar),
+                BarSidebarButton(onToggle: onToggleSidebar),
               ],
             ),
           ),

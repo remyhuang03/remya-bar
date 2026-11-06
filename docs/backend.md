@@ -17,11 +17,11 @@ The package contains the versioned contract, D-Bus client, settings opener,
 MD3E theme, and observable theme controller. Release bars request the effective
 theme through `top.remya.settings.Service1`, use `Changed` signals, and refresh
 every two seconds to recover from service restarts. Settings starts in the
-background on demand; the release gear button calls `Open("home")`. In debug,
+background on demand; the sidebar Settings action calls `Open("remya-bar")`. In debug,
 the public opener launches the sibling repository's
 `build/linux/x64/debug/bundle/remya_settings` directly, so an installed D-Bus
 activation file is unnecessary. Build that Settings debug bundle first. Failed launches show
-an error tooltip/icon and remain retryable. The bar never writes settings files
+a popup error banner and remain retryable. The bar never writes settings files
 or applies desktop appearance itself. Bar and popup typography use the system
 Inter font, while preserving the shared CJK fallback list. Inter is a runtime
 dependency (`inter-font` on Arch), checked by the installer; no font files are bundled.
@@ -44,7 +44,8 @@ private config parsing. No speculative plugins or future modules are included.
 ## Hyprland IPC
 
 The `remya_bar_hyprland` Rust crate owns IPC. `flutter_rust_bridge` 2.13.0 exposes
-`hyprlandRequest(command)` and `subscribeHyprland()`; the handwritten Dart adapter
+`hyprlandRequest(command)`, `subscribeHyprland()`, the typed `hyprlandSnapshot()`
+and validated workspace actions; the handwritten Dart adapter
 is `lib/features/hyprland/hyprland_backend.dart`. The empty core crate is retained.
 Regenerate bindings using the matching generator and `flutter_rust_bridge.yaml`.
 Linux CMake builds and bundles the shared library for debug/profile/release.
@@ -122,13 +123,13 @@ text rendering with Flutter and does not change desktop scale or font settings.
 
 ## Clock
 
-`lib/features/clock/bar_clock.dart` displays the local system date and time at the
-geometric center of each output. It reads the real wall clock on every tick,
+`lib/features/clock/bar_clock.dart` displays the local system date and time to
+the right of the workspaces on wide outputs, and centered on narrow outputs. It reads the real wall clock on every tick,
 aligns updates to second boundaries, and cancels its timer when an output view
 is removed. Only the clock widget rebuilds. It does not call Settings or spawn
 processes for each tick; time and time zone writes remain owned by Settings.
 The initial date/time format is deliberately fixed, with no formatting preference.
-Very narrow transitional surfaces omit the clock so the Settings launcher remains usable.
+Very narrow transitional surfaces omit the clock so the sidebar button remains usable.
 
 
 ## Battery indicator
@@ -252,9 +253,44 @@ releases the bar's exclusive zone while hidden. Leaving fullscreen restores the
 40-pixel reservation and the existing Flutter view. Hyprland events trigger a
 refresh, with periodic reconciliation for missed events.
 
-The main bar budgets each side from the centered clock's available width.
-Resource spacing compacts and the media title yields space before a component
-is omitted. On the right, the launchers and battery get space before the tray.
+On outputs at least 700 logical pixels wide (after text scaling), the workspaces
+are centered. Resources and media sit left of them, with the active window title
+at the far left; the clock and battery sit to their right. The tray and sidebar
+button are right-aligned. Resource spacing compacts and window/media titles yield
+space before a component is omitted. Media needs 1100 logical pixels. Narrower
+outputs show the centered clock and the sidebar button; the tray is hidden.
+Capsules with missing data are omitted before their width is assigned.
+
+## Per-output workspace state
+
+Rust parses the real monitor, workspace, client and active-window IPC responses.
+GTK supplies the owning GDK monitor's logical geometry; Dart resolves it against
+Rust monitor coordinates, independently of focus and enumeration order. GDK
+geometry notifications (`top.remya.bar/window.outputChanged`) update this match.
+Ambiguous mirrored coordinates are unavailable rather than selecting another
+output. Named normal workspaces are supported. Rust produces eight 26px numeric
+slots in the owning output's current group, using global occupancy and the
+largest mapped window's app class. Special or named workspaces have an overlay;
+missing normal slots are genuine navigation targets, not detected occupied state.
+The active indicator is a 22px animated circle; 26px circular buttons contain
+22px circularly clipped icons with preserved aspect ratios. GTK/GIO resolves
+application classes to cached themed PNG paths (`top.remya.bar/icons.lookup`)
+for presentation; SVG-only/missing icons use a Material fallback. No icon files
+or settings are written.
+
+Each output's current window is the focused client when it is visible there,
+otherwise its selected workspace's last window. Only mapped, non-hidden clients
+on the visible active/special workspace qualify. The title shows at the far left
+with the app class above it, collapsing to one line at large text scales.
+
+Relevant Hyprland events trigger coalesced state reads; a two-second reconciliation
+recovers missed events and state changes. Failed reads retain the last valid data
+and disable workspace controls until recovery. Switching validates the workspace
+in Rust and dispatches the installed Lua API. Existing targets retain their output;
+empty slots are created on the requesting bar's output. Wheel events use `r±1`
+after focusing that output, and back-button events toggle its default special
+workspace. Workspaces have no hover or right-click preview popup. No compositor
+configuration is installed.
 
 
 Battery and resource data share one cached hardware sample across outputs. Media

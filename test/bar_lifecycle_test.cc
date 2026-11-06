@@ -1,3 +1,4 @@
+#include "../linux/runner/bar_icons.cc"
 #include "../linux/runner/my_application.cc"
 
 static guint released_engines = 0;
@@ -52,6 +53,10 @@ static gboolean check_monitor_lifecycle(gpointer data) {
 }
 
 int main(int argc, char** argv) {
+  const auto desktop_id = normalized("Code.desktop");
+  const auto app_id = normalized("com.Example.App");
+  g_assert_cmpstr(desktop_id.c_str(), ==, "code");
+  g_assert_cmpstr(app_id.c_str(), ==, "com.example.app");
   g_autoptr(MyApplication) app = my_application_new();
   g_timeout_add(500, check_monitor_lifecycle, app);
   int status = g_application_run(G_APPLICATION(app), argc, argv);
