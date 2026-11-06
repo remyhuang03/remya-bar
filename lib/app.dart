@@ -20,7 +20,6 @@ import 'features/resources/resource_data.dart';
 import 'features/tray/bar_tray.dart';
 import 'features/settings/settings_button.dart';
 import 'widgets/bar_tooltip.dart';
-import 'widgets/bar_hover_card.dart';
 
 Future<void> _openPowerSettings() => openRemyaSettings(page: 'power');
 
@@ -448,7 +447,11 @@ class _BarContent extends StatelessWidget {
                 if (showBattery)
                   Padding(
                     padding: const .only(right: 4),
-                    child: _BatteryWithCard(system: system!),
+                    child: BarBattery(
+                      battery: system!.battery,
+                      isPowerSaver: system!.isPowerSaver,
+                      power: system!.batteryPower,
+                    ),
                   ),
                 if (tray != null && trayWidth >= 44)
                   ConstrainedBox(
@@ -464,30 +467,4 @@ class _BarContent extends StatelessWidget {
       );
     },
   );
-}
-
-class _BatteryWithCard extends StatelessWidget {
-  const _BatteryWithCard({required this.system});
-
-  final SystemBackend system;
-
-  @override
-  Widget build(BuildContext context) {
-    final battery = system.battery;
-    return BarHoverCard(
-      kind: 'battery',
-      size: const Size(420, 506),
-      data: {
-        'present': battery != null,
-        'percent': battery?.percent,
-        'status': battery?.state,
-        'secondsRemaining': battery?.remainingSeconds,
-        'powerWatts': battery?.powerWatts,
-        'healthPercent': battery?.healthPercent,
-        'cycleCount': battery?.cycleCount,
-        'power': system.batteryPower,
-      },
-      child: BarBattery(battery: battery, isPowerSaver: system.isPowerSaver),
-    );
-  }
 }

@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../bar_theme.dart';
+import '../../widgets/bar_hover_card.dart';
 import '../system/system_backend.dart';
 
 const _batteryGreen = Color(0xFF0AC20A);
@@ -33,6 +35,7 @@ class BarBattery extends StatelessWidget {
     this.isLow,
     this.isPowerSaver,
     this.isCharging,
+    this.power = const {},
   });
 
   final BatterySnapshot? battery;
@@ -40,6 +43,7 @@ class BarBattery extends StatelessWidget {
   final bool? isLow;
   final bool? isPowerSaver;
   final bool? isCharging;
+  final Map<String, Object?> power;
 
   @override
   Widget build(BuildContext context) {
@@ -72,8 +76,9 @@ class BarBattery extends StatelessWidget {
             Text(
               '$percent',
               style: baseStyle.copyWith(
-                fontFamily: 'Inter',
-                fontSize: 16,
+                fontFamily: barFontFamily,
+                fontFamilyFallback: barFontFamilyFallback,
+                fontSize: 15,
                 height: 1,
                 fontFeatures: const [],
                 color: color,
@@ -89,28 +94,42 @@ class BarBattery extends StatelessWidget {
       child: SizedBox(
         width: 48,
         height: 24,
-        child: Semantics(
-          label: 'Battery $percent%${charging ? ', charging' : ''}',
-          excludeSemantics: true,
-          child: ClipRRect(
-            borderRadius: .circular(12),
-            child: Stack(
-              fit: .expand,
-              children: [
-                if (percent < 100)
-                  ColoredBox(
-                    color: trackColor,
-                    child: buildLabel(onTrackColor),
-                  ),
-                if (percent > 0)
-                  ClipPath(
-                    clipper: _BatteryFillClipper(fraction),
-                    child: ColoredBox(
-                      color: fillColor,
-                      child: buildLabel(onFillColor),
+        child: BarHoverCard(
+          kind: 'battery',
+          size: const Size(420, 506),
+          data: {
+            'present': battery != null,
+            'percent': battery?.percent,
+            'status': battery?.state,
+            'secondsRemaining': battery?.remainingSeconds,
+            'powerWatts': battery?.powerWatts,
+            'healthPercent': battery?.healthPercent,
+            'cycleCount': battery?.cycleCount,
+            'power': power,
+          },
+          child: Semantics(
+            label: 'Battery $percent%${charging ? ', charging' : ''}',
+            excludeSemantics: true,
+            child: ClipRRect(
+              borderRadius: .circular(12),
+              child: Stack(
+                fit: .expand,
+                children: [
+                  if (percent < 100)
+                    ColoredBox(
+                      color: trackColor,
+                      child: buildLabel(onTrackColor),
                     ),
-                  ),
-              ],
+                  if (percent > 0)
+                    ClipPath(
+                      clipper: _BatteryFillClipper(fraction),
+                      child: ColoredBox(
+                        color: fillColor,
+                        child: buildLabel(onFillColor),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
