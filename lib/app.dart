@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 import 'bar_theme.dart';
+import 'features/account/account_profile_controller.dart';
+import 'features/sidebar/right_sidebar.dart';
+import 'features/sidebar/sidebar_backend.dart';
 import 'features/battery/bar_battery.dart';
 import 'features/media/bar_media.dart';
 import 'features/system/system_backend.dart';
@@ -26,6 +30,8 @@ class RemyaBarApp extends StatefulWidget {
     required this.preferences,
     this.hyprland,
     this.system,
+    this.account,
+    this.onOpenSettingsPage,
     this.showTray = false,
     this.onOpenSettings = openRemyaSettings,
     this.onOpenPowerSettings = _openPowerSettings,
@@ -34,6 +40,8 @@ class RemyaBarApp extends StatefulWidget {
   final SettingsThemeController preferences;
   final HyprlandBackend? hyprland;
   final SystemBackend? system;
+  final AccountProfileController? account;
+  final Future<void> Function(String page)? onOpenSettingsPage;
   final bool showTray;
   final Future<void> Function() onOpenSettings;
   final Future<void> Function() onOpenPowerSettings;
@@ -46,6 +54,88 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   SystemSnapshot? _pillSnapshot;
   Timer? _pillRefresh;
   final _tray = GlobalKey<BarTrayState>();
+  SidebarBackend? _sidebar;
+  bool _sidebarOpen = false;
+  String? _sidebarOutput;
+
+  Map<String, Object?> get _sidebarData => {
+    'account': widget.account?.data ?? const {},
+    ...?_sidebar?.data,
+  };
+
+  Future<void> _toggleSidebar(
+    Rect anchor,
+    double scale, {
+    String? focusedOutput,
+  }) async {
+    if (_sidebarOpen) {
+      _sidebarOpen = false;
+      _sidebar?.close();
+      await BarPopup.hide(kind: 'sidebar');
+      return;
+    }
+    _sidebar ??= SidebarBackend()..addListener(_updateSidebar);
+    _sidebarOpen = true;
+    try {
+      final monitor = await _sidebarMonitor();
+      if (!mounted || !_sidebarOpen) return;
+      if (focusedOutput != null && monitor?['name'] != focusedOutput) {
+        _sidebarOpen = false;
+        return;
+      }
+      _sidebarOutput = monitor?['name'] as String?;
+      final reserved = monitor?['reserved'];
+      final reservedHeight = switch (reserved) {
+        [_, final int top, _, final int bottom] => top + bottom,
+        _ => null,
+      };
+      await BarPopup.show(
+        kind: 'sidebar',
+        anchor: anchor,
+        size: sidebarSize,
+        data: {
+          ..._sidebarData,
+          'scale': scale,
+          'reservedHeight': reservedHeight,
+        },
+        theme: widget.preferences.theme,
+      );
+      if (_sidebarOpen && mounted) _sidebar?.open(_sidebarOutput);
+    } catch (error) {
+      _sidebarOpen = false;
+      _sidebar?.close();
+      debugPrint('Sidebar: $error');
+    }
+  }
+
+  static const _window = MethodChannel('top.remya.bar/window');
+
+  Future<Map?> _sidebarMonitor() async {
+    final hyprland = widget.hyprland;
+    if (hyprland == null) return null;
+    final geometry = await _window.invokeMapMethod<String, int>('output');
+    final monitors = jsonDecode(await hyprland.request('j/monitors'));
+    if (geometry == null || monitors is! List) return null;
+    final matches = monitors.whereType<Map>().where(
+      (monitor) =>
+          monitor['x'] == geometry['x'] && monitor['y'] == geometry['y'],
+    );
+    return matches.length == 1 ? matches.single : null;
+  }
+
+  void _updateSidebar() {
+    if (!_sidebarOpen) return;
+    unawaited(
+      BarPopup.update(
+        kind: 'sidebar',
+        anchor: const Rect.fromLTWH(0, 0, 1, 1),
+        size: sidebarSize,
+        data: _sidebarData,
+        theme: widget.preferences.theme,
+      ).catchError((Object error) => debugPrint('Sidebar update: $error')),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -59,6 +149,21 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         }
       });
     }
+    widget.account?.addListener(_updateSidebar);
+    widget.preferences.addListener(_updateSidebar);
+    _window.setMethodCallHandler((call) async {
+      if (call.method != 'toggleSidebar') throw MissingPluginException();
+      final hyprland = widget.hyprland;
+      if (hyprland == null) return;
+      final active = jsonDecode(await hyprland.request('j/activeworkspace'));
+      if (mounted && active is Map && active['monitor'] is String) {
+        await _toggleSidebar(
+          const Rect.fromLTWH(0, 0, 1, 1),
+          MediaQueryData.fromView(View.of(context)).textScaler.scale(1),
+          focusedOutput: active['monitor'] as String,
+        );
+      }
+    });
     BarPopup.channel.setMethodCallHandler(_popupAction);
   }
 
@@ -74,7 +179,31 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     final args = call.arguments;
     if (args is! Map) throw const FormatException('Invalid popup action');
     final action = args['action'];
-    if (action == 'media.volume' &&
+    if (action == 'sidebar.closed') {
+      _sidebarOpen = false;
+      _sidebar?.close();
+    } else if (action == 'sidebar.settings') {
+      final page = args['target'];
+      if (page is! String ||
+          !const {
+            'remya-bar',
+            'wifi',
+            'bluetooth',
+            'sound-volume',
+            'power',
+          }.contains(page)) {
+        throw const FormatException('Invalid Settings page');
+      }
+      await (widget.onOpenSettingsPage ??
+          (page) => openRemyaSettings(page: page))(page);
+      await BarPopup.hide(kind: 'sidebar');
+    } else if (action is String && action.startsWith('sidebar.')) {
+      final sidebar = _sidebar;
+      if (!_sidebarOpen || sidebar == null) {
+        throw StateError('Sidebar is closed');
+      }
+      await sidebar.perform(args, _sidebarOutput);
+    } else if (action == 'media.volume' &&
         args['output'] is String &&
         args['percent'] is num) {
       final system = widget.system;
@@ -120,6 +249,11 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   @override
   void dispose() {
     _pillRefresh?.cancel();
+    _sidebar?.dispose();
+    widget.account?.removeListener(_updateSidebar);
+    widget.account?.dispose();
+    widget.preferences.removeListener(_updateSidebar);
+    _window.setMethodCallHandler(null);
     widget.system?.removeListener(_showFirstResourceSample);
     BarPopup.channel.setMethodCallHandler(null);
     widget.preferences.dispose();
@@ -149,6 +283,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
                 pillSnapshot: _pillSnapshot,
                 tray: widget.showTray ? BarTray(key: _tray) : null,
                 onOpenSettings: widget.onOpenSettings,
+                onToggleSidebar: _toggleSidebar,
               ),
             ),
           ),
@@ -162,6 +297,7 @@ class _BarContent extends StatelessWidget {
   const _BarContent({
     required this.error,
     required this.onOpenSettings,
+    required this.onToggleSidebar,
     required this.pillSnapshot,
     this.system,
     this.tray,
@@ -172,6 +308,7 @@ class _BarContent extends StatelessWidget {
   final SystemBackend? system;
   final Widget? tray;
   final Future<void> Function() onOpenSettings;
+  final Future<void> Function(Rect, double) onToggleSidebar;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -255,6 +392,8 @@ class _BarContent extends StatelessWidget {
                     child: tray,
                   ),
                 SettingsButton(onOpen: onOpenSettings),
+                if (constraints.maxWidth >= (error == null ? 80 : 100))
+                  BarSidebarButton(onToggle: onToggleSidebar),
               ],
             ),
           ),

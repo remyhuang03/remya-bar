@@ -6,3 +6,5 @@ mod tray;
 
 mod metrics;
 mod resources;
+
+mod session;

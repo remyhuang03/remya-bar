@@ -200,3 +200,37 @@ with partial coverage marked in the card.
 The System card uses a zero-exclusive-zone layer-shell surface on the pill's
 output. The popup stays open as the pointer moves between the pill and card.
 Its monitor button opens a supported desktop system monitor.
+
+## Sidebar controls
+
+The 420-logical-pixel panel opens 6 pixels from the output’s right edge and
+8 pixels below the bar. The panel sizes to its content and scrolls when needed.
+
+The sidebar reads live Settings state while visible. Display brightness targets
+the owning output. Sound controls act on the displayed PipeWire input/output
+device. Sliders send their value on release or adjust by five percentage points
+per wheel step. The output slider opens the output picker on secondary click.
+
+Wi-Fi scan, connection, disconnect, forget, and hidden-network activation use
+Settings' NetworkManager API. BlueZ state, scan, connect, disconnect, forget,
+and pairing prompts use the Bluetooth API. Night Light toggles the current
+hyprsunset state and follows the schedule already configured in Settings.
+Power Saver toggles between power-saver and balanced when both profiles exist,
+and the Power detail lists every available profile. Do Not Disturb and the
+compact toggles are displayed as unavailable.
+
+The editor sends the old and new visible tile order to Settings for an atomic
+update. Hidden IDs are inferred from the full tile list. The Power menu asks
+logind to lock or terminate the current graphical session, reboot, or power off.
+Log out, restart and shut down require a second click within three seconds.
+
+The installed Bar can toggle its sidebar through a session D-Bus signal. To
+bind Super+A manually in Hyprland Lua, use:
+
+```lua
+hl.bind("SUPER + A", hl.dsp.exec_cmd(
+    'gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.ToggleSidebar "$HYPRLAND_INSTANCE_SIGNATURE"'))
+```
+
+Replace any existing binding for that chord when adopting it. Bar listens only
+to the signal for its own Hyprland instance and opens on the focused output.

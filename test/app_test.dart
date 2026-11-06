@@ -2,11 +2,17 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:remya_bar/features/settings/settings_button.dart';
+import 'package:remya_bar/features/sidebar/right_sidebar.dart';
 import 'package:remya_bar/app.dart';
 import 'package:remya_bar/features/clock/bar_clock.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 void main() {
+  final settingsButton = find.descendant(
+    of: find.byType(SettingsButton),
+    matching: find.byType(IconButton),
+  );
   testWidgets('settings button fits the 40-pixel bar and opens settings', (
     tester,
   ) async {
@@ -28,7 +34,7 @@ void main() {
     );
     expect(find.byIcon(Icons.settings_rounded), findsOneWidget);
     expect(tester.getSize(find.byType(Scaffold)).height, 40);
-    await tester.tap(find.byType(IconButton));
+    await tester.tap(settingsButton);
     await tester.pump();
     expect(opened, 1);
     final context = tester.element(find.byType(Scaffold));
@@ -91,10 +97,10 @@ void main() {
         },
       ),
     );
-    await tester.tap(find.byType(IconButton));
+    await tester.tap(settingsButton);
     await tester.pump();
     expect(find.byIcon(Icons.error_outline_rounded), findsOneWidget);
-    await tester.tap(find.byType(IconButton));
+    await tester.tap(settingsButton);
     await tester.pump();
     expect(find.byIcon(Icons.settings_rounded), findsOneWidget);
     expect(attempts, 2);
@@ -116,9 +122,10 @@ void main() {
         RemyaBarApp(preferences: preferences, onOpenSettings: () async {}),
       );
       expect(tester.takeException(), isNull, reason: 'width $width');
+      expect(settingsButton, width < 40 ? findsNothing : findsOneWidget);
       expect(
-        find.byType(IconButton),
-        width < 40 ? findsNothing : findsOneWidget,
+        find.byType(BarSidebarButton),
+        width < 100 ? findsNothing : findsOneWidget,
       );
     }
   });

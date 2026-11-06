@@ -1,5 +1,4 @@
 import 'package:flutter/services.dart';
-import 'package:flutter/rendering.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
@@ -9,6 +8,8 @@ import '../battery/battery_card.dart';
 import 'bar_card_surface.dart';
 import '../tray/tray_menu_popup.dart';
 import 'bar_popup.dart';
+import 'popup_measure.dart';
+import '../sidebar/right_sidebar.dart';
 import '../resources/resource_card.dart';
 
 class BarPopupApp extends StatefulWidget {
@@ -39,6 +40,7 @@ class _BarPopupAppState extends State<BarPopupApp> {
           arguments['data'] is! Map ||
           !const {
             'tooltip',
+            'sidebar',
             'resources',
             'media',
             'battery',
@@ -78,6 +80,7 @@ class _BarPopupAppState extends State<BarPopupApp> {
           }
           _contentGeneration++;
           if (arguments['opening'] == true || _kind != arguments['kind']) {
+            _navigator.currentState?.popUntil((route) => route.isFirst);
             _opening++;
           }
           _kind = arguments['kind'] as String;
@@ -126,39 +129,62 @@ class _BarPopupAppState extends State<BarPopupApp> {
         child: MouseRegion(
           onEnter: (_) => _send(BarPopup.enter()),
           onExit: (_) {
-            _navigator.currentState?.popUntil((route) => route.isFirst);
+            if (_kind != 'sidebar') {
+              _navigator.currentState?.popUntil((route) => route.isFirst);
+            }
             _send(BarPopup.leave());
           },
           child: child!,
         ),
       ),
-      home: SingleChildScrollView(
-        child: _PopupMeasure(
-          generation: _contentGeneration,
-          onHeight: (height) => _send(
-            BarPopup.channel.invokeMethod<void>('resize', {
-              'height': height.ceil(),
-            }),
-          ),
-          child: _kind == 'tooltip'
-              ? _content(details, textScale)
-              : TweenAnimationBuilder<double>(
-                  key: ValueKey(_opening),
-                  duration: const Duration(milliseconds: 150),
-                  tween: Tween(begin: 0, end: 1),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, progress, child) => Opacity(
-                    opacity: progress,
-                    child: Transform.scale(
-                      scale: .96 + .04 * progress,
-                      alignment: _kind == 'tray-menu' ? .topLeft : .topCenter,
-                      child: child,
-                    ),
-                  ),
-                  child: _content(details, textScale),
+      home: _kind == 'sidebar'
+          ? Align(
+              alignment: .topRight,
+              child: TweenAnimationBuilder<double>(
+                key: ValueKey(_opening),
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+                tween: Tween(begin: 1, end: 0),
+                builder: (context, offset, child) => FractionalTranslation(
+                  translation: Offset(offset, 0),
+                  child: child,
                 ),
-        ),
-      ),
+                child: RightSidebar(
+                  data: details,
+                  onAction: BarPopup.action,
+                  onHeight: _resize,
+                ),
+              ),
+            )
+          : SingleChildScrollView(
+              child: PopupMeasure(
+                generation: _contentGeneration,
+                onHeight: (height) => _send(
+                  BarPopup.channel.invokeMethod<void>('resize', {
+                    'height': height.ceil(),
+                  }),
+                ),
+                child: _kind == 'tooltip'
+                    ? _content(details, textScale)
+                    : TweenAnimationBuilder<double>(
+                        key: ValueKey(_opening),
+                        duration: const Duration(milliseconds: 150),
+                        tween: Tween(begin: 0, end: 1),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, progress, child) => Opacity(
+                          opacity: progress,
+                          child: Transform.scale(
+                            scale: .96 + .04 * progress,
+                            alignment: _kind == 'tray-menu'
+                                ? .topLeft
+                                : .topCenter,
+                            child: child,
+                          ),
+                        ),
+                        child: _content(details, textScale),
+                      ),
+              ),
+            ),
     );
   }
 
@@ -208,6 +234,10 @@ class _BarPopupAppState extends State<BarPopupApp> {
         },
       ),
     ],
+  );
+
+  void _resize(double height) => _send(
+    BarPopup.channel.invokeMethod<void>('resize', {'height': height.ceil()}),
   );
 
   void _send(Future<void> request) {
@@ -279,54 +309,5 @@ class _TooltipContent extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _PopupMeasure extends SingleChildRenderObjectWidget {
-  const _PopupMeasure({
-    required this.generation,
-    required this.onHeight,
-    required super.child,
-  });
-  final int generation;
-  final ValueChanged<double> onHeight;
-
-  @override
-  RenderObject createRenderObject(BuildContext context) =>
-      _PopupMeasureBox(generation, onHeight);
-
-  @override
-  void updateRenderObject(
-    BuildContext context,
-    covariant _PopupMeasureBox renderObject,
-  ) {
-    renderObject.onHeight = onHeight;
-    if (renderObject.generation != generation) {
-      renderObject.generation = generation;
-      renderObject.resetMeasurement();
-    }
-  }
-}
-
-class _PopupMeasureBox extends RenderProxyBox {
-  _PopupMeasureBox(this.generation, this.onHeight);
-  int generation;
-  ValueChanged<double> onHeight;
-  double? _height;
-
-  void resetMeasurement() {
-    _height = null;
-    markNeedsLayout();
-  }
-
-  @override
-  void performLayout() {
-    super.performLayout();
-    if (_height == size.height) return;
-    _height = size.height;
-    final height = size.height;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (attached) onHeight(height);
-    });
   }
 }

@@ -73,7 +73,7 @@ class SystemRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -789352983;
+  int get rustContentHash => 1362500686;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -103,6 +103,10 @@ abstract class SystemRustLibApi extends BaseApi {
   Future<ResourceDetails> crateApiResourceDetailsDefault();
 
   Future<SystemSnapshot> crateApiResourceSnapshot();
+
+  Future<void> crateApiSidebarSessionAction({required String action});
+
+  Future<double?> crateApiSidebarUptime();
 
   Future<void> crateApiTrayAction({
     required String id,
@@ -312,6 +316,64 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       const TaskConstMeta(debugName: "resource_snapshot", argNames: []);
 
   @override
+  Future<void> crateApiSidebarSessionAction({required String action}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(action, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 7,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiSidebarSessionActionConstMeta,
+        argValues: [action],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSidebarSessionActionConstMeta =>
+      const TaskConstMeta(
+        debugName: "sidebar_session_action",
+        argNames: ["action"],
+      );
+
+  @override
+  Future<double?> crateApiSidebarUptime() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_f_64,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiSidebarUptimeConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSidebarUptimeConstMeta =>
+      const TaskConstMeta(debugName: "sidebar_uptime", argNames: []);
+
+  @override
   Future<void> crateApiTrayAction({
     required String id,
     required String action,
@@ -327,7 +389,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 9,
             port: port_,
           );
         },
@@ -356,7 +418,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 10,
             port: port_,
           );
         },
@@ -388,7 +450,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 11,
             port: port_,
           );
         },
@@ -422,7 +484,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 12,
             port: port_,
           );
         },

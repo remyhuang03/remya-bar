@@ -64,6 +64,12 @@ Future<void> trayMenuAction({
 Future<SystemSnapshot> resourceSnapshot() =>
     SystemRustLib.instance.api.crateApiResourceSnapshot();
 
+Future<void> sidebarSessionAction({required String action}) =>
+    SystemRustLib.instance.api.crateApiSidebarSessionAction(action: action);
+
+Future<double?> sidebarUptime() =>
+    SystemRustLib.instance.api.crateApiSidebarUptime();
+
 class BatterySnapshot {
   final String name;
   final double? percent;

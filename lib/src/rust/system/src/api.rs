@@ -279,3 +279,17 @@ pub async fn resource_snapshot() -> Result<SystemSnapshot, String> {
     cache.snapshot = Some(snapshot.clone());
     Ok(snapshot)
 }
+
+pub async fn sidebar_session_action(action: String) -> Result<(), String> {
+    crate::session::action(&action).await
+}
+
+pub fn sidebar_uptime() -> Option<f64> {
+    let uptime = std::fs::read_to_string("/proc/uptime").ok()?;
+    uptime
+        .split_whitespace()
+        .next()?
+        .parse::<f64>()
+        .ok()
+        .filter(|value| value.is_finite() && *value >= 0.0)
+}

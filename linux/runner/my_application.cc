@@ -11,9 +11,22 @@ struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
   GHashTable* bar_windows;
+  GDBusConnection* shortcut_bus;
+  guint shortcut_subscription;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
+
+static FlValue* output_geometry(GdkMonitor* monitor) {
+  GdkRectangle geometry;
+  gdk_monitor_get_geometry(monitor, &geometry);
+  FlValue* result = fl_value_new_map();
+  fl_value_set_string_take(result, "x", fl_value_new_int(geometry.x));
+  fl_value_set_string_take(result, "y", fl_value_new_int(geometry.y));
+  fl_value_set_string_take(result, "width", fl_value_new_int(geometry.width));
+  fl_value_set_string_take(result, "height", fl_value_new_int(geometry.height));
+  return result;
+}
 
 static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   if (g_hash_table_contains(self->bar_windows, monitor)) return;
@@ -49,6 +62,24 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   register_bar_popup(view);
   register_bar_icons(view);
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
+  g_autoptr(FlStandardMethodCodec) window_codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) window_channel = fl_method_channel_new(
+      fl_engine_get_binary_messenger(fl_view_get_engine(view)), "top.remya.bar/window",
+      FL_METHOD_CODEC(window_codec));
+  g_object_set_data_full(G_OBJECT(view), "window-channel", g_object_ref(window_channel), g_object_unref);
+  fl_method_channel_set_method_call_handler(
+      window_channel,
+      [](FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
+        auto* monitor = GDK_MONITOR(data);
+        const char* method = fl_method_call_get_name(call);
+        if (g_strcmp0(method, "output") == 0) {
+          g_autoptr(FlValue) geometry = output_geometry(monitor);
+          fl_method_call_respond_success(call, geometry, nullptr);
+        } else {
+          fl_method_call_respond_not_implemented(call, nullptr);
+        }
+      },
+      g_object_ref(monitor), g_object_unref);
   g_autoptr(FlStandardMethodCodec) paths_codec = fl_standard_method_codec_new();
   g_autoptr(FlMethodChannel) paths_channel = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)), "top.remya.paths",
@@ -125,6 +156,35 @@ static gboolean my_application_local_command_line(GApplication* application,
 static void my_application_startup(GApplication* application) {
   G_APPLICATION_CLASS(my_application_parent_class)->startup(application);
   GdkDisplay* display = gdk_display_get_default();
+  MyApplication* self = MY_APPLICATION(application);
+  self->shortcut_bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, nullptr);
+  if (self->shortcut_bus != nullptr) {
+    self->shortcut_subscription = g_dbus_connection_signal_subscribe(
+        self->shortcut_bus, nullptr, "top.remya.bar.Shortcuts", "ToggleSidebar",
+        "/top/remya/bar", nullptr, G_DBUS_SIGNAL_FLAGS_NONE,
+        +[](GDBusConnection*, const gchar*, const gchar*, const gchar*, const gchar*,
+            GVariant* parameters, gpointer data) {
+          const gchar* signature;
+          if (!g_variant_is_of_type(parameters, G_VARIANT_TYPE("(s)"))) return;
+          g_variant_get(parameters, "(&s)", &signature);
+          if (g_strcmp0(signature, g_getenv("HYPRLAND_INSTANCE_SIGNATURE")) != 0) return;
+          auto* self = MY_APPLICATION(data);
+          GHashTableIter iterator;
+          gpointer value;
+          g_hash_table_iter_init(&iterator, self->bar_windows);
+          bool closed = false;
+          while (g_hash_table_iter_next(&iterator, nullptr, &value)) {
+            closed |= close_bar_sidebar(FL_VIEW(gtk_bin_get_child(GTK_BIN(value))));
+          }
+          if (closed) return;
+          g_hash_table_iter_init(&iterator, self->bar_windows);
+          while (g_hash_table_iter_next(&iterator, nullptr, &value)) {
+            auto* view = gtk_bin_get_child(GTK_BIN(value));
+            auto* channel = FL_METHOD_CHANNEL(g_object_get_data(G_OBJECT(view), "window-channel"));
+            fl_method_channel_invoke_method(channel, "toggleSidebar", nullptr, nullptr, nullptr, nullptr);
+          }
+        }, self, nullptr);
+  }
   g_signal_connect_object(display, "monitor-added", G_CALLBACK(monitor_added),
                           application, G_CONNECT_DEFAULT);
   g_signal_connect_object(display, "monitor-removed",
@@ -135,6 +195,10 @@ static void my_application_startup(GApplication* application) {
 // Implements GApplication::shutdown.
 static void my_application_shutdown(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
+  if (self->shortcut_bus != nullptr) {
+    g_dbus_connection_signal_unsubscribe(self->shortcut_bus, self->shortcut_subscription);
+    g_clear_object(&self->shortcut_bus);
+  }
   g_hash_table_foreach(
       self->bar_windows,
       [](gpointer key, gpointer value, gpointer data) {

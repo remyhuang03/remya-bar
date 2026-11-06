@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 import 'app.dart';
+import 'features/account/account_profile_controller.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/settings/bar_theme_controller.dart';
 import 'features/popups/popup_app.dart';
@@ -52,6 +53,9 @@ Future<void> main(List<String> arguments) async {
       preferences: preferences,
       hyprland: hyprland,
       system: system,
+      account: AccountProfileController()..start(),
+      onOpenSettingsPage: (page) =>
+          openRemyaSettings(debugExecutable: debugSettings, page: page),
       showTray: true,
       onOpenSettings: () => openRemyaSettings(debugExecutable: debugSettings),
       onOpenPowerSettings: () =>
