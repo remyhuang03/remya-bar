@@ -11,6 +11,7 @@ import 'package:remya_bar/features/system/system_backend.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 const _snapshot = SystemSnapshot(
+  batteries: [],
   cpuPercent: 91,
   memoryUsedBytes: 8200000000,
   memoryTotalBytes: 32000000000,
@@ -93,7 +94,11 @@ void main() {
       Widget app() => RemyaBarApp(preferences: preferences, system: system);
       BarResources pill() => tester.widget(find.byType(BarResources));
       await tester.pumpWidget(app());
-      system.resourceSnapshot = const SystemSnapshot(cpuPercent: 42, gpus: []);
+      system.resourceSnapshot = const SystemSnapshot(
+        cpuPercent: 42,
+        gpus: [],
+        batteries: [],
+      );
       await tester.pumpWidget(app());
       await tester.pump(const Duration(seconds: 2));
       expect(pill().snapshot?.cpuPercent, 91);

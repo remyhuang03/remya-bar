@@ -69,6 +69,7 @@ impl Sampler {
         Ok((
             now,
             SystemSnapshot {
+                batteries: crate::api::batteries(),
                 cpu_percent,
                 memory_used_bytes: memory
                     .get("MemTotal")

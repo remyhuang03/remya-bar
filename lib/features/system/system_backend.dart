@@ -31,9 +31,8 @@ class SystemBackend extends ChangeNotifier {
   bool showClockSeconds = true;
   Map<String, Object?> batteryPower = const {};
   bool isPowerSaver = false;
-  api.BatterySnapshot? battery;
+  api.BatterySnapshot? get battery => resourceSnapshot?.batteries.firstOrNull;
   api.SystemSnapshot? resourceSnapshot;
-  bool _refreshingResources = false;
 
   static Future<void> initialize() => SystemRustLib.init(
     externalLibrary: ExternalLibrary.open(
@@ -55,7 +54,6 @@ class SystemBackend extends ChangeNotifier {
     }, onError: (Object error) => debugPrint('Settings changes: $error'));
     void refresh() {
       unawaited(_refresh());
-      unawaited(_refreshResources());
       unawaited(_refreshMedia());
       unawaited(_refreshPower());
       unawaited(_refreshClockPreference());
@@ -65,32 +63,16 @@ class SystemBackend extends ChangeNotifier {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => refresh());
   }
 
-  Future<void> _refreshResources() async {
-    if (_disposed || _refreshingResources) return;
-    _refreshingResources = true;
-    try {
-      final next = await api.resourceSnapshot();
-      if (_disposed) return;
-      resourceSnapshot = next;
-      notifyListeners();
-    } catch (failure) {
-      if (!_disposed) debugPrint('System resources: $failure');
-    } finally {
-      _refreshingResources = false;
-    }
-  }
-
   Future<void> _refresh() async {
     if (_disposed || _refreshing) return;
     _refreshing = true;
     try {
-      final next = (await api.batteries()).firstOrNull;
-      if (_disposed || next == battery) return;
-      battery = next;
+      final next = await api.hardwareSnapshot();
+      if (_disposed) return;
+      resourceSnapshot = next;
       notifyListeners();
     } catch (failure) {
-      if (_disposed) return;
-      debugPrint('System backend: $failure');
+      if (!_disposed) debugPrint('System hardware: $failure');
     } finally {
       _refreshing = false;
     }

@@ -13,7 +13,7 @@ pub struct BatterySnapshot {
     pub cycle_count: Option<i32>,
 }
 
-pub fn batteries() -> Vec<BatterySnapshot> {
+pub(crate) fn batteries() -> Vec<BatterySnapshot> {
     let Ok(entries) = fs::read_dir("/sys/class/power_supply") else {
         return vec![];
     };
@@ -198,6 +198,7 @@ pub async fn tray_menu_action(id: String, parent: i32, entry: i32) -> Result<(),
 
 #[derive(Clone, Debug)]
 pub struct SystemSnapshot {
+    pub batteries: Vec<BatterySnapshot>,
     pub cpu_percent: Option<f64>,
     pub memory_used_bytes: Option<f64>,
     pub memory_total_bytes: Option<f64>,
@@ -243,7 +244,7 @@ pub struct NetworkOverview {
 }
 
 /// All output engines share one sample and one set of CPU/network baselines.
-pub async fn resource_snapshot() -> Result<SystemSnapshot, String> {
+pub async fn hardware_snapshot() -> Result<SystemSnapshot, String> {
     #[derive(Default)]
     struct Cache {
         updated: Option<Instant>,

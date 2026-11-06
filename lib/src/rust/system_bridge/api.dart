@@ -7,11 +7,8 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `percentage`, `read_number`, `remaining_seconds`
+// These functions are ignored because they are not marked as `pub`: `batteries`, `percentage`, `read_number`, `remaining_seconds`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
-
-Future<List<BatterySnapshot>> batteries() =>
-    SystemRustLib.instance.api.crateApiBatteries();
 
 Future<List<MediaPlayerSnapshot>> mediaPlayers() =>
     SystemRustLib.instance.api.crateApiMediaPlayers();
@@ -61,8 +58,8 @@ Future<void> trayMenuAction({
 );
 
 /// All output engines share one sample and one set of CPU/network baselines.
-Future<SystemSnapshot> resourceSnapshot() =>
-    SystemRustLib.instance.api.crateApiResourceSnapshot();
+Future<SystemSnapshot> hardwareSnapshot() =>
+    SystemRustLib.instance.api.crateApiHardwareSnapshot();
 
 Future<void> sidebarSessionAction({required String action}) =>
     SystemRustLib.instance.api.crateApiSidebarSessionAction(action: action);
@@ -324,6 +321,7 @@ class ResourceDetails {
 }
 
 class SystemSnapshot {
+  final List<BatterySnapshot> batteries;
   final double? cpuPercent;
   final double? memoryUsedBytes;
   final double? memoryTotalBytes;
@@ -334,6 +332,7 @@ class SystemSnapshot {
   final ResourceDetails? resources;
 
   const SystemSnapshot({
+    required this.batteries,
     this.cpuPercent,
     this.memoryUsedBytes,
     this.memoryTotalBytes,
@@ -346,6 +345,7 @@ class SystemSnapshot {
 
   @override
   int get hashCode =>
+      batteries.hashCode ^
       cpuPercent.hashCode ^
       memoryUsedBytes.hashCode ^
       memoryTotalBytes.hashCode ^
@@ -360,6 +360,7 @@ class SystemSnapshot {
       identical(this, other) ||
       other is SystemSnapshot &&
           runtimeType == other.runtimeType &&
+          batteries == other.batteries &&
           cpuPercent == other.cpuPercent &&
           memoryUsedBytes == other.memoryUsedBytes &&
           memoryTotalBytes == other.memoryTotalBytes &&

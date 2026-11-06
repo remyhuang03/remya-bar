@@ -73,7 +73,7 @@ class SystemRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1362500686;
+  int get rustContentHash => -1435637729;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -85,7 +85,7 @@ class SystemRustLib
 }
 
 abstract class SystemRustLibApi extends BaseApi {
-  Future<List<BatterySnapshot>> crateApiBatteries();
+  Future<SystemSnapshot> crateApiHardwareSnapshot();
 
   Future<void> crateApiMediaAction({
     required String busName,
@@ -101,8 +101,6 @@ abstract class SystemRustLibApi extends BaseApi {
   });
 
   Future<ResourceDetails> crateApiResourceDetailsDefault();
-
-  Future<SystemSnapshot> crateApiResourceSnapshot();
 
   Future<void> crateApiSidebarSessionAction({required String action});
 
@@ -138,7 +136,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   });
 
   @override
-  Future<List<BatterySnapshot>> crateApiBatteries() {
+  Future<SystemSnapshot> crateApiHardwareSnapshot() {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -151,18 +149,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_list_battery_snapshot,
-          decodeErrorData: null,
+          decodeSuccessData: sse_decode_system_snapshot,
+          decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiBatteriesConstMeta,
+        constMeta: kCrateApiHardwareSnapshotConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiBatteriesConstMeta =>
-      const TaskConstMeta(debugName: "batteries", argNames: []);
+  TaskConstMeta get kCrateApiHardwareSnapshotConstMeta =>
+      const TaskConstMeta(debugName: "hardware_snapshot", argNames: []);
 
   @override
   Future<void> crateApiMediaAction({
@@ -289,33 +287,6 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       const TaskConstMeta(debugName: "resource_details_default", argNames: []);
 
   @override
-  Future<SystemSnapshot> crateApiResourceSnapshot() {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 6,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_system_snapshot,
-          decodeErrorData: sse_decode_String,
-        ),
-        constMeta: kCrateApiResourceSnapshotConstMeta,
-        argValues: [],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiResourceSnapshotConstMeta =>
-      const TaskConstMeta(debugName: "resource_snapshot", argNames: []);
-
-  @override
   Future<void> crateApiSidebarSessionAction({required String action}) {
     return handler.executeNormal(
       NormalTask(
@@ -325,7 +296,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 6,
             port: port_,
           );
         },
@@ -355,7 +326,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 7,
             port: port_,
           );
         },
@@ -389,7 +360,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 8,
             port: port_,
           );
         },
@@ -418,7 +389,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 9,
             port: port_,
           );
         },
@@ -450,7 +421,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 10,
             port: port_,
           );
         },
@@ -484,7 +455,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 11,
             port: port_,
           );
         },
@@ -736,17 +707,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   SystemSnapshot dco_decode_system_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return SystemSnapshot(
-      cpuPercent: dco_decode_opt_box_autoadd_f_64(arr[0]),
-      memoryUsedBytes: dco_decode_opt_box_autoadd_f_64(arr[1]),
-      memoryTotalBytes: dco_decode_opt_box_autoadd_f_64(arr[2]),
-      swapUsedBytes: dco_decode_opt_box_autoadd_f_64(arr[3]),
-      swapTotalBytes: dco_decode_opt_box_autoadd_f_64(arr[4]),
-      gpus: dco_decode_list_gpu_snapshot(arr[5]),
-      networkOverview: dco_decode_opt_box_autoadd_network_overview(arr[6]),
-      resources: dco_decode_opt_box_autoadd_resource_details(arr[7]),
+      batteries: dco_decode_list_battery_snapshot(arr[0]),
+      cpuPercent: dco_decode_opt_box_autoadd_f_64(arr[1]),
+      memoryUsedBytes: dco_decode_opt_box_autoadd_f_64(arr[2]),
+      memoryTotalBytes: dco_decode_opt_box_autoadd_f_64(arr[3]),
+      swapUsedBytes: dco_decode_opt_box_autoadd_f_64(arr[4]),
+      swapTotalBytes: dco_decode_opt_box_autoadd_f_64(arr[5]),
+      gpus: dco_decode_list_gpu_snapshot(arr[6]),
+      networkOverview: dco_decode_opt_box_autoadd_network_overview(arr[7]),
+      resources: dco_decode_opt_box_autoadd_resource_details(arr[8]),
     );
   }
 
@@ -1164,6 +1136,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   @protected
   SystemSnapshot sse_decode_system_snapshot(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_batteries = sse_decode_list_battery_snapshot(deserializer);
     var var_cpuPercent = sse_decode_opt_box_autoadd_f_64(deserializer);
     var var_memoryUsedBytes = sse_decode_opt_box_autoadd_f_64(deserializer);
     var var_memoryTotalBytes = sse_decode_opt_box_autoadd_f_64(deserializer);
@@ -1177,6 +1150,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       deserializer,
     );
     return SystemSnapshot(
+      batteries: var_batteries,
       cpuPercent: var_cpuPercent,
       memoryUsedBytes: var_memoryUsedBytes,
       memoryTotalBytes: var_memoryTotalBytes,
@@ -1554,6 +1528,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_battery_snapshot(self.batteries, serializer);
     sse_encode_opt_box_autoadd_f_64(self.cpuPercent, serializer);
     sse_encode_opt_box_autoadd_f_64(self.memoryUsedBytes, serializer);
     sse_encode_opt_box_autoadd_f_64(self.memoryTotalBytes, serializer);

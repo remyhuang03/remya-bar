@@ -141,7 +141,11 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     final system = SystemBackend()
-      ..resourceSnapshot = const SystemSnapshot(cpuPercent: 42, gpus: [])
+      ..resourceSnapshot = const SystemSnapshot(
+        cpuPercent: 42,
+        gpus: [],
+        batteries: [],
+      )
       ..players = const [
         MediaPlayerSnapshot(
           busName: 'org.mpris.MediaPlayer2.test',
