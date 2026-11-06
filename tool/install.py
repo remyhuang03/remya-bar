@@ -28,17 +28,17 @@ def desktop_quote(path):
     return '"' + value.replace("\\", "\\\\") + '"'
 
 
-def require_roboto_flex_font():
+def require_inter_font():
     try:
-        result = subprocess.run(['fc-match', '--format=%{family}', 'Roboto Flex'], capture_output=True, text=True, check=True)
+        result = subprocess.run(['fc-match', '--format=%{family}', 'Inter'], capture_output=True, text=True, check=True)
     except (OSError, subprocess.CalledProcessError) as error:
-        raise RuntimeError("Install fontconfig and the Roboto Flex system font first (Arch: ttf-roboto-flex)") from error
-    if 'Roboto Flex' not in result.stdout.strip().split(','):
-        raise RuntimeError("Install the Roboto Flex system font first (Arch: sudo pacman -S ttf-roboto-flex)")
+        raise RuntimeError("Install fontconfig and the Inter system font first (Arch: sudo pacman -S inter-font)") from error
+    if 'Inter' not in result.stdout.strip().split(','):
+        raise RuntimeError("Install the Inter system font first (Arch: sudo pacman -S inter-font)")
 
 
 def install(root, environment):
-    require_roboto_flex_font()
+    require_inter_font()
     data = data_home(environment).resolve()
     source = root / "build/linux/x64/release/bundle"
     if not (source / APP_ID).is_file():
