@@ -17,6 +17,90 @@ pub struct HyprlandUpdate {
     pub data: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HyprlandWindow {
+    pub address: String,
+    pub title: String,
+    pub app_id: String,
+    pub workspace_id: i32,
+    pub monitor_name: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HyprlandWorkspace {
+    pub id: i32,
+    pub name: String,
+    pub monitor_name: String,
+    pub window_count: u32,
+    pub windows: Vec<HyprlandWindow>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HyprlandWorkspaceSlot {
+    pub id: i32,
+    pub name: String,
+    pub active: bool,
+    pub occupied: bool,
+    pub window_count: u32,
+    pub app_id: Option<String>,
+    pub title: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HyprlandMonitor {
+    pub name: String,
+    pub x: i32,
+    pub y: i32,
+    pub active_workspace_id: i32,
+    pub special_workspace_id: Option<i32>,
+    pub special_workspace_name: Option<String>,
+    pub current_window: Option<HyprlandWindow>,
+    pub workspace_slots: Vec<HyprlandWorkspaceSlot>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HyprlandSnapshot {
+    pub monitors: Vec<HyprlandMonitor>,
+    pub workspaces: Vec<HyprlandWorkspace>,
+}
+
+pub async fn hyprland_snapshot() -> Result<HyprlandSnapshot, String> {
+    let monitors = hyprland_request("j/monitors".into()).await?;
+    let workspaces = hyprland_request("j/workspaces".into()).await?;
+    let clients = hyprland_request("j/clients".into()).await?;
+    let active_window = hyprland_request("j/activewindow".into()).await?;
+    crate::workspace_state::parse(&monitors, &workspaces, &clients, &active_window)
+}
+
+pub async fn hyprland_switch_workspace(
+    output_name: String,
+    workspace_id: i32,
+) -> Result<(), String> {
+    let snapshot = hyprland_snapshot().await?;
+    let command = crate::workspace_state::switch_command(&snapshot, &output_name, workspace_id)?;
+    dispatch_workspace_command(command).await
+}
+
+pub async fn hyprland_scroll_workspace(output_name: String, direction: i32) -> Result<(), String> {
+    let snapshot = hyprland_snapshot().await?;
+    let command = crate::workspace_state::scroll_command(&snapshot, &output_name, direction)?;
+    dispatch_workspace_command(command).await
+}
+
+pub async fn hyprland_toggle_special(output_name: String) -> Result<(), String> {
+    let snapshot = hyprland_snapshot().await?;
+    let command = crate::workspace_state::special_command(&snapshot, &output_name)?;
+    dispatch_workspace_command(command).await
+}
+
+async fn dispatch_workspace_command(command: String) -> Result<(), String> {
+    let reply = hyprland_request(command).await?;
+    if reply.trim() != "ok" {
+        return Err(format!("Workspace switch failed: {reply}"));
+    }
+    Ok(())
+}
+
 pub async fn hyprland_request(command: String) -> Result<String, String> {
     let directory = crate::ipc::socket_directory().map_err(|error| error.to_string())?;
     crate::ipc::request(&directory, &command)

@@ -33,8 +33,11 @@ Future<void> main(List<String> arguments) async {
   await preferences.start();
   await HyprlandBackend.initialize();
   await SystemBackend.initialize();
+  final output = await const MethodChannel('top.remya.bar/window')
+      .invokeMapMethod<String, int>('output');
+  final hyprland = HyprlandBackend(outputX: output?['x'], outputY: output?['y'])
+    ..start();
   final system = SystemBackend()..start();
-  final hyprland = HyprlandBackend()..start();
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks([
       "Remy'a Bar",

@@ -73,7 +73,7 @@ class HyprlandRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1770362681;
+  int get rustContentHash => 1869353342;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -91,6 +91,20 @@ abstract class HyprlandRustLibApi extends BaseApi {
   });
 
   Future<String> crateApiHyprlandRequest({required String command});
+
+  Future<void> crateApiHyprlandScrollWorkspace({
+    required String outputName,
+    required int direction,
+  });
+
+  Future<HyprlandSnapshot> crateApiHyprlandSnapshot();
+
+  Future<void> crateApiHyprlandSwitchWorkspace({
+    required String outputName,
+    required int workspaceId,
+  });
+
+  Future<void> crateApiHyprlandToggleSpecial({required String outputName});
 
   Stream<HyprlandUpdate> crateApiSubscribeHyprland();
 }
@@ -168,6 +182,134 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
       const TaskConstMeta(debugName: "hyprland_request", argNames: ["command"]);
 
   @override
+  Future<void> crateApiHyprlandScrollWorkspace({
+    required String outputName,
+    required int direction,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(outputName, serializer);
+          sse_encode_i_32(direction, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 3,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHyprlandScrollWorkspaceConstMeta,
+        argValues: [outputName, direction],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHyprlandScrollWorkspaceConstMeta =>
+      const TaskConstMeta(
+        debugName: "hyprland_scroll_workspace",
+        argNames: ["outputName", "direction"],
+      );
+
+  @override
+  Future<HyprlandSnapshot> crateApiHyprlandSnapshot() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 4,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_hyprland_snapshot,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHyprlandSnapshotConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHyprlandSnapshotConstMeta =>
+      const TaskConstMeta(debugName: "hyprland_snapshot", argNames: []);
+
+  @override
+  Future<void> crateApiHyprlandSwitchWorkspace({
+    required String outputName,
+    required int workspaceId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(outputName, serializer);
+          sse_encode_i_32(workspaceId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 5,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHyprlandSwitchWorkspaceConstMeta,
+        argValues: [outputName, workspaceId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHyprlandSwitchWorkspaceConstMeta =>
+      const TaskConstMeta(
+        debugName: "hyprland_switch_workspace",
+        argNames: ["outputName", "workspaceId"],
+      );
+
+  @override
+  Future<void> crateApiHyprlandToggleSpecial({required String outputName}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(outputName, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 6,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHyprlandToggleSpecialConstMeta,
+        argValues: [outputName],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHyprlandToggleSpecialConstMeta =>
+      const TaskConstMeta(
+        debugName: "hyprland_toggle_special",
+        argNames: ["outputName"],
+      );
+
+  @override
   Stream<HyprlandUpdate> crateApiSubscribeHyprland() {
     final sink = RustStreamSink<HyprlandUpdate>();
     unawaited(
@@ -179,7 +321,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 3,
+              funcId: 7,
               port: port_,
             );
           },
@@ -226,6 +368,48 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   }
 
   @protected
+  HyprlandWindow dco_decode_box_autoadd_hyprland_window(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_hyprland_window(raw);
+  }
+
+  @protected
+  int dco_decode_box_autoadd_i_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
+  HyprlandMonitor dco_decode_hyprland_monitor(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return HyprlandMonitor(
+      name: dco_decode_String(arr[0]),
+      x: dco_decode_i_32(arr[1]),
+      y: dco_decode_i_32(arr[2]),
+      activeWorkspaceId: dco_decode_i_32(arr[3]),
+      specialWorkspaceId: dco_decode_opt_box_autoadd_i_32(arr[4]),
+      specialWorkspaceName: dco_decode_opt_String(arr[5]),
+      currentWindow: dco_decode_opt_box_autoadd_hyprland_window(arr[6]),
+      workspaceSlots: dco_decode_list_hyprland_workspace_slot(arr[7]),
+    );
+  }
+
+  @protected
+  HyprlandSnapshot dco_decode_hyprland_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return HyprlandSnapshot(
+      monitors: dco_decode_list_hyprland_monitor(arr[0]),
+      workspaces: dco_decode_list_hyprland_workspace(arr[1]),
+    );
+  }
+
+  @protected
   HyprlandUpdate dco_decode_hyprland_update(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -239,15 +423,114 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   }
 
   @protected
+  HyprlandWindow dco_decode_hyprland_window(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return HyprlandWindow(
+      address: dco_decode_String(arr[0]),
+      title: dco_decode_String(arr[1]),
+      appId: dco_decode_String(arr[2]),
+      workspaceId: dco_decode_i_32(arr[3]),
+      monitorName: dco_decode_String(arr[4]),
+    );
+  }
+
+  @protected
+  HyprlandWorkspace dco_decode_hyprland_workspace(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return HyprlandWorkspace(
+      id: dco_decode_i_32(arr[0]),
+      name: dco_decode_String(arr[1]),
+      monitorName: dco_decode_String(arr[2]),
+      windowCount: dco_decode_u_32(arr[3]),
+      windows: dco_decode_list_hyprland_window(arr[4]),
+    );
+  }
+
+  @protected
+  HyprlandWorkspaceSlot dco_decode_hyprland_workspace_slot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return HyprlandWorkspaceSlot(
+      id: dco_decode_i_32(arr[0]),
+      name: dco_decode_String(arr[1]),
+      active: dco_decode_bool(arr[2]),
+      occupied: dco_decode_bool(arr[3]),
+      windowCount: dco_decode_u_32(arr[4]),
+      appId: dco_decode_opt_String(arr[5]),
+      title: dco_decode_opt_String(arr[6]),
+    );
+  }
+
+  @protected
   int dco_decode_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
   }
 
   @protected
+  List<HyprlandMonitor> dco_decode_list_hyprland_monitor(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_hyprland_monitor).toList();
+  }
+
+  @protected
+  List<HyprlandWindow> dco_decode_list_hyprland_window(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_hyprland_window).toList();
+  }
+
+  @protected
+  List<HyprlandWorkspace> dco_decode_list_hyprland_workspace(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_hyprland_workspace).toList();
+  }
+
+  @protected
+  List<HyprlandWorkspaceSlot> dco_decode_list_hyprland_workspace_slot(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_hyprland_workspace_slot)
+        .toList();
+  }
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as Uint8List;
+  }
+
+  @protected
+  String? dco_decode_opt_String(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_String(raw);
+  }
+
+  @protected
+  HyprlandWindow? dco_decode_opt_box_autoadd_hyprland_window(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_hyprland_window(raw);
+  }
+
+  @protected
+  int? dco_decode_opt_box_autoadd_i_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_i_32(raw);
+  }
+
+  @protected
+  int dco_decode_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
   }
 
   @protected
@@ -291,6 +574,55 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   }
 
   @protected
+  HyprlandWindow sse_decode_box_autoadd_hyprland_window(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_hyprland_window(deserializer));
+  }
+
+  @protected
+  int sse_decode_box_autoadd_i_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_i_32(deserializer));
+  }
+
+  @protected
+  HyprlandMonitor sse_decode_hyprland_monitor(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_x = sse_decode_i_32(deserializer);
+    var var_y = sse_decode_i_32(deserializer);
+    var var_activeWorkspaceId = sse_decode_i_32(deserializer);
+    var var_specialWorkspaceId = sse_decode_opt_box_autoadd_i_32(deserializer);
+    var var_specialWorkspaceName = sse_decode_opt_String(deserializer);
+    var var_currentWindow = sse_decode_opt_box_autoadd_hyprland_window(
+      deserializer,
+    );
+    var var_workspaceSlots = sse_decode_list_hyprland_workspace_slot(
+      deserializer,
+    );
+    return HyprlandMonitor(
+      name: var_name,
+      x: var_x,
+      y: var_y,
+      activeWorkspaceId: var_activeWorkspaceId,
+      specialWorkspaceId: var_specialWorkspaceId,
+      specialWorkspaceName: var_specialWorkspaceName,
+      currentWindow: var_currentWindow,
+      workspaceSlots: var_workspaceSlots,
+    );
+  }
+
+  @protected
+  HyprlandSnapshot sse_decode_hyprland_snapshot(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_monitors = sse_decode_list_hyprland_monitor(deserializer);
+    var var_workspaces = sse_decode_list_hyprland_workspace(deserializer);
+    return HyprlandSnapshot(monitors: var_monitors, workspaces: var_workspaces);
+  }
+
+  @protected
   HyprlandUpdate sse_decode_hyprland_update(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_kind = sse_decode_String(deserializer);
@@ -300,9 +632,124 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   }
 
   @protected
+  HyprlandWindow sse_decode_hyprland_window(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_address = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_appId = sse_decode_String(deserializer);
+    var var_workspaceId = sse_decode_i_32(deserializer);
+    var var_monitorName = sse_decode_String(deserializer);
+    return HyprlandWindow(
+      address: var_address,
+      title: var_title,
+      appId: var_appId,
+      workspaceId: var_workspaceId,
+      monitorName: var_monitorName,
+    );
+  }
+
+  @protected
+  HyprlandWorkspace sse_decode_hyprland_workspace(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_i_32(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_monitorName = sse_decode_String(deserializer);
+    var var_windowCount = sse_decode_u_32(deserializer);
+    var var_windows = sse_decode_list_hyprland_window(deserializer);
+    return HyprlandWorkspace(
+      id: var_id,
+      name: var_name,
+      monitorName: var_monitorName,
+      windowCount: var_windowCount,
+      windows: var_windows,
+    );
+  }
+
+  @protected
+  HyprlandWorkspaceSlot sse_decode_hyprland_workspace_slot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_i_32(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_active = sse_decode_bool(deserializer);
+    var var_occupied = sse_decode_bool(deserializer);
+    var var_windowCount = sse_decode_u_32(deserializer);
+    var var_appId = sse_decode_opt_String(deserializer);
+    var var_title = sse_decode_opt_String(deserializer);
+    return HyprlandWorkspaceSlot(
+      id: var_id,
+      name: var_name,
+      active: var_active,
+      occupied: var_occupied,
+      windowCount: var_windowCount,
+      appId: var_appId,
+      title: var_title,
+    );
+  }
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getInt32();
+  }
+
+  @protected
+  List<HyprlandMonitor> sse_decode_list_hyprland_monitor(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HyprlandMonitor>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_hyprland_monitor(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<HyprlandWindow> sse_decode_list_hyprland_window(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HyprlandWindow>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_hyprland_window(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<HyprlandWorkspace> sse_decode_list_hyprland_workspace(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HyprlandWorkspace>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_hyprland_workspace(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<HyprlandWorkspaceSlot> sse_decode_list_hyprland_workspace_slot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HyprlandWorkspaceSlot>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_hyprland_workspace_slot(deserializer));
+    }
+    return ans_;
   }
 
   @protected
@@ -310,6 +757,47 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
     return deserializer.buffer.getUint8List(len_);
+  }
+
+  @protected
+  String? sse_decode_opt_String(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_String(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  HyprlandWindow? sse_decode_opt_box_autoadd_hyprland_window(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_hyprland_window(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_i_32(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint32();
   }
 
   @protected
@@ -362,6 +850,47 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_box_autoadd_hyprland_window(
+    HyprlandWindow self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_hyprland_window(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self, serializer);
+  }
+
+  @protected
+  void sse_encode_hyprland_monitor(
+    HyprlandMonitor self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_i_32(self.x, serializer);
+    sse_encode_i_32(self.y, serializer);
+    sse_encode_i_32(self.activeWorkspaceId, serializer);
+    sse_encode_opt_box_autoadd_i_32(self.specialWorkspaceId, serializer);
+    sse_encode_opt_String(self.specialWorkspaceName, serializer);
+    sse_encode_opt_box_autoadd_hyprland_window(self.currentWindow, serializer);
+    sse_encode_list_hyprland_workspace_slot(self.workspaceSlots, serializer);
+  }
+
+  @protected
+  void sse_encode_hyprland_snapshot(
+    HyprlandSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_hyprland_monitor(self.monitors, serializer);
+    sse_encode_list_hyprland_workspace(self.workspaces, serializer);
+  }
+
+  @protected
   void sse_encode_hyprland_update(
     HyprlandUpdate self,
     SseSerializer serializer,
@@ -373,9 +902,98 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_hyprland_window(
+    HyprlandWindow self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.address, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_String(self.appId, serializer);
+    sse_encode_i_32(self.workspaceId, serializer);
+    sse_encode_String(self.monitorName, serializer);
+  }
+
+  @protected
+  void sse_encode_hyprland_workspace(
+    HyprlandWorkspace self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.monitorName, serializer);
+    sse_encode_u_32(self.windowCount, serializer);
+    sse_encode_list_hyprland_window(self.windows, serializer);
+  }
+
+  @protected
+  void sse_encode_hyprland_workspace_slot(
+    HyprlandWorkspaceSlot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_bool(self.active, serializer);
+    sse_encode_bool(self.occupied, serializer);
+    sse_encode_u_32(self.windowCount, serializer);
+    sse_encode_opt_String(self.appId, serializer);
+    sse_encode_opt_String(self.title, serializer);
+  }
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
+  }
+
+  @protected
+  void sse_encode_list_hyprland_monitor(
+    List<HyprlandMonitor> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_hyprland_monitor(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_hyprland_window(
+    List<HyprlandWindow> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_hyprland_window(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_hyprland_workspace(
+    List<HyprlandWorkspace> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_hyprland_workspace(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_hyprland_workspace_slot(
+    List<HyprlandWorkspaceSlot> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_hyprland_workspace_slot(item, serializer);
+    }
   }
 
   @protected
@@ -386,6 +1004,45 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
+  }
+
+  @protected
+  void sse_encode_opt_String(String? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_String(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_hyprland_window(
+    HyprlandWindow? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_hyprland_window(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_i_32(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint32(self);
   }
 
   @protected

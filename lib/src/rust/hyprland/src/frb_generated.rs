@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1770362681;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1869353342;
 
 // Section: executor
 
@@ -113,6 +113,158 @@ fn wire__crate__api__hyprland_request_impl(
                 transform_result_sse::<_, String>(
                     (move || async move {
                         let output_ok = crate::api::hyprland_request(api_command).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__hyprland_scroll_workspace_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "hyprland_scroll_workspace",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_output_name = <String>::sse_decode(&mut deserializer);
+            let api_direction = <i32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::hyprland_scroll_workspace(api_output_name, api_direction)
+                                .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__hyprland_snapshot_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "hyprland_snapshot",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::hyprland_snapshot().await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__hyprland_switch_workspace_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "hyprland_switch_workspace",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_output_name = <String>::sse_decode(&mut deserializer);
+            let api_workspace_id = <i32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::hyprland_switch_workspace(
+                            api_output_name,
+                            api_workspace_id,
+                        )
+                        .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__hyprland_toggle_special_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "hyprland_toggle_special",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_output_name = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::hyprland_toggle_special(api_output_name).await?;
                         std::result::Result::Ok(output_ok)
                     })()
                     .await,
@@ -198,6 +350,43 @@ impl SseDecode for bool {
     }
 }
 
+impl SseDecode for crate::api::HyprlandMonitor {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_x = <i32>::sse_decode(deserializer);
+        let mut var_y = <i32>::sse_decode(deserializer);
+        let mut var_activeWorkspaceId = <i32>::sse_decode(deserializer);
+        let mut var_specialWorkspaceId = <Option<i32>>::sse_decode(deserializer);
+        let mut var_specialWorkspaceName = <Option<String>>::sse_decode(deserializer);
+        let mut var_currentWindow = <Option<crate::api::HyprlandWindow>>::sse_decode(deserializer);
+        let mut var_workspaceSlots =
+            <Vec<crate::api::HyprlandWorkspaceSlot>>::sse_decode(deserializer);
+        return crate::api::HyprlandMonitor {
+            name: var_name,
+            x: var_x,
+            y: var_y,
+            active_workspace_id: var_activeWorkspaceId,
+            special_workspace_id: var_specialWorkspaceId,
+            special_workspace_name: var_specialWorkspaceName,
+            current_window: var_currentWindow,
+            workspace_slots: var_workspaceSlots,
+        };
+    }
+}
+
+impl SseDecode for crate::api::HyprlandSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_monitors = <Vec<crate::api::HyprlandMonitor>>::sse_decode(deserializer);
+        let mut var_workspaces = <Vec<crate::api::HyprlandWorkspace>>::sse_decode(deserializer);
+        return crate::api::HyprlandSnapshot {
+            monitors: var_monitors,
+            workspaces: var_workspaces,
+        };
+    }
+}
+
 impl SseDecode for crate::api::HyprlandUpdate {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -212,10 +401,118 @@ impl SseDecode for crate::api::HyprlandUpdate {
     }
 }
 
+impl SseDecode for crate::api::HyprlandWindow {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_address = <String>::sse_decode(deserializer);
+        let mut var_title = <String>::sse_decode(deserializer);
+        let mut var_appId = <String>::sse_decode(deserializer);
+        let mut var_workspaceId = <i32>::sse_decode(deserializer);
+        let mut var_monitorName = <String>::sse_decode(deserializer);
+        return crate::api::HyprlandWindow {
+            address: var_address,
+            title: var_title,
+            app_id: var_appId,
+            workspace_id: var_workspaceId,
+            monitor_name: var_monitorName,
+        };
+    }
+}
+
+impl SseDecode for crate::api::HyprlandWorkspace {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <i32>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_monitorName = <String>::sse_decode(deserializer);
+        let mut var_windowCount = <u32>::sse_decode(deserializer);
+        let mut var_windows = <Vec<crate::api::HyprlandWindow>>::sse_decode(deserializer);
+        return crate::api::HyprlandWorkspace {
+            id: var_id,
+            name: var_name,
+            monitor_name: var_monitorName,
+            window_count: var_windowCount,
+            windows: var_windows,
+        };
+    }
+}
+
+impl SseDecode for crate::api::HyprlandWorkspaceSlot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <i32>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_active = <bool>::sse_decode(deserializer);
+        let mut var_occupied = <bool>::sse_decode(deserializer);
+        let mut var_windowCount = <u32>::sse_decode(deserializer);
+        let mut var_appId = <Option<String>>::sse_decode(deserializer);
+        let mut var_title = <Option<String>>::sse_decode(deserializer);
+        return crate::api::HyprlandWorkspaceSlot {
+            id: var_id,
+            name: var_name,
+            active: var_active,
+            occupied: var_occupied,
+            window_count: var_windowCount,
+            app_id: var_appId,
+            title: var_title,
+        };
+    }
+}
+
 impl SseDecode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_i32::<NativeEndian>().unwrap()
+    }
+}
+
+impl SseDecode for Vec<crate::api::HyprlandMonitor> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::HyprlandMonitor>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::HyprlandWindow> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::HyprlandWindow>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::HyprlandWorkspace> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::HyprlandWorkspace>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::HyprlandWorkspaceSlot> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::HyprlandWorkspaceSlot>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
     }
 }
 
@@ -228,6 +525,46 @@ impl SseDecode for Vec<u8> {
             ans_.push(<u8>::sse_decode(deserializer));
         }
         return ans_;
+    }
+}
+
+impl SseDecode for Option<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<String>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::HyprlandWindow> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::HyprlandWindow>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<i32>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u32::<NativeEndian>().unwrap()
     }
 }
 
@@ -254,7 +591,11 @@ fn pde_ffi_dispatcher_primary_impl(
     match func_id {
         1 => wire__crate__api__hyprland_output_fullscreen_impl(port, ptr, rust_vec_len, data_len),
         2 => wire__crate__api__hyprland_request_impl(port, ptr, rust_vec_len, data_len),
-        3 => wire__crate__api__subscribe_hyprland_impl(port, ptr, rust_vec_len, data_len),
+        3 => wire__crate__api__hyprland_scroll_workspace_impl(port, ptr, rust_vec_len, data_len),
+        4 => wire__crate__api__hyprland_snapshot_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__hyprland_switch_workspace_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__hyprland_toggle_special_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__subscribe_hyprland_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -274,6 +615,48 @@ fn pde_ffi_dispatcher_sync_impl(
 // Section: rust2dart
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::HyprlandMonitor {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.name.into_into_dart().into_dart(),
+            self.x.into_into_dart().into_dart(),
+            self.y.into_into_dart().into_dart(),
+            self.active_workspace_id.into_into_dart().into_dart(),
+            self.special_workspace_id.into_into_dart().into_dart(),
+            self.special_workspace_name.into_into_dart().into_dart(),
+            self.current_window.into_into_dart().into_dart(),
+            self.workspace_slots.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::HyprlandMonitor {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::HyprlandMonitor>
+    for crate::api::HyprlandMonitor
+{
+    fn into_into_dart(self) -> crate::api::HyprlandMonitor {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::HyprlandSnapshot {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.monitors.into_into_dart().into_dart(),
+            self.workspaces.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::HyprlandSnapshot {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::HyprlandSnapshot>
+    for crate::api::HyprlandSnapshot
+{
+    fn into_into_dart(self) -> crate::api::HyprlandSnapshot {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::HyprlandUpdate {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -287,6 +670,72 @@ impl flutter_rust_bridge::IntoDart for crate::api::HyprlandUpdate {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::HyprlandUpdate {}
 impl flutter_rust_bridge::IntoIntoDart<crate::api::HyprlandUpdate> for crate::api::HyprlandUpdate {
     fn into_into_dart(self) -> crate::api::HyprlandUpdate {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::HyprlandWindow {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.address.into_into_dart().into_dart(),
+            self.title.into_into_dart().into_dart(),
+            self.app_id.into_into_dart().into_dart(),
+            self.workspace_id.into_into_dart().into_dart(),
+            self.monitor_name.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::HyprlandWindow {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::HyprlandWindow> for crate::api::HyprlandWindow {
+    fn into_into_dart(self) -> crate::api::HyprlandWindow {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::HyprlandWorkspace {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.monitor_name.into_into_dart().into_dart(),
+            self.window_count.into_into_dart().into_dart(),
+            self.windows.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::HyprlandWorkspace {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::HyprlandWorkspace>
+    for crate::api::HyprlandWorkspace
+{
+    fn into_into_dart(self) -> crate::api::HyprlandWorkspace {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::HyprlandWorkspaceSlot {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.active.into_into_dart().into_dart(),
+            self.occupied.into_into_dart().into_dart(),
+            self.window_count.into_into_dart().into_dart(),
+            self.app_id.into_into_dart().into_dart(),
+            self.title.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::HyprlandWorkspaceSlot
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::HyprlandWorkspaceSlot>
+    for crate::api::HyprlandWorkspaceSlot
+{
+    fn into_into_dart(self) -> crate::api::HyprlandWorkspaceSlot {
         self
     }
 }
@@ -321,12 +770,69 @@ impl SseEncode for bool {
     }
 }
 
+impl SseEncode for crate::api::HyprlandMonitor {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <i32>::sse_encode(self.x, serializer);
+        <i32>::sse_encode(self.y, serializer);
+        <i32>::sse_encode(self.active_workspace_id, serializer);
+        <Option<i32>>::sse_encode(self.special_workspace_id, serializer);
+        <Option<String>>::sse_encode(self.special_workspace_name, serializer);
+        <Option<crate::api::HyprlandWindow>>::sse_encode(self.current_window, serializer);
+        <Vec<crate::api::HyprlandWorkspaceSlot>>::sse_encode(self.workspace_slots, serializer);
+    }
+}
+
+impl SseEncode for crate::api::HyprlandSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<crate::api::HyprlandMonitor>>::sse_encode(self.monitors, serializer);
+        <Vec<crate::api::HyprlandWorkspace>>::sse_encode(self.workspaces, serializer);
+    }
+}
+
 impl SseEncode for crate::api::HyprlandUpdate {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.kind, serializer);
         <String>::sse_encode(self.name, serializer);
         <String>::sse_encode(self.data, serializer);
+    }
+}
+
+impl SseEncode for crate::api::HyprlandWindow {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.address, serializer);
+        <String>::sse_encode(self.title, serializer);
+        <String>::sse_encode(self.app_id, serializer);
+        <i32>::sse_encode(self.workspace_id, serializer);
+        <String>::sse_encode(self.monitor_name, serializer);
+    }
+}
+
+impl SseEncode for crate::api::HyprlandWorkspace {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <String>::sse_encode(self.monitor_name, serializer);
+        <u32>::sse_encode(self.window_count, serializer);
+        <Vec<crate::api::HyprlandWindow>>::sse_encode(self.windows, serializer);
+    }
+}
+
+impl SseEncode for crate::api::HyprlandWorkspaceSlot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <bool>::sse_encode(self.active, serializer);
+        <bool>::sse_encode(self.occupied, serializer);
+        <u32>::sse_encode(self.window_count, serializer);
+        <Option<String>>::sse_encode(self.app_id, serializer);
+        <Option<String>>::sse_encode(self.title, serializer);
     }
 }
 
@@ -337,6 +843,46 @@ impl SseEncode for i32 {
     }
 }
 
+impl SseEncode for Vec<crate::api::HyprlandMonitor> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::HyprlandMonitor>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::HyprlandWindow> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::HyprlandWindow>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::HyprlandWorkspace> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::HyprlandWorkspace>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::HyprlandWorkspaceSlot> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::HyprlandWorkspaceSlot>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -344,6 +890,43 @@ impl SseEncode for Vec<u8> {
         for item in self {
             <u8>::sse_encode(item, serializer);
         }
+    }
+}
+
+impl SseEncode for Option<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::HyprlandWindow> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::HyprlandWindow>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <i32>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u32::<NativeEndian>(self).unwrap();
     }
 }
 

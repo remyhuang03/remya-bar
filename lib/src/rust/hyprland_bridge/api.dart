@@ -7,9 +7,33 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `output_fullscreen`
+// These functions are ignored because they are not marked as `pub`: `dispatch_workspace_command`, `output_fullscreen`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Hub`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `eq`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+
+Future<HyprlandSnapshot> hyprlandSnapshot() =>
+    HyprlandRustLib.instance.api.crateApiHyprlandSnapshot();
+
+Future<void> hyprlandSwitchWorkspace({
+  required String outputName,
+  required int workspaceId,
+}) => HyprlandRustLib.instance.api.crateApiHyprlandSwitchWorkspace(
+  outputName: outputName,
+  workspaceId: workspaceId,
+);
+
+Future<void> hyprlandScrollWorkspace({
+  required String outputName,
+  required int direction,
+}) => HyprlandRustLib.instance.api.crateApiHyprlandScrollWorkspace(
+  outputName: outputName,
+  direction: direction,
+);
+
+Future<void> hyprlandToggleSpecial({required String outputName}) =>
+    HyprlandRustLib.instance.api.crateApiHyprlandToggleSpecial(
+      outputName: outputName,
+    );
 
 Future<String> hyprlandRequest({required String command}) =>
     HyprlandRustLib.instance.api.crateApiHyprlandRequest(command: command);
@@ -19,6 +43,71 @@ Stream<HyprlandUpdate> subscribeHyprland() =>
 
 Future<bool> hyprlandOutputFullscreen({required int x, required int y}) =>
     HyprlandRustLib.instance.api.crateApiHyprlandOutputFullscreen(x: x, y: y);
+
+class HyprlandMonitor {
+  final String name;
+  final int x;
+  final int y;
+  final int activeWorkspaceId;
+  final int? specialWorkspaceId;
+  final String? specialWorkspaceName;
+  final HyprlandWindow? currentWindow;
+  final List<HyprlandWorkspaceSlot> workspaceSlots;
+
+  const HyprlandMonitor({
+    required this.name,
+    required this.x,
+    required this.y,
+    required this.activeWorkspaceId,
+    this.specialWorkspaceId,
+    this.specialWorkspaceName,
+    this.currentWindow,
+    required this.workspaceSlots,
+  });
+
+  @override
+  int get hashCode =>
+      name.hashCode ^
+      x.hashCode ^
+      y.hashCode ^
+      activeWorkspaceId.hashCode ^
+      specialWorkspaceId.hashCode ^
+      specialWorkspaceName.hashCode ^
+      currentWindow.hashCode ^
+      workspaceSlots.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HyprlandMonitor &&
+          runtimeType == other.runtimeType &&
+          name == other.name &&
+          x == other.x &&
+          y == other.y &&
+          activeWorkspaceId == other.activeWorkspaceId &&
+          specialWorkspaceId == other.specialWorkspaceId &&
+          specialWorkspaceName == other.specialWorkspaceName &&
+          currentWindow == other.currentWindow &&
+          workspaceSlots == other.workspaceSlots;
+}
+
+class HyprlandSnapshot {
+  final List<HyprlandMonitor> monitors;
+  final List<HyprlandWorkspace> workspaces;
+
+  const HyprlandSnapshot({required this.monitors, required this.workspaces});
+
+  @override
+  int get hashCode => monitors.hashCode ^ workspaces.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HyprlandSnapshot &&
+          runtimeType == other.runtimeType &&
+          monitors == other.monitors &&
+          workspaces == other.workspaces;
+}
 
 class HyprlandUpdate {
   /// connected, disconnected, event, resync, or heartbeat.
@@ -45,4 +134,117 @@ class HyprlandUpdate {
           kind == other.kind &&
           name == other.name &&
           data == other.data;
+}
+
+class HyprlandWindow {
+  final String address;
+  final String title;
+  final String appId;
+  final int workspaceId;
+  final String monitorName;
+
+  const HyprlandWindow({
+    required this.address,
+    required this.title,
+    required this.appId,
+    required this.workspaceId,
+    required this.monitorName,
+  });
+
+  @override
+  int get hashCode =>
+      address.hashCode ^
+      title.hashCode ^
+      appId.hashCode ^
+      workspaceId.hashCode ^
+      monitorName.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HyprlandWindow &&
+          runtimeType == other.runtimeType &&
+          address == other.address &&
+          title == other.title &&
+          appId == other.appId &&
+          workspaceId == other.workspaceId &&
+          monitorName == other.monitorName;
+}
+
+class HyprlandWorkspace {
+  final int id;
+  final String name;
+  final String monitorName;
+  final int windowCount;
+  final List<HyprlandWindow> windows;
+
+  const HyprlandWorkspace({
+    required this.id,
+    required this.name,
+    required this.monitorName,
+    required this.windowCount,
+    required this.windows,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      monitorName.hashCode ^
+      windowCount.hashCode ^
+      windows.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HyprlandWorkspace &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          monitorName == other.monitorName &&
+          windowCount == other.windowCount &&
+          windows == other.windows;
+}
+
+class HyprlandWorkspaceSlot {
+  final int id;
+  final String name;
+  final bool active;
+  final bool occupied;
+  final int windowCount;
+  final String? appId;
+  final String? title;
+
+  const HyprlandWorkspaceSlot({
+    required this.id,
+    required this.name,
+    required this.active,
+    required this.occupied,
+    required this.windowCount,
+    this.appId,
+    this.title,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      active.hashCode ^
+      occupied.hashCode ^
+      windowCount.hashCode ^
+      appId.hashCode ^
+      title.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HyprlandWorkspaceSlot &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          active == other.active &&
+          occupied == other.occupied &&
+          windowCount == other.windowCount &&
+          appId == other.appId &&
+          title == other.title;
 }
