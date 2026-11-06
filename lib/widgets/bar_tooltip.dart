@@ -6,10 +6,16 @@ import '../features/popups/bar_popup.dart';
 
 /// A Flutter tooltip hosted outside the bar's fixed-height surface.
 class BarTooltip extends StatefulWidget {
-  const BarTooltip({super.key, required this.message, required this.child});
+  const BarTooltip({
+    super.key,
+    required this.message,
+    required this.child,
+    this.trayStyle = false,
+  });
 
   final String message;
   final Widget child;
+  final bool trayStyle;
 
   @override
   State<BarTooltip> createState() => _BarTooltipState();
@@ -27,23 +33,31 @@ class _BarTooltipState extends State<BarTooltip> {
     }
     final theme = Theme.of(context);
     final scaler = MediaQuery.textScalerOf(context);
+    final tray = widget.trayStyle;
+    final style = theme.textTheme.bodySmall?.copyWith(
+      fontSize: tray ? 12 : null,
+    );
     final painter = TextPainter(
-      text: TextSpan(text: widget.message, style: theme.textTheme.bodySmall),
+      text: TextSpan(text: widget.message, style: style),
       textDirection: Directionality.of(context),
       textScaler: scaler,
     )..layout(maxWidth: 320);
     final size = Size(
-      painter.width.ceilToDouble() + 24,
-      painter.height.ceilToDouble() + 16,
+      painter.width.ceilToDouble() + (tray ? 16 : 24),
+      painter.height.ceilToDouble() + (tray ? 8 : 16),
     );
     painter.dispose();
     _shown = true;
     _send(
       BarPopup.show(
         kind: 'tooltip',
-        anchor: box.localToGlobal(.zero) & box.size,
+        anchor: box.localToGlobal(Offset(0, tray ? 2 : 0)) & box.size,
         size: size,
-        data: {'message': widget.message, 'scale': scaler.scale(12) / 12},
+        data: {
+          'message': widget.message,
+          'scale': scaler.scale(12) / 12,
+          if (tray) 'tray': true,
+        },
         theme: BarPopupScope.themeOf(context),
       ),
     );
@@ -55,7 +69,7 @@ class _BarTooltipState extends State<BarTooltip> {
 
   void _hide() {
     _timer?.cancel();
-    if (_shown) _send(BarPopup.hide());
+    if (_shown) _send(BarPopup.hide(kind: 'tooltip'));
     _shown = false;
   }
 
@@ -70,7 +84,12 @@ class _BarTooltipState extends State<BarTooltip> {
   @override
   void didUpdateWidget(BarTooltip oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _refresh();
+    if (widget.message.isEmpty) {
+      _hide();
+    } else if (oldWidget.message != widget.message ||
+        oldWidget.trayStyle != widget.trayStyle) {
+      _refresh();
+    }
   }
 
   @override

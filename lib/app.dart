@@ -9,6 +9,7 @@ import 'features/system/system_backend.dart';
 import 'features/clock/bar_clock.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/popups/bar_popup.dart';
+import 'features/tray/bar_tray.dart';
 import 'features/settings/settings_button.dart';
 import 'widgets/bar_tooltip.dart';
 import 'widgets/bar_hover_card.dart';
@@ -21,6 +22,7 @@ class RemyaBarApp extends StatefulWidget {
     required this.preferences,
     this.hyprland,
     this.system,
+    this.showTray = false,
     this.onOpenSettings = openRemyaSettings,
     this.onOpenPowerSettings = _openPowerSettings,
   });
@@ -28,6 +30,7 @@ class RemyaBarApp extends StatefulWidget {
   final SettingsThemeController preferences;
   final HyprlandBackend? hyprland;
   final SystemBackend? system;
+  final bool showTray;
   final Future<void> Function() onOpenSettings;
   final Future<void> Function() onOpenPowerSettings;
 
@@ -36,6 +39,7 @@ class RemyaBarApp extends StatefulWidget {
 }
 
 class _RemyaBarAppState extends State<RemyaBarApp> {
+  final _tray = GlobalKey<BarTrayState>();
   @override
   void initState() {
     super.initState();
@@ -73,6 +77,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       } else {
         await system.mediaAction(player, action.substring(6));
       }
+    } else if (action is String && action.startsWith('tray.')) {
+      await _tray.currentState?.popupAction(args);
     } else if (action == 'battery.settings') {
       await widget.onOpenPowerSettings();
       await BarPopup.hide(kind: 'battery');
@@ -112,6 +118,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
               body: _BarContent(
                 error: widget.preferences.error,
                 system: widget.system,
+                tray: widget.showTray ? BarTray(key: _tray) : null,
                 onOpenSettings: widget.onOpenSettings,
               ),
             ),
@@ -127,10 +134,12 @@ class _BarContent extends StatelessWidget {
     required this.error,
     required this.onOpenSettings,
     this.system,
+    this.tray,
   });
 
   final String? error;
   final SystemBackend? system;
+  final Widget? tray;
   final Future<void> Function() onOpenSettings;
 
   @override
@@ -177,6 +186,13 @@ class _BarContent extends StatelessWidget {
                   Padding(
                     padding: const .only(right: 4),
                     child: _BatteryWithCard(system: system!),
+                  ),
+                if (tray != null && constraints.maxWidth >= 700)
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: (constraints.maxWidth / 2 - 225).clamp(44, 290),
+                    ),
+                    child: tray,
                   ),
                 SettingsButton(onOpen: onOpenSettings),
               ],

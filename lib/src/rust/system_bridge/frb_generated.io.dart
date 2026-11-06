@@ -53,6 +53,12 @@ abstract class SystemRustLibApiImplPlatform
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<TrayItem> dco_decode_list_tray_item(dynamic raw);
+
+  @protected
+  List<TrayMenuEntry> dco_decode_list_tray_menu_entry(dynamic raw);
+
+  @protected
   MediaPlayerSnapshot dco_decode_media_player_snapshot(dynamic raw);
 
   @protected
@@ -63,6 +69,15 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw);
+
+  @protected
+  TrayItem dco_decode_tray_item(dynamic raw);
+
+  @protected
+  TrayMenuEntry dco_decode_tray_menu_entry(dynamic raw);
+
+  @protected
+  int dco_decode_u_32(dynamic raw);
 
   @protected
   int dco_decode_u_8(dynamic raw);
@@ -105,6 +120,14 @@ abstract class SystemRustLibApiImplPlatform
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<TrayItem> sse_decode_list_tray_item(SseDeserializer deserializer);
+
+  @protected
+  List<TrayMenuEntry> sse_decode_list_tray_menu_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   MediaPlayerSnapshot sse_decode_media_player_snapshot(
     SseDeserializer deserializer,
   );
@@ -117,6 +140,15 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer);
+
+  @protected
+  TrayItem sse_decode_tray_item(SseDeserializer deserializer);
+
+  @protected
+  TrayMenuEntry sse_decode_tray_menu_entry(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_8(SseDeserializer deserializer);
@@ -167,6 +199,15 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  void sse_encode_list_tray_item(List<TrayItem> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_tray_menu_entry(
+    List<TrayMenuEntry> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_media_player_snapshot(
     MediaPlayerSnapshot self,
     SseSerializer serializer,
@@ -180,6 +221,15 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_tray_item(TrayItem self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_tray_menu_entry(TrayMenuEntry self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_8(int self, SseSerializer serializer);

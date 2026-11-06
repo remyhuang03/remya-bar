@@ -73,7 +73,7 @@ class SystemRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1724791273;
+  int get rustContentHash => -683611409;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -98,6 +98,25 @@ abstract class SystemRustLibApi extends BaseApi {
     required String busName,
     required String track,
     required double seconds,
+  });
+
+  Future<void> crateApiTrayAction({
+    required String id,
+    required String action,
+    required int delta,
+  });
+
+  Future<List<TrayItem>> crateApiTrayItems();
+
+  Future<List<TrayMenuEntry>> crateApiTrayMenu({
+    required String id,
+    required int parent,
+  });
+
+  Future<void> crateApiTrayMenuAction({
+    required String id,
+    required int parent,
+    required int entry,
   });
 }
 
@@ -234,6 +253,137 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     argNames: ["busName", "track", "seconds"],
   );
 
+  @override
+  Future<void> crateApiTrayAction({
+    required String id,
+    required String action,
+    required int delta,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          sse_encode_String(action, serializer);
+          sse_encode_i_32(delta, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 5,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiTrayActionConstMeta,
+        argValues: [id, action, delta],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTrayActionConstMeta => const TaskConstMeta(
+    debugName: "tray_action",
+    argNames: ["id", "action", "delta"],
+  );
+
+  @override
+  Future<List<TrayItem>> crateApiTrayItems() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 6,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_tray_item,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiTrayItemsConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTrayItemsConstMeta =>
+      const TaskConstMeta(debugName: "tray_items", argNames: []);
+
+  @override
+  Future<List<TrayMenuEntry>> crateApiTrayMenu({
+    required String id,
+    required int parent,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          sse_encode_i_32(parent, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 7,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_tray_menu_entry,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiTrayMenuConstMeta,
+        argValues: [id, parent],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTrayMenuConstMeta =>
+      const TaskConstMeta(debugName: "tray_menu", argNames: ["id", "parent"]);
+
+  @override
+  Future<void> crateApiTrayMenuAction({
+    required String id,
+    required int parent,
+    required int entry,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(id, serializer);
+          sse_encode_i_32(parent, serializer);
+          sse_encode_i_32(entry, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiTrayMenuActionConstMeta,
+        argValues: [id, parent, entry],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTrayMenuActionConstMeta => const TaskConstMeta(
+    debugName: "tray_menu_action",
+    argNames: ["id", "parent", "entry"],
+  );
+
   @protected
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -308,6 +458,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  List<TrayItem> dco_decode_list_tray_item(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_tray_item).toList();
+  }
+
+  @protected
+  List<TrayMenuEntry> dco_decode_list_tray_menu_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_tray_menu_entry).toList();
+  }
+
+  @protected
   MediaPlayerSnapshot dco_decode_media_player_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -348,6 +510,52 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_i_32(raw);
+  }
+
+  @protected
+  TrayItem dco_decode_tray_item(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    return TrayItem(
+      id: dco_decode_String(arr[0]),
+      appId: dco_decode_String(arr[1]),
+      iconThemePath: dco_decode_String(arr[2]),
+      title: dco_decode_String(arr[3]),
+      iconName: dco_decode_String(arr[4]),
+      iconArgb: dco_decode_list_prim_u_8_strict(arr[5]),
+      iconWidth: dco_decode_u_32(arr[6]),
+      iconHeight: dco_decode_u_32(arr[7]),
+      itemIsMenu: dco_decode_bool(arr[8]),
+      hasMenu: dco_decode_bool(arr[9]),
+      attention: dco_decode_bool(arr[10]),
+    );
+  }
+
+  @protected
+  TrayMenuEntry dco_decode_tray_menu_entry(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    return TrayMenuEntry(
+      id: dco_decode_i_32(arr[0]),
+      label: dco_decode_String(arr[1]),
+      enabled: dco_decode_bool(arr[2]),
+      separator: dco_decode_bool(arr[3]),
+      submenu: dco_decode_bool(arr[4]),
+      iconName: dco_decode_String(arr[5]),
+      iconData: dco_decode_list_prim_u_8_strict(arr[6]),
+      toggleType: dco_decode_String(arr[7]),
+      toggleState: dco_decode_i_32(arr[8]),
+    );
+  }
+
+  @protected
+  int dco_decode_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
   }
 
   @protected
@@ -456,6 +664,32 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  List<TrayItem> sse_decode_list_tray_item(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <TrayItem>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_tray_item(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<TrayMenuEntry> sse_decode_list_tray_menu_entry(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <TrayMenuEntry>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_tray_menu_entry(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   MediaPlayerSnapshot sse_decode_media_player_snapshot(
     SseDeserializer deserializer,
   ) {
@@ -525,6 +759,66 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     } else {
       return null;
     }
+  }
+
+  @protected
+  TrayItem sse_decode_tray_item(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_appId = sse_decode_String(deserializer);
+    var var_iconThemePath = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_iconName = sse_decode_String(deserializer);
+    var var_iconArgb = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_iconWidth = sse_decode_u_32(deserializer);
+    var var_iconHeight = sse_decode_u_32(deserializer);
+    var var_itemIsMenu = sse_decode_bool(deserializer);
+    var var_hasMenu = sse_decode_bool(deserializer);
+    var var_attention = sse_decode_bool(deserializer);
+    return TrayItem(
+      id: var_id,
+      appId: var_appId,
+      iconThemePath: var_iconThemePath,
+      title: var_title,
+      iconName: var_iconName,
+      iconArgb: var_iconArgb,
+      iconWidth: var_iconWidth,
+      iconHeight: var_iconHeight,
+      itemIsMenu: var_itemIsMenu,
+      hasMenu: var_hasMenu,
+      attention: var_attention,
+    );
+  }
+
+  @protected
+  TrayMenuEntry sse_decode_tray_menu_entry(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_i_32(deserializer);
+    var var_label = sse_decode_String(deserializer);
+    var var_enabled = sse_decode_bool(deserializer);
+    var var_separator = sse_decode_bool(deserializer);
+    var var_submenu = sse_decode_bool(deserializer);
+    var var_iconName = sse_decode_String(deserializer);
+    var var_iconData = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_toggleType = sse_decode_String(deserializer);
+    var var_toggleState = sse_decode_i_32(deserializer);
+    return TrayMenuEntry(
+      id: var_id,
+      label: var_label,
+      enabled: var_enabled,
+      separator: var_separator,
+      submenu: var_submenu,
+      iconName: var_iconName,
+      iconData: var_iconData,
+      toggleType: var_toggleType,
+      toggleState: var_toggleState,
+    );
+  }
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint32();
   }
 
   @protected
@@ -624,6 +918,30 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_list_tray_item(
+    List<TrayItem> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_tray_item(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_tray_menu_entry(
+    List<TrayMenuEntry> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_tray_menu_entry(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_media_player_snapshot(
     MediaPlayerSnapshot self,
     SseSerializer serializer,
@@ -674,6 +992,45 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     if (self != null) {
       sse_encode_box_autoadd_i_32(self, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_tray_item(TrayItem self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.appId, serializer);
+    sse_encode_String(self.iconThemePath, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_String(self.iconName, serializer);
+    sse_encode_list_prim_u_8_strict(self.iconArgb, serializer);
+    sse_encode_u_32(self.iconWidth, serializer);
+    sse_encode_u_32(self.iconHeight, serializer);
+    sse_encode_bool(self.itemIsMenu, serializer);
+    sse_encode_bool(self.hasMenu, serializer);
+    sse_encode_bool(self.attention, serializer);
+  }
+
+  @protected
+  void sse_encode_tray_menu_entry(
+    TrayMenuEntry self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.id, serializer);
+    sse_encode_String(self.label, serializer);
+    sse_encode_bool(self.enabled, serializer);
+    sse_encode_bool(self.separator, serializer);
+    sse_encode_bool(self.submenu, serializer);
+    sse_encode_String(self.iconName, serializer);
+    sse_encode_list_prim_u_8_strict(self.iconData, serializer);
+    sse_encode_String(self.toggleType, serializer);
+    sse_encode_i_32(self.toggleState, serializer);
+  }
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint32(self);
   }
 
   @protected

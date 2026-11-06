@@ -4,6 +4,7 @@
 #include <gtk-layer-shell.h>
 
 #include "bar_popup.h"
+#include "bar_icons.h"
 #include "flutter/generated_plugin_registrant.h"
 
 struct _MyApplication {
@@ -46,6 +47,7 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   const GdkRGBA transparent = {0, 0, 0, 0};
   fl_view_set_background_color(view, &transparent);
   register_bar_popup(view);
+  register_bar_icons(view);
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
   g_autoptr(FlStandardMethodCodec) paths_codec = fl_standard_method_codec_new();
   g_autoptr(FlMethodChannel) paths_channel = fl_method_channel_new(

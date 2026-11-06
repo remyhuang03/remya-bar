@@ -154,3 +154,42 @@ mod tests {
         );
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct TrayItem {
+    pub id: String,
+    pub app_id: String,
+    pub icon_theme_path: String,
+    pub title: String,
+    pub icon_name: String,
+    pub icon_argb: Vec<u8>,
+    pub icon_width: u32,
+    pub icon_height: u32,
+    pub item_is_menu: bool,
+    pub has_menu: bool,
+    pub attention: bool,
+}
+#[derive(Clone, Debug)]
+pub struct TrayMenuEntry {
+    pub id: i32,
+    pub label: String,
+    pub enabled: bool,
+    pub separator: bool,
+    pub submenu: bool,
+    pub icon_name: String,
+    pub icon_data: Vec<u8>,
+    pub toggle_type: String,
+    pub toggle_state: i32,
+}
+pub async fn tray_items() -> Result<Vec<TrayItem>, String> {
+    crate::tray::items().await
+}
+pub async fn tray_action(id: String, action: String, delta: i32) -> Result<(), String> {
+    crate::tray::action(&id, &action, delta).await
+}
+pub async fn tray_menu(id: String, parent: i32) -> Result<Vec<TrayMenuEntry>, String> {
+    crate::tray::menu(&id, parent).await
+}
+pub async fn tray_menu_action(id: String, parent: i32, entry: i32) -> Result<(), String> {
+    crate::tray::menu_action(&id, parent, entry).await
+}

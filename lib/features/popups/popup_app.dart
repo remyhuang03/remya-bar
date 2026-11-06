@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter/rendering.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
@@ -6,6 +7,7 @@ import '../../bar_theme.dart';
 import '../media/media_preview.dart';
 import '../battery/battery_card.dart';
 import 'bar_card_surface.dart';
+import '../tray/tray_menu_popup.dart';
 import 'bar_popup.dart';
 
 class BarPopupApp extends StatefulWidget {
@@ -17,37 +19,68 @@ class BarPopupApp extends StatefulWidget {
 
 class _BarPopupAppState extends State<BarPopupApp> {
   final _navigator = GlobalKey<NavigatorState>();
-  Map<Object?, Object?>? _content;
+  String? _kind;
+  int _contentGeneration = 0;
+  int _opening = 0;
+  Map<String, Object?> _data = const {};
+  RemyaTheme? _theme;
   String? _actionError;
   bool _batteryActionPending = false;
-
-  Future<void> _action(Map<String, Object?> action) async {
-    final battery = _content?['kind'] == 'battery';
-    if (battery && _batteryActionPending) return;
-    if (battery) setState(() => _batteryActionPending = true);
-    try {
-      await BarPopup.action(action);
-      if (mounted) setState(() => _actionError = null);
-    } catch (error) {
-      debugPrint('Popup action: $error');
-      if (mounted) {
-        setState(() => _actionError = 'Action failed. Please try again.');
-      }
-    } finally {
-      if (battery && mounted) setState(() => _batteryActionPending = false);
-    }
-  }
 
   @override
   void initState() {
     super.initState();
     BarPopup.channel.setMethodCallHandler((call) async {
       if (call.method != 'content') throw MissingPluginException();
+      final arguments = call.arguments;
+      if (arguments is! Map ||
+          arguments['theme'] is! Map ||
+          arguments['data'] is! Map ||
+          !const {
+            'tooltip',
+            'media',
+            'battery',
+            'tray-menu',
+          }.contains(arguments['kind'])) {
+        throw PlatformException(
+          code: 'invalid-content',
+          message: 'Invalid popup content',
+        );
+      }
+      final baseTheme = RemyaTheme.fromMap(
+        Map<String, dynamic>.from(arguments['theme'] as Map),
+      );
+      final seed = _seedColor(arguments['seed']);
+      final theme = seed == null
+          ? baseTheme
+          : RemyaTheme(
+              styleVariant: baseTheme.styleVariant,
+              mode: baseTheme.mode,
+              seedColor: seed,
+            );
+      final data = Map<String, Object?>.from(arguments['data'] as Map);
+      if (arguments['kind'] == 'tooltip' &&
+          (data['message'] is! String || data['scale'] is! num)) {
+        throw PlatformException(
+          code: 'invalid-content',
+          message: 'Invalid tooltip content',
+        );
+      }
+      if (arguments['kind'] == _kind && !data.containsKey('scale')) {
+        data['scale'] = _data['scale'];
+      }
       if (mounted) {
         setState(() {
-          final next = call.arguments as Map<Object?, Object?>;
-          if (_content?['kind'] != next['kind']) _actionError = null;
-          _content = next;
+          if (_kind != arguments['kind'] || _data['token'] != data['token']) {
+            _actionError = null;
+          }
+          _contentGeneration++;
+          if (arguments['opening'] == true || _kind != arguments['kind']) {
+            _opening++;
+          }
+          _kind = arguments['kind'] as String;
+          _data = data;
+          _theme = theme;
         });
       }
     });
@@ -62,65 +95,137 @@ class _BarPopupAppState extends State<BarPopupApp> {
 
   @override
   Widget build(BuildContext context) {
-    final content = _content;
-    if (content == null) return const SizedBox.shrink();
-    final baseTheme = RemyaTheme.fromMap(
-      Map<String, dynamic>.from(content['theme'] as Map),
-    );
-    final seed = _seedColor(content['seed']);
-    final theme = seed == null
-        ? baseTheme
-        : RemyaTheme(
-            styleVariant: baseTheme.styleVariant,
-            mode: baseTheme.mode,
-            seedColor: seed,
-          );
-    final data = content['data'] as Map;
-    final kind = content['kind'] as String;
+    final theme = _theme;
+    if (theme == null) return const SizedBox.shrink();
+    final scale = _data['scale'];
+    final textScale = scale is num && scale.isFinite && scale > 0
+        ? scale.toDouble()
+        : 1.0;
+    final details = switch (_kind) {
+      'battery' => {
+        ..._data,
+        'pending': _batteryActionPending,
+        'error': _actionError,
+      },
+      'media' || 'tray-menu' when _actionError != null => {
+        ..._data,
+        'error': _actionError,
+      },
+      _ => _data,
+    };
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigator,
-      builder: (context, child) => kind == 'tooltip'
-          ? child!
-          : MouseRegion(
-              onEnter: (_) => BarPopup.enter(kind: kind),
-              onExit: (_) {
-                _navigator.currentState?.popUntil((route) => route.isFirst);
-                BarPopup.leave(kind: kind);
-              },
-              child: MediaQuery(
-                data: MediaQuery.of(context).copyWith(
-                  textScaler: .linear((data['scale'] as num?)?.toDouble() ?? 1),
-                ),
-                child: child!,
-              ),
-            ),
       theme: barTheme(theme.theme(.light)),
       darkTheme: barTheme(theme.theme(.dark)),
       themeMode: theme.mode,
-      home: switch (content['kind']) {
-        'media' => MediaPreview(
-          data: {...Map<String, Object?>.from(data), 'error': ?_actionError},
-          onAction: _action,
-          styleVariant: theme.styleVariant,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: .linear(textScale)),
+        child: MouseRegion(
+          onEnter: (_) => _send(BarPopup.enter()),
+          onExit: (_) {
+            _navigator.currentState?.popUntil((route) => route.isFirst);
+            _send(BarPopup.leave());
+          },
+          child: child!,
         ),
-        'battery' => BarCardSurface(
-          child: BatteryCard(
-            data: {
-              ...Map<String, Object?>.from(data),
-              'error': ?_actionError,
-              'pending': _batteryActionPending,
-            },
+      ),
+      home: SingleChildScrollView(
+        child: _PopupMeasure(
+          generation: _contentGeneration,
+          onHeight: (height) => _send(
+            BarPopup.channel.invokeMethod<void>('resize', {
+              'height': height.ceil(),
+            }),
+          ),
+          child: _kind == 'tooltip'
+              ? _content(details, textScale)
+              : TweenAnimationBuilder<double>(
+                  key: ValueKey(_opening),
+                  duration: const Duration(milliseconds: 150),
+                  tween: Tween(begin: 0, end: 1),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, progress, child) => Opacity(
+                    opacity: progress,
+                    child: Transform.scale(
+                      scale: .96 + .04 * progress,
+                      alignment: _kind == 'tray-menu' ? .topLeft : .topCenter,
+                      child: child,
+                    ),
+                  ),
+                  child: _content(details, textScale),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _content(Map<String, Object?> details, double textScale) => Column(
+    mainAxisSize: .min,
+    crossAxisAlignment: .stretch,
+    children: [
+      if (_actionError case final error?
+          when _kind != 'media' && _kind != 'battery' && _kind != 'tray-menu')
+        MaterialBanner(
+          content: Text(error),
+          actions: [
+            TextButton(
+              onPressed: () => setState(() => _actionError = null),
+              child: const Text('Dismiss'),
+            ),
+          ],
+        ),
+      Flexible(
+        child: switch (_kind) {
+          'tooltip' => _TooltipContent(
+            message: _data['message'] as String,
+            scale: textScale,
+            tray: _data['tray'] == true,
+          ),
+          'tray-menu' => TrayMenuPopup(
+            key: ValueKey(_data['token']),
+            data: details,
             onAction: _action,
           ),
-        ),
-        'tooltip' => _TooltipContent(
-          message: data['message'] as String,
-          scale: (data['scale'] as num).toDouble(),
-        ),
-        _ => const SizedBox.shrink(),
-      },
-    );
+          'media' => MediaPreview(
+            data: details,
+            onAction: _action,
+            styleVariant: _theme!.styleVariant,
+          ),
+          'battery' => BarCardSurface(
+            child: BatteryCard(data: details, onAction: _action),
+          ),
+          _ => const SizedBox.shrink(),
+        },
+      ),
+    ],
+  );
+
+  void _send(Future<void> request) {
+    request.catchError((Object error) => debugPrint('Bar popup: $error'));
+  }
+
+  Future<void> _action(Map<String, Object?> action) async {
+    final kind = _kind;
+    final token = _data['token'];
+    final battery = kind == 'battery';
+    if (battery) {
+      if (_batteryActionPending) return;
+      setState(() => _batteryActionPending = true);
+    }
+    try {
+      await BarPopup.action(action);
+      if (mounted && _kind == kind && _data['token'] == token) {
+        setState(() => _actionError = null);
+      }
+    } catch (error) {
+      debugPrint('Bar popup action: $error');
+      if (mounted && _kind == kind && _data['token'] == token) {
+        setState(() => _actionError = 'Action failed. Please try again.');
+      }
+    } finally {
+      if (mounted && battery) setState(() => _batteryActionPending = false);
+    }
   }
 }
 
@@ -128,30 +233,91 @@ Color? _seedColor(Object? rgb) =>
     rgb is int && rgb >= 0 && rgb <= 0xFFFFFF ? Color(0xFF000000 | rgb) : null;
 
 class _TooltipContent extends StatelessWidget {
-  const _TooltipContent({required this.message, required this.scale});
+  const _TooltipContent({
+    required this.message,
+    required this.scale,
+    required this.tray,
+  });
   final String message;
   final double scale;
+  final bool tray;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Material(
-      color: theme.colorScheme.surfaceContainerHigh,
+      color: tray
+          ? theme.colorScheme.inverseSurface
+          : theme.colorScheme.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
-        borderRadius: .circular(8),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
+        borderRadius: .circular(tray ? 4 : 8),
+        side: tray
+            ? .none
+            : BorderSide(color: theme.colorScheme.outlineVariant),
       ),
       clipBehavior: .antiAlias,
       child: Padding(
-        padding: const .symmetric(horizontal: 12, vertical: 8),
+        padding: .symmetric(horizontal: tray ? 8 : 12, vertical: tray ? 4 : 8),
         child: Text(
           message,
           textScaler: .linear(scale),
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface,
+            fontSize: tray ? 12 : null,
+            color: tray
+                ? theme.colorScheme.onInverseSurface
+                : theme.colorScheme.onSurface,
           ),
         ),
       ),
     );
+  }
+}
+
+class _PopupMeasure extends SingleChildRenderObjectWidget {
+  const _PopupMeasure({
+    required this.generation,
+    required this.onHeight,
+    required super.child,
+  });
+  final int generation;
+  final ValueChanged<double> onHeight;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _PopupMeasureBox(generation, onHeight);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    covariant _PopupMeasureBox renderObject,
+  ) {
+    renderObject.onHeight = onHeight;
+    if (renderObject.generation != generation) {
+      renderObject.generation = generation;
+      renderObject.resetMeasurement();
+    }
+  }
+}
+
+class _PopupMeasureBox extends RenderProxyBox {
+  _PopupMeasureBox(this.generation, this.onHeight);
+  int generation;
+  ValueChanged<double> onHeight;
+  double? _height;
+
+  void resetMeasurement() {
+    _height = null;
+    markNeedsLayout();
+  }
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    if (_height == size.height) return;
+    _height = size.height;
+    final height = size.height;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (attached) onHeight(height);
+    });
   }
 }

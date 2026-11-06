@@ -56,6 +56,7 @@ abstract final class BarPopup {
     required RemyaTheme theme,
   }) => channel.invokeMethod<void>(method, {
     'kind': kind,
+    'opening': method == 'show',
     'anchor': [
       anchor.left.floor(),
       anchor.top.floor(),

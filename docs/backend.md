@@ -161,3 +161,29 @@ the power profile and automatic Energy Saver through the public Settings Power
 API. Settings owns the threshold and restores the last nonzero threshold when
 automatic Energy Saver is enabled. Settings continues to validate and apply
 power writes, and the card displays the returned state.
+
+## Application tray
+
+The Rust system backend registers as a StatusNotifierHost on the session bus.
+It uses an existing `org.kde.StatusNotifierWatcher` or supplies the watcher if
+none is present. Outputs share a short-lived snapshot with bounded, concurrent
+item reads. Passive and disconnected items are hidden. Icons use validated ARGB
+pixmaps, themed names, or app-provided icon paths rasterized by GTK. Normal and
+secondary activation and wheel events are forwarded to the current D-Bus owner.
+
+The 32px tray pill shows pinned items and reveals folded items inline with a
+240ms transition. Right click opens a shared Flutter popup with the app's icon,
+DBusMenu entries, and a local pin/fold action. The native layer positions it 6px
+below the pill and clamps it to the owning output. Escape and outside clicks
+dismiss the menu. An outside click while the overflow is open collapses it;
+the native dismissal surface consumes that click. The menu loads one level at
+a time with `AboutToShow` and `GetLayout` and revalidates enabled leaf actions
+before sending `Event`. If an app has no usable DBusMenu, the local menu offers
+its native `ContextMenu` action. Legacy XEmbed items are outside this implementation.
+
+Items start pinned. Settings owns the folded IDs through
+[`remya-bar.folded-apps`](../../remya_settings/docs/public-api.md#remya-bar-folded-applications).
+Bar identifies apps by SNI ID with the executable name when available, since
+different Chromium-based apps can export the same ID. All outputs read the
+same Settings preference and reconcile on change. Appearance → Remya Bar
+in Settings lists folded IDs and can pin them again, even while the app is closed.

@@ -8,7 +8,7 @@ import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `percentage`, `read_number`, `remaining_seconds`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Future<List<BatterySnapshot>> batteries() =>
     SystemRustLib.instance.api.crateApiBatteries();
@@ -30,6 +30,34 @@ Future<void> mediaSeek({
   busName: busName,
   track: track,
   seconds: seconds,
+);
+
+Future<List<TrayItem>> trayItems() =>
+    SystemRustLib.instance.api.crateApiTrayItems();
+
+Future<void> trayAction({
+  required String id,
+  required String action,
+  required int delta,
+}) => SystemRustLib.instance.api.crateApiTrayAction(
+  id: id,
+  action: action,
+  delta: delta,
+);
+
+Future<List<TrayMenuEntry>> trayMenu({
+  required String id,
+  required int parent,
+}) => SystemRustLib.instance.api.crateApiTrayMenu(id: id, parent: parent);
+
+Future<void> trayMenuAction({
+  required String id,
+  required int parent,
+  required int entry,
+}) => SystemRustLib.instance.api.crateApiTrayMenuAction(
+  id: id,
+  parent: parent,
+  entry: entry,
 );
 
 class BatterySnapshot {
@@ -148,4 +176,114 @@ class MediaPlayerSnapshot {
           seekToken == other.seekToken &&
           positionSeconds == other.positionSeconds &&
           lengthSeconds == other.lengthSeconds;
+}
+
+class TrayItem {
+  final String id;
+  final String appId;
+  final String iconThemePath;
+  final String title;
+  final String iconName;
+  final Uint8List iconArgb;
+  final int iconWidth;
+  final int iconHeight;
+  final bool itemIsMenu;
+  final bool hasMenu;
+  final bool attention;
+
+  const TrayItem({
+    required this.id,
+    required this.appId,
+    required this.iconThemePath,
+    required this.title,
+    required this.iconName,
+    required this.iconArgb,
+    required this.iconWidth,
+    required this.iconHeight,
+    required this.itemIsMenu,
+    required this.hasMenu,
+    required this.attention,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      appId.hashCode ^
+      iconThemePath.hashCode ^
+      title.hashCode ^
+      iconName.hashCode ^
+      iconArgb.hashCode ^
+      iconWidth.hashCode ^
+      iconHeight.hashCode ^
+      itemIsMenu.hashCode ^
+      hasMenu.hashCode ^
+      attention.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TrayItem &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          appId == other.appId &&
+          iconThemePath == other.iconThemePath &&
+          title == other.title &&
+          iconName == other.iconName &&
+          iconArgb == other.iconArgb &&
+          iconWidth == other.iconWidth &&
+          iconHeight == other.iconHeight &&
+          itemIsMenu == other.itemIsMenu &&
+          hasMenu == other.hasMenu &&
+          attention == other.attention;
+}
+
+class TrayMenuEntry {
+  final int id;
+  final String label;
+  final bool enabled;
+  final bool separator;
+  final bool submenu;
+  final String iconName;
+  final Uint8List iconData;
+  final String toggleType;
+  final int toggleState;
+
+  const TrayMenuEntry({
+    required this.id,
+    required this.label,
+    required this.enabled,
+    required this.separator,
+    required this.submenu,
+    required this.iconName,
+    required this.iconData,
+    required this.toggleType,
+    required this.toggleState,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      label.hashCode ^
+      enabled.hashCode ^
+      separator.hashCode ^
+      submenu.hashCode ^
+      iconName.hashCode ^
+      iconData.hashCode ^
+      toggleType.hashCode ^
+      toggleState.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TrayMenuEntry &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          label == other.label &&
+          enabled == other.enabled &&
+          separator == other.separator &&
+          submenu == other.submenu &&
+          iconName == other.iconName &&
+          iconData == other.iconData &&
+          toggleType == other.toggleType &&
+          toggleState == other.toggleState;
 }

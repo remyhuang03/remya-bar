@@ -52,6 +52,7 @@ Future<void> main(List<String> arguments) async {
       preferences: preferences,
       hyprland: hyprland,
       system: system,
+      showTray: true,
       onOpenSettings: () => openRemyaSettings(debugExecutable: debugSettings),
       onOpenPowerSettings: () =>
           openRemyaSettings(debugExecutable: debugSettings, page: 'power'),

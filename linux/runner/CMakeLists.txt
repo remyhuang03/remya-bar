@@ -10,6 +10,7 @@ add_executable(${BINARY_NAME}
   "main.cc"
   "my_application.cc"
   "bar_popup.cc"
+  "bar_icons.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 
@@ -33,6 +34,7 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 add_executable(bar_lifecycle_test EXCLUDE_FROM_ALL
   "../../test/bar_lifecycle_test.cc"
   "bar_popup.cc"
+  "bar_icons.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 apply_standard_settings(bar_lifecycle_test)
