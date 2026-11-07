@@ -1,7 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/features/battery/bar_battery.dart';
+import 'package:remya_bar/features/media/bar_media.dart';
+import 'package:remya_bar/features/media/media_preview.dart';
+import 'package:remya_bar/features/popups/bar_popup.dart';
 import 'package:remya_bar/features/system/system_backend.dart';
+import 'package:remya_bar/features/system/system_popup_data.dart';
+import 'package:remya_settings_client/remya_settings_client.dart';
 
 Widget _host(Widget child, {double scale = 1}) => MaterialApp(
   home: MediaQuery(
@@ -11,6 +18,84 @@ Widget _host(Widget child, {double scale = 1}) => MaterialApp(
 );
 
 void main() {
+  testWidgets('the media pill and card share the artwork palette', (
+    tester,
+  ) async {
+    final preferences = RemyaTheme.fromConfig(
+      const ThemeConfig(styleVariant: 'expressive', mode: 'dark'),
+    );
+    final fallback = preferences.theme(.dark);
+    final cover = File('assets/icons/media-artwork.png').absolute;
+
+    Widget host(String artUrl) {
+      final players = [
+        MediaPlayerSnapshot(
+          busName: 'test',
+          identity: 'Test player',
+          title: 'Track',
+          artist: '',
+          album: '',
+          artUrl: artUrl,
+          playbackStatus: 'Playing',
+          canControl: true,
+          canGoNext: false,
+          canGoPrevious: false,
+          canPlay: true,
+          canPause: true,
+        ),
+      ];
+      return BarPopupScope(
+        theme: preferences,
+        child: MaterialApp(
+          theme: fallback,
+          home: Column(
+            children: [
+              SizedBox(
+                width: 204,
+                height: 40,
+                child: BarMedia(players: players),
+              ),
+              Expanded(
+                child: MediaPreview(
+                  data: mediaPopupData(players),
+                  onAction: (_) {},
+                  styleVariant: preferences.styleVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Color? pillColor() =>
+        tester.widget<Icon>(find.byIcon(Icons.music_note)).color;
+    ColorScheme cardColors() =>
+        Theme.of(tester.element(find.text('Now playing'))).colorScheme;
+
+    await tester.pumpWidget(host(''));
+    expect(pillColor(), fallback.colorScheme.primary);
+    expect(cardColors(), fallback.colorScheme);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(host(cover.uri.toString()));
+      for (var attempt = 0; attempt < 50; attempt++) {
+        if (pillColor() != fallback.colorScheme.primary &&
+            cardColors() != fallback.colorScheme) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        await tester.pump();
+      }
+    });
+    expect(pillColor(), isNot(fallback.colorScheme.primary));
+    expect(pillColor(), cardColors().primary);
+
+    await tester.pumpWidget(host(''));
+    expect(pillColor(), fallback.colorScheme.primary);
+    expect(cardColors(), fallback.colorScheme);
+  });
+
   testWidgets('battery distinguishes charging, low power, unknown and absent', (
     tester,
   ) async {

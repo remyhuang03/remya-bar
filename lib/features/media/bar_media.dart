@@ -1,8 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/bar_hover_card.dart';
+import '../popups/bar_popup.dart';
 import '../system/system_backend.dart';
 import '../system/system_popup_data.dart';
+import 'media_artwork.dart';
 
 class BarMedia extends StatelessWidget {
   const BarMedia({
@@ -32,26 +34,31 @@ class BarMedia extends StatelessWidget {
         ...mediaPopupData(players, error: error),
         'output': output,
       },
-      child: _MediaPill(
-        title: player.title.isEmpty ? player.identity : player.title,
-        playing: playing,
-        progress: switch ((player.positionSeconds, player.lengthSeconds)) {
-          (final position?, final length?) when length > 0 =>
-            (position / length).clamp(0, 1),
-          _ => 0,
-        },
-        onToggle:
-            toggle != null &&
-                player.canControl &&
-                (playing ? player.canPause : player.canPlay)
-            ? () async {
-                try {
-                  await toggle(player.busName, 'playPause');
-                } catch (error) {
-                  debugPrint('Media action: $error');
+      child: MediaArtwork(
+        url: player.artUrl,
+        styleVariant: BarPopupScope.themeOf(context).styleVariant,
+        builder: (_, _, scheme) => _MediaPill(
+          scheme: scheme,
+          title: player.title.isEmpty ? player.identity : player.title,
+          playing: playing,
+          progress: switch ((player.positionSeconds, player.lengthSeconds)) {
+            (final position?, final length?) when length > 0 =>
+              (position / length).clamp(0, 1),
+            _ => 0,
+          },
+          onToggle:
+              toggle != null &&
+                  player.canControl &&
+                  (playing ? player.canPause : player.canPlay)
+              ? () async {
+                  try {
+                    await toggle(player.busName, 'playPause');
+                  } catch (error) {
+                    debugPrint('Media action: $error');
+                  }
                 }
-              }
-            : null,
+              : null,
+        ),
       ),
     );
   }
@@ -63,12 +70,14 @@ class _MediaPill extends StatefulWidget {
     required this.playing,
     required this.progress,
     required this.onToggle,
+    required this.scheme,
   });
 
   final String title;
   final bool playing;
   final double progress;
   final VoidCallback? onToggle;
+  final ColorScheme? scheme;
 
   @override
   State<_MediaPill> createState() => _MediaPillState();
@@ -82,7 +91,7 @@ class _MediaPillState extends State<_MediaPill> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final colors = widget.scheme ?? theme.colorScheme;
     final enabled = widget.onToggle != null;
     final expanded = enabled && (_hovered || _focused || _pressed);
     final pressed = expanded && _pressed;

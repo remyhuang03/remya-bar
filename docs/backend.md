@@ -143,7 +143,9 @@ live `system.profile` from Settings' public `Get power` operation.
 ## Media control
 
 The Bar polls MPRIS on the session bus and shares its Rust player selection
-across outputs. The pill uses the selected player's position and duration.
+across outputs. The pill uses the selected player's position and duration. Both
+the pill and hover card derive their palette from the selected cover and fall
+back to the Settings palette when artwork is unavailable.
 The hover card sends transport and seek commands to that player. Rust checks
 capabilities and validates the unique owner and track ID before seeking.
 The output slider reads the default device via Settings' public Sound API

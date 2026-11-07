@@ -1,12 +1,11 @@
-import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
 import '../popups/bar_card_surface.dart';
+import 'media_artwork.dart';
 
-class MediaPreview extends StatefulWidget {
+class MediaPreview extends StatelessWidget {
   const MediaPreview({
     super.key,
     required this.data,
@@ -21,118 +20,63 @@ class MediaPreview extends StatefulWidget {
   final ValueChanged<Map<String, Object?>> onAction;
 
   @override
-  State<MediaPreview> createState() => _MediaPreviewState();
-}
-
-class _MediaPreviewState extends State<MediaPreview> {
-  String? _url;
-  Brightness? _brightness;
-  DynamicSchemeVariant? _variant;
-  ImageProvider? _artwork;
-  ColorScheme? _scheme;
-  int _generation = 0;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _resolveArtwork();
-  }
-
-  @override
-  void didUpdateWidget(MediaPreview oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _resolveArtwork();
-  }
-
-  void _resolveArtwork() {
-    final selected = _players(widget.data['players']).firstOrNull;
-    final url = _text(selected?['artUrl']);
-    final brightness = Theme.of(context).brightness;
-    if (_url == url &&
-        _brightness == brightness &&
-        _variant == widget.styleVariant) {
-      return;
-    }
-    _variant = widget.styleVariant;
-    _url = url;
-    _brightness = brightness;
-    _scheme = null;
-    _artwork = _artworkImage(url);
-    final generation = ++_generation;
-    final artwork = _artwork;
-    if (artwork == null) return;
-    unawaited(
-      ColorScheme.fromImageProvider(
-            provider: artwork,
-            brightness: brightness,
-            dynamicSchemeVariant: widget.styleVariant,
-          )
-          .then((scheme) {
-            if (mounted && generation == _generation) {
-              setState(() => _scheme = scheme);
-            }
-          })
-          .catchError((Object error) {
-            // Missing or unsupported cover art retains the owning Settings palette.
-            if (mounted && generation == _generation) {
-              setState(() => _scheme = null);
-            }
-          }),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final fallback = Theme.of(context);
-    final scheme = _scheme;
-    final theme = scheme == null
-        ? fallback
-        : fallback.copyWith(
-            colorScheme: scheme,
-            textTheme: fallback.textTheme.apply(
-              bodyColor: scheme.onSurface,
-              displayColor: scheme.onSurface,
-            ),
-            primaryTextTheme: fallback.primaryTextTheme.apply(
-              bodyColor: scheme.onPrimary,
-              displayColor: scheme.onPrimary,
-            ),
-            iconTheme: fallback.iconTheme.copyWith(color: scheme.onSurface),
-            primaryIconTheme: fallback.primaryIconTheme.copyWith(
-              color: scheme.onPrimary,
-            ),
-          );
-    final players = _players(widget.data['players']);
+    final players = _players(data['players']);
     final player = players.firstOrNull;
-    final error = _text(widget.data['error']);
-    final output = widget.data['output'];
-    return Theme(
-      data: theme,
-      child: BarCardSurface(
-        seedColor: widget.seedColor,
-        styleVariant: widget.styleVariant,
-        child: Column(
-          crossAxisAlignment: .stretch,
-          spacing: 16,
-          children: [
-            _PlayerHeader(players: players, onAction: widget.onAction),
-            if (error.isNotEmpty)
-              Text(error, style: TextStyle(color: theme.colorScheme.error)),
-            if (player == null && error.isEmpty) const Text('No active player'),
-            if (player != null)
-              _PlayerHero(
-                player: player,
-                artwork: _artwork,
-                onAction: widget.onAction,
-              ),
-            if (player != null)
-              _OutputVolume(
-                output: output is Map ? output : const {},
-                onAction: widget.onAction,
-              ),
-          ],
-        ),
-      ),
+    final error = _text(data['error']);
+    final output = data['output'];
+    return MediaArtwork(
+      url: _text(player?['artUrl']),
+      styleVariant: styleVariant,
+      builder: (context, artwork, scheme) {
+        final fallback = Theme.of(context);
+        final theme = scheme == null
+            ? fallback
+            : fallback.copyWith(
+                colorScheme: scheme,
+                textTheme: fallback.textTheme.apply(
+                  bodyColor: scheme.onSurface,
+                  displayColor: scheme.onSurface,
+                ),
+                primaryTextTheme: fallback.primaryTextTheme.apply(
+                  bodyColor: scheme.onPrimary,
+                  displayColor: scheme.onPrimary,
+                ),
+                iconTheme: fallback.iconTheme.copyWith(color: scheme.onSurface),
+                primaryIconTheme: fallback.primaryIconTheme.copyWith(
+                  color: scheme.onPrimary,
+                ),
+              );
+        return Theme(
+          data: theme,
+          child: BarCardSurface(
+            seedColor: seedColor,
+            styleVariant: styleVariant,
+            child: Column(
+              crossAxisAlignment: .stretch,
+              spacing: 16,
+              children: [
+                _PlayerHeader(players: players, onAction: onAction),
+                if (error.isNotEmpty)
+                  Text(error, style: TextStyle(color: theme.colorScheme.error)),
+                if (player == null && error.isEmpty)
+                  const Text('No active player'),
+                if (player != null)
+                  _PlayerHero(
+                    player: player,
+                    artwork: artwork,
+                    onAction: onAction,
+                  ),
+                if (player != null)
+                  _OutputVolume(
+                    output: output is Map ? output : const {},
+                    onAction: onAction,
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -743,30 +687,6 @@ String _durationLabel(double seconds) {
   if (minutes == 0) return '${seconds.floor()}s';
   if (minutes < 60) return '${minutes}m';
   return '${minutes ~/ 60}h ${minutes % 60}m';
-}
-
-ImageProvider? _artworkImage(String source) {
-  if (source.isEmpty) return null;
-  final uri = Uri.tryParse(source);
-  if (uri == null || uri.userInfo.isNotEmpty) return null;
-  ImageProvider image;
-  if (uri.scheme == 'file' &&
-      (uri.host.isEmpty || uri.host == 'localhost') &&
-      uri.path.startsWith('/') &&
-      !uri.hasQuery &&
-      !uri.hasFragment) {
-    try {
-      image = FileImage(File(uri.replace(host: '').toFilePath(windows: false)));
-    } on ArgumentError {
-      return null;
-    }
-  } else if ((uri.scheme == 'http' || uri.scheme == 'https') &&
-      uri.host.isNotEmpty) {
-    image = NetworkImage(uri.removeFragment().toString());
-  } else {
-    return null;
-  }
-  return ResizeImage(image, width: 256, height: 256, policy: .fit);
 }
 
 String _text(Object? value, [String fallback = '']) =>
