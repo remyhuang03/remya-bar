@@ -228,7 +228,9 @@ and pairing prompts use the Bluetooth API. Night Light toggles the current
 hyprsunset state and follows the schedule already configured in Settings.
 Power Saver toggles between power-saver and balanced when both profiles exist,
 and the Power detail lists every available profile. Keep awake shares the
-Settings service's session-only hypridle inhibitor. Dark mode uses the Settings
+Settings service's session-only hypridle inhibitor. On startup the bar asks
+Settings to ensure hypridle is running. Settings reuses an existing daemon or
+starts the packaged user service. Dark mode uses the Settings
 Light/Dark preference and applies it through the same appearance backend.
 Mic mute controls the current default PipeWire input through Settings Sound.
 Do Not Disturb and the other unimplemented toggles are displayed as unavailable.

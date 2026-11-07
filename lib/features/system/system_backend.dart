@@ -43,6 +43,11 @@ class SystemBackend extends ChangeNotifier {
 
   void start() {
     if (_disposed || _timer != null) return;
+    unawaited(
+      _settings.ensureIdleDaemon().catchError((Object error) {
+        if (!_disposed) debugPrint('hypridle startup: $error');
+      }),
+    );
     _settingsChanges = _settings.changes.listen((change) {
       switch (change.topic) {
         case barClockSecondsSettingId:
