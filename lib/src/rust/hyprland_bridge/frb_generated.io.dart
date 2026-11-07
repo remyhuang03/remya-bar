@@ -64,6 +64,9 @@ abstract class HyprlandRustLibApiImplPlatform
   int dco_decode_i_32(dynamic raw);
 
   @protected
+  List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
   List<HyprlandMonitor> dco_decode_list_hyprland_monitor(dynamic raw);
 
   @protected
@@ -142,6 +145,9 @@ abstract class HyprlandRustLibApiImplPlatform
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
+
+  @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
   List<HyprlandMonitor> sse_decode_list_hyprland_monitor(
@@ -251,6 +257,9 @@ abstract class HyprlandRustLibApiImplPlatform
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_hyprland_monitor(

@@ -4,6 +4,8 @@ import 'package:remya_settings_client/remya_settings_client.dart';
 
 import '../../bar_theme.dart';
 import '../tray/tray_menu_popup.dart';
+import '../workspaces/bar_workspaces.dart';
+import '../workspaces/workspace_overview.dart';
 import 'bar_detail_card.dart';
 import 'bar_popup.dart';
 import 'popup_measure.dart';
@@ -43,6 +45,7 @@ class _BarPopupAppState extends State<BarPopupApp> {
             'battery',
             'datetime',
             'tray-menu',
+            workspaceOverviewKind,
           }.contains(arguments['kind'])) {
         throw PlatformException(
           code: 'invalid-content',
@@ -207,6 +210,10 @@ class _BarPopupAppState extends State<BarPopupApp> {
             message: _data['message'] as String,
             scale: textScale,
             tray: _data['tray'] == true,
+          ),
+          workspaceOverviewKind => WorkspaceOverview(
+            workspaces: details['workspaces'] as List? ?? const [],
+            onAction: _action,
           ),
           'tray-menu' => TrayMenuPopup(
             key: ValueKey(_data['token']),

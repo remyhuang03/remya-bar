@@ -7,7 +7,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `dispatch_workspace_command`, `output_fullscreen`
+// These functions are ignored because they are not marked as `pub`: `dispatch_workspace_command`, `output_fullscreen`, `super_update`, `watch_super`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Hub`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
@@ -46,6 +46,7 @@ Future<bool> hyprlandOutputFullscreen({required int x, required int y}) =>
 
 class HyprlandMonitor {
   final String name;
+  final int outputNumber;
   final int x;
   final int y;
   final int activeWorkspaceId;
@@ -56,6 +57,7 @@ class HyprlandMonitor {
 
   const HyprlandMonitor({
     required this.name,
+    required this.outputNumber,
     required this.x,
     required this.y,
     required this.activeWorkspaceId,
@@ -68,6 +70,7 @@ class HyprlandMonitor {
   @override
   int get hashCode =>
       name.hashCode ^
+      outputNumber.hashCode ^
       x.hashCode ^
       y.hashCode ^
       activeWorkspaceId.hashCode ^
@@ -82,6 +85,7 @@ class HyprlandMonitor {
       other is HyprlandMonitor &&
           runtimeType == other.runtimeType &&
           name == other.name &&
+          outputNumber == other.outputNumber &&
           x == other.x &&
           y == other.y &&
           activeWorkspaceId == other.activeWorkspaceId &&
@@ -212,8 +216,9 @@ class HyprlandWorkspaceSlot {
   final bool active;
   final bool occupied;
   final int windowCount;
-  final String? appId;
-  final String? title;
+  final String? owner;
+  final List<String> apps;
+  final bool urgent;
 
   const HyprlandWorkspaceSlot({
     required this.id,
@@ -221,8 +226,9 @@ class HyprlandWorkspaceSlot {
     required this.active,
     required this.occupied,
     required this.windowCount,
-    this.appId,
-    this.title,
+    this.owner,
+    required this.apps,
+    required this.urgent,
   });
 
   @override
@@ -232,8 +238,9 @@ class HyprlandWorkspaceSlot {
       active.hashCode ^
       occupied.hashCode ^
       windowCount.hashCode ^
-      appId.hashCode ^
-      title.hashCode;
+      owner.hashCode ^
+      apps.hashCode ^
+      urgent.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -245,6 +252,7 @@ class HyprlandWorkspaceSlot {
           active == other.active &&
           occupied == other.occupied &&
           windowCount == other.windowCount &&
-          appId == other.appId &&
-          title == other.title;
+          owner == other.owner &&
+          apps == other.apps &&
+          urgent == other.urgent;
 }

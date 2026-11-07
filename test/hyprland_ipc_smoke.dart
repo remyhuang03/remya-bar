@@ -19,6 +19,29 @@ Future<void> main() async {
     final monitors =
         jsonDecode(await hyprlandRequest(command: 'j/monitors')) as List;
     if (monitors.isEmpty) throw StateError('No active outputs');
+    final expected = monitors.cast<Map<String, dynamic>>().toList()
+      ..sort((a, b) {
+        final row = (a['y'] as int).compareTo(b['y'] as int);
+        if (row != 0) return row;
+        final column = (a['x'] as int).compareTo(b['x'] as int);
+        return column != 0
+            ? column
+            : (a['name'] as String).compareTo(b['name'] as String);
+      });
+    final snapshot = await hyprlandSnapshot();
+    if (snapshot.monitors.length != expected.length) {
+      throw StateError('Output count changed during the snapshot');
+    }
+    for (var i = 0; i < expected.length; i++) {
+      final monitor = snapshot.monitors[i];
+      if (monitor.name != expected[i]['name'] ||
+          monitor.outputNumber != i + 1) {
+        throw StateError('Output numbering disagrees with compositor geometry');
+      }
+    }
+    stdout.writeln(
+      'PASS: ${snapshot.monitors.map((m) => '${m.outputNumber} ${m.name}').join(', ')}',
+    );
     final event = await subscribeHyprland()
         .firstWhere((update) => update.kind == 'event')
         .timeout(const Duration(seconds: 20));

@@ -270,31 +270,33 @@ Rust parses the real monitor, workspace, client and active-window IPC responses.
 GTK supplies the owning GDK monitor's logical geometry; Dart resolves it against
 Rust monitor coordinates, independently of focus and enumeration order. GDK
 geometry notifications (`top.remya.bar/window.outputChanged`) update this match.
-Ambiguous mirrored coordinates are unavailable rather than selecting another
-output. Named normal workspaces are supported. Rust produces eight 26px numeric
-slots in the owning output's current group, using global occupancy and the
-largest mapped window's app class. Special or named workspaces have an overlay;
-missing normal slots are genuine navigation targets, not detected occupied state.
-The active indicator is a 22px animated circle; 26px circular buttons contain
-22px circularly clipped icons with preserved aspect ratios. GTK/GIO resolves
-application classes to cached themed PNG paths (`top.remya.bar/icons.lookup`)
-for presentation; SVG-only/missing icons use a Material fallback. No icon files
-or settings are written.
+Ambiguous mirrored coordinates are unavailable. Named workspaces are supported.
+Rust builds eight slots from the active numeric group, with global occupancy,
+connector ownership, urgency, and unique application classes ordered by window
+area. Hyprland 0.57 exposes urgency through its Lua workspace API. Output
+numbers follow the current layout, from left to right within each row and from
+top to bottom across rows. Connector names still identify workspace ownership
+when output numbers change.
 
-Each output's current window is the focused client when it is visible there,
-otherwise its selected workspace's last window. Only mapped, non-hidden clients
-on the visible active/special workspace qualify. The title shows at the far left
-with the app class above it, collapsing to one line at large text scales.
+The pill is 32 pixels high with widths of 214 on one display, 242 on several,
+and up to 40 additional pixels for the active multi-app workspace. Own-output
+workspaces use filled bands. Other outputs use outline bands and an MD3E ring
+where visible. The Soft Triangle ring and tag use the Figma vectors because
+the library triangle has a different profile. The ring overlays the standard
+icon layout at its original 24-pixel size. A single shared Rust worker samples
+Hyprland's Super key state every 100 ms and publishes changes to all views. Held
+Super reveals numbers and
+remote ownership marks. The special workspace name overlays dimmed, blurred slots
+until the pointer enters the pill. Tooltips report the workspace, output and apps.
 
-Relevant Hyprland events trigger coalesced state reads; a two-second reconciliation
-recovers missed events and state changes. Failed reads retain the last valid data
-and disable workspace controls until recovery. Switching validates the workspace
-in Rust and dispatches the installed Lua API. Existing targets retain their output;
-empty slots are created on the requesting bar's output. Wheel events use `r±1`
-after focusing that output, and back-button events toggle its default special
-workspace. Workspaces have no hover or right-click preview popup. No compositor
-configuration is installed.
-
+Relevant Hyprland events trigger coalesced state reads. A two-second
+reconciliation recovers missed events and state changes. Failed reads retain the
+last valid data and hide the pill until recovery. Left click focuses the owner of
+an existing workspace or creates a missing numeric workspace on the owning bar
+output. Wheel events use Hyprland's monitor-relative `r±1`. A mouse back button
+toggles the open special workspace, or the default special workspace when none
+is open. Right click opens a Flutter overview with keyboard navigation and
+workspace selection. The bar surface retains its non-focusable policy.
 
 Battery and resource data share one cached hardware sample across outputs. Media
 discovery keeps its own refresh and retains its last successful player list if a

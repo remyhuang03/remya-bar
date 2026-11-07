@@ -2,6 +2,7 @@ use crate::api::{
     HyprlandMonitor, HyprlandSnapshot, HyprlandWindow, HyprlandWorkspace, HyprlandWorkspaceSlot,
 };
 use serde::Deserialize;
+use std::collections::HashSet;
 
 #[derive(Deserialize)]
 struct WorkspaceRef {
@@ -56,8 +57,9 @@ pub fn parse(
     workspaces: &str,
     clients: &str,
     active_window: &str,
+    urgent: &HashSet<i32>,
 ) -> Result<HyprlandSnapshot, String> {
-    let monitors: Vec<Monitor> =
+    let mut monitors: Vec<Monitor> =
         serde_json::from_str(monitors).map_err(|error| error.to_string())?;
     let workspaces: Vec<Workspace> =
         serde_json::from_str(workspaces).map_err(|error| error.to_string())?;
@@ -75,6 +77,7 @@ pub fn parse(
     }) {
         return Err("Invalid Hyprland monitor snapshot".into());
     }
+    monitors.sort_by(|a, b| (a.y, a.x, &a.name).cmp(&(b.y, b.x, &b.name)));
     let window = |client: &Client| HyprlandWindow {
         address: client.address.clone(),
         title: client.title.clone(),
@@ -89,7 +92,8 @@ pub fn parse(
     Ok(HyprlandSnapshot {
         monitors: monitors
             .iter()
-            .map(|monitor| {
+            .enumerate()
+            .map(|(index, monitor)| {
                 let active_id = monitor.active_workspace.id.unwrap();
                 let special_id = monitor.special_workspace.id.filter(|id| *id != 0);
                 let visible = |client: &&Client| {
@@ -115,6 +119,7 @@ pub fn parse(
                 });
                 HyprlandMonitor {
                     name: monitor.name.clone(),
+                    output_number: index as u32 + 1,
                     x: monitor.x,
                     y: monitor.y,
                     active_workspace_id: active_id,
@@ -125,7 +130,7 @@ pub fn parse(
                         .clone()
                         .filter(|name| !name.is_empty()),
                     current_window: current_window.map(window),
-                    workspace_slots: slots(active_id, &workspaces, &clients),
+                    workspace_slots: slots(active_id, &workspaces, &clients, urgent),
                 }
             })
             .collect(),
@@ -159,6 +164,7 @@ fn slots(
     active_id: i32,
     workspaces: &[Workspace],
     clients: &[Client],
+    urgent: &HashSet<i32>,
 ) -> Vec<HyprlandWorkspaceSlot> {
     // Match this workstation's ii layout: eight slots, each in the active numeric group.
     let start = if active_id > 0 {
@@ -170,19 +176,21 @@ fn slots(
         .map(|offset| {
             let id = start.checked_add(offset).unwrap_or_default();
             let workspace = workspaces.iter().find(|workspace| workspace.id == id);
-            let biggest = clients
+            let mut windows: Vec<_> = clients
                 .iter()
                 .filter(|client| client.mapped && client.workspace.id == Some(id))
-                .reduce(|biggest, client| {
-                    let area = |client: &Client| {
-                        i64::from(client.size[0].max(0)) * i64::from(client.size[1].max(0))
-                    };
-                    if area(client) > area(biggest) {
-                        client
-                    } else {
-                        biggest
-                    }
-                });
+                .collect();
+            windows.sort_by_key(|client| {
+                std::cmp::Reverse(
+                    i64::from(client.size[0].max(0)) * i64::from(client.size[1].max(0)),
+                )
+            });
+            let mut seen = HashSet::new();
+            let apps = windows
+                .into_iter()
+                .filter(|client| seen.insert(client.class.as_str()))
+                .map(|client| client.class.clone())
+                .collect();
             HyprlandWorkspaceSlot {
                 id,
                 name: workspace
@@ -199,10 +207,11 @@ fn slots(
                 window_count: workspace
                     .map(|workspace| workspace.windows)
                     .unwrap_or_default(),
-                app_id: biggest
-                    .map(|client| client.class.clone())
-                    .filter(|class| !class.is_empty()),
-                title: biggest.map(|client| client.title.clone()),
+                owner: workspace
+                    .map(|workspace| workspace.monitor.clone())
+                    .filter(|name| !name.is_empty()),
+                apps,
+                urgent: urgent.contains(&id),
             }
         })
         .collect()
@@ -220,7 +229,7 @@ fn output(snapshot: &HyprlandSnapshot, name: &str) -> Result<String, String> {
         return Err("Output unavailable".into());
     }
     Ok(format!(
-        "hl.dispatch(hl.dsp.focus({{monitor = {}}})); ",
+        "local focus = hl.dispatch(hl.dsp.focus({{monitor = {}}})); if not focus.ok then return focus.error or 'Output unavailable' end; ",
         quoted(name)?
     ))
 }
@@ -238,7 +247,7 @@ pub fn switch_command(
     let (prefix, selector) = match workspace {
         // Existing workspaces stay on their monitor; focusing them never moves them.
         Some(workspace) => (
-            String::new(),
+            output(snapshot, &workspace.monitor_name).unwrap_or_default(),
             if id > 0 {
                 id.to_string()
             } else {
@@ -258,9 +267,9 @@ pub fn switch_command(
         }
         None => return Err("Workspace target is outside the current group".into()),
     };
-    Ok(format!(
-        "eval {prefix}hl.dispatch(hl.dsp.focus({{workspace = {}}}))",
-        quoted(&selector)?
+    Ok(dispatch(
+        &prefix,
+        &format!("hl.dsp.focus({{workspace = {}}})", quoted(&selector)?),
     ))
 }
 
@@ -274,16 +283,35 @@ pub fn scroll_command(
     }
     let owner = output(snapshot, output_name)?;
     let selector = if direction == 1 { "r+1" } else { "r-1" };
-    Ok(format!(
-        "eval {owner}hl.dispatch(hl.dsp.focus({{workspace = \"{selector}\"}}))"
+    Ok(dispatch(
+        &owner,
+        &format!("hl.dsp.focus({{workspace = \"{selector}\"}})"),
     ))
 }
 
 pub fn special_command(snapshot: &HyprlandSnapshot, output_name: &str) -> Result<String, String> {
     let owner = output(snapshot, output_name)?;
-    Ok(format!(
-        "eval {owner}hl.dispatch(hl.dsp.workspace.toggle_special(\"special\"))"
+    let monitor = snapshot
+        .monitors
+        .iter()
+        .find(|monitor| monitor.name == output_name)
+        .ok_or("Output unavailable")?;
+    let special = monitor
+        .special_workspace_name
+        .as_deref()
+        .and_then(|name| name.strip_prefix("special:"))
+        .filter(|name| !name.is_empty())
+        .unwrap_or("special");
+    Ok(dispatch(
+        &owner,
+        &format!("hl.dsp.workspace.toggle_special({})", quoted(special)?),
     ))
+}
+
+fn dispatch(prefix: &str, action: &str) -> String {
+    format!(
+        "repl {prefix}local result = hl.dispatch({action}); return result.ok and 'ok' or (result.error or 'Workspace action failed')"
+    )
 }
 
 #[cfg(test)]
@@ -315,8 +343,32 @@ mod tests {
             &workspaces.to_string(),
             &clients.to_string(),
             r#"{"address":"0xa"}"#,
+            &HashSet::from([10]),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn output_numbers_follow_rows_then_horizontal_position() {
+        let state = parse(
+            r#"[
+                {"id":0,"name":"lower-left","x":-1920,"y":1080,"activeWorkspace":{"id":1},"specialWorkspace":{}},
+                {"id":3,"name":"top-right","x":1920,"y":0,"activeWorkspace":{"id":2},"specialWorkspace":{}},
+                {"id":1,"name":"top-left","x":0,"y":0,"activeWorkspace":{"id":3},"specialWorkspace":{}}
+            ]"#,
+            "[]",
+            "[]",
+            "{}",
+            &HashSet::new(),
+        ).unwrap();
+        assert_eq!(
+            state
+                .monitors
+                .iter()
+                .map(|m| (m.name.as_str(), m.output_number))
+                .collect::<Vec<_>>(),
+            [("top-left", 1), ("top-right", 2), ("lower-left", 3)]
+        );
     }
 
     #[test]
@@ -354,6 +406,7 @@ mod tests {
             r#"[{"id":-1337,"type":"normal","name":"Writing","monitor":"DP-1","windows":0,"lastwindow":""},{"id":-99,"type":"special","name":"special:scratch","monitor":"DP-1","windows":1,"lastwindow":"0xa"}]"#,
             r#"[{"address":"0xa","title":"Scratch","class":"terminal","workspace":{"id":-99},"monitor":0,"mapped":true,"hidden":false,"focusHistoryID":0}]"#,
             "{}",
+            &HashSet::new(),
         ).unwrap();
         assert_eq!(state.workspaces.len(), 1);
         assert_eq!(state.workspaces[0].id, -1337);
@@ -365,16 +418,15 @@ mod tests {
 
     #[test]
     fn invalid_data_and_command_targets_are_rejected() {
-        assert!(parse("{}", "[]", "[]", "{}").is_err());
-        assert!(parse("[]", "[]", "[]", "invalid").is_err());
+        assert!(parse("{}", "[]", "[]", "{}", &HashSet::new()).is_err());
+        assert!(parse("[]", "[]", "[]", "invalid", &HashSet::new()).is_err());
         let state = snapshot(false, 2);
         assert!(switch_command(&state, "DP-1\n", 1).is_err());
         assert!(switch_command(&state, "DP-1", 0).is_err());
         assert!(switch_command(&state, "DP-1", 42).is_err());
-        assert_eq!(
-            switch_command(&state, "DP-1", 4).unwrap(),
-            "eval hl.dispatch(hl.dsp.focus({monitor = \"DP-1\"})); hl.dispatch(hl.dsp.focus({workspace = \"4\"}))"
-        );
+        let command = switch_command(&state, "DP-1", 4).unwrap();
+        assert!(command.contains("monitor = \"DP-1\""));
+        assert!(command.contains("workspace = \"4\""));
         assert!(quoted("DP-\"1").unwrap().contains(r#"DP-\"1"#));
         assert!(quoted("bad\nname").is_err());
         assert!(scroll_command(&state, "DP-1", 0).is_err());
@@ -388,6 +440,7 @@ mod tests {
             r#"[{"id":14,"name":"14","monitor":"DP-1","windows":2,"lastwindow":"0xa"},{"id":10,"name":"10","monitor":"DP-2","windows":1,"lastwindow":"0xb"},{"id":-1337,"name":"Writing","monitor":"DP-2","windows":0,"lastwindow":""}]"#,
             r#"[{"address":"0xa","title":"Small","class":"small","workspace":{"id":14},"monitor":0,"mapped":true,"hidden":false,"focusHistoryID":0,"size":[100,100]},{"address":"0xc","title":"Large","class":"large","workspace":{"id":14},"monitor":0,"mapped":true,"hidden":false,"focusHistoryID":1,"size":[1000,500]},{"address":"0xb","title":"Other output","class":"other","workspace":{"id":10},"monitor":1,"mapped":true,"hidden":false,"focusHistoryID":2,"size":[300,300]}]"#,
             r#"{"address":"0xa"}"#,
+            &HashSet::from([10]),
         ).unwrap();
         let slots = &state.monitors[0].workspace_slots;
         assert_eq!(
@@ -395,14 +448,15 @@ mod tests {
             (9..=16).collect::<Vec<_>>()
         );
         assert!(slots[5].active);
-        assert_eq!(slots[5].app_id.as_deref(), Some("large"));
-        assert_eq!(slots[1].app_id.as_deref(), Some("other"));
+        assert_eq!(slots[5].apps, ["large", "small"]);
+        assert_eq!(slots[1].apps, ["other"]);
+        assert_eq!(slots[1].owner.as_deref(), Some("DP-2"));
+        assert!(slots[1].urgent);
         assert!(slots[1].occupied);
         assert!(!slots[0].occupied);
-        assert_eq!(
-            switch_command(&state, "DP-1", 10).unwrap(),
-            "eval hl.dispatch(hl.dsp.focus({workspace = \"10\"}))"
-        );
+        let command = switch_command(&state, "DP-1", 10).unwrap();
+        assert!(command.contains("monitor = \"DP-2\""));
+        assert!(command.contains("workspace = \"10\""));
         assert!(
             switch_command(&state, "DP-1", 15)
                 .unwrap()
@@ -417,7 +471,7 @@ mod tests {
         assert!(
             scroll_command(&state, "DP-1", 1)
                 .unwrap()
-                .ends_with("workspace = \"r+1\"}))")
+                .contains("workspace = \"r+1\"}))")
         );
         assert!(
             special_command(&state, "DP-1")

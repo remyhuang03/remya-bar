@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -27,6 +29,8 @@ const _slots = [
     name: '1',
     active: false,
     occupied: false,
+    urgent: false,
+    apps: [],
     windowCount: 0,
   ),
   HyprlandWorkspaceSlot(
@@ -34,23 +38,28 @@ const _slots = [
     name: '2',
     active: false,
     occupied: true,
+    urgent: false,
+    apps: ['other'],
+    owner: 'DP-2',
     windowCount: 1,
-    appId: 'other',
   ),
   HyprlandWorkspaceSlot(
     id: 3,
     name: 'Writing',
     active: true,
     occupied: true,
+    urgent: false,
+    apps: ['editor'],
+    owner: 'DP-1',
     windowCount: 1,
-    appId: 'editor',
-    title: 'Report',
   ),
   HyprlandWorkspaceSlot(
     id: 4,
     name: '4',
     active: false,
     occupied: false,
+    urgent: false,
+    apps: [],
     windowCount: 0,
   ),
   HyprlandWorkspaceSlot(
@@ -58,6 +67,8 @@ const _slots = [
     name: '5',
     active: false,
     occupied: false,
+    urgent: false,
+    apps: [],
     windowCount: 0,
   ),
   HyprlandWorkspaceSlot(
@@ -65,6 +76,8 @@ const _slots = [
     name: '6',
     active: false,
     occupied: false,
+    urgent: false,
+    apps: [],
     windowCount: 0,
   ),
   HyprlandWorkspaceSlot(
@@ -72,6 +85,8 @@ const _slots = [
     name: '7',
     active: false,
     occupied: false,
+    urgent: false,
+    apps: [],
     windowCount: 0,
   ),
   HyprlandWorkspaceSlot(
@@ -79,6 +94,8 @@ const _slots = [
     name: '8',
     active: false,
     occupied: false,
+    urgent: false,
+    apps: [],
     windowCount: 0,
   ),
 ];
@@ -87,6 +104,7 @@ const _snapshot = HyprlandSnapshot(
   monitors: [
     HyprlandMonitor(
       name: 'DP-1',
+      outputNumber: 1,
       x: 1920,
       y: 0,
       activeWorkspaceId: 3,
@@ -95,6 +113,7 @@ const _snapshot = HyprlandSnapshot(
     ),
     HyprlandMonitor(
       name: 'DP-2',
+      outputNumber: 2,
       x: 0,
       y: 0,
       activeWorkspaceId: 2,
@@ -154,6 +173,7 @@ void main() {
         monitors: [
           HyprlandMonitor(
             name: 'DP-1',
+            outputNumber: 1,
             x: 0,
             y: 0,
             activeWorkspaceId: 1,
@@ -161,6 +181,7 @@ void main() {
           ),
           HyprlandMonitor(
             name: 'DP-2',
+            outputNumber: 2,
             x: 0,
             y: 0,
             activeWorkspaceId: 2,
@@ -251,50 +272,25 @@ void main() {
             body: Align(
               alignment: .topLeft,
               child: SizedBox(
-                width: BarWorkspaces.width,
-                height: 40,
+                height: 32,
                 child: BarWorkspaces(backend: backend),
               ),
             ),
           ),
         ),
       );
-      expect(find.byType(SegmentedButton<int>), findsNothing);
-      expect(find.byType(IconButton), findsNWidgets(8));
       expect(find.byIcon(Icons.apps_rounded), findsNWidgets(2));
-      expect(tester.getSize(find.byType(BarWorkspaces)).width, 208);
+      expect(tester.getSize(find.byType(BarWorkspaces)), const Size(242, 32));
       expect(
         tester.getSize(find.byKey(const ValueKey('workspace-1'))),
         const Size(26, 26),
       );
-      final indicator = tester.widget<AnimatedPositioned>(
-        find.byKey(const ValueKey('workspace-active-indicator')),
-      );
-      expect(indicator.left, 54);
-      expect(indicator.width, 22);
-      expect(indicator.height, 22);
-      final activeMaterial = tester.widget<Material>(
-        find.descendant(
-          of: find.byKey(const ValueKey('workspace-active-indicator')),
-          matching: find.byType(Material),
+      expect(
+        tester.getSize(
+          find.byKey(const ValueKey('workspace-active-indicator')),
         ),
+        const Size(22, 22),
       );
-      expect(activeMaterial.shape, isA<CircleBorder>());
-      for (final button in tester.widgetList<IconButton>(
-        find.byType(IconButton),
-      )) {
-        expect(button.iconSize, 22);
-        expect(button.alignment, Alignment.center);
-        expect(button.padding, EdgeInsets.zero);
-        for (final states in [
-          <WidgetState>{},
-          {WidgetState.hovered},
-          {WidgetState.focused},
-          {WidgetState.pressed},
-        ]) {
-          expect(button.style?.shape?.resolve(states), isA<CircleBorder>());
-        }
-      }
       await tester.tap(find.byKey(const ValueKey('workspace-1')));
       await tester.pump();
       expect(activations, [('DP-1', 1)]);
@@ -315,6 +311,62 @@ void main() {
     },
   );
 
+  testWidgets('workspace hover, press, and keyboard focus match their states', (
+    tester,
+  ) async {
+    final backend = HyprlandBackend(
+      outputName: 'DP-1',
+      readSnapshot: () async => _snapshot,
+      activateWorkspace: ({required outputName, required workspaceId}) async {},
+    );
+    addTearDown(backend.dispose);
+    await backend.refresh();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(child: BarWorkspaces(backend: backend)),
+      ),
+    );
+    final active = find.byKey(const ValueKey('workspace-3'));
+    final stateLayer = find.descendant(
+      of: active,
+      matching: find.byType(AnimatedContainer),
+    );
+    BoxDecoration decoration() =>
+        tester.widget<AnimatedContainer>(stateLayer).decoration!
+            as BoxDecoration;
+
+    final colors = Theme.of(tester.element(active)).colorScheme;
+    expect(decoration().color, colors.onPrimary.withValues(alpha: 0));
+    final mouse = await tester.createGesture(kind: .mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer(location: tester.getCenter(active));
+    await tester.pump();
+    expect(decoration().color, colors.onPrimary.withValues(alpha: .08));
+    await mouse.down(tester.getCenter(active));
+    await tester.pump();
+    expect(decoration().color, colors.onPrimary.withValues(alpha: .10));
+    expect(decoration().borderRadius, BorderRadius.circular(7));
+    await mouse.up();
+    await mouse.moveTo(Offset.zero);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    expect(
+      find.descendant(
+        of: find.byType(BarWorkspaces),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is DecoratedBox &&
+              w.decoration is ShapeDecoration &&
+              (w.decoration as ShapeDecoration).shape is StadiumBorder &&
+              ((w.decoration as ShapeDecoration).shape as StadiumBorder).side ==
+                  BorderSide(color: colors.secondary, width: 2),
+        ),
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('unavailable workspaces do not fabricate a selected desktop', (
     tester,
   ) async {
@@ -325,69 +377,79 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('hover and secondary click never request a workspace popup', (
-    tester,
-  ) async {
-    final calls = <String>[];
-    binding.defaultBinaryMessenger.setMockMethodCallHandler(BarPopup.channel, (
-      call,
-    ) async {
-      calls.add(call.method);
-      return null;
-    });
-    addTearDown(
-      () => binding.defaultBinaryMessenger.setMockMethodCallHandler(
+  testWidgets(
+    'hover shows the workspace tooltip and right click opens the overview',
+    (tester) async {
+      final calls = <MethodCall>[];
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(
         BarPopup.channel,
-        null,
-      ),
-    );
-    final backend = HyprlandBackend(
-      outputName: 'DP-1',
-      readSnapshot: () async => _snapshot,
-    );
-    addTearDown(backend.dispose);
-    await backend.refresh();
-    await tester.pumpWidget(
-      BarPopupScope(
-        theme: RemyaTheme.fromConfig(const ThemeConfig()),
-        child: MaterialApp(
-          theme: barTheme(ThemeData()),
-          home: Scaffold(
-            body: Align(
-              alignment: .topLeft,
-              child: SizedBox(
-                width: BarWorkspaces.width,
-                height: 32,
-                child: BarWorkspaces(backend: backend),
+        (call) async {
+          calls.add(call);
+          return null;
+        },
+      );
+      addTearDown(
+        () => binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          BarPopup.channel,
+          null,
+        ),
+      );
+      final backend = HyprlandBackend(
+        outputName: 'DP-1',
+        readSnapshot: () async => _snapshot,
+      );
+      addTearDown(backend.dispose);
+      await backend.refresh();
+      await tester.pumpWidget(
+        BarPopupScope(
+          theme: RemyaTheme.fromConfig(const ThemeConfig()),
+          child: MaterialApp(
+            theme: barTheme(ThemeData()),
+            home: Scaffold(
+              body: Align(
+                alignment: .topLeft,
+                child: SizedBox(
+                  height: 32,
+                  child: BarWorkspaces(backend: backend),
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-    final mouse = await tester.createGesture(
-      kind: .mouse,
-      buttons: kSecondaryMouseButton,
-    );
-    await mouse.addPointer(location: Offset.zero);
-    await mouse.moveTo(
-      tester.getCenter(find.byKey(const ValueKey('workspace-3'))),
-    );
-    await tester.pump(const Duration(milliseconds: 700));
-    await mouse.down(
-      tester.getCenter(find.byKey(const ValueKey('workspace-3'))),
-    );
-    await mouse.up();
-    await tester.pump(const Duration(milliseconds: 700));
-    await mouse.moveTo(const Offset(400, 100));
-    await tester.pump();
-    await tester.pumpWidget(const SizedBox.shrink());
-    expect(calls, isEmpty);
-    expect(tester.takeException(), isNull);
-  });
+      );
+      final mouse = await tester.createGesture(
+        kind: .mouse,
+        buttons: kSecondaryMouseButton,
+      );
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(
+        tester.getCenter(find.byKey(const ValueKey('workspace-3'))),
+      );
+      await tester.pump(const Duration(milliseconds: 700));
+      await mouse.down(
+        tester.getCenter(find.byKey(const ValueKey('workspace-3'))),
+      );
+      await mouse.up();
+      await tester.pump(const Duration(milliseconds: 700));
+      await mouse.moveTo(const Offset(400, 100));
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(
+        calls
+            .where((call) => call.method == 'show')
+            .map((call) => call.arguments['kind']),
+        ['tooltip', workspaceOverviewKind],
+      );
+      expect(
+        calls.first.arguments['data']['message'],
+        'Workspace Writing\nDisplay 1 (DP-1)\neditor',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
-    'non-square app images retain aspect ratio inside a circular 22px icon',
+    'non-square app images retain aspect ratio inside a circular 18px icon',
     (tester) async {
       final directory = Directory.systemTemp.createTempSync(
         'remya-workspace-icon-',
@@ -417,7 +479,6 @@ void main() {
             body: Align(
               alignment: .topLeft,
               child: SizedBox(
-                width: BarWorkspaces.width,
                 height: 32,
                 child: BarWorkspaces(backend: backend),
               ),
@@ -428,17 +489,158 @@ void main() {
       await tester.pump();
       expect(find.byType(Image), findsNWidgets(2));
       for (final image in tester.widgetList<Image>(find.byType(Image))) {
-        expect(image.width, 22);
-        expect(image.height, 22);
+        expect(image.width, 18);
+        expect(image.height, 18);
         expect(image.fit, BoxFit.contain);
-        expect(image.colorBlendMode, BlendMode.color);
       }
       expect(find.byType(ClipOval), findsNWidgets(2));
       for (final image in find.byType(Image).evaluate()) {
-        expect(tester.getSize(find.byWidget(image.widget)), const Size(22, 22));
+        expect(tester.getSize(find.byWidget(image.widget)), const Size(18, 18));
       }
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'output rings fit apps and preserve the Figma Soft Triangle icon dimensions',
+    (tester) async {
+      final directory = Directory.systemTemp.createTempSync('remya-ring-test-');
+      final icon = File('${directory.path}/icon.png')
+        ..writeAsBytesSync(
+          base64Decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAADUlEQVR4nGP4zwAE/wEHAAH/4iOeWQAAAABJRU5ErkJggg==',
+          ),
+        );
+      addTearDown(() => directory.deleteSync(recursive: true));
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        icons,
+        (_) async => {
+          for (final app in ['first', 'second', 'third']) app: icon.path,
+        },
+      );
+      var outputNumber = 1;
+      var count = 1;
+      final backend = HyprlandBackend(
+        outputName: 'DP-1',
+        readSnapshot: () async => HyprlandSnapshot(
+          monitors: [
+            HyprlandMonitor(
+              name: 'DP-1',
+              outputNumber: 5,
+              x: 0,
+              y: 0,
+              activeWorkspaceId: 1,
+              workspaceSlots: [
+                _slots.first,
+                HyprlandWorkspaceSlot(
+                  id: 2,
+                  name: '2',
+                  active: false,
+                  occupied: true,
+                  windowCount: count,
+                  owner: 'DP-2',
+                  apps: ['first', 'second', 'third'].take(count).toList(),
+                  urgent: false,
+                ),
+                ..._slots.skip(2),
+              ],
+            ),
+            HyprlandMonitor(
+              name: 'DP-2',
+              outputNumber: outputNumber,
+              x: 1920,
+              y: 0,
+              activeWorkspaceId: 2,
+              workspaceSlots: [],
+            ),
+          ],
+          workspaces: [],
+        ),
+      );
+      addTearDown(backend.dispose);
+      await backend.refresh();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(child: BarWorkspaces(backend: backend)),
+        ),
+      );
+
+      for (outputNumber = 1; outputNumber <= 4; outputNumber++) {
+        for (count = 1; count <= 3; count++) {
+          await backend.refresh();
+          await tester.pumpAndSettle();
+          final slot = find.byKey(const ValueKey('workspace-2'));
+          final appCircles = find.descendant(
+            of: slot,
+            matching: find.byType(ClipOval),
+          );
+          expect(appCircles, findsNWidgets(count == 2 ? 2 : 1));
+          if (outputNumber == 3) {
+            final ring = find.descendant(
+              of: slot,
+              matching: find.byType(SvgPicture),
+            );
+            final svg = tester.widget<SvgPicture>(ring);
+            expect(
+              (svg.bytesLoader as SvgAssetLoader).assetName,
+              'assets/icons/workspaces/soft-triangle-outline.svg',
+            );
+            final bounds = tester.getRect(ring);
+            expect(bounds.size, const Size.square(24));
+            expect(
+              tester.getRect(appCircles.first),
+              Rect.fromLTWH(
+                bounds.left + (count == 1 ? 3 : 2),
+                bounds.top + (count == 1 ? 3 : 2),
+                count == 1 ? 18 : 16,
+                count == 1 ? 18 : 16,
+              ),
+            );
+            if (count == 2) {
+              expect(tester.getSize(appCircles.last), const Size.square(10));
+            }
+            continue;
+          }
+          final ring = find.descendant(
+            of: slot,
+            matching: find.byWidgetPredicate(
+              (w) => w is Material && w.shape is MaterialShapeBorder,
+            ),
+          );
+          final shape = tester.widget<Material>(ring).shape!;
+          final ringBox = tester.renderObject<RenderBox>(ring);
+          final path = shape.getInnerPath(Offset.zero & ringBox.size);
+          expect(ringBox.size, const Size.square(24));
+          final circles = [
+            ...appCircles.evaluate(),
+            if (count == 3)
+              find
+                  .ancestor(
+                    of: find.descendant(of: slot, matching: find.text('+2')),
+                    matching: find.byType(Padding),
+                  )
+                  .first
+                  .evaluate()
+                  .single,
+          ];
+          for (final element in circles) {
+            final box = element.renderObject! as RenderBox;
+            for (var i = 0; i < 64; i++) {
+              final angle = i * math.pi / 32;
+              final point =
+                  box.size.center(Offset.zero) +
+                  Offset(math.cos(angle), math.sin(angle)) *
+                      (box.size.width / 2);
+              expect(
+                path.contains(ringBox.globalToLocal(box.localToGlobal(point))),
+                isTrue,
+                reason: 'Display $outputNumber, $count apps, contour point $i',
+              );
+            }
+          }
+        }
+      }
     },
   );
 
@@ -496,11 +698,7 @@ void main() {
         home: Scaffold(
           body: Align(
             alignment: .topLeft,
-            child: SizedBox(
-              width: BarWorkspaces.width,
-              height: 32,
-              child: BarWorkspaces(backend: backend),
-            ),
+            child: SizedBox(height: 32, child: BarWorkspaces(backend: backend)),
           ),
         ),
       ),
@@ -547,7 +745,6 @@ void main() {
             body: Align(
               alignment: .topLeft,
               child: SizedBox(
-                width: BarWorkspaces.width,
                 height: 32,
                 child: BarWorkspaces(backend: backend),
               ),
@@ -559,6 +756,7 @@ void main() {
         monitors: [
           HyprlandMonitor(
             name: 'DP-1',
+            outputNumber: 1,
             x: 1920,
             y: 0,
             activeWorkspaceId: 14,
@@ -569,6 +767,8 @@ void main() {
                   name: '$id',
                   active: id == 14,
                   occupied: false,
+                  urgent: false,
+                  apps: [],
                   windowCount: 0,
                 ),
             ],
@@ -578,19 +778,75 @@ void main() {
       );
       await backend.refresh();
       await tester.pump();
-      final indicator = tester.widget<AnimatedPositioned>(
+      await tester.pumpAndSettle();
+      final pill = tester.getTopLeft(find.byType(BarWorkspaces));
+      final indicator = tester.getTopLeft(
         find.byKey(const ValueKey('workspace-active-indicator')),
       );
-      expect(indicator.left, 132);
-      expect(indicator.duration, const Duration(milliseconds: 200));
-      await tester.pump(const Duration(milliseconds: 250));
+      expect(indicator.dx - pill.dx, 135);
       expect(find.byKey(const ValueKey('workspace-1')), findsNothing);
       expect(
         tester.getSize(find.byKey(const ValueKey('workspace-14'))),
         const Size(26, 26),
       );
-      expect(tester.getSize(find.byType(BarWorkspaces)).width, 208);
+      expect(tester.getSize(find.byType(BarWorkspaces)).width, 214);
       expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'multi-app slots expand, Super reveals IDs, and Special dims slots',
+    (tester) async {
+      final backend = HyprlandBackend(
+        outputName: 'DP-1',
+        readSnapshot: () async => HyprlandSnapshot(
+          monitors: [
+            HyprlandMonitor(
+              name: 'DP-1',
+              outputNumber: 1,
+              x: 1920,
+              y: 0,
+              activeWorkspaceId: 3,
+              specialWorkspaceId: -99,
+              specialWorkspaceName: 'special:scratchpad',
+              workspaceSlots: [
+                ..._slots.take(2),
+                const HyprlandWorkspaceSlot(
+                  id: 3,
+                  name: '3',
+                  active: true,
+                  occupied: true,
+                  windowCount: 4,
+                  owner: 'DP-1',
+                  apps: ['editor', 'browser', 'terminal', 'mail'],
+                  urgent: true,
+                ),
+                ..._slots.skip(3),
+              ],
+            ),
+            _snapshot.monitors[1],
+          ],
+          workspaces: _snapshot.workspaces,
+        ),
+      );
+      addTearDown(backend.dispose);
+      await backend.refresh();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Center(child: BarWorkspaces(backend: backend)),
+        ),
+      );
+      expect(find.text('scratchpad'), findsOneWidget);
+      expect(tester.getSize(find.byType(BarWorkspaces)), const Size(282, 32));
+      expect(find.text('+2'), findsOneWidget);
+
+      backend.superHeld = true;
+      await backend.refresh();
+      await tester.pumpAndSettle();
+      expect(find.text('scratchpad'), findsNothing);
+      expect(find.text('+2'), findsNothing);
+      expect(find.text('8'), findsOneWidget);
+      expect(tester.getSize(find.byType(BarWorkspaces)), const Size(242, 32));
     },
   );
 

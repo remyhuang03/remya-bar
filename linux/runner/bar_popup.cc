@@ -11,6 +11,8 @@ namespace {
 
 constexpr int kSidebarRightMargin = 6;
 
+const char* kind_of(FlValue* content);
+
 struct BarPopup {
   FlView* owner;
   GtkWidget* window = nullptr;
@@ -46,7 +48,7 @@ struct BarPopup {
   }
   void hide() {
     cancel_hide();
-    if (visible && tray) {
+    if (visible && tray && g_strcmp0(kind_of(content), "tray-menu") == 0) {
       g_autoptr(FlValue) args = fl_value_new_map();
       fl_value_set_string_take(args, "action", fl_value_new_string("tray.closed"));
       FlValue* details = content != nullptr ? fl_value_lookup_string(content, "data") : nullptr;
@@ -317,7 +319,8 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   auto* root = state;
   const bool show = g_strcmp0(method, "show") == 0;
   const bool sidebar = g_strcmp0(kind, "sidebar") == 0;
-  const bool tray = g_strcmp0(kind, "tray-menu") == 0;
+  const bool overview = g_strcmp0(kind, "workspace-overview") == 0;
+  const bool tray = overview || g_strcmp0(kind, "tray-menu") == 0;
   const bool resources = g_strcmp0(kind, "resources") == 0;
   const bool tooltip = g_strcmp0(kind, "tooltip") == 0;
   if (g_strcmp0(method, "watchTrayOutside") == 0) {
@@ -412,6 +415,7 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
     fl_method_call_respond_success(call, nullptr, nullptr);
     return;
   }
+  if (tray && state->visible && g_strcmp0(kind, kind_of(state->content)) != 0) state->hide();
   state->cancel_hide();
   if (sidebar || tray) watch_outside(state);
   if (state->window == nullptr) create_popup(state, sidebar, tray, resources, tooltip);
@@ -452,7 +456,8 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   if (tray) {
     // The pill ends 4px above the bar's exclusive edge.
     gtk_layer_set_margin(GTK_WINDOW(state->window), GTK_LAYER_SHELL_EDGE_LEFT,
-        CLAMP(rect.x, 0, MAX(0, monitor.width - width)));
+        CLAMP(rect.x + (overview ? (rect.width - width) / 2 : 0),
+              0, MAX(0, monitor.width - width)));
   }
   state->width = width;
   if (!sidebar && !tray && !resources && !tooltip) {

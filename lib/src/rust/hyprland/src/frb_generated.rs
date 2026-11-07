@@ -354,6 +354,7 @@ impl SseDecode for crate::api::HyprlandMonitor {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_outputNumber = <u32>::sse_decode(deserializer);
         let mut var_x = <i32>::sse_decode(deserializer);
         let mut var_y = <i32>::sse_decode(deserializer);
         let mut var_activeWorkspaceId = <i32>::sse_decode(deserializer);
@@ -364,6 +365,7 @@ impl SseDecode for crate::api::HyprlandMonitor {
             <Vec<crate::api::HyprlandWorkspaceSlot>>::sse_decode(deserializer);
         return crate::api::HyprlandMonitor {
             name: var_name,
+            output_number: var_outputNumber,
             x: var_x,
             y: var_y,
             active_workspace_id: var_activeWorkspaceId,
@@ -445,16 +447,18 @@ impl SseDecode for crate::api::HyprlandWorkspaceSlot {
         let mut var_active = <bool>::sse_decode(deserializer);
         let mut var_occupied = <bool>::sse_decode(deserializer);
         let mut var_windowCount = <u32>::sse_decode(deserializer);
-        let mut var_appId = <Option<String>>::sse_decode(deserializer);
-        let mut var_title = <Option<String>>::sse_decode(deserializer);
+        let mut var_owner = <Option<String>>::sse_decode(deserializer);
+        let mut var_apps = <Vec<String>>::sse_decode(deserializer);
+        let mut var_urgent = <bool>::sse_decode(deserializer);
         return crate::api::HyprlandWorkspaceSlot {
             id: var_id,
             name: var_name,
             active: var_active,
             occupied: var_occupied,
             window_count: var_windowCount,
-            app_id: var_appId,
-            title: var_title,
+            owner: var_owner,
+            apps: var_apps,
+            urgent: var_urgent,
         };
     }
 }
@@ -463,6 +467,18 @@ impl SseDecode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_i32::<NativeEndian>().unwrap()
+    }
+}
+
+impl SseDecode for Vec<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<String>::sse_decode(deserializer));
+        }
+        return ans_;
     }
 }
 
@@ -619,6 +635,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::HyprlandMonitor {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.name.into_into_dart().into_dart(),
+            self.output_number.into_into_dart().into_dart(),
             self.x.into_into_dart().into_dart(),
             self.y.into_into_dart().into_dart(),
             self.active_workspace_id.into_into_dart().into_dart(),
@@ -722,8 +739,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::HyprlandWorkspaceSlot {
             self.active.into_into_dart().into_dart(),
             self.occupied.into_into_dart().into_dart(),
             self.window_count.into_into_dart().into_dart(),
-            self.app_id.into_into_dart().into_dart(),
-            self.title.into_into_dart().into_dart(),
+            self.owner.into_into_dart().into_dart(),
+            self.apps.into_into_dart().into_dart(),
+            self.urgent.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -774,6 +792,7 @@ impl SseEncode for crate::api::HyprlandMonitor {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.name, serializer);
+        <u32>::sse_encode(self.output_number, serializer);
         <i32>::sse_encode(self.x, serializer);
         <i32>::sse_encode(self.y, serializer);
         <i32>::sse_encode(self.active_workspace_id, serializer);
@@ -831,8 +850,9 @@ impl SseEncode for crate::api::HyprlandWorkspaceSlot {
         <bool>::sse_encode(self.active, serializer);
         <bool>::sse_encode(self.occupied, serializer);
         <u32>::sse_encode(self.window_count, serializer);
-        <Option<String>>::sse_encode(self.app_id, serializer);
-        <Option<String>>::sse_encode(self.title, serializer);
+        <Option<String>>::sse_encode(self.owner, serializer);
+        <Vec<String>>::sse_encode(self.apps, serializer);
+        <bool>::sse_encode(self.urgent, serializer);
     }
 }
 
@@ -840,6 +860,16 @@ impl SseEncode for i32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_i32::<NativeEndian>(self).unwrap();
+    }
+}
+
+impl SseEncode for Vec<String> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <String>::sse_encode(item, serializer);
+        }
     }
 }
 

@@ -1,16 +1,21 @@
 use crate::frb_generated::StreamSink;
-use std::sync::OnceLock;
+use std::collections::HashSet;
+use std::sync::{
+    OnceLock,
+    atomic::{AtomicBool, Ordering},
+};
 use std::time::Duration;
 use tokio::sync::{broadcast, watch};
 
 struct Hub {
     events: broadcast::Sender<HyprlandUpdate>,
     status: watch::Sender<Option<HyprlandUpdate>>,
+    super_held: AtomicBool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HyprlandUpdate {
-    /// connected, disconnected, event, resync, or heartbeat.
+    /// connected, disconnected, event, modifier, resync, or heartbeat.
     pub kind: String,
     pub name: String,
     /// Raw payload: commas and future event names are preserved.
@@ -42,13 +47,15 @@ pub struct HyprlandWorkspaceSlot {
     pub active: bool,
     pub occupied: bool,
     pub window_count: u32,
-    pub app_id: Option<String>,
-    pub title: Option<String>,
+    pub owner: Option<String>,
+    pub apps: Vec<String>,
+    pub urgent: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HyprlandMonitor {
     pub name: String,
+    pub output_number: u32,
     pub x: i32,
     pub y: i32,
     pub active_workspace_id: i32,
@@ -69,7 +76,20 @@ pub async fn hyprland_snapshot() -> Result<HyprlandSnapshot, String> {
     let workspaces = hyprland_request("j/workspaces".into()).await?;
     let clients = hyprland_request("j/clients".into()).await?;
     let active_window = hyprland_request("j/activewindow".into()).await?;
-    crate::workspace_state::parse(&monitors, &workspaces, &clients, &active_window)
+    let urgent = hyprland_request(
+        "repl local ids = {}; for _, ws in ipairs(hl.get_workspaces()) do if ws.has_urgent then table.insert(ids, ws.id) end end; return 'urgent:' .. table.concat(ids, ',')".into(),
+    ).await?;
+    let urgent = urgent
+        .trim()
+        .strip_prefix("urgent:")
+        .ok_or("Invalid urgent workspace reply")?;
+    let urgent = urgent
+        .split(',')
+        .filter(|id| !id.is_empty())
+        .map(str::parse)
+        .collect::<Result<HashSet<i32>, _>>()
+        .map_err(|e| e.to_string())?;
+    crate::workspace_state::parse(&monitors, &workspaces, &clients, &active_window, &urgent)
 }
 
 pub async fn hyprland_switch_workspace(
@@ -113,13 +133,25 @@ pub async fn subscribe_hyprland(sink: StreamSink<HyprlandUpdate>) {
     let hub = EVENTS.get_or_init(|| {
         let (events, _) = broadcast::channel(256);
         let (status, _) = watch::channel(None);
-        tokio::spawn(crate::ipc::listen(events.clone(), status.clone()));
-        Hub { events, status }
+        let hub = Hub {
+            events,
+            status,
+            super_held: AtomicBool::new(false),
+        };
+        tokio::spawn(crate::ipc::listen(hub.events.clone(), hub.status.clone()));
+        tokio::spawn(watch_super(&EVENTS));
+        hub
     });
     let mut receiver = hub.events.subscribe();
     let initial = hub.status.borrow().clone();
     if let Some(update) = initial
         && sink.add(update).is_err()
+    {
+        return;
+    }
+    if sink
+        .add(super_update(hub.super_held.load(Ordering::Relaxed)))
+        .is_err()
     {
         return;
     }
@@ -138,9 +170,46 @@ pub async fn subscribe_hyprland(sink: StreamSink<HyprlandUpdate>) {
                 data: String::new(),
             },
         };
+        let resync = update.kind == "resync";
         // A heartbeat also releases subscriptions belonging to destroyed engines.
-        if sink.add(update).is_err() {
+        if sink.add(update).is_err()
+            || resync
+                && sink
+                    .add(super_update(hub.super_held.load(Ordering::Relaxed)))
+                    .is_err()
+        {
             break;
+        }
+    }
+}
+
+fn super_update(held: bool) -> HyprlandUpdate {
+    HyprlandUpdate {
+        kind: "modifier".into(),
+        name: "super".into(),
+        data: held.to_string(),
+    }
+}
+
+async fn watch_super(hub: &'static OnceLock<Hub>) {
+    // One compositor read serves all bar views without taking keyboard focus.
+    loop {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let Some(hub) = hub.get() else { continue };
+        let connected = hub
+            .status
+            .borrow()
+            .as_ref()
+            .is_some_and(|update| update.kind == "connected");
+        let held = connected
+            && hyprland_request(
+                "repl return tostring(hl.is_key_down('Super_L') or hl.is_key_down('Super_R'))"
+                    .into(),
+            )
+            .await
+            .is_ok_and(|reply| reply.trim() == "true");
+        if hub.super_held.swap(held, Ordering::Relaxed) != held {
+            let _ = hub.events.send(super_update(held));
         }
     }
 }

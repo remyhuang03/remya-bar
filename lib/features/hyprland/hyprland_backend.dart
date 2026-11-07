@@ -55,6 +55,9 @@ class HyprlandBackend extends ChangeNotifier {
   String? error;
   HyprlandUpdate? latest;
   bool connected = false;
+  bool superHeld = false;
+
+  List<HyprlandMonitor> get monitors => _snapshot?.monitors ?? [];
 
   HyprlandMonitor? get output {
     final matches = (_snapshot?.monitors ?? <HyprlandMonitor>[]).where(
@@ -95,6 +98,14 @@ class HyprlandBackend extends ChangeNotifier {
     _subscription = subscribeHyprland().listen(
       (update) {
         if (update.kind == 'heartbeat') return;
+        if (update.kind == 'modifier' && update.name == 'super') {
+          final held = update.data == 'true';
+          if (held != superHeld) {
+            superHeld = held;
+            notifyListeners();
+          }
+          return;
+        }
         latest = update;
         if (update.kind == 'connected') connected = true;
         if (update.kind == 'disconnected') connected = false;
@@ -110,6 +121,7 @@ class HyprlandBackend extends ChangeNotifier {
           });
         }
         if (update.kind == 'disconnected') {
+          superHeld = false;
           error = 'Hyprland unavailable';
           notifyListeners();
         }
@@ -136,6 +148,7 @@ class HyprlandBackend extends ChangeNotifier {
     'renameworkspace',
     'focusedmon',
     'activewindow',
+    'urgent',
     'openwindow',
     'closewindow',
     'movewindow',
@@ -180,13 +193,13 @@ class HyprlandBackend extends ChangeNotifier {
     }
   }
 
-  Future<void> switchWorkspace(int id) async {
+  Future<bool> switchWorkspace(int id) async {
     if (id == 0 ||
         !(allWorkspaces.any((workspace) => workspace.id == id) ||
             workspaceSlots.any((slot) => slot.id == id))) {
-      return;
+      return false;
     }
-    await _workspaceAction(
+    return _workspaceAction(
       (name) => activateWorkspace(outputName: name, workspaceId: id),
     );
   }
@@ -198,22 +211,24 @@ class HyprlandBackend extends ChangeNotifier {
     );
   }
 
-  Future<void> toggleSpecial() =>
-      _workspaceAction((name) => toggleSpecialWorkspace(outputName: name));
+  Future<void> toggleSpecial() async {
+    await _workspaceAction((name) => toggleSpecialWorkspace(outputName: name));
+  }
 
-  Future<void> _workspaceAction(
+  Future<bool> _workspaceAction(
     Future<void> Function(String output) action,
   ) async {
     final monitor = output;
-    if (_disposed || !connected || error != null || monitor == null) return;
+    if (_disposed || !connected || error != null || monitor == null) {
+      return false;
+    }
     try {
       await action(monitor.name);
       await refresh();
+      return true;
     } catch (failure) {
-      if (_disposed) return;
-      error = 'Workspace switch failed';
       debugPrint('Hyprland workspace switch: $failure');
-      notifyListeners();
+      return false;
     }
   }
 
@@ -222,7 +237,8 @@ class HyprlandBackend extends ChangeNotifier {
     final classes = <String>{
       for (final monitor in _snapshot?.monitors ?? <HyprlandMonitor>[])
         for (final slot in monitor.workspaceSlots)
-          if (slot.appId case final String appId) appId,
+          for (final app in slot.apps)
+            if (app.isNotEmpty) app,
     }.difference(_requestedIcons);
     if (classes.isEmpty) return;
     _requestedIcons.addAll(classes);

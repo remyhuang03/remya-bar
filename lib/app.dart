@@ -20,7 +20,6 @@ import 'features/resources/resource_data.dart';
 import 'features/tray/bar_tray.dart';
 import 'features/window/bar_active_window.dart';
 import 'features/workspaces/bar_workspaces.dart';
-import 'widgets/bar_group.dart';
 import 'widgets/bar_tooltip.dart';
 
 Future<void> _openPowerSettings() => openRemyaSettings(page: 'power');
@@ -251,6 +250,13 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         throw StateError('Sidebar is closed');
       }
       await sidebar.perform(args, _sidebarOutput);
+    } else if (action == 'workspace.switch' && args['id'] is int) {
+      final backend = widget.hyprland;
+      if (backend == null ||
+          !await backend.switchWorkspace(args['id'] as int)) {
+        throw StateError('Workspace unavailable');
+      }
+      await BarPopup.hide(kind: workspaceOverviewKind);
     } else if (action == 'media.volume' &&
         args['output'] is String &&
         args['percent'] is num) {
@@ -390,7 +396,7 @@ class _BarContent extends StatelessWidget {
               hyprland?.connected == true &&
               hyprland?.error == null &&
               hyprland!.workspaceSlots.isNotEmpty
-          ? BarWorkspaces.width + 16
+          ? BarWorkspaces.maxWidth
           : 0.0;
       final workspaceLeft = (width - workspaceWidth) / 2;
       final budget = workspaceLeft - 4;
@@ -440,7 +446,7 @@ class _BarContent extends StatelessWidget {
                 width: workspaceWidth,
                 top: 0,
                 bottom: 0,
-                child: BarGroup(child: BarWorkspaces(backend: hyprland)),
+                child: Center(child: BarWorkspaces(backend: hyprland)),
               ),
             if (leftWidth > 0)
               Positioned(

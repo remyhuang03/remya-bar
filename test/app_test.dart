@@ -217,6 +217,7 @@ void main() {
         monitors: [
           HyprlandMonitor(
             name: 'DP-1',
+            outputNumber: 1,
             x: 0,
             y: 0,
             activeWorkspaceId: 1,
@@ -226,6 +227,8 @@ void main() {
                 name: '1',
                 active: true,
                 occupied: false,
+                urgent: false,
+                apps: [],
                 windowCount: 0,
               ),
             ],

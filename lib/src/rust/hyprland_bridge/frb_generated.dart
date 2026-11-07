@@ -383,17 +383,18 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   HyprlandMonitor dco_decode_hyprland_monitor(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return HyprlandMonitor(
       name: dco_decode_String(arr[0]),
-      x: dco_decode_i_32(arr[1]),
-      y: dco_decode_i_32(arr[2]),
-      activeWorkspaceId: dco_decode_i_32(arr[3]),
-      specialWorkspaceId: dco_decode_opt_box_autoadd_i_32(arr[4]),
-      specialWorkspaceName: dco_decode_opt_String(arr[5]),
-      currentWindow: dco_decode_opt_box_autoadd_hyprland_window(arr[6]),
-      workspaceSlots: dco_decode_list_hyprland_workspace_slot(arr[7]),
+      outputNumber: dco_decode_u_32(arr[1]),
+      x: dco_decode_i_32(arr[2]),
+      y: dco_decode_i_32(arr[3]),
+      activeWorkspaceId: dco_decode_i_32(arr[4]),
+      specialWorkspaceId: dco_decode_opt_box_autoadd_i_32(arr[5]),
+      specialWorkspaceName: dco_decode_opt_String(arr[6]),
+      currentWindow: dco_decode_opt_box_autoadd_hyprland_window(arr[7]),
+      workspaceSlots: dco_decode_list_hyprland_workspace_slot(arr[8]),
     );
   }
 
@@ -456,16 +457,17 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   HyprlandWorkspaceSlot dco_decode_hyprland_workspace_slot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return HyprlandWorkspaceSlot(
       id: dco_decode_i_32(arr[0]),
       name: dco_decode_String(arr[1]),
       active: dco_decode_bool(arr[2]),
       occupied: dco_decode_bool(arr[3]),
       windowCount: dco_decode_u_32(arr[4]),
-      appId: dco_decode_opt_String(arr[5]),
-      title: dco_decode_opt_String(arr[6]),
+      owner: dco_decode_opt_String(arr[5]),
+      apps: dco_decode_list_String(arr[6]),
+      urgent: dco_decode_bool(arr[7]),
     );
   }
 
@@ -473,6 +475,12 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   int dco_decode_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
+  }
+
+  @protected
+  List<String> dco_decode_list_String(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_String).toList();
   }
 
   @protected
@@ -591,6 +599,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   HyprlandMonitor sse_decode_hyprland_monitor(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_name = sse_decode_String(deserializer);
+    var var_outputNumber = sse_decode_u_32(deserializer);
     var var_x = sse_decode_i_32(deserializer);
     var var_y = sse_decode_i_32(deserializer);
     var var_activeWorkspaceId = sse_decode_i_32(deserializer);
@@ -604,6 +613,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
     );
     return HyprlandMonitor(
       name: var_name,
+      outputNumber: var_outputNumber,
       x: var_x,
       y: var_y,
       activeWorkspaceId: var_activeWorkspaceId,
@@ -677,16 +687,18 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
     var var_active = sse_decode_bool(deserializer);
     var var_occupied = sse_decode_bool(deserializer);
     var var_windowCount = sse_decode_u_32(deserializer);
-    var var_appId = sse_decode_opt_String(deserializer);
-    var var_title = sse_decode_opt_String(deserializer);
+    var var_owner = sse_decode_opt_String(deserializer);
+    var var_apps = sse_decode_list_String(deserializer);
+    var var_urgent = sse_decode_bool(deserializer);
     return HyprlandWorkspaceSlot(
       id: var_id,
       name: var_name,
       active: var_active,
       occupied: var_occupied,
       windowCount: var_windowCount,
-      appId: var_appId,
-      title: var_title,
+      owner: var_owner,
+      apps: var_apps,
+      urgent: var_urgent,
     );
   }
 
@@ -694,6 +706,18 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   int sse_decode_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getInt32();
+  }
+
+  @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <String>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_String(deserializer));
+    }
+    return ans_;
   }
 
   @protected
@@ -871,6 +895,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.name, serializer);
+    sse_encode_u_32(self.outputNumber, serializer);
     sse_encode_i_32(self.x, serializer);
     sse_encode_i_32(self.y, serializer);
     sse_encode_i_32(self.activeWorkspaceId, serializer);
@@ -938,14 +963,24 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
     sse_encode_bool(self.active, serializer);
     sse_encode_bool(self.occupied, serializer);
     sse_encode_u_32(self.windowCount, serializer);
-    sse_encode_opt_String(self.appId, serializer);
-    sse_encode_opt_String(self.title, serializer);
+    sse_encode_opt_String(self.owner, serializer);
+    sse_encode_list_String(self.apps, serializer);
+    sse_encode_bool(self.urgent, serializer);
   }
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
+  }
+
+  @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_String(item, serializer);
+    }
   }
 
   @protected
