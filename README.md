@@ -13,120 +13,175 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial-blue" alt="License"></a>
 </p>
 
-A desktop status bar for **Hyprland on Linux**, built with **Flutter**, **Material Design 3 Expressive**, and a modular **Rust workspace**. Visual hierarchy and layout take proportions from [illogical-impulse's Bar](https://github.com/end-4/dots-hyprland/tree/main/dots/.config/quickshell/ii/modules/ii/bar), featuring an active window title, dedicated Resources and Media capsules, centered workspaces, clock, battery, system tray, and an Android-style Quick settings sidebar. Remya Bar deeply integrates with the Linux system via Rust and follows the shared Remya Settings ecosystem.
+A modern, fluid desktop status bar for **Hyprland on Linux**, crafted with **Flutter** and **Material Design 3 Expressive**, backed by a high-performance **Rust** engine.
 
-> [!CAUTION]
-> **Early Development & Preview Only — Not Ready for Daily Use**
->
-> - **Under Active Development**: Remya Bar is in an early, experimental development stage and has not reached a stable release.
-> - **WIP Subsystems & Preview Boundaries**: While core modules (workspaces, active window, system metrics, media player, battery, clock, system tray, and Flutter popup host) are implemented and functional, Quick settings sidebar controls and notification integrations are UI placeholders awaiting backend connections.
-> - **Subject to Breaking Changes**: Internal protocols, bridge bindings, and layout parameters may change rapidly. Hardware edge cases (e.g., dynamic physical multi-monitor hotplugging across complex GPU configurations) require ongoing real-session verification.
-> - **For Preview & Evaluation Only**: This repository is intended strictly for development preview and reference. Use at your own risk on real desktop sessions.
+Remy'a Bar blends refined desktop aesthetics with deep Linux system integration. Drawing visual inspiration from [illogical-impulse's Bar](https://github.com/end-4/dots-hyprland/tree/main/dots/.config/quickshell/ii/modules/ii/bar), it delivers smooth animations, real-time compositor awareness, artwork-adaptive media controls, rich hover dashboards, and an Android/macOS-style Quick Settings control center—all while keeping system overhead minimal.
 
-## Implemented Features (Experimental)
+> [!NOTE]
+> **Status**: Remy'a Bar is actively developed for the Remya desktop ecosystem. Core bar modules, native popup hosts, and Quick Settings controls are fully functional. Notifications and select advanced toggles are planned for upcoming milestones.
 
-Remya Bar combines modern desktop bar ergonomics with low-overhead native Linux and Hyprland backend integrations, synchronized with the system via Rust:
+---
 
-- **Multi-Monitor Layer Shell**: 40-logical-pixel top capsule bar per connected output using native `gtk-layer-shell`. Exclusive space reservation, zero window decorations, no keyboard focus stealing, and dynamic GDK display hotplug/unplug keeping the app alive across zero connected outputs. Fullscreen windows automatically hide the bar and release reserved space on the active output.
-- **Hyprland IPC & Workspaces**: Low-overhead native Hyprland integration via Tokio Unix sockets (`.socket.sock` for request/reply, `.socket2.sock` for live events). Features an 8-slot workspace strip with occupancy indicators, largest-window application icons cached via GDK/GIO, animated 22px active indicator, mouse wheel navigation (`r±1`), mouse back-button special workspace toggle, and active window title tracking.
-- **Hardware Resources Monitor**: Compact capsule displaying CPU, RAM, Swap, Network upload/download totals, and GPU utilization (DRM sysfs & NVIDIA). Icon-backed circular sector indicators rendered with MD3 inverse surface roles for contrast across light/dark themes. 500 ms hover card with detailed system metrics.
-- **MPRIS Media Player**: Integrated media pill with real-time playback progress bar, continuous marquee scrolling for long titles, and hover expansion. Accompanied by a rich Flutter media card featuring dynamic artwork-seeded Expressive color scheme, playback transport controls, position seeking, and default output volume slider.
-- **System Tray (StatusNotifierItem)**: Native SNI host on the session bus with `DBusMenu` support. 32px tray pill supporting pinned items, inline reveal animations for folded items, right-click interactive Flutter popup menu, and preference synchronization with Remya Settings (`remya-bar.folded-apps`).
-- **Power & Battery**: 48 × 24 px battery capsule showing sysfs percentage, dynamic charging bolt, health, and estimated remaining time. Integrates with Remya Settings power saver profiles (`system.profile`). Hover card provides battery stats and energy saver toggles.
-- **Clock & Calendar**: Centered local time display with English weekday formatting. Configurable seconds toggle synchronized with Settings (`remya-bar.clock-seconds`). Hover card exposes a full calendar view and timezone information.
-- **Connectivity Indicators**: Live NetworkManager (Wi-Fi signal strength, ethernet state) and BlueZ Bluetooth device readouts via D-Bus without manual polling.
-- **Quick Settings Sidebar**: 460px Android-style slide-out panel featuring account avatar & username synchronized with Settings, system actions (Settings opener, lock, logout, power, quit), volume/brightness/microphone sliders, quick controls grid, and notification area. Includes outside-click dismissal and on-demand keyboard focus.
-- **Native Flutter Popups**: Shared `BarPopup`/`BarPopupApp` architecture ensuring all tooltips, hover detail cards, menus, and the sidebar render natively in Flutter with proper MD3E styling, avoiding GTK drawing limitations.
-- **Remya Settings Integration**: Real-time MD3E theme, seed color, and dark mode synchronization via `remya_settings_client` over D-Bus (`top.remya.settings`).
+## Features
 
-## Architecture & Native Runner
+### 🪟 Smart Workspaces & Window Tracking
+- **Application-Aware Slots**: Displays live icons for the active windows on each workspace, automatically featuring the primary application and stacked previews for multi-window workspaces.
+- **Multi-Monitor Presence**: Distinguishes between workspaces on the current display and other connected monitors with distinct visual styling and monitor identity tags.
+- **Super Key Inspection**: Hold the `Super` key at any moment to reveal underlying workspace numbers and remote monitor indicators.
+- **Urgency Alerts**: Highlights windows requesting user attention with distinct urgency badges.
+- **Special Workspace Support**: Smoothly previews scratchpad/special workspaces with background dimming.
+- **Effortless Navigation**: Click to switch or create workspaces, scroll with the mouse wheel (`r±1`), use the mouse back button to toggle special workspaces, or right-click to open a keyboard-navigable workspace overview.
+- **Active Window Title**: Displays the focused window title with smooth ellipsis compaction that yields space gracefully when screen estate is tight.
 
-Bar uses a multi-engine GTK layer-shell runner paired with unified Rust backend workers:
+### 🎵 Dynamic Media Player
+- **Artwork-Adaptive Theming**: Both the bar's media pill and its expanded control card dynamically sample colors from the currently playing album art, creating a harmonious look for every track.
+- **At-a-Glance Progress**: Real-time progress bar with marquee title scrolling for longer track names.
+- **Rich Media Card**: Hover or click to access full playback controls (play/pause, previous/next, track seeking) and master audio output volume.
 
-- **Per-Output Engines**: Each physical monitor has its own GTK window and independent Flutter view/engine, managed dynamically on GDK display signals without using brittle display indices.
-- **Flutter Popup Host**: Floating components (tooltips, hover detail cards, tray context menus, and the Quick settings sidebar) render through a dedicated native popup host (`BarPopup` / `BarPopupApp`). GTK manages only placement, visibility, focus policy, and lifetime; all UI, typography, and animations are driven by Flutter.
-- **Unified Rust Backends**: Rust crates under `lib/src/rust/` bridge directly to Dart via `flutter_rust_bridge` 2.13.0:
-  - `remya_bar_hyprland`: Native Wayland compositor IPC handling request/reply and persistent live event streaming.
-  - `remya_bar_system`: Unified periodic snapshot worker for system metrics (CPU, RAM, GPU, network, battery), MPRIS media player discovery, SNI tray host, BlueZ, and NetworkManager.
-- **Shared Worker Caching**: All per-output Flutter engines share a single Rust baseline cache, avoiding duplicate `/proc` reads, redundant D-Bus queries, or excessive GPU driver polling.
-- **Settings Ecosystem**: Remya Bar is a client to Remya Settings. It reads themes, preferences, and account metadata over D-Bus, delegating all system writes and configuration persistence to Remya Settings.
+### 📊 Hardware & Resource Monitor
+- **Compact Gauges**: Circular sector indicators provide instant visual readouts for CPU, RAM, Swap, Network upload/download, and GPU utilization (DRM sysfs & NVIDIA).
+- **Live 60-Second History**: Hover over the monitor capsule to reveal detailed metric cards with real-time rolling graphs and network totals for the day.
+- **Task Manager Shortcut**: Quick-launch button to jump straight into your preferred desktop system monitor.
+- **Efficient Caching**: Shared background sampling engine ensures smooth metrics without redundant disk or driver polling.
 
-## Repository Layout
+### 🎛️ Quick Settings Control Center
+- **Slide-Out Panel**: An Android-style quick settings drawer accessible by clicking the sidebar launcher icon, clicking the clock, or pressing `Super + A`.
+- **Hardware Sliders**: Smooth adjustments for Display Brightness (targeting your active monitor), Sound Output Volume (with right-click output device selector), and Microphone Input Volume.
+- **Connected Quick Toggles**:
+  - **Wi-Fi**: Scan nearby networks, connect, disconnect, forget, and join hidden networks.
+  - **Bluetooth**: Scan, pair, connect, and manage wireless peripherals.
+  - **Night Light**: Toggle screen temperature (hyprsunset) following your configured schedule.
+  - **Power Profiles**: Switch between Performance, Balanced, and Power Saver modes.
+  - **Keep Awake**: Inhibit screen idle and sleep (hypridle) on demand with automatic startup checks.
+  - **Dark Mode**: Instantly switch between light and dark Material Design themes.
+  - **Mic Mute**: One-click mute for your active PipeWire input device.
+- **Customizable Tile Layout**: Reorder quick tiles and hide unused toggles with settings saved automatically.
+- **Session Actions**: Quick shortcuts for Lock, Log Out, Restart, and Shut Down, protected with confirmation timers against accidental clicks.
 
-```text
-Cargo.toml                Root Rust workspace
-lib/
-  main.dart, app.dart     Flutter startup, composition, and theme
-  features/<feature>/     Feature-first Flutter UI, state, and controllers
-  src/rust/<crate>/       Modular Rust backends (hyprland, system) and FRB bridges
-  widgets/                Reusable bar widgets (tooltips, groups, sector indicators)
-linux/                    GTK layer-shell runner, popup placement, and icon lookup
-docs/                     Architecture, IPC specs, and backend documentation
-test/                     Unit, widget, lifecycle, and desktop smoke tests
-tool/                     Build and installation scripts
-```
+### 📥 Intelligent System Tray
+- **StatusNotifierItem (SNI) & DBusMenu**: Full support for modern Linux tray applications (Steam, Discord, OBS, Telegram, etc.).
+- **Pinned & Folded Apps**: Keep your most important icons visible while folding secondary apps into an expandable tray with smooth reveal animations.
+- **Context Menus**: Right-click any tray icon to open native application menus alongside pin/fold management.
 
-## Development
+### 🔋 Battery & Power Management
+- **Battery Capsule**: Clear visual readout with percentage, dynamic charging bolt, and remaining runtime estimates.
+- **Detailed Power Card**: Hover to inspect battery health, charge cycle counts, current power draw, and Energy Saver thresholds.
 
-Prerequisites:
-- **Fonts**: Inter system font (`inter-font` on Arch) and Noto Sans CJK (`noto-fonts-cjk` on Arch).
-- **Libraries & Tools**: `gtk-layer-shell` (dynamically linked LGPL system library), fontconfig, FVM, Rust via rustup, Clang, CMake, Ninja, pkg-config, and GTK 3 development headers.
-- **Runtime Environment**: Hyprland (or Wayland compositor supporting wlr-layer-shell-unstable-v1), NetworkManager, and BlueZ.
+### 📅 Time, Date & Interactive Calendar
+- **Live Clock**: Clean date and time display with configurable seconds synchronization.
+- **Datetime Dashboard**: Hover or click to view local time with seconds, UTC offset, ISO week number, day of year, and UTC reference time.
+- **Interactive Calendar**: Monday-first calendar with month navigation and quick access to Remya Settings Date & Time configuration.
 
-```bash
-fvm install
-fvm flutter pub get
-# (Optional) Build sibling Settings debug bundle for the Quick settings launcher:
-# (cd ../remya_settings && fvm flutter build linux --debug)
-fvm flutter run -d linux --no-start-paused
-```
+### 🖥️ Multi-Monitor & Smart Fullscreen
+- **Per-Monitor Layer Shell**: Automatic 40px capsule bar across every connected output with zero keyboard focus stealing and exclusive space reservation.
+- **Smart Fullscreen Auto-Hide**: The bar automatically conceals itself and releases reserved space when a fullscreen application is active on that output, smoothly returning when leaving fullscreen.
+- **Responsive Layout**: Adapts gracefully across display widths:
+  - $\ge$ 700 px: Centered workspaces, left-aligned window title and resource/media capsules, right-aligned clock, battery, tray, and control center.
+  - $\ge$ 1100 px: Expands the full MPRIS media player pill.
+  - < 700 px: Compact mode showing centered clock and essential control center launcher.
 
-FVM pins Flutter to `3.47.8`; `rust-toolchain.toml` selects stable Rust with rustfmt and Clippy. See [AGENTS.md](AGENTS.md) for architecture, coding, validation, and Git rules. Use `--no-start-paused` so all per-output engines render during development.
+### 🎨 Material Design 3 Expressive
+- **Unified Design System**: Built with MD3 Expressive styling, smooth spring curves, high-contrast surface roles, and Inter typography with comprehensive CJK fallbacks.
+- **System Theme Sync**: Live color scheme, accent seed, and dark/light mode synchronization driven by Remya Settings over D-Bus.
 
-### Code Quality & Verification
+---
 
-Run the relevant validation checks before presenting changes:
+## Getting Started
 
-```bash
-fvm dart format --output=none --set-exit-if-changed lib test
-fvm flutter analyze
-fvm flutter test
-fvm flutter build linux --debug
-python test/bar_window_smoke.py         # Requires a running Hyprland session.
-python test/fullscreen_window_smoke.py # Uses its own temporary GTK window.
-python test/popup_window_smoke.py      # Requires ydotoold for real pointer interaction.
-cargo run -p remya_bar_system --example system_probe
-dbus-run-session -- cargo run -p remya_bar_system --example mpris_smoke
-cmake --build build/linux/x64/debug --target bar_lifecycle_test
-build/linux/x64/debug/bundle/bar_lifecycle_test
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-git diff --check
-```
+### Prerequisites
 
-## Installation
+- **Desktop Environment**: Hyprland (or Wayland compositor supporting `wlr-layer-shell-unstable-v1`).
+- **Dependencies**:
+  - `gtk-layer-shell` (system package)
+  - `inter-font` and `noto-fonts-cjk`
+  - NetworkManager and BlueZ (for network & Bluetooth toggles)
+  - Remya Settings (`remya_settings`, provides theme & system D-Bus services)
 
-The application ID is `top.remya.bar`; its executable is `remya_bar`.
-Build and install into `XDG_DATA_HOME` with a user command in `~/.local/bin`:
+### Installation
+
+Install Remy'a Bar using the automated installer into `~/.local/bin` and `XDG_DATA_HOME`:
 
 ```bash
 fvm flutter build linux --release
 python tool/install.py
 ```
 
-- Launch **Remy'a Bar** directly by running `remya_bar`, or add `exec-once = remya_bar` to your Hyprland configuration.
-- The installer verifies runtime dependencies (gtk-layer-shell, Inter font, and Remya Settings desktop entry), registers the desktop entry and icon, and installs the release binary.
-- Configuration policy, IPC behavior, and Settings dependency boundaries are documented in [backend integration](docs/backend.md).
-- See [Settings' complete CLI/D-Bus API](../remya_settings/docs/public-api.md) and [the shared XDG layout](../remya_settings/docs/xdg-layout.md).
+The installer verifies runtime libraries, registers the desktop entry, installs icons, and places the executable `remya_bar` in your user PATH.
 
-## Usage & Interactions
+### Hyprland Configuration
 
-- **Workspace Navigation**: Scroll the mouse wheel over the workspace strip to switch workspaces (`r±1`); click the mouse back button to toggle the default special workspace.
-- **Hover Detail Cards**: Hover over Resources, Media, Battery, or Clock for 500 ms to view detailed Flutter cards; move the pointer away to dismiss with an interactive grace timer.
-- **Media Controls**: Click the media pill to expand or play/pause; scrub track position or adjust master output volume directly inside the media card.
-- **System Tray**: Left-click tray items for primary activation, right-click for the DBusMenu popup, and click the reveal chevron to expand folded icons.
-- **Quick Settings Sidebar**: Click the Quick settings launcher icon or Clock to toggle the 460px sidebar. Click outside or press `Escape` to dismiss.
+Add the bar to your Hyprland startup configuration:
+
+```ini
+# ~/.config/hypr/hyprland.conf
+
+# Autostart Remy'a Bar
+exec-once = remya_bar
+```
+
+To bind a shortcut (e.g. `Super + A`) to toggle the Quick Settings control center:
+
+```ini
+# Hyprland bind to toggle Quick Settings sidebar
+bind = SUPER, A, exec, gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.ToggleSidebar "$HYPRLAND_INSTANCE_SIGNATURE"
+```
+
+---
+
+## Interactions & Shortcuts Cheat Sheet
+
+| Component | Gesture / Action | Result |
+| :--- | :--- | :--- |
+| **Workspaces** | **Left Click** | Switch to workspace, or create if empty |
+| | **Scroll Wheel** | Switch adjacent workspace (`r+1` / `r-1`) |
+| | **Mouse Back Button** | Toggle special / scratchpad workspace |
+| | **Hold Super** | Reveal workspace numbers and remote monitor tags |
+| | **Right Click** | Open workspace overview popup |
+| **Media Pill** | **Click** | Toggle play / pause or expand pill |
+| | **Hover** | Open media card with track scrubber and volume |
+| **Resources** | **Hover** | Open 60-second live performance graphs |
+| **Clock** | **Click / Hover** | Open datetime dashboard and interactive calendar |
+| **Quick Settings** | **Click Icon / Clock** | Toggle the Quick Settings control center |
+| | **`Super + A`** | Toggle the Quick Settings control center from anywhere |
+| | **Volume Slider Right-Click** | Open audio output device picker |
+| | **Sliders Scroll Wheel** | Adjust volume or brightness by 5% per step |
+| **System Tray** | **Left Click** | Activate tray application |
+| | **Right Click** | Open application context menu & Pin/Fold options |
+| | **Chevron Click** | Expand or collapse folded tray icons |
+| **Any Popup** | **Escape / Click Outside** | Dismiss popup or detail card |
+
+---
+
+## Architecture Overview
+
+Remy'a Bar utilizes a hybrid architecture engineered for responsiveness and reliability:
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   Flutter UI Layer                     │
+│  - MD3 Expressive widgets & spring animations          │
+│  - Per-monitor GTK Layer-Shell views                   │
+│  - Floating Flutter popup host (BarPopup / Popups)     │
+└───────────────────────────▲────────────────────────────┘
+                            │ flutter_rust_bridge 2.13.0
+┌───────────────────────────▼────────────────────────────┐
+│                    Rust Workspace                      │
+│  - remya_bar_hyprland: Tokio Unix socket IPC & events  │
+│  - remya_bar_system: Cached /proc, sysfs, GPU & MPRIS  │
+│  - System tray SNI host & DBusMenu client              │
+└───────────────────────────▲────────────────────────────┘
+                            │ D-Bus
+┌───────────────────────────▼────────────────────────────┐
+│                Remya Settings Ecosystem                │
+│  - Shared themes, colors, power profiles, and settings │
+└────────────────────────────────────────────────────────┘
+```
+
+- **Low Resource Usage**: Rust handles all heavy lifting—sampling hardware sensors, parsing Hyprland socket streams, and hosting D-Bus interfaces—sharing a single cached state across all outputs.
+- **Native Wayland Integration**: Built directly against `gtk-layer-shell` for true Wayland surface management, automatic exclusive zone handling, and zero-flicker monitor hotplugging.
+- **Decoupled Architecture**: Configuration, themes, and persistence are cleanly managed via the companion [Remya Settings](https://github.com/remya/remya_settings) service.
+
+---
 
 ## License
 
