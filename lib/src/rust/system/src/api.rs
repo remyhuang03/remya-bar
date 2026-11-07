@@ -97,7 +97,7 @@ fn percentage(value: Option<f64>, total: Option<f64>) -> Option<f64> {
     Some(value? / total * 100.0)
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MediaPlayerSnapshot {
     pub bus_name: String,
     pub identity: String,
@@ -118,6 +118,10 @@ pub struct MediaPlayerSnapshot {
 
 pub async fn media_players() -> Result<Vec<MediaPlayerSnapshot>, String> {
     crate::media::players().await
+}
+
+pub async fn subscribe_media(sink: crate::frb_generated::StreamSink<Vec<MediaPlayerSnapshot>>) {
+    crate::media::subscribe(sink).await;
 }
 
 pub async fn media_action(bus_name: String, action: String) -> Result<(), String> {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
@@ -494,6 +495,7 @@ class _OutputVolume extends StatelessWidget {
               child: _MediaSlider(
                 key: ValueKey(name),
                 label: 'Output volume',
+                live: true,
                 value: ((percent ?? 0) / 100).clamp(0, 1),
                 displayValue: (value) => '${(value * 100).round()}%',
                 onCommit: percent != null && name.isNotEmpty
@@ -528,6 +530,7 @@ class _MediaSlider extends StatefulWidget {
     required this.onCommit,
     this.seek = false,
     this.wave = false,
+    this.live = false,
   });
 
   final String label;
@@ -536,6 +539,7 @@ class _MediaSlider extends StatefulWidget {
   final ValueChanged<double>? onCommit;
   final bool seek;
   final bool wave;
+  final bool live;
 
   @override
   State<_MediaSlider> createState() => _MediaSliderState();
@@ -543,6 +547,65 @@ class _MediaSlider extends StatefulWidget {
 
 class _MediaSliderState extends State<_MediaSlider> {
   double? _drag;
+  ({double value, DateTime committed})? _pending;
+  Timer? _pendingTimer;
+  Timer? _liveTimer;
+  double? _trailing;
+
+  @override
+  void didUpdateWidget(covariant _MediaSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_pending case final pending?) {
+      if ((widget.value - pending.value).abs() <= 0.005 ||
+          DateTime.now().difference(pending.committed) >=
+              const Duration(milliseconds: 1500)) {
+        _pending = null;
+        _pendingTimer?.cancel();
+      }
+    }
+  }
+
+  void _changed(double value) {
+    setState(() => _drag = value);
+    if (!widget.live) return;
+    if (_liveTimer != null) {
+      _trailing = value;
+      return;
+    }
+    widget.onCommit?.call(value);
+    _liveTimer = Timer(const Duration(milliseconds: 60), _sendTrailing);
+  }
+
+  void _sendTrailing() {
+    _liveTimer = null;
+    final value = _trailing;
+    _trailing = null;
+    if (value == null) return;
+    widget.onCommit?.call(value);
+    _liveTimer = Timer(const Duration(milliseconds: 60), _sendTrailing);
+  }
+
+  void _committed(double value) {
+    _liveTimer?.cancel();
+    _liveTimer = null;
+    _trailing = null;
+    _pendingTimer?.cancel();
+    setState(() {
+      _drag = null;
+      _pending = (value: value, committed: DateTime.now());
+    });
+    _pendingTimer = Timer(const Duration(milliseconds: 1500), () {
+      setState(() => _pending = null);
+    });
+    widget.onCommit?.call(value);
+  }
+
+  @override
+  void dispose() {
+    _pendingTimer?.cancel();
+    _liveTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -581,17 +644,10 @@ class _MediaSliderState extends State<_MediaSlider> {
           child: Slider(
             value: widget.onCommit == null
                 ? widget.value
-                : _drag ?? widget.value,
+                : _drag ?? _pending?.value ?? widget.value,
             semanticFormatterCallback: widget.displayValue,
-            onChanged: widget.onCommit == null
-                ? null
-                : (value) => setState(() => _drag = value),
-            onChangeEnd: widget.onCommit == null
-                ? null
-                : (value) {
-                    setState(() => _drag = null);
-                    widget.onCommit!(value);
-                  },
+            onChanged: widget.onCommit == null ? null : _changed,
+            onChangeEnd: widget.onCommit == null ? null : _committed,
           ),
         ),
       ),

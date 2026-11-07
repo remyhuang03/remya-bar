@@ -142,14 +142,20 @@ live `system.profile` from Settings' public `Get power` operation.
 
 ## Media control
 
-The Bar polls MPRIS on the session bus and shares its Rust player selection
-across outputs. The pill uses the selected player's position and duration. Both
-the pill and hover card derive their palette from the selected cover and fall
+The Bar subscribes to MPRIS property, seek and player-owner signals on a shared
+session-bus connection and shares its Rust player selection across outputs.
+Signals coalesce for 25 ms; position refreshes once per second only while playing.
+Failed connections reconnect with bounded backoff; unchanged snapshots are suppressed.
+Play/pause updates optimistically for up to two seconds and rolls back on failure.
+The pill uses the selected player's position and duration. Both the pill and hover card derive their palette from the selected cover and fall
 back to the Settings palette when artwork is unavailable.
 The hover card sends transport and seek commands to that player. Rust checks
 capabilities and validates the unique owner and track ID before seeking.
 The output slider reads the default device via Settings' public Sound API
-and writes the named device through `sound.output-volume`.
+and writes the named device through `sound.output-volume`. Volume updates immediately
+and coalesces pending writes to the latest value, with authoritative final readback.
+The volume slider sends throttled updates while dragging; both sliders hold their
+committed value until readback catches up or 1.5 seconds pass.
 
 ## Datetime card
 

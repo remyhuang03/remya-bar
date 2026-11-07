@@ -18,6 +18,66 @@ Widget _host(Widget child, {double scale = 1}) => MaterialApp(
 );
 
 void main() {
+  for (final seek in [true, false]) {
+    testWidgets(
+      '${seek ? 'seek' : 'volume'} holds a commit until match or timeout',
+      (tester) async {
+        Widget host(double value) => _mediaSliders((_) {}, value: value);
+        Finder slider() =>
+            seek ? find.byType(Slider).first : find.byType(Slider).last;
+        Slider control() => tester.widget<Slider>(slider());
+
+        await tester.pumpWidget(host(0.2));
+        control().onChanged!(0.7);
+        control().onChangeEnd!(0.7);
+        await tester.pump();
+        expect(control().value, 0.7);
+        await tester.pumpWidget(host(0.2));
+        expect(control().value, 0.7);
+        await tester.pumpWidget(host(0.704));
+        expect(control().value, closeTo(0.704, 0.0001));
+        await tester.pumpWidget(host(0.2));
+        expect(control().value, 0.2);
+        control().onChanged!(0.8);
+        control().onChangeEnd!(0.8);
+        await tester.pump(const Duration(milliseconds: 1499));
+        expect(control().value, 0.8);
+        await tester.pump(const Duration(milliseconds: 1));
+        expect(control().value, 0.2);
+      },
+    );
+  }
+
+  testWidgets('only volume sends leading and latest trailing drag commits', (
+    tester,
+  ) async {
+    final actions = <Map<String, Object?>>[];
+    await tester.pumpWidget(_mediaSliders(actions.add));
+    final volume = tester.widget<Slider>(find.byType(Slider).last);
+    volume.onChanged!(0.3);
+    volume.onChanged!(0.4);
+    volume.onChanged!(0.5);
+    expect(actions.map((action) => action['percent']), [30]);
+    await tester.pump(const Duration(milliseconds: 59));
+    expect(actions, hasLength(1));
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(actions.map((action) => action['percent']), [30, 50]);
+    volume.onChanged!(0.6);
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(actions.map((action) => action['percent']), [30, 50, 60]);
+    volume.onChangeEnd!(0.7);
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(actions.map((action) => action['percent']), [30, 50, 60, 70]);
+    final seek = tester.widget<Slider>(find.byType(Slider).first);
+    seek.onChanged!(0.4);
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(actions, hasLength(4));
+    seek.onChangeEnd!(0.4);
+    expect(actions.last['action'], 'media.seek');
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 2));
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('the media pill and card share the artwork palette', (
     tester,
   ) async {
@@ -196,3 +256,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 }
+
+Widget _mediaSliders(
+  ValueChanged<Map<String, Object?>> onAction, {
+  double value = 0.2,
+}) => _host(
+  MediaPreview(
+    data: {
+      'players': [
+        {
+          'name': 'test',
+          'identity': 'Test player',
+          'title': 'Track',
+          'status': 'Paused',
+          'positionSeconds': value * 100,
+          'lengthSeconds': 100,
+          'seekToken': ':1.2/track',
+        },
+      ],
+      'output': {'name': 'speaker', 'percent': value * 100},
+    },
+    onAction: onAction,
+  ),
+);

@@ -12,7 +12,10 @@ import '../../src/rust/system_bridge/frb_generated.dart';
 export '../../src/rust/system_bridge/api.dart';
 
 class SystemBackend extends ChangeNotifier {
-  final _settings = SettingsClient();
+  SystemBackend({SettingsClient? settings})
+    : _settings = settings ?? SettingsClient();
+
+  final SettingsClient _settings;
   Timer? _timer;
   bool _disposed = false;
   bool _refreshing = false;
@@ -21,9 +24,15 @@ class SystemBackend extends ChangeNotifier {
   bool _refreshingSound = false;
   bool _writingSound = false;
   int _soundRevision = 0;
+  ({String output, double percent})? _queuedSound;
+  bool _soundRefreshPending = false;
   Map<String, Object?> mediaOutput = const {};
   List<api.MediaPlayerSnapshot> players = const [];
-  bool _refreshingMedia = false;
+  StreamSubscription<List<api.MediaPlayerSnapshot>>? _mediaSubscription;
+  Timer? _mediaRetry;
+  Timer? _playbackExpiry;
+  List<api.MediaPlayerSnapshot> _realPlayers = const [];
+  final _pendingPlayback = <String, ({String status, DateTime expires})>{};
   String? mediaError;
   StreamSubscription<SettingsChange>? _settingsChanges;
   bool _writingPower = false;
@@ -70,9 +79,10 @@ class SystemBackend extends ChangeNotifier {
           unawaited(_refreshSound(force: true));
       }
     }, onError: (Object error) => debugPrint('Settings changes: $error'));
+    _subscribeMedia();
     void refresh() {
       unawaited(_refresh());
-      unawaited(_refreshMedia());
+      unawaited(_refreshSound());
       unawaited(_refreshPower());
       unawaited(_refreshClockPreference());
       unawaited(_refreshLayout());
@@ -229,31 +239,85 @@ class SystemBackend extends ChangeNotifier {
     }
   }
 
-  Future<void> _refreshMedia() async {
-    if (_disposed || _refreshingMedia) return;
-    _refreshingMedia = true;
+  void _subscribeMedia() {
+    if (_disposed) return;
     try {
-      final next = await api.mediaPlayers();
-      if (_disposed) return;
-      if (!listEquals(players, next) || mediaError != null) {
-        players = next;
-        mediaError = null;
-        notifyListeners();
-      }
-      unawaited(_refreshSound());
+      _mediaSubscription = api.subscribeMedia().listen(
+        (next) {
+          if (!_disposed) _applyPlayers(next);
+        },
+        onError: (Object error) {
+          _mediaFailure(error);
+          // Rust retries transport errors on this same stream.
+        },
+        onDone: _retryMedia,
+      );
     } catch (error) {
-      if (!_disposed && mediaError == null) {
-        mediaError = 'Media status unavailable';
-        debugPrint('Media status: $error');
-        notifyListeners();
-      }
-    } finally {
-      _refreshingMedia = false;
+      _mediaFailure(error);
+      _retryMedia();
     }
   }
 
+  void _mediaFailure(Object error) {
+    if (_disposed) return;
+    debugPrint('Media status: $error');
+    if (mediaError != null) return;
+    mediaError = 'Media status unavailable';
+    notifyListeners();
+  }
+
+  void _retryMedia() {
+    if (_disposed || _mediaRetry != null) return;
+    _mediaSubscription = null;
+    _mediaRetry = Timer(const Duration(seconds: 1), () {
+      _mediaRetry = null;
+      _subscribeMedia();
+    });
+  }
+
+  void _applyPlayers(
+    List<api.MediaPlayerSnapshot> next, {
+    bool clearError = true,
+  }) {
+    _realPlayers = next;
+    final now = DateTime.now();
+    _pendingPlayback.removeWhere(
+      (name, pending) =>
+          !pending.expires.isAfter(now) ||
+          !next.any((player) => player.busName == name) ||
+          next.any(
+            (player) =>
+                player.busName == name &&
+                player.playbackStatus == pending.status,
+          ),
+    );
+    final effective = [
+      for (final player in next)
+        if (_pendingPlayback[player.busName] case final pending?)
+          _withPlayback(player, pending.status)
+        else
+          player,
+    ];
+    final changed =
+        !listEquals(players, effective) || clearError && mediaError != null;
+    players = effective;
+    if (clearError) mediaError = null;
+    _playbackExpiry?.cancel();
+    if (_pendingPlayback.isNotEmpty) {
+      final expires = _pendingPlayback.values
+          .map((value) => value.expires)
+          .reduce((a, b) => a.isBefore(b) ? a : b);
+      _playbackExpiry = Timer(expires.difference(now), () {
+        if (!_disposed) _applyPlayers(_realPlayers, clearError: false);
+      });
+    }
+    if (changed) notifyListeners();
+  }
+
   Future<void> _refreshSound({bool force = false}) async {
-    if (_disposed || _refreshingSound || _writingSound || players.isEmpty) {
+    if (_disposed || players.isEmpty) return;
+    if (_refreshingSound || _writingSound) {
+      if (force) _soundRefreshPending = true;
       return;
     }
     if (!force &&
@@ -274,6 +338,10 @@ class SystemBackend extends ChangeNotifier {
       if (!_disposed) debugPrint('Settings sound: $failure');
     } finally {
       _refreshingSound = false;
+      if (_soundRefreshPending) {
+        _soundRefreshPending = false;
+        unawaited(_refreshSound(force: true));
+      }
     }
   }
 
@@ -316,43 +384,110 @@ class SystemBackend extends ChangeNotifier {
 
   Future<void> setMediaVolume(String output, double percent) async {
     if (_disposed ||
-        _writingSound ||
         output != mediaOutput['name'] ||
         !percent.isFinite ||
         percent < 0 ||
         percent > 100) {
       throw StateError('Audio output or volume unavailable');
     }
+    _soundRevision++;
+    mediaOutput = {...mediaOutput, 'percent': percent};
+    notifyListeners();
+    final request = (output: output, percent: percent);
+    if (_writingSound) {
+      _queuedSound = request;
+      return;
+    }
+    await _writeMediaVolume(request);
+  }
+
+  Future<void> _writeMediaVolume(
+    ({String output, double percent}) request,
+  ) async {
     _writingSound = true;
     _soundRevision++;
     try {
-      _applySound(
-        await _settings.changeSound(soundOutputVolumeSettingId, {
-          'name': output,
-          'percent': percent,
-        }),
-      );
+      final sound = await _settings.changeSound(soundOutputVolumeSettingId, {
+        'name': request.output,
+        'percent': request.percent,
+      });
+      if (_queuedSound == null) _applySound(sound);
+    } catch (error) {
+      debugPrint('Settings media volume: $error');
+      _soundRefreshPending = true;
+      rethrow;
     } finally {
       _writingSound = false;
+      final queued = _queuedSound;
+      _queuedSound = null;
+      if (!_disposed && queued != null) {
+        unawaited(_writeMediaVolume(queued).catchError((Object _) {}));
+      } else if (_soundRefreshPending) {
+        _soundRefreshPending = false;
+        await _refreshSound(force: true);
+      }
     }
   }
 
   Future<void> mediaAction(String busName, String action) async {
-    await api.mediaAction(busName: busName, action: action);
-    if (!_disposed) await _refreshMedia();
+    if (_disposed) return;
+    if (action == 'playPause') {
+      final player = players
+          .where((player) => player.busName == busName)
+          .firstOrNull;
+      if (player != null) {
+        _pendingPlayback[busName] = (
+          status: player.playbackStatus == 'Playing' ? 'Paused' : 'Playing',
+          expires: DateTime.now().add(const Duration(seconds: 2)),
+        );
+        _applyPlayers(_realPlayers, clearError: false);
+      }
+    }
+    final pending = _pendingPlayback[busName];
+    try {
+      await api.mediaAction(busName: busName, action: action);
+    } catch (_) {
+      if (!_disposed && _pendingPlayback[busName] == pending) {
+        _pendingPlayback.remove(busName);
+        _applyPlayers(_realPlayers, clearError: false);
+      }
+      rethrow;
+    }
   }
 
-  Future<void> mediaSeek(String busName, String track, double seconds) async {
-    await api.mediaSeek(busName: busName, track: track, seconds: seconds);
-    if (!_disposed) await _refreshMedia();
-  }
+  Future<void> mediaSeek(String busName, String track, double seconds) =>
+      api.mediaSeek(busName: busName, track: track, seconds: seconds);
 
   @override
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    _mediaRetry?.cancel();
+    _playbackExpiry?.cancel();
+    unawaited(_mediaSubscription?.cancel());
     unawaited(_settingsChanges?.cancel());
     unawaited(_settings.close());
     super.dispose();
   }
 }
+
+api.MediaPlayerSnapshot _withPlayback(
+  api.MediaPlayerSnapshot player,
+  String status,
+) => .new(
+  busName: player.busName,
+  identity: player.identity,
+  title: player.title,
+  artist: player.artist,
+  album: player.album,
+  artUrl: player.artUrl,
+  playbackStatus: status,
+  canControl: player.canControl,
+  canGoNext: player.canGoNext,
+  canGoPrevious: player.canGoPrevious,
+  canPlay: player.canPlay,
+  canPause: player.canPause,
+  seekToken: player.seekToken,
+  positionSeconds: player.positionSeconds,
+  lengthSeconds: player.lengthSeconds,
+);

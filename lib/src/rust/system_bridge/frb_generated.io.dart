@@ -23,6 +23,13 @@ abstract class SystemRustLibApiImplPlatform
   });
 
   @protected
+  AnyhowException dco_decode_AnyhowException(dynamic raw);
+
+  @protected
+  RustStreamSink<List<MediaPlayerSnapshot>>
+  dco_decode_StreamSink_list_media_player_snapshot_Sse(dynamic raw);
+
+  @protected
   String dco_decode_String(dynamic raw);
 
   @protected
@@ -120,6 +127,15 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   void dco_decode_unit(dynamic raw);
+
+  @protected
+  AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
+
+  @protected
+  RustStreamSink<List<MediaPlayerSnapshot>>
+  sse_decode_StreamSink_list_media_player_snapshot_Sse(
+    SseDeserializer deserializer,
+  );
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
@@ -237,6 +253,18 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
+
+  @protected
+  void sse_encode_AnyhowException(
+    AnyhowException self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_list_media_player_snapshot_Sse(
+    RustStreamSink<List<MediaPlayerSnapshot>> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
