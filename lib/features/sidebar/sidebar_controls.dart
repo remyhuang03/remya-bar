@@ -532,20 +532,74 @@ class _SidebarSlider extends StatefulWidget {
 
 class _SidebarSliderState extends State<_SidebarSlider> {
   double? _draft;
+  double? _pending;
+  Timer? _pendingTimer;
+  Timer? _liveTimer;
+  double? _trailing;
+
+  @override
+  void didUpdateWidget(covariant _SidebarSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_pending != null &&
+        widget.percent != null &&
+        (widget.percent! - _pending!).abs() <= 0.5) {
+      _pending = null;
+      _pendingTimer?.cancel();
+    }
+  }
+
+  void _changed(double value) {
+    setState(() => _draft = value);
+    if (_liveTimer != null) {
+      _trailing = value;
+      return;
+    }
+    widget.onChange?.call(value);
+    _liveTimer = Timer(const Duration(milliseconds: 60), _sendTrailing);
+  }
+
+  void _sendTrailing() {
+    _liveTimer = null;
+    final value = _trailing;
+    _trailing = null;
+    if (value == null) return;
+    widget.onChange?.call(value);
+    _liveTimer = Timer(const Duration(milliseconds: 60), _sendTrailing);
+  }
+
+  void _committed(double value) {
+    _liveTimer?.cancel();
+    _liveTimer = null;
+    _trailing = null;
+    _pendingTimer?.cancel();
+    setState(() {
+      _draft = null;
+      _pending = value;
+    });
+    _pendingTimer = Timer(const Duration(milliseconds: 1500), () {
+      setState(() => _pending = null);
+    });
+    widget.onChange?.call(value);
+  }
+
+  @override
+  void dispose() {
+    _pendingTimer?.cancel();
+    _liveTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final percent = (_draft ?? widget.percent?.toDouble() ?? 0).clamp(
-      0.0,
-      100.0,
-    );
-    final muted = widget.muted && _draft == null;
+    final percent = (_draft ?? _pending ?? widget.percent?.toDouble() ?? 0)
+        .clamp(0.0, 100.0);
+    final muted = widget.muted && _draft == null && _pending == null;
     final label = muted
         ? 'Muted'
         : widget.percent == null
         ? '—'
-        : '${(_draft ?? widget.percent!).round()}%';
+        : '${percent.round()}%';
     final onChange = widget.onChange;
     final active = muted ? colors.onSurface : colors.primary;
     final inactive = colors.secondaryContainer;
@@ -648,17 +702,12 @@ class _SidebarSliderState extends State<_SidebarSlider> {
                               ? null
                               : (value) {
                                   if (_draft != null) {
-                                    setState(() => _draft = value);
+                                    _changed(value);
                                   } else {
                                     onChange(value);
                                   }
                                 },
-                          onChangeEnd: onChange == null
-                              ? null
-                              : (value) {
-                                  setState(() => _draft = null);
-                                  onChange(value);
-                                },
+                          onChangeEnd: onChange == null ? null : _committed,
                         ),
                       ),
                     ),

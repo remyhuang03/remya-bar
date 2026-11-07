@@ -1,14 +1,328 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/features/sidebar/right_sidebar.dart';
+import 'package:remya_bar/features/sidebar/sidebar_backend.dart';
+import 'package:remya_bar/src/rust/system_bridge/frb_generated.dart';
+import 'package:remya_settings_client/remya_settings_client.dart';
 
 void main() {
+  group('SidebarBackend', () {
+    late _Settings settings;
+    late SidebarBackend backend;
+    setUp(() async {
+      SystemRustLib.initMock(api: _SidebarApi());
+      settings = _Settings();
+      backend = SidebarBackend(settings: settings)..open('eDP-1');
+      await _flush();
+    });
+    tearDown(() {
+      backend.dispose();
+      SystemRustLib.dispose();
+    });
+
+    Future<void> volume(
+      num percent, {
+      String direction = 'output',
+      String target = 'speaker',
+    }) => backend.perform({
+      'action': 'sidebar.$direction-volume',
+      'target': target,
+      'value': percent,
+    }, 'eDP-1');
+
+    test(
+      'FIFO writes coalesce only queued volume for the same target',
+      () async {
+        final original = settings.snapshots['sound'];
+        final first = volume(30);
+        final second = volume(50);
+        final wifi = backend.perform({
+          'action': 'sidebar.wifi',
+          'value': false,
+        }, null);
+        final latest = volume(80);
+        final input = volume(40, direction: 'input', target: 'mic');
+        var completed = false;
+        unawaited(second.then((_) => completed = true));
+        expect(settings.writes, hasLength(1));
+        expect(_percent(backend.data), closeTo(80, .002));
+        expect(_percent({'sound': original}), closeTo(20, .002));
+        settings.writes[0].result.complete(_sound(30));
+        await first;
+        expect(completed, isFalse);
+        expect(settings.writes.map((write) => write.id), [
+          'sound.output-volume',
+          'sound.output-volume',
+        ]);
+        expect(jsonDecode(settings.writes[1].value)['percent'], 80);
+        expect(_percent(backend.data), closeTo(80, .002));
+        expect(settings.soundReads, 1);
+        settings.writes[1].result.complete(_sound(79));
+        await Future.wait([second, latest]);
+        expect(_percent(backend.data), closeTo(79, .002));
+        settings.writes[2].result.complete({'wifi_enabled': false});
+        await wifi;
+        expect(settings.writes[3].id, 'sound.input-volume');
+        expect(jsonDecode(settings.writes[3].value)['name'], 'mic');
+        settings.snapshots['sound'] = _sound(79);
+        settings.writes[3].result.complete(_sound(79));
+        await input;
+        await _flush();
+        expect(settings.soundReads, 2);
+      },
+    );
+
+    for (final action in ['input-volume', 'brightness']) {
+      test('$action coalesces queued values', () async {
+        backend.close();
+        Future<void> send(num value) => backend.perform({
+          'action': 'sidebar.$action',
+          'target': action == 'brightness' ? 'eDP-1' : 'mic',
+          'value': value,
+        }, 'eDP-1');
+        final first = send(30);
+        final second = send(50);
+        final latest = send(80);
+        expect(settings.writes, hasLength(1));
+        settings.writes[0].result.complete(_sound(30));
+        await first;
+        expect(settings.writes, hasLength(2));
+        final request = jsonDecode(settings.writes[1].value) as Map;
+        expect(
+          request[action == 'brightness' ? 'value' : 'percent'],
+          action == 'brightness' ? '80' : 80,
+        );
+        settings.writes[1].result.complete(_sound(80));
+        await Future.wait([second, latest]);
+      });
+    }
+
+    test('volume coalescing keeps different device targets separate', () async {
+      backend.close();
+      final first = volume(30);
+      final second = volume(50);
+      final other = volume(40, target: 'headphones');
+      final latest = volume(80);
+      settings.writes[0].result.complete(_sound(30));
+      await first;
+      expect(jsonDecode(settings.writes[1].value), {
+        'name': 'speaker',
+        'percent': 80,
+      });
+      settings.writes[1].result.complete(_sound(80));
+      await Future.wait([second, latest]);
+      expect(jsonDecode(settings.writes[2].value), {
+        'name': 'headphones',
+        'percent': 40,
+      });
+      settings.writes[2].result.complete(_sound(80));
+      await other;
+    });
+
+    test(
+      'coalesced errors reach both callers, the queue continues and reconciles',
+      () async {
+        final first = volume(30);
+        final second = volume(50);
+        final latest = volume(80);
+        final firstError = expectLater(first, throwsStateError);
+        final secondError = expectLater(second, throwsStateError);
+        final latestError = expectLater(latest, throwsStateError);
+        settings.writes[0].result.completeError(StateError('first failed'));
+        await firstError;
+        expect(settings.writes, hasLength(2));
+        expect(settings.soundReads, 1);
+        settings.writes[1].result.complete({'error': 'last failed'});
+        await Future.wait([secondError, latestError]);
+        await _flush();
+        expect(settings.soundReads, 2);
+        expect(_percent(backend.data), closeTo(20, .002));
+      },
+    );
+
+    test(
+      'stale reads and change signals cannot overwrite pending predictions',
+      () async {
+        final read = settings.soundRead = Completer<Map<String, dynamic>>();
+        settings.updates.add((topic: 'sound', value: {}));
+        await _flush();
+        final write = volume(75);
+        final dark = backend.perform({
+          'action': 'sidebar.dark',
+          'value': true,
+        }, null);
+        settings.updates.add((
+          topic: 'theme',
+          value: {
+            'theme': {'theme_mode': 'light'},
+          },
+        ));
+        read.complete(_sound(10));
+        await _flush();
+        expect(_percent(backend.data), closeTo(75, .002));
+        expect(
+          ((backend.data['theme'] as Map)['theme'] as Map)['theme_mode'],
+          'dark',
+        );
+        expect(settings.soundReads, 2);
+        settings.writes[0].result.complete(_sound(75));
+        await write;
+        backend.close();
+        settings.writes[1].result.complete({
+          'theme': {'theme_mode': 'dark'},
+        });
+        await dark;
+      },
+    );
+
+    final predictions =
+        <
+          ({
+            Map args,
+            String key,
+            Object? Function(Map) select,
+            Object? expected,
+          })
+        >[
+          (
+            args: {
+              'action': 'sidebar.output-volume',
+              'target': 'speaker',
+              'value': 65,
+            },
+            key: 'sound',
+            select: (data) => _percent(data).round(),
+            expected: 65,
+          ),
+          (
+            args: {
+              'action': 'sidebar.input-volume',
+              'target': 'mic',
+              'value': 65,
+            },
+            key: 'sound',
+            select: (data) => _percent(data, direction: 'input').round(),
+            expected: 65,
+          ),
+          (
+            args: {
+              'action': 'sidebar.output-muted',
+              'target': 'speaker',
+              'value': true,
+            },
+            key: 'sound',
+            select: (data) => _preferences(data, 'output')['muted'],
+            expected: true,
+          ),
+          (
+            args: {
+              'action': 'sidebar.input-muted',
+              'target': 'mic',
+              'value': true,
+            },
+            key: 'sound',
+            select: (data) => _preferences(data, 'input')['muted'],
+            expected: true,
+          ),
+          (
+            args: {
+              'action': 'sidebar.brightness',
+              'target': 'eDP-1',
+              'value': 65,
+            },
+            key: 'brightness',
+            select: (data) => (data['brightness'] as Map)['percent'],
+            expected: 65,
+          ),
+          (
+            args: {'action': 'sidebar.wifi', 'value': false},
+            key: 'network',
+            select: (data) => (data['network'] as Map)['wifi_enabled'],
+            expected: false,
+          ),
+          (
+            args: {
+              'action': 'sidebar.bluetooth',
+              'value': {'adapter': 'hci0', 'enabled': true},
+            },
+            key: 'bluetooth',
+            select: (data) => ((data['bluetooth'] as Map)['adapters'] as List)
+                .first['powered'],
+            expected: true,
+          ),
+          (
+            args: {'action': 'sidebar.night-light', 'value': true},
+            key: 'night-light',
+            select: (data) => (data['night-light'] as Map)['enabled'],
+            expected: true,
+          ),
+          (
+            args: {'action': 'sidebar.keep-awake', 'value': true},
+            key: 'keep-awake',
+            select: (data) => (data['keep-awake'] as Map)['value'],
+            expected: true,
+          ),
+          (
+            args: {'action': 'sidebar.dark', 'value': true},
+            key: 'theme',
+            select: (data) =>
+                ((data['theme'] as Map)['theme'] as Map)['theme_mode'],
+            expected: 'dark',
+          ),
+          (
+            args: {'action': 'sidebar.profile', 'value': 'power-saver'},
+            key: 'power',
+            select: (data) =>
+                ((data['power'] as Map)['system'] as Map)['profile'],
+            expected: 'power-saver',
+          ),
+        ];
+    for (final prediction in predictions) {
+      test(
+        '${prediction.args['action']} predicts immutably then accepts authoritative state',
+        () async {
+          backend.close();
+          final original = backend.data;
+          final before = jsonEncode(original);
+          var notifications = 0;
+          backend.addListener(() => notifications++);
+          final write = backend.perform(prediction.args, 'eDP-1');
+          expect(prediction.select(backend.data), prediction.expected);
+          expect(notifications, 1);
+          expect(jsonEncode(original), before);
+          expect(
+            identical(original[prediction.key], backend.data[prediction.key]),
+            isFalse,
+          );
+          final result = <String, dynamic>{'authoritative': true};
+          if (prediction.key == 'brightness') {
+            settings.snapshots['display-brightness'] = {
+              'outputs': [
+                {'output': 'eDP-1', ...result},
+              ],
+            };
+          }
+          settings.writes.single.result.complete(result);
+          await write;
+          expect(
+            (backend.data[prediction.key] as Map)['authoritative'],
+            isTrue,
+          );
+        },
+      );
+    }
+  });
+
   Future<void> showSidebar(
     WidgetTester tester,
     List<Map<String, Object?>> actions, {
     Map<String, Object?> overrides = const {},
+    Future<void> Function(Map<String, Object?>)? onAction,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(420, 663);
@@ -46,7 +360,7 @@ void main() {
             },
             ...overrides,
           },
-          onAction: (action) async => actions.add(action),
+          onAction: onAction ?? (action) async => actions.add(action),
           onHeight: (_) {},
         ),
       ),
@@ -206,10 +520,137 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<Slider>(slider).value, 0);
     expect(find.text('0%'), findsOneWidget);
-    expect(actions, isEmpty);
+    expect(actions, isNotEmpty);
+    expect(actions.last['value'], 0);
     await drag.up();
-    expect(actions.single['value'], 0);
+    expect(actions.last['value'], 0);
+    await tester.pump(const Duration(milliseconds: 1499));
+    expect(tester.widget<Slider>(slider).value, 0);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(tester.widget<Slider>(slider).value, 50);
   });
+
+  testWidgets(
+    'slider throttles leading and trailing writes and holds release',
+    (tester) async {
+      final actions = <Map<String, Object?>>[];
+      await showSidebar(tester, actions);
+      Slider slider() => tester.widget<Slider>(find.byType(Slider).first);
+      slider().onChangeStart!(50);
+      slider().onChanged!(60);
+      slider().onChanged!(70);
+      expect(actions.map((action) => action['value']), [60]);
+      await tester.pump(const Duration(milliseconds: 59));
+      expect(actions, hasLength(1));
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(actions.map((action) => action['value']), [60, 70]);
+      slider().onChanged!(80);
+      slider().onChangeEnd!(85);
+      await tester.pump();
+      expect(actions.map((action) => action['value']), [60, 70, 85]);
+      expect(slider().value, 85);
+      await tester.pump(const Duration(milliseconds: 1499));
+      expect(slider().value, 85);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(slider().value, 50);
+
+      slider().onChangeStart!(50);
+      slider().onChanged!(80);
+      slider().onChangeEnd!(80);
+      await tester.pump();
+      expect(slider().value, 80);
+      await showSidebar(
+        tester,
+        actions,
+        overrides: {
+          'brightness': {'output': 'eDP-1', 'percent': 79.6},
+        },
+      );
+      expect(slider().value, 79.6);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 2));
+    },
+  );
+
+  testWidgets(
+    'quick controls stay enabled while actions overlap and show errors',
+    (tester) async {
+      final writes = <Completer<void>>[];
+      final actions = <Map<String, Object?>>[];
+      await showSidebar(
+        tester,
+        actions,
+        overrides: {
+          'layout': ['caffeine', 'dark'],
+          'keep-awake': {'value': false},
+          'theme': {
+            'theme': {'theme_mode': 'light'},
+          },
+        },
+        onAction: (action) {
+          actions.add(action);
+          final result = Completer<void>();
+          writes.add(result);
+          return result.future;
+        },
+      );
+      await tester.tap(
+        find.byWidgetPredicate(
+          (w) => w is Tooltip && w.message == 'Keep awake',
+        ),
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byWidgetPredicate((w) => w is Tooltip && w.message == 'Dark mode'),
+      );
+      await tester.pump();
+      expect(actions.map((action) => action['action']), [
+        'sidebar.keep-awake',
+        'sidebar.dark',
+      ]);
+      expect(
+        tester.widget<Slider>(find.byType(Slider).first).onChanged,
+        isNotNull,
+      );
+      expect(
+        tester
+            .widget<IconButton>(
+              find.byWidgetPredicate(
+                (w) => w is IconButton && w.tooltip == 'Edit layout',
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      writes.first.complete();
+      await tester.pump();
+      expect(
+        tester
+            .widget<IconButton>(
+              find.byWidgetPredicate(
+                (w) => w is IconButton && w.tooltip == 'Edit layout',
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      writes.last.completeError(
+        PlatformException(code: 'failed', message: 'Write failed'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Write failed'), findsOneWidget);
+      expect(
+        tester
+            .widget<IconButton>(
+              find.byWidgetPredicate(
+                (w) => w is IconButton && w.tooltip == 'Edit layout',
+              ),
+            )
+            .onPressed,
+        isNotNull,
+      );
+    },
+  );
 
   testWidgets('Audio and Power detail headers have no switch', (tester) async {
     await showSidebar(tester, []);
@@ -221,4 +662,108 @@ void main() {
       await tester.pumpAndSettle();
     }
   });
+}
+
+Future<void> _flush() => Future<void>.delayed(Duration.zero);
+
+Map _preferences(Map data, String direction) =>
+    (((data['sound'] as Map)['system'] as Map)['devices'] as List).firstWhere(
+          (device) => device['direction'] == direction,
+        )['preferences']
+        as Map;
+
+double _percent(Map data, {String direction = 'output'}) =>
+    ((_preferences(data, direction)['channels'] as List).reduce(
+      (a, b) => (a as int) > (b as int) ? a : b,
+    ) as int) *
+    100 /
+    65536;
+
+Map<String, dynamic> _sound(num percent) => {
+  'system': {
+    'default_output': 'speaker',
+    'default_input': 'mic',
+    'devices': [
+      for (final direction in ['output', 'input'])
+        {
+          'direction': direction,
+          'name': direction == 'output' ? 'speaker' : 'mic',
+          'preferences': {
+            'channels': [
+              (percent * 65536 / 100).round(),
+              (percent * 65536 / 200).round(),
+            ],
+            'muted': false,
+          },
+        },
+    ],
+  },
+};
+
+class _Settings extends SettingsClient {
+  final updates = StreamController<SettingsChange>();
+  final writes =
+      <({String id, String value, Completer<Map<String, dynamic>> result})>[];
+  final snapshots = <String, Map<String, dynamic>>{
+    'sound': _sound(20),
+    'network': {'wifi_enabled': true},
+    'bluetooth': {
+      'adapters': [
+        {'id': 'hci0', 'powered': false},
+        {'id': 'hci1', 'powered': false},
+      ],
+    },
+    'night-light': {'enabled': false},
+    'power.keep-awake': {'value': false},
+    'theme': {
+      'theme': {'theme_mode': 'light'},
+    },
+    'power': {
+      'system': {'profile': 'balanced'},
+    },
+    'display-brightness': {
+      'outputs': [
+        {'output': 'eDP-1', 'percent': 50},
+      ],
+    },
+    barSidebarLayoutSettingId: {
+      'value': ['internet', 'power'],
+    },
+  };
+  Completer<Map<String, dynamic>>? soundRead;
+  int soundReads = 0;
+
+  @override
+  Stream<SettingsChange> get changes => updates.stream;
+
+  @override
+  Future<Map<String, dynamic>> call(
+    String method, [
+    List<String> arguments = const [],
+  ]) async {
+    if (method == 'Get') {
+      if (arguments.single == 'sound') {
+        soundReads++;
+        if (soundRead case final read?) return read.future;
+      }
+      return snapshots[arguments.single] ?? {};
+    }
+    final result = Completer<Map<String, dynamic>>();
+    writes.add((id: arguments[0], value: arguments[1], result: result));
+    return result.future;
+  }
+
+  @override
+  Future<void> close() async {
+    await updates.close();
+    await super.close();
+  }
+}
+
+class _SidebarApi implements SystemRustLibApi {
+  @override
+  Future<double?> crateApiSidebarUptime() async => 3600;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

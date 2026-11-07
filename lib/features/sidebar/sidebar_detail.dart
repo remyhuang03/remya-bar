@@ -29,8 +29,12 @@ class _SidebarDetailState extends State<_SidebarDetail> {
   void _expand(String id) =>
       setState(() => _expanded = _expanded == id ? null : id);
 
-  Widget _button(String label, VoidCallback? action) => FilledButton.tonal(
-    onPressed: widget.busy ? null : action,
+  Widget _button(
+    String label,
+    VoidCallback? action, {
+    bool exclusive = false,
+  }) => FilledButton.tonal(
+    onPressed: exclusive && widget.busy ? null : action,
     child: Text(label),
   );
 
@@ -81,7 +85,7 @@ class _SidebarDetailState extends State<_SidebarDetail> {
           const Expanded(child: Text('Available networks')),
           IconButton(
             tooltip: 'Scan for Wi-Fi networks',
-            onPressed: canConnect && !widget.busy
+            onPressed: canConnect
                 ? () => widget.send('sidebar.wifi-scan')
                 : null,
             icon: const Icon(Icons.refresh_rounded),
@@ -108,6 +112,7 @@ class _SidebarDetailState extends State<_SidebarDetail> {
                     failure['uuid'] == null &&
                     !accessPoints.any((point) => point['ssid'] == ssid),
               ),
+              exclusive: true,
             ),
           ),
       ],
@@ -124,6 +129,7 @@ class _SidebarDetailState extends State<_SidebarDetail> {
           _button(
             'Hidden network…',
             canConnect && connecting == null ? () => _wifiCredentials() : null,
+            exclusive: true,
           ),
         ],
       ),
@@ -193,9 +199,7 @@ class _SidebarDetailState extends State<_SidebarDetail> {
             spacing: 4,
             children: [
               TextButton(
-                onPressed: widget.busy
-                    ? null
-                    : () => widget.send('sidebar.wifi-disconnect'),
+                onPressed: () => widget.send('sidebar.wifi-disconnect'),
                 child: const Text('Disconnect'),
               ),
               if (uuid != null)
@@ -331,7 +335,7 @@ class _SidebarDetailState extends State<_SidebarDetail> {
         DropdownButton<String>(
           isExpanded: true,
           value: adapterId as String?,
-          onChanged: widget.busy || pairing ? null : widget.onSelectAdapter,
+          onChanged: pairing ? null : widget.onSelectAdapter,
           items: [
             for (final item in adapters)
               DropdownMenuItem(
@@ -360,6 +364,7 @@ class _SidebarDetailState extends State<_SidebarDetail> {
               'sidebar.bluetooth-cancel',
               value: <String, Object?>{},
             ),
+            exclusive: true,
           ),
         ),
       for (final device in devices) ...[
@@ -395,6 +400,8 @@ class _SidebarDetailState extends State<_SidebarDetail> {
                         device,
                       )
                     : null,
+                exclusive:
+                    device['connected'] != true && device['paired'] != true,
               ),
               if (device['paired'] == true || device['bonded'] == true)
                 _button(
@@ -410,6 +417,7 @@ class _SidebarDetailState extends State<_SidebarDetail> {
                           }
                         }
                       : null,
+                  exclusive: true,
                 ),
             ],
           ),
@@ -455,7 +463,7 @@ class _SidebarDetailState extends State<_SidebarDetail> {
               ? 'Default output'
               : 'Available',
           selected: device['name'] == system['default_output'],
-          onTap: widget.busy || device['name'] == system['default_output']
+          onTap: device['name'] == system['default_output']
               ? null
               : () => widget.send(
                   'sidebar.output-device',
@@ -490,10 +498,7 @@ class _SidebarDetailState extends State<_SidebarDetail> {
           title: _profileLabel(profile),
           subtitle: profile == system['profile'] ? 'Current mode' : 'Available',
           selected: profile == system['profile'],
-          onTap:
-              widget.busy ||
-                  power['conflict'] == true ||
-                  profile == system['profile']
+          onTap: power['conflict'] == true || profile == system['profile']
               ? null
               : () => widget.send('sidebar.profile', value: profile),
         ),

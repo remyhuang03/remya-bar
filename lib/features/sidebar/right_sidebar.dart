@@ -186,7 +186,8 @@ class _RightSidebarState extends State<RightSidebar> {
 
   String? _detail;
   bool _power = false;
-  bool _busy = false;
+  int _pendingActions = 0;
+  bool get _busy => _pendingActions > 0;
   String? _error;
   String? _confirming;
   Timer? _confirmation;
@@ -235,9 +236,20 @@ class _RightSidebarState extends State<RightSidebar> {
   }
 
   Future<bool> _send(String action, {Object? value, Object? target}) async {
-    if (_busy) return false;
+    if (_busy &&
+        const {
+          'sidebar.layout',
+          'sidebar.session',
+          'sidebar.wifi-connect',
+          'sidebar.wifi-forget',
+          'sidebar.bluetooth-pair',
+          'sidebar.bluetooth-forget',
+          'sidebar.bluetooth-respond',
+        }.contains(action)) {
+      return false;
+    }
     setState(() {
-      _busy = true;
+      _pendingActions++;
       _error = null;
     });
     try {
@@ -254,7 +266,7 @@ class _RightSidebarState extends State<RightSidebar> {
       }
       return false;
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _pendingActions--);
     }
   }
 
@@ -444,7 +456,7 @@ class _RightSidebarState extends State<RightSidebar> {
               label: _detailTitles[detail],
               child: Switch(
                 value: enabled ?? false,
-                onChanged: enabled == null || _busy
+                onChanged: enabled == null
                     ? null
                     : (value) async {
                         if (detail == 'bluetooth') {
@@ -537,9 +549,7 @@ class _RightSidebarState extends State<RightSidebar> {
                 _HeaderButton(
                   Icons.settings_outlined,
                   'Settings',
-                  _busy
-                      ? null
-                      : () => _send('sidebar.settings', target: 'remya-bar'),
+                  () => _send('sidebar.settings', target: 'remya-bar'),
                 ),
                 _HeaderButton(
                   Icons.power_settings_new_rounded,
@@ -593,7 +603,7 @@ class _RightSidebarState extends State<RightSidebar> {
               icon: Icons.brightness_6_rounded,
               label: 'Brightness',
               percent: brightness['percent'] as num?,
-              onChange: edit || _busy || brightness['percent'] == null
+              onChange: edit || brightness['percent'] == null
                   ? null
                   : (percent) => _send(
                       'sidebar.brightness',
@@ -681,7 +691,7 @@ class _RightSidebarState extends State<RightSidebar> {
     final percent = values.isEmpty
         ? null
         : values.reduce((a, b) => a > b ? a : b) * 100 / 65536;
-    final enabled = _draft == null && !_busy && device != null;
+    final enabled = _draft == null && device != null;
     return _SidebarSlider(
       key: ValueKey((direction, device?['name'])),
       icon: muted ? mutedIcon : icon,
@@ -830,7 +840,7 @@ class _RightSidebarState extends State<RightSidebar> {
       subtitle: subtitle,
       active: active,
       editing: _draft != null,
-      onToggle: _busy || _draft != null ? null : toggle,
+      onToggle: _draft != null ? null : toggle,
       onDetail: _draft != null ? null : detail,
     );
     return _editable(id, title, icon, tile);
@@ -852,7 +862,7 @@ class _RightSidebarState extends State<RightSidebar> {
       title: selected == null ? '$title unavailable' : title,
       selected: selected,
       editing: _draft != null,
-      onTap: selected == null || _busy || _draft != null
+      onTap: selected == null || _draft != null
           ? null
           : switch (id) {
               'caffeine' => () => _send('sidebar.keep-awake', value: !selected),

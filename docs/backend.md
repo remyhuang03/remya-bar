@@ -225,8 +225,16 @@ The 420-logical-pixel panel opens 6 pixels from the output’s right edge and
 
 The sidebar reads live Settings state while visible. Display brightness targets
 the owning output. Sound controls act on the displayed PipeWire input/output
-device. Sliders send their value on release or adjust by five percentage points
-per wheel step. The output slider opens the output picker on secondary click.
+device. Sliders apply live at 60 ms intervals and send the final value on release,
+or adjust by five percentage points per wheel step. They hold the released value
+until readback catches up or 1.5 seconds pass. The output slider opens the output
+picker on secondary click.
+
+Sidebar writes run in FIFO order; queued volume and brightness writes coalesce
+per action and target to the latest value. Predictable controls update immediately
+and reconcile with Settings results; refresh reads wait until the queue drains.
+Only layout editing, session actions, Wi-Fi connection/forget flows and Bluetooth
+pairing/forget flows use the panel's busy guard.
 
 Wi-Fi scan, connection, disconnect, forget, and hidden-network activation use
 Settings' NetworkManager API. BlueZ state, scan, connect, disconnect, forget,
