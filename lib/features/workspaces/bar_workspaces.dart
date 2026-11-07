@@ -111,7 +111,13 @@ class _BarWorkspacesState extends State<BarWorkspaces> {
             behavior: .opaque,
             onPointerSignal: (event) {
               if (event is PointerScrollEvent && event.scrollDelta.dy != 0) {
-                unawaited(backend.scroll(event.scrollDelta.dy > 0 ? 1 : -1));
+                // Claim the wheel so the scrollable bar does not also move.
+                GestureBinding.instance.pointerSignalResolver.register(
+                  event,
+                  (_) => unawaited(
+                    backend.scroll(event.scrollDelta.dy > 0 ? 1 : -1),
+                  ),
+                );
               }
             },
             onPointerDown: (event) {

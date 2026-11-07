@@ -30,6 +30,14 @@ class SystemBackend extends ChangeNotifier {
   int _powerRevision = 0;
   bool _refreshingClock = false;
   bool showClockSeconds = true;
+  bool _refreshingLayout = false;
+  BarLayout layout = BarLayout.defaults;
+  bool _refreshingStatus = false;
+  int _ticks = 0;
+
+  /// Wi-Fi radio and Bluetooth power for the quick settings toggle; null when
+  /// Settings cannot report them.
+  ({bool? wifi, bool? bluetooth}) quickStatus = (wifi: null, bluetooth: null);
   Map<String, Object?> batteryPower = const {};
   bool isPowerSaver = false;
   api.BatterySnapshot? get battery => resourceSnapshot?.batteries.firstOrNull;
@@ -52,6 +60,10 @@ class SystemBackend extends ChangeNotifier {
       switch (change.topic) {
         case barClockSecondsSettingId:
           unawaited(_refreshClockPreference());
+        case barLayoutSettingId:
+          unawaited(_refreshLayout());
+        case 'network' || 'bluetooth':
+          unawaited(_refreshQuickStatus());
         case 'power':
           unawaited(_refreshPower());
         case 'sound':
@@ -63,6 +75,8 @@ class SystemBackend extends ChangeNotifier {
       unawaited(_refreshMedia());
       unawaited(_refreshPower());
       unawaited(_refreshClockPreference());
+      unawaited(_refreshLayout());
+      if (_ticks++ % 5 == 0) unawaited(_refreshQuickStatus());
     }
 
     refresh();
@@ -96,6 +110,52 @@ class SystemBackend extends ChangeNotifier {
       if (!_disposed) debugPrint('Settings clock: $failure');
     } finally {
       _refreshingClock = false;
+    }
+  }
+
+  // Errors keep the last valid layout, like the theme.
+  Future<void> _refreshLayout() async {
+    if (_disposed || _refreshingLayout) return;
+    _refreshingLayout = true;
+    try {
+      final next = await _settings.readBarLayout();
+      if (_disposed || next == layout) return;
+      layout = next;
+      notifyListeners();
+    } catch (failure) {
+      if (!_disposed) debugPrint('Settings bar layout: $failure');
+    } finally {
+      _refreshingLayout = false;
+    }
+  }
+
+  Future<void> _refreshQuickStatus() async {
+    if (_disposed || _refreshingStatus) return;
+    _refreshingStatus = true;
+    Future<Map?> read(Future<Map> request) =>
+        request.then<Map?>((value) => value).catchError((Object error) {
+          debugPrint('Settings quick status: $error');
+          return null;
+        });
+    try {
+      final (network, bluetooth) = await (
+        read(_settings.readNetwork()),
+        read(_settings.readBluetooth()),
+      ).wait;
+      final adapters = bluetooth?['adapters'];
+      final next = (
+        wifi: network?['wifi_enabled'] as bool?,
+        bluetooth: adapters is List && adapters.isNotEmpty
+            ? adapters.any(
+                (adapter) => adapter is Map && adapter['powered'] == true,
+              )
+            : null,
+      );
+      if (_disposed || next == quickStatus) return;
+      quickStatus = next;
+      notifyListeners();
+    } finally {
+      _refreshingStatus = false;
     }
   }
 

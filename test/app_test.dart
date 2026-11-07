@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/app.dart';
@@ -168,8 +169,7 @@ void main() {
       expect(find.byType(type), findsNothing);
     }
     expect(find.byType(BarSidebarButton), findsOneWidget);
-    final buttons = tester.widgetList<IconButton>(find.byType(IconButton));
-    expect(buttons.where((button) => button.onPressed != null).length, 1);
+    expect(find.byType(IconButton), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -277,28 +277,158 @@ void main() {
           );
         }
         if (width / scale >= 700) {
-          final workspace = find.byType(BarWorkspaces);
-          expect(tester.getCenter(workspace).dx, width / 2);
-          if (find.byType(BarResources).evaluate().isNotEmpty) {
-            final resources = tester.getRect(find.byType(BarResources));
-            expect(resources.overlaps(tester.getRect(workspace)), isFalse);
-            if (find.byType(BarMedia).evaluate().isNotEmpty) {
-              final media = tester.getRect(find.byType(BarMedia));
-              expect(resources.overlaps(media), isFalse);
-              expect(media.right, lessThan(tester.getRect(workspace).left));
+          // Default groups keep pills in order, without overlap, and end
+          // with the quick settings toggle.
+          Rect? previous;
+          for (final type in [
+            BarResources,
+            BarMedia,
+            BarWorkspaces,
+            BarClock,
+            BarBattery,
+            BarSidebarButton,
+          ]) {
+            if (find.byType(type).evaluate().isEmpty) continue;
+            final rect = tester.getRect(find.byType(type));
+            if (previous != null) {
+              expect(
+                rect.left,
+                greaterThanOrEqualTo(previous.right),
+                reason: '$type at $width, $scale',
+              );
             }
+            previous = rect;
           }
-          final status = tester.getRect(find.byType(BarSidebarButton));
+          // Overlong content scrolls until the last pill is fully visible.
+          if (previous!.right > width) {
+            final position = tester
+                .state<ScrollableState>(find.byType(Scrollable).first)
+                .position;
+            // A vertical wheel over a non-scrolling pill scrolls the bar.
+            await tester.sendEventToBinding(
+              PointerScrollEvent(
+                position: tester.getCenter(find.byType(BarClock)),
+                scrollDelta: const Offset(0, 10000),
+              ),
+            );
+            await tester.pump();
+            expect(position.pixels, position.maxScrollExtent);
+          }
           expect(
-            status.overlaps(tester.getRect(find.byType(BarClock))),
-            isFalse,
+            tester.getRect(find.byType(BarSidebarButton)).right,
+            lessThanOrEqualTo(width - 24),
           );
+          expect(find.byType(BarWorkspaces), findsOneWidget);
         } else {
           expect(find.byType(BarWorkspaces), findsNothing);
           expect(tester.getCenter(find.byType(BarClock)).dx, width / 2);
         }
       }
     }
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Settings layout orders, hides and configures pills', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 40);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final system = SystemBackend()
+      ..resourceSnapshot = const SystemSnapshot(
+        cpuPercent: 50,
+        memoryUsedBytes: 1024,
+        memoryTotalBytes: 2048,
+        swapTotalBytes: 0,
+        gpus: [],
+        batteries: [BatterySnapshot(name: 'BAT0', percent: 80, state: '')],
+      )
+      ..layout = const BarLayout(
+        groups: [
+          ['sidebar', 'resources'],
+          ['clock'],
+        ],
+        resources: ['cpu'],
+      );
+    await tester.pumpWidget(
+      RemyaBarApp(
+        preferences: SettingsThemeController(
+          () => File('/nonexistent/theme.toml'),
+        ),
+        system: system,
+        onOpenSettings: () async {},
+      ),
+    );
+    expect(find.byType(BarBattery), findsNothing);
+    final sidebar = tester.getRect(find.byType(BarSidebarButton));
+    final resources = tester.getRect(find.byType(BarResources));
+    expect(sidebar.left, 24);
+    expect(resources.left, sidebar.right + 8);
+    expect(tester.getRect(find.byType(BarClock)).right, 1920 - 24);
+    expect(find.text('50%'), findsOneWidget);
+    expect(tester.widget<BarResources>(find.byType(BarResources)).metrics, [
+      'cpu',
+    ]);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('a centered group stays centered with its own sides', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 40);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final hyprland = HyprlandBackend(
+      outputName: 'DP-1',
+      readSnapshot: () async => const HyprlandSnapshot(
+        monitors: [
+          HyprlandMonitor(
+            name: 'DP-1',
+            outputNumber: 1,
+            x: 0,
+            y: 0,
+            activeWorkspaceId: 1,
+            currentWindow: HyprlandWindow(
+              address: '0x1',
+              title: 'A very long window title that must not widen the slot',
+              appId: 'kitty',
+              workspaceId: 1,
+              monitorName: 'DP-1',
+            ),
+            workspaceSlots: [],
+          ),
+        ],
+        workspaces: [],
+      ),
+    );
+    await hyprland.refresh();
+    final system = SystemBackend()
+      ..layout = const BarLayout(
+        groups: [
+          ['window'],
+          ['clock'],
+          ['sidebar'],
+        ],
+        center: 1,
+      );
+    await tester.pumpWidget(
+      RemyaBarApp(
+        preferences: SettingsThemeController(
+          () => File('/nonexistent/theme.toml'),
+        ),
+        system: system,
+        hyprland: hyprland,
+        onOpenSettings: () async {},
+      ),
+    );
+    expect(tester.getCenter(find.byType(BarClock)).dx, 960);
+    final window = tester.getRect(find.byType(BarActiveWindow));
+    expect(window.left, 24);
+    expect(window.width, BarActiveWindow.width);
+    expect(tester.getRect(find.byType(BarSidebarButton)).right, 1920 - 24);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

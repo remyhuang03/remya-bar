@@ -14,21 +14,26 @@ class BarResources extends StatefulWidget {
     this.snapshot,
     required this.cardSnapshot,
     this.compact = false,
+    this.metrics,
   });
 
   final SystemSnapshot? snapshot;
   final SystemSnapshot? cardSnapshot;
   final bool compact;
 
-  static bool hasData(SystemSnapshot? snapshot) =>
-      _segments(snapshot).isNotEmpty;
+  /// Shown metric names (`cpu`, `memory`, `gpu`, `network`); null shows all.
+  final List<String>? metrics;
+
+  static bool hasData(SystemSnapshot? snapshot, {List<String>? metrics}) =>
+      _segments(snapshot, metrics).isNotEmpty;
 
   static double widthFor(
     BuildContext context, {
     bool compact = false,
     SystemSnapshot? snapshot,
+    List<String>? metrics,
   }) {
-    final segments = _segments(snapshot);
+    final segments = _segments(snapshot, metrics);
     if (segments.isEmpty) return 0;
     final gap = compact ? 6 : 14;
     return (compact ? 14 : 28) +
@@ -81,7 +86,7 @@ class _BarResourcesState extends State<BarResources> {
 
   @override
   Widget build(BuildContext context) {
-    final segments = _segments(widget.snapshot);
+    final segments = _segments(widget.snapshot, widget.metrics);
     if (segments.isEmpty) return const SizedBox.shrink();
     if (_requested) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -190,7 +195,12 @@ class _Segment {
       26 + (network ? 32 + 2 * valueWidth(context) : valueWidth(context));
 }
 
-List<_Segment> _segments(SystemSnapshot? snapshot) {
+List<_Segment> _segments(SystemSnapshot? snapshot, [List<String>? metrics]) => [
+  for (final segment in _allSegments(snapshot))
+    if (metrics?.contains(segment.metric.name) ?? true) segment,
+];
+
+List<_Segment> _allSegments(SystemSnapshot? snapshot) {
   final memory = resourceUsage(
     snapshot?.memoryUsedBytes,
     snapshot?.memoryTotalBytes,

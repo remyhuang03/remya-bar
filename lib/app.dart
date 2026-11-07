@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
@@ -20,6 +21,7 @@ import 'features/resources/resource_data.dart';
 import 'features/tray/bar_tray.dart';
 import 'features/window/bar_active_window.dart';
 import 'features/workspaces/bar_workspaces.dart';
+import 'widgets/bar_groups_layout.dart';
 import 'widgets/bar_tooltip.dart';
 
 Future<void> _openPowerSettings() => openRemyaSettings(page: 'power');
@@ -55,7 +57,15 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   Timer? _pillRefresh;
   final _tray = GlobalKey<BarTrayState>();
   SidebarBackend? _sidebar;
-  bool _sidebarOpen = false;
+  bool _sidebarOpenValue = false;
+  bool get _sidebarOpen => _sidebarOpenValue;
+  // The toggle shows the open state, so changes rebuild the bar.
+  set _sidebarOpen(bool value) {
+    if (value == _sidebarOpenValue) return;
+    _sidebarOpenValue = value;
+    if (mounted) setState(() {});
+  }
+
   bool _fullscreen = false;
   bool _checkingFullscreen = false;
   Timer? _fullscreenCheck;
@@ -176,6 +186,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     if (widget.system case final system?) {
       _pillSnapshot = system.resourceSnapshot;
       system.addListener(_showFirstResourceSample);
+      system.addListener(_applyWorkspaceCount);
       _pillRefresh = Timer.periodic(const Duration(seconds: 3), (_) {
         final next = system.resourceSnapshot;
         if (!identical(_pillSnapshot, next)) {
@@ -212,6 +223,11 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       }
     });
     BarPopup.channel.setMethodCallHandler(_popupAction);
+  }
+
+  void _applyWorkspaceCount() {
+    final count = widget.system?.layout.workspaceCount;
+    if (count != null) unawaited(widget.hyprland?.setWorkspaceCount(count));
   }
 
   void _showFirstResourceSample() {
@@ -319,6 +335,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     widget.preferences.removeListener(_updateSidebar);
     _window.setMethodCallHandler(null);
     widget.system?.removeListener(_showFirstResourceSample);
+    widget.system?.removeListener(_applyWorkspaceCount);
     BarPopup.channel.setMethodCallHandler(null);
     widget.preferences.dispose();
     widget.hyprland?.dispose();
@@ -350,6 +367,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
                 hyprland: widget.hyprland,
                 system: widget.system,
                 pillSnapshot: _pillSnapshot,
+                sidebarOpen: _sidebarOpen,
                 tray: widget.showTray ? BarTray(key: _tray) : null,
                 onToggleSidebar: _toggleSidebar,
               ),
@@ -366,6 +384,7 @@ class _BarContent extends StatelessWidget {
     required this.error,
     required this.onToggleSidebar,
     required this.pillSnapshot,
+    required this.sidebarOpen,
     this.hyprland,
     this.system,
     this.tray,
@@ -376,6 +395,7 @@ class _BarContent extends StatelessWidget {
   final HyprlandBackend? hyprland;
   final SystemBackend? system;
   final Widget? tray;
+  final bool sidebarOpen;
   final Future<void> Function(Rect, double) onToggleSidebar;
 
   @override
@@ -385,153 +405,176 @@ class _BarContent extends StatelessWidget {
       final width = constraints.maxWidth;
       if (width < 40) return const SizedBox.shrink();
       final scaledWidth = width / MediaQuery.textScalerOf(context).scale(1);
-      final wide = scaledWidth >= 700;
-      final window = hyprland?.currentWindow;
-      final hasWindow =
-          hyprland?.error == null &&
-          window != null &&
-          (window.title.isNotEmpty || window.appId.isNotEmpty);
-      final workspaceWidth =
-          wide &&
-              hyprland?.connected == true &&
-              hyprland?.error == null &&
-              hyprland!.workspaceSlots.isNotEmpty
-          ? BarWorkspaces.maxWidth
-          : 0.0;
-      final workspaceLeft = (width - workspaceWidth) / 2;
-      final budget = workspaceLeft - 4;
-      final hasResources = BarResources.hasData(pillSnapshot);
-      final fullResourcesWidth = hasResources
-          ? BarResources.widthFor(context, snapshot: pillSnapshot)
-          : 0.0;
-      final compactResources = fullResourcesWidth + 112 > budget;
-      final resourcesWidth = hasResources && compactResources
-          ? BarResources.widthFor(
-              context,
-              compact: true,
-              snapshot: pillSnapshot,
-            )
-          : fullResourcesWidth;
-      final leadingReserve = hasWindow
-          ? (budget - resourcesWidth - 116).clamp(0.0, 72.0)
-          : 0.0;
-      final showResources =
-          hasResources && resourcesWidth + leadingReserve <= budget;
-      final remaining =
-          budget - leadingReserve - (showResources ? resourcesWidth + 4 : 0);
-      final mediaWidth =
-          system?.players.isNotEmpty == true &&
-              scaledWidth >= 1100 &&
-              remaining >= 112
-          ? remaining.clamp(112.0, BarMedia.width).toDouble()
-          : 0.0;
-      final leftWidth =
-          (showResources ? resourcesWidth : 0.0) +
-          (mediaWidth > 0 ? mediaWidth + (showResources ? 4 : 0) : 0.0);
-      final leftStart = workspaceLeft - 4 - leftWidth;
-      final trayWidth = wide && tray != null
-          ? (budget - 232 - 108).clamp(0.0, 290.0)
-          : 0.0;
-      final rightWidth = (budget - trayWidth - 108).clamp(0.0, 360.0);
-      final showBattery =
-          system?.battery?.percent?.isFinite == true && rightWidth >= 232;
+      final layout = system?.layout ?? BarLayout.defaults;
       final clock = BarClock(showSeconds: system?.showClockSeconds ?? true);
-      return Stack(
-        fit: .expand,
+      final sidebar = Row(
+        mainAxisSize: .min,
         children: [
-          if (wide) ...[
-            if (workspaceWidth > 0)
-              Positioned(
-                left: workspaceLeft,
-                width: workspaceWidth,
-                top: 0,
-                bottom: 0,
-                child: Center(child: BarWorkspaces(backend: hyprland)),
-              ),
-            if (leftWidth > 0)
-              Positioned(
-                left: leftStart,
-                width: leftWidth,
-                top: 0,
-                bottom: 0,
-                child: Row(
-                  spacing: 4,
-                  children: [
-                    if (showResources)
-                      SizedBox(
-                        width: resourcesWidth,
-                        child: BarResources(
-                          snapshot: pillSnapshot,
-                          cardSnapshot: system?.resourceSnapshot,
-                          compact: compactResources,
-                        ),
-                      ),
-                    if (mediaWidth > 0)
-                      SizedBox(
-                        width: mediaWidth,
-                        child: BarMedia(
-                          players: system!.players,
-                          output: system!.mediaOutput,
-                          error: system!.mediaError,
-                          onAction: system!.mediaAction,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            Positioned(
-              left: workspaceLeft + workspaceWidth + 4,
-              width: rightWidth,
-              top: 0,
-              bottom: 0,
-              child: Row(
-                spacing: 4,
-                children: [
-                  Flexible(child: clock),
-                  if (showBattery)
-                    BarBattery(
-                      battery: system!.battery,
-                      isPowerSaver: system!.isPowerSaver,
-                      power: system!.batteryPower,
-                    ),
-                ],
+          if (error != null && width >= 60)
+            const Padding(
+              padding: .only(right: 8),
+              child: BarTooltip(
+                message: 'Theme unavailable',
+                child: Icon(Icons.warning_amber_rounded, size: 20),
               ),
             ),
-            if (hasWindow && leftStart >= 64)
-              Positioned(
-                left: 12,
-                width: leftStart - 24,
-                top: 0,
-                bottom: 0,
-                child: BarActiveWindow(backend: hyprland),
-              ),
-          ] else if (width >= 200)
-            Positioned.fill(
-              left: error == null ? 40 : 60,
-              right: error == null ? 40 : 60,
-              child: Center(child: clock),
-            ),
-          Align(
-            alignment: .centerRight,
-            child: Row(
-              mainAxisSize: .min,
-              children: [
-                if (error != null && width >= 60)
-                  const BarTooltip(
-                    message: 'Theme unavailable',
-                    child: Icon(Icons.warning_amber_rounded, size: 20),
-                  ),
-                if (trayWidth >= 44)
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: trayWidth),
-                    child: tray,
-                  ),
-                BarSidebarButton(onToggle: onToggleSidebar),
-              ],
-            ),
+          BarSidebarButton(
+            onToggle: onToggleSidebar,
+            open: sidebarOpen,
+            wifi: system?.quickStatus.wifi,
+            bluetooth: system?.quickStatus.bluetooth,
+            volume: (system?.mediaOutput['percent'] as num?)?.toDouble(),
+            muted: system?.mediaOutput['muted'] as bool?,
           ),
         ],
       );
+      if (scaledWidth < 700) {
+        return Stack(
+          fit: .expand,
+          children: [
+            if (width >= 200)
+              Positioned.fill(
+                left: 100,
+                right: 100,
+                child: Center(child: clock),
+              ),
+            // Transitional surfaces can be narrower than the toggle.
+            Align(
+              alignment: .centerRight,
+              child: FittedBox(fit: .scaleDown, child: sidebar),
+            ),
+          ],
+        );
+      }
+      final metrics = layout.resources;
+      final compactResources = scaledWidth < 1600;
+      Widget? pill(String id) => switch (id) {
+        // A fixed slot, kept while no window is focused, so title changes
+        // never move other pills.
+        'window' when hyprland != null && hyprland!.error == null => SizedBox(
+          width: BarActiveWindow.width,
+          child: BarActiveWindow(
+            backend: hyprland,
+            showAppName: layout.windowAppName,
+          ),
+        ),
+        'resources' when BarResources.hasData(pillSnapshot, metrics: metrics) =>
+          SizedBox(
+            width: BarResources.widthFor(
+              context,
+              compact: compactResources,
+              snapshot: pillSnapshot,
+              metrics: metrics,
+            ),
+            child: BarResources(
+              snapshot: pillSnapshot,
+              cardSnapshot: system?.resourceSnapshot,
+              compact: compactResources,
+              metrics: metrics,
+            ),
+          ),
+        'media' when system?.players.isNotEmpty == true => ConstrainedBox(
+          constraints: const .new(maxWidth: BarMedia.width),
+          // The title needs room; drop the pill rather than squeeze it.
+          child: LayoutBuilder(
+            builder: (context, constraints) => constraints.maxWidth < 112
+                ? const SizedBox.shrink()
+                : BarMedia(
+                    players: system!.players,
+                    output: system!.mediaOutput,
+                    error: system!.mediaError,
+                    onAction: system!.mediaAction,
+                  ),
+          ),
+        ),
+        'workspaces'
+            when hyprland?.connected == true &&
+                hyprland?.error == null &&
+                hyprland!.workspaceSlots.isNotEmpty =>
+          BarWorkspaces(backend: hyprland),
+        'clock' => ConstrainedBox(
+          constraints: const .new(maxWidth: 180),
+          child: clock,
+        ),
+        'tray' when tray != null => ConstrainedBox(
+          constraints: const .new(maxWidth: 290),
+          child: LayoutBuilder(
+            builder: (context, constraints) =>
+                constraints.maxWidth < 44 ? const SizedBox.shrink() : tray!,
+          ),
+        ),
+        'battery' when system?.battery?.percent?.isFinite == true => BarBattery(
+          battery: system!.battery,
+          isPowerSaver: system!.isPowerSaver,
+          power: system!.batteryPower,
+        ),
+        'sidebar' => sidebar,
+        _ => null,
+      };
+      final groups = <Widget>[];
+      int? center;
+      for (var i = 0; i < layout.groups.length; i++) {
+        final pills = [...layout.groups[i].map(pill).nonNulls];
+        if (pills.isEmpty) continue;
+        if (i == layout.center) center = groups.length;
+        groups.add(Row(mainAxisSize: .min, spacing: 8, children: pills));
+      }
+      // Overlong content scrolls instead of squeezing or dropping pills.
+      return _WheelScroll(
+        builder: (controller) => SingleChildScrollView(
+          controller: controller,
+          scrollDirection: .horizontal,
+          padding: const .symmetric(horizontal: 24),
+          child: ConstrainedBox(
+            constraints: .new(minWidth: width - 48, maxHeight: 40),
+            child: BarGroupsLayout(center: center, children: groups),
+          ),
+        ),
+      );
     },
+  );
+}
+
+/// Maps vertical mouse wheel scrolling to the horizontal bar, unless a pill
+/// such as the workspaces claimed the wheel event first.
+class _WheelScroll extends StatefulWidget {
+  const _WheelScroll({required this.builder});
+
+  final Widget Function(ScrollController controller) builder;
+
+  @override
+  State<_WheelScroll> createState() => _WheelScrollState();
+}
+
+class _WheelScrollState extends State<_WheelScroll> {
+  final _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerSignal: (event) {
+      final delta = event is PointerScrollEvent ? event.scrollDelta.dy : 0.0;
+      if (delta == 0 ||
+          !_controller.hasClients ||
+          _controller.position.maxScrollExtent == 0) {
+        return;
+      }
+      GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+        final position = _controller.position;
+        _controller.jumpTo(
+          (position.pixels + delta).clamp(0.0, position.maxScrollExtent),
+        );
+      });
+    },
+    child: ScrollConfiguration(
+      // A scrollbar would cover the 40-pixel pills.
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: widget.builder(_controller),
+    ),
   );
 }

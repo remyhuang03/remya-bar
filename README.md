@@ -33,7 +33,7 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 - **Urgency Alerts**: Highlights windows requesting user attention with distinct urgency badges.
 - **Special Workspace Support**: Smoothly previews scratchpad/special workspaces with background dimming.
 - **Effortless Navigation**: Click to switch or create workspaces, scroll with the mouse wheel (`r±1`), use the mouse back button to toggle special workspaces, or right-click to open a keyboard-navigable workspace overview.
-- **Active Window Title**: Displays the focused window title with smooth ellipsis compaction that yields space gracefully when screen estate is tight.
+- **Active Window Info**: Shows the focused app ID above its window title, compacting with ellipsis when space is tight. The app ID line can be turned off in Settings.
 
 ### 🎵 Dynamic Media Player
 - **Artwork-Adaptive Theming**: Both the bar's media pill and its expanded control card dynamically sample colors from the currently playing album art, creating a harmonious look for every track.
@@ -47,7 +47,7 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 - **Efficient Caching**: Shared background sampling engine ensures smooth metrics without redundant disk or driver polling.
 
 ### 🎛️ Quick Settings Control Center
-- **Slide-Out Panel**: An Android-style quick settings drawer accessible by clicking the sidebar launcher icon, clicking the clock, or pressing `Super + A`.
+- **Slide-Out Panel**: An Android-style quick settings drawer accessible by clicking the Wi-Fi, Bluetooth and volume status toggle, clicking the clock, or pressing `Super + A`.
 - **Hardware Sliders**: Smooth adjustments for Display Brightness (targeting your active monitor), Sound Output Volume (with right-click output device selector), and Microphone Input Volume.
 - **Connected Quick Toggles**:
   - **Wi-Fi**: Scan nearby networks, connect, disconnect, forget, and join hidden networks.
@@ -78,8 +78,8 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 - **Per-Monitor Layer Shell**: Automatic 40px capsule bar across every connected output with zero keyboard focus stealing and exclusive space reservation.
 - **Smart Fullscreen Auto-Hide**: The bar automatically conceals itself and releases reserved space when a fullscreen application is active on that output, smoothly returning when leaving fullscreen.
 - **Responsive Layout**: Adapts gracefully across display widths:
-  - $\ge$ 700 px: Centered workspaces, left-aligned window title and resource/media capsules, right-aligned clock, battery, tray, and control center.
-  - $\ge$ 1100 px: Expands the full MPRIS media player pill.
+  - $\ge$ 700 px: Pills in evenly spaced groups that you can reorder, regroup, or hide in Remy'a Settings (window, resources and media; workspaces and clock; tray; battery and Quick Settings by default); one group can be centered).
+  - Content that does not fit scrolls horizontally instead of being clipped.
   - < 700 px: Compact mode showing centered clock and essential control center launcher.
 
 ### 🎨 Material Design 3 Expressive

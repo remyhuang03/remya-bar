@@ -123,8 +123,8 @@ text rendering with Flutter and does not change desktop scale or font settings.
 
 ## Clock
 
-`lib/features/clock/bar_clock.dart` displays the local system date and time to
-the right of the workspaces on wide outputs, and centered on narrow outputs. It reads the real wall clock on every tick,
+`lib/features/clock/bar_clock.dart` displays the local system date and time in
+its configured pill group on wide outputs, and centered on narrow outputs. It reads the real wall clock on every tick,
 aligns updates to second boundaries, and cancels its timer when an output view
 is removed. Only the clock widget rebuilds. It does not call Settings or spawn
 processes for each tick; time and time zone writes remain owned by Settings.
@@ -260,12 +260,23 @@ releases the bar's exclusive zone while hidden. Leaving fullscreen restores the
 40-pixel reservation and the existing Flutter view. Hyprland events trigger a
 refresh, with periodic reconciliation for missed events.
 
-On outputs at least 700 logical pixels wide (after text scaling), the workspaces
-are centered. Resources and media sit left of them, with the active window title
-at the far left; the clock and battery sit to their right. The tray and sidebar
-button are right-aligned. Resource spacing compacts and window/media titles yield
-space before a component is omitted. Media needs 1100 logical pixels. Narrower
-outputs show the centered clock and the sidebar button; the tray is hidden.
+On outputs at least 700 logical pixels wide (after text scaling), pills follow
+Settings' `remya-bar.layout` (read through `BarLayoutClient`, refreshed on
+`Changed`, with the last valid layout kept on errors). Groups are spaced evenly
+across the bar with 24-pixel side padding, and pills inside a group are 8 pixels
+apart. The default groups are window, resources and media; workspaces and clock;
+tray; battery and the quick settings toggle. Groups keep their natural widths.
+When they fit, they are spaced evenly; Settings may center one group, and the
+groups before and after it are then spaced evenly within their own side, as long
+as both sides fit. Otherwise groups sit 16 pixels apart and the bar scrolls
+horizontally; the mouse wheel scrolls it unless a pill such as the workspaces
+claims the wheel. The active window keeps a fixed 128-pixel slot, even with no
+focused window, so title changes never move other pills. Resources compact below 1600
+logical pixels. Layout options select resource metrics, the active window app
+name, and the workspace slot count, which Rust applies to every output engine.
+Narrower outputs show the centered clock and the quick settings toggle.
+The toggle shows live Wi-Fi, Bluetooth and volume state from Settings and
+omits icons whose state is unknown.
 Capsules with missing data are omitted before their width is assigned.
 
 ## Per-output workspace state
