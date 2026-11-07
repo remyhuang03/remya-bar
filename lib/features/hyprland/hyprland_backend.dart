@@ -26,6 +26,7 @@ class HyprlandBackend extends ChangeNotifier {
     this.activateWorkspace = hyprlandSwitchWorkspace,
     this.scrollWorkspace = hyprlandScrollWorkspace,
     this.toggleSpecialWorkspace = hyprlandToggleSpecial,
+    this.setSlotCount = hyprlandSetWorkspaceCount,
   }) : _position = (outputX, outputY);
 
   final String? outputName;
@@ -42,6 +43,8 @@ class HyprlandBackend extends ChangeNotifier {
   scrollWorkspace;
   final Future<void> Function({required String outputName})
   toggleSpecialWorkspace;
+  final Future<void> Function({required int count}) setSlotCount;
+  int _workspaceCount = 8;
   final _iconPaths = <String, String>{};
   final _requestedIcons = <String>{};
   (int?, int?) _position;
@@ -79,6 +82,18 @@ class HyprlandBackend extends ChangeNotifier {
   String? iconPath(String appId) => _iconPaths[appId];
 
   HyprlandWindow? get currentWindow => output?.currentWindow;
+
+  /// Applies the Settings workspace count, shared by every output in Rust.
+  Future<void> setWorkspaceCount(int count) async {
+    if (_disposed || count == _workspaceCount) return;
+    _workspaceCount = count;
+    try {
+      await setSlotCount(count: count);
+      await refresh();
+    } catch (error) {
+      debugPrint('Hyprland workspace count: $error');
+    }
+  }
 
   void updateOutput({required int x, required int y}) {
     if (_disposed || _position == (x, y)) return;

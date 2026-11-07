@@ -71,6 +71,15 @@ pub struct HyprlandSnapshot {
     pub workspaces: Vec<HyprlandWorkspace>,
 }
 
+/// Sets the workspace slots per numbered group (1 to 10) for every output.
+pub fn hyprland_set_workspace_count(count: u8) -> Result<(), String> {
+    if !(1..=10).contains(&count) {
+        return Err("Workspace count must be between 1 and 10".into());
+    }
+    crate::workspace_state::SLOT_COUNT.store(count, Ordering::Relaxed);
+    Ok(())
+}
+
 pub async fn hyprland_snapshot() -> Result<HyprlandSnapshot, String> {
     let monitors = hyprland_request("j/monitors".into()).await?;
     let workspaces = hyprland_request("j/workspaces".into()).await?;

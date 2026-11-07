@@ -73,7 +73,7 @@ class HyprlandRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1869353342;
+  int get rustContentHash => -1765259113;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -96,6 +96,8 @@ abstract class HyprlandRustLibApi extends BaseApi {
     required String outputName,
     required int direction,
   });
+
+  Future<void> crateApiHyprlandSetWorkspaceCount({required int count});
 
   Future<HyprlandSnapshot> crateApiHyprlandSnapshot();
 
@@ -217,6 +219,37 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
       );
 
   @override
+  Future<void> crateApiHyprlandSetWorkspaceCount({required int count}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_8(count, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 4,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiHyprlandSetWorkspaceCountConstMeta,
+        argValues: [count],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiHyprlandSetWorkspaceCountConstMeta =>
+      const TaskConstMeta(
+        debugName: "hyprland_set_workspace_count",
+        argNames: ["count"],
+      );
+
+  @override
   Future<HyprlandSnapshot> crateApiHyprlandSnapshot() {
     return handler.executeNormal(
       NormalTask(
@@ -225,7 +258,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 5,
             port: port_,
           );
         },
@@ -257,7 +290,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 6,
             port: port_,
           );
         },
@@ -288,7 +321,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 7,
             port: port_,
           );
         },
@@ -321,7 +354,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 7,
+              funcId: 8,
               port: port_,
             );
           },

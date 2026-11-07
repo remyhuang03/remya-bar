@@ -3,6 +3,7 @@ use crate::api::{
 };
 use serde::Deserialize;
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 #[derive(Deserialize)]
 struct WorkspaceRef {
@@ -130,7 +131,13 @@ pub fn parse(
                         .clone()
                         .filter(|name| !name.is_empty()),
                     current_window: current_window.map(window),
-                    workspace_slots: slots(active_id, &workspaces, &clients, urgent),
+                    workspace_slots: slots(
+                        active_id,
+                        SLOT_COUNT.load(Ordering::Relaxed),
+                        &workspaces,
+                        &clients,
+                        urgent,
+                    ),
                 }
             })
             .collect(),
@@ -160,19 +167,24 @@ pub fn parse(
     })
 }
 
+/// Workspace slots per group, shared by every output engine in this process.
+pub static SLOT_COUNT: AtomicU8 = AtomicU8::new(8);
+
 fn slots(
     active_id: i32,
+    count: u8,
     workspaces: &[Workspace],
     clients: &[Client],
     urgent: &HashSet<i32>,
 ) -> Vec<HyprlandWorkspaceSlot> {
-    // Match this workstation's ii layout: eight slots, each in the active numeric group.
+    // Slots cover the numeric group containing the active workspace.
+    let count = i32::from(count.max(1));
     let start = if active_id > 0 {
-        (active_id - 1) / 8 * 8 + 1
+        (active_id - 1) / count * count + 1
     } else {
         1
     };
-    (0..8)
+    (0..count)
         .map(|offset| {
             let id = start.checked_add(offset).unwrap_or_default();
             let workspace = workspaces.iter().find(|workspace| workspace.id == id);
@@ -463,6 +475,14 @@ mod tests {
                 .contains("monitor = \"DP-1\"")
         );
         assert!(switch_command(&state, "DP-1", 17).is_err());
+        let ids = |active, count| {
+            super::slots(active, count, &[], &[], &HashSet::new())
+                .iter()
+                .map(|slot| slot.id)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ids(7, 5), (6..=10).collect::<Vec<_>>());
+        assert_eq!(ids(10, 10), (1..=10).collect::<Vec<_>>());
         assert!(
             switch_command(&state, "DP-1", -1337)
                 .unwrap()

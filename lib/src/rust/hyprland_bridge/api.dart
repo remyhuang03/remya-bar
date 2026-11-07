@@ -11,6 +11,12 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Hub`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
+/// Sets the workspace slots per numbered group (1 to 10) for every output.
+Future<void> hyprlandSetWorkspaceCount({required int count}) => HyprlandRustLib
+    .instance
+    .api
+    .crateApiHyprlandSetWorkspaceCount(count: count);
+
 Future<HyprlandSnapshot> hyprlandSnapshot() =>
     HyprlandRustLib.instance.api.crateApiHyprlandSnapshot();
 
@@ -114,7 +120,7 @@ class HyprlandSnapshot {
 }
 
 class HyprlandUpdate {
-  /// connected, disconnected, event, resync, or heartbeat.
+  /// connected, disconnected, event, modifier, resync, or heartbeat.
   final String kind;
   final String name;
 
