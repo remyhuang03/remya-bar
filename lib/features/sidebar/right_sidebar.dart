@@ -7,6 +7,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../widgets/bar_tooltip.dart';
+
 import '../popups/popup_measure.dart';
 
 part 'sidebar_controls.dart';
@@ -14,34 +16,119 @@ part 'sidebar_detail.dart';
 
 const sidebarSize = Size(420, 663);
 
-class BarSidebarButton extends StatelessWidget {
-  const BarSidebarButton({super.key, required this.onToggle});
+/// The quick settings toggle: live Wi-Fi, Bluetooth and volume status icons.
+/// States whose value is unknown are omitted rather than guessed.
+class BarSidebarButton extends StatefulWidget {
+  const BarSidebarButton({
+    super.key,
+    required this.onToggle,
+    this.open = false,
+    this.wifi,
+    this.bluetooth,
+    this.volume,
+    this.muted,
+  });
 
   final Future<void> Function(Rect anchor, double scale) onToggle;
+  final bool open;
+  final bool? wifi;
+  final bool? bluetooth;
+  final double? volume;
+  final bool? muted;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    label: 'Quick settings',
-    button: true,
-    child: Builder(
-      builder: (context) => IconButton(
-        onPressed: () {
-          final box = context.findRenderObject() as RenderBox;
-          unawaited(
-            onToggle(
-              box.localToGlobal(.zero) & box.size,
-              MediaQuery.textScalerOf(context).scale(1),
-            ),
-          );
-        },
-        icon: const Icon(Icons.tune_rounded),
-        iconSize: 20,
-        padding: const .symmetric(horizontal: 8),
-        constraints: const .new(minWidth: 40, maxHeight: 40),
-        style: const .new(tapTargetSize: .shrinkWrap),
+  State<BarSidebarButton> createState() => _BarSidebarButtonState();
+}
+
+class _BarSidebarButtonState extends State<BarSidebarButton> {
+  final _pill = GlobalKey();
+  bool _hovered = false;
+  bool _focused = false;
+  bool _pressed = false;
+
+  void _toggle() {
+    final box = _pill.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    unawaited(
+      widget.onToggle(
+        box.localToGlobal(.zero) & box.size,
+        MediaQuery.textScalerOf(context).scale(1),
       ),
-    ),
-  );
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final expanded = _hovered || _focused || _pressed;
+    final (base, foreground) = _pressed
+        ? (colors.primaryContainer, colors.onPrimaryContainer)
+        : widget.open
+        ? (colors.primary, colors.onPrimary)
+        : (colors.surfaceContainerHighest, colors.onSurface);
+    final layer = _pressed ? .16 : (expanded ? .08 : 0.0);
+    final radius = _pressed ? 12.0 : (expanded ? 22.0 : 16.0);
+    final icons = [
+      if (widget.wifi case final on?)
+        on ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+      if (widget.bluetooth case final on?)
+        on ? Icons.bluetooth_rounded : Icons.bluetooth_disabled_rounded,
+      if (widget.muted == true || widget.volume == 0)
+        Icons.volume_off_rounded
+      else if (widget.volume case final volume?)
+        volume < 50 ? Icons.volume_down_rounded : Icons.volume_up_rounded,
+    ];
+    return BarTooltip(
+      message: 'Quick settings',
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Semantics(
+          button: true,
+          toggled: widget.open,
+          label: 'Quick settings',
+          child: InkWell(
+            onTap: _toggle,
+            onFocusChange: (value) => setState(() => _focused = value),
+            onHighlightChanged: (value) => setState(() => _pressed = value),
+            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+            splashFactory: NoSplash.splashFactory,
+            child: AnimatedContainer(
+              key: _pill,
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 140),
+              height: expanded ? 40 : 32,
+              padding: const .symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Color.alphaBlend(
+                  (_pressed ? colors.onPrimaryContainer : foreground)
+                      .withValues(alpha: layer),
+                  base,
+                ),
+                borderRadius: .circular(radius),
+              ),
+              foregroundDecoration: _focused
+                  ? BoxDecoration(
+                      border: .all(color: colors.primary, width: 2),
+                      borderRadius: .circular(radius),
+                    )
+                  : null,
+              child: Row(
+                mainAxisSize: .min,
+                spacing: 6,
+                children: [
+                  for (final icon
+                      in icons.isEmpty ? [Icons.tune_rounded] : icons)
+                    Icon(icon, size: 18, color: foreground),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class RightSidebar extends StatefulWidget {
