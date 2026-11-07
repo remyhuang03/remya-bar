@@ -43,7 +43,6 @@ class BarPill extends StatefulWidget {
     this.expandedPadding,
     this.onTap,
     this.toggled,
-    this.attached = false,
     this.semanticsLabel,
     this.semanticsHint,
     this.card,
@@ -58,7 +57,6 @@ class BarPill extends StatefulWidget {
   final EdgeInsetsGeometry? expandedPadding;
   final VoidCallback? onTap;
   final bool? toggled;
-  final bool attached;
   final String? semanticsLabel;
   final String? semanticsHint;
   final BarPillCard? card;
@@ -99,8 +97,7 @@ class _BarPillState extends State<BarPill> {
   Widget _buildPill(BuildContext context, VoidCallback? onTap) {
     final scheme = widget.scheme ?? Theme.of(context).colorScheme;
     final attached =
-        widget.attached ||
-        (widget.card != null && BarPopup.openCard.value == widget.card!.kind);
+        widget.card != null && BarPopup.openCard.value == widget.card!.kind;
     final cardScheme = widget.card == null
         ? scheme
         : BarCardSurface.colors(
