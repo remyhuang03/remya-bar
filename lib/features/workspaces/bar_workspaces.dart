@@ -157,9 +157,10 @@ class _BarWorkspacesState extends State<BarWorkspaces> {
                               duration: const Duration(milliseconds: 180),
                               child: ImageFiltered(
                                 enabled: overlay != null,
+                                // Figma layer blur radius 2 ≈ sigma 1.
                                 imageFilter: ImageFilter.blur(
-                                  sigmaX: 1.5,
-                                  sigmaY: 1.5,
+                                  sigmaX: 1,
+                                  sigmaY: 1,
                                 ),
                                 child: _WorkspaceSlots(
                                   backend: backend,

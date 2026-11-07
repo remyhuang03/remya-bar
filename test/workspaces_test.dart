@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -442,7 +441,7 @@ void main() {
       );
       expect(
         calls.first.arguments['data']['message'],
-        'Workspace Writing\nDisplay 1 (DP-1)\neditor',
+        'Workspace Writing · Display 1 (DP-1)\neditor',
       );
       expect(tester.takeException(), isNull);
     },
@@ -502,147 +501,129 @@ void main() {
     },
   );
 
-  testWidgets(
-    'output rings fit apps and preserve the Figma Soft Triangle icon dimensions',
-    (tester) async {
-      final directory = Directory.systemTemp.createTempSync('remya-ring-test-');
-      final icon = File('${directory.path}/icon.png')
-        ..writeAsBytesSync(
-          base64Decode(
-            'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAADUlEQVR4nGP4zwAE/wEHAAH/4iOeWQAAAABJRU5ErkJggg==',
+  testWidgets('output rings overlay full-size apps like the Figma Slot spec', (
+    tester,
+  ) async {
+    final directory = Directory.systemTemp.createTempSync('remya-ring-test-');
+    final icon = File('${directory.path}/icon.png')
+      ..writeAsBytesSync(
+        base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAADUlEQVR4nGP4zwAE/wEHAAH/4iOeWQAAAABJRU5ErkJggg==',
+        ),
+      );
+    addTearDown(() => directory.deleteSync(recursive: true));
+    binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      icons,
+      (_) async => {
+        for (final app in ['first', 'second', 'third']) app: icon.path,
+      },
+    );
+    var outputNumber = 1;
+    var count = 1;
+    final backend = HyprlandBackend(
+      outputName: 'DP-1',
+      readSnapshot: () async => HyprlandSnapshot(
+        monitors: [
+          HyprlandMonitor(
+            name: 'DP-1',
+            outputNumber: 5,
+            x: 0,
+            y: 0,
+            activeWorkspaceId: 1,
+            workspaceSlots: [
+              _slots.first,
+              HyprlandWorkspaceSlot(
+                id: 2,
+                name: '2',
+                active: false,
+                occupied: true,
+                windowCount: count,
+                owner: 'DP-2',
+                apps: ['first', 'second', 'third'].take(count).toList(),
+                urgent: false,
+              ),
+              ..._slots.skip(2),
+            ],
+          ),
+          HyprlandMonitor(
+            name: 'DP-2',
+            outputNumber: outputNumber,
+            x: 1920,
+            y: 0,
+            activeWorkspaceId: 2,
+            workspaceSlots: [],
+          ),
+        ],
+        workspaces: [],
+      ),
+    );
+    addTearDown(backend.dispose);
+    await backend.refresh();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Center(child: BarWorkspaces(backend: backend)),
+      ),
+    );
+
+    for (outputNumber = 1; outputNumber <= 4; outputNumber++) {
+      for (count = 1; count <= 3; count++) {
+        await backend.refresh();
+        await tester.pumpAndSettle();
+        final slot = find.byKey(const ValueKey('workspace-2'));
+        final appCircles = find.descendant(
+          of: slot,
+          matching: find.byType(ClipOval),
+        );
+        expect(appCircles, findsNWidgets(count == 2 ? 2 : 1));
+        // Figma Slot: the ring overlays content without shrinking it.
+        final bounds = tester.getRect(slot);
+        expect(
+          tester.getRect(appCircles.first),
+          Rect.fromLTWH(
+            bounds.left + (count == 1 ? 4 : 3),
+            bounds.top + (count == 1 ? 4 : 3),
+            count == 1 ? 18 : 16,
+            count == 1 ? 18 : 16,
           ),
         );
-      addTearDown(() => directory.deleteSync(recursive: true));
-      binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        icons,
-        (_) async => {
-          for (final app in ['first', 'second', 'third']) app: icon.path,
-        },
-      );
-      var outputNumber = 1;
-      var count = 1;
-      final backend = HyprlandBackend(
-        outputName: 'DP-1',
-        readSnapshot: () async => HyprlandSnapshot(
-          monitors: [
-            HyprlandMonitor(
-              name: 'DP-1',
-              outputNumber: 5,
-              x: 0,
-              y: 0,
-              activeWorkspaceId: 1,
-              workspaceSlots: [
-                _slots.first,
-                HyprlandWorkspaceSlot(
-                  id: 2,
-                  name: '2',
-                  active: false,
-                  occupied: true,
-                  windowCount: count,
-                  owner: 'DP-2',
-                  apps: ['first', 'second', 'third'].take(count).toList(),
-                  urgent: false,
-                ),
-                ..._slots.skip(2),
-              ],
-            ),
-            HyprlandMonitor(
-              name: 'DP-2',
-              outputNumber: outputNumber,
-              x: 1920,
-              y: 0,
-              activeWorkspaceId: 2,
-              workspaceSlots: [],
-            ),
-          ],
-          workspaces: [],
-        ),
-      );
-      addTearDown(backend.dispose);
-      await backend.refresh();
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Center(child: BarWorkspaces(backend: backend)),
-        ),
-      );
-
-      for (outputNumber = 1; outputNumber <= 4; outputNumber++) {
-        for (count = 1; count <= 3; count++) {
-          await backend.refresh();
-          await tester.pumpAndSettle();
-          final slot = find.byKey(const ValueKey('workspace-2'));
-          final appCircles = find.descendant(
-            of: slot,
-            matching: find.byType(ClipOval),
+        if (count == 2) {
+          expect(
+            tester.getRect(appCircles.last),
+            Rect.fromLTWH(bounds.left + 11, bounds.top + 11, 13, 13),
           );
-          expect(appCircles, findsNWidgets(count == 2 ? 2 : 1));
-          if (outputNumber == 3) {
-            final ring = find.descendant(
-              of: slot,
-              matching: find.byType(SvgPicture),
-            );
-            final svg = tester.widget<SvgPicture>(ring);
-            expect(
-              (svg.bytesLoader as SvgAssetLoader).assetName,
-              'assets/icons/workspaces/soft-triangle-outline.svg',
-            );
-            final bounds = tester.getRect(ring);
-            expect(bounds.size, const Size.square(24));
-            expect(
-              tester.getRect(appCircles.first),
-              Rect.fromLTWH(
-                bounds.left + (count == 1 ? 3 : 2),
-                bounds.top + (count == 1 ? 3 : 2),
-                count == 1 ? 18 : 16,
-                count == 1 ? 18 : 16,
-              ),
-            );
-            if (count == 2) {
-              expect(tester.getSize(appCircles.last), const Size.square(10));
-            }
-            continue;
-          }
+        }
+        if (count == 3) {
+          expect(
+            find.descendant(of: slot, matching: find.text('+2')),
+            findsOneWidget,
+          );
+        }
+        if (outputNumber == 3) {
           final ring = find.descendant(
             of: slot,
-            matching: find.byWidgetPredicate(
-              (w) => w is Material && w.shape is MaterialShapeBorder,
-            ),
+            matching: find.byType(SvgPicture),
           );
-          final shape = tester.widget<Material>(ring).shape!;
-          final ringBox = tester.renderObject<RenderBox>(ring);
-          final path = shape.getInnerPath(Offset.zero & ringBox.size);
-          expect(ringBox.size, const Size.square(24));
-          final circles = [
-            ...appCircles.evaluate(),
-            if (count == 3)
-              find
-                  .ancestor(
-                    of: find.descendant(of: slot, matching: find.text('+2')),
-                    matching: find.byType(Padding),
-                  )
-                  .first
-                  .evaluate()
-                  .single,
-          ];
-          for (final element in circles) {
-            final box = element.renderObject! as RenderBox;
-            for (var i = 0; i < 64; i++) {
-              final angle = i * math.pi / 32;
-              final point =
-                  box.size.center(Offset.zero) +
-                  Offset(math.cos(angle), math.sin(angle)) *
-                      (box.size.width / 2);
-              expect(
-                path.contains(ringBox.globalToLocal(box.localToGlobal(point))),
-                isTrue,
-                reason: 'Display $outputNumber, $count apps, contour point $i',
-              );
-            }
-          }
+          final svg = tester.widget<SvgPicture>(ring);
+          expect(
+            (svg.bytesLoader as SvgAssetLoader).assetName,
+            'assets/icons/workspaces/soft-triangle-outline.svg',
+          );
+          expect(tester.getRect(ring), bounds.deflate(1));
+          continue;
         }
+        final ring = find.descendant(
+          of: slot,
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is DecoratedBox &&
+                w.decoration is ShapeDecoration &&
+                (w.decoration as ShapeDecoration).shape is MaterialShapeBorder,
+          ),
+        );
+        expect(tester.getRect(ring), bounds.deflate(2));
       }
-    },
-  );
+    }
+  });
 
   test(
     'icon classes are looked up once and invalid native paths are ignored',

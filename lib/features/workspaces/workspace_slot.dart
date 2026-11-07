@@ -22,19 +22,28 @@ class OutputMark extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    // Compact marks are the Super-held owner pips: shape only, outlined in
+    // the pill colour so they stay legible over slot content.
     final compact = size <= 10;
     final fill = compact ? colors.tertiary : colors.tertiaryContainer;
-    final label = Center(
-      child: Text(
-        '$number',
-        textScaler: .noScaling,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: compact ? colors.onTertiary : colors.onTertiaryContainer,
-          fontSize: compact ? 6 : 11,
-          fontWeight: .w600,
-        ),
-      ),
+    final outline = BorderSide(
+      color: colors.surfaceContainerHigh,
+      width: 1.5,
+      strokeAlign: BorderSide.strokeAlignOutside,
     );
+    final label = compact
+        ? null
+        : Center(
+            child: Text(
+              '$number',
+              textScaler: .noScaling,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colors.onTertiaryContainer,
+                fontSize: 11,
+                fontWeight: .w600,
+              ),
+            ),
+          );
     return SizedBox.square(
       dimension: size,
       child: _isTriangle(number)
@@ -46,16 +55,24 @@ class OutputMark extends StatelessWidget {
                   maxHeight: compact ? size : 22,
                   child: SvgPicture.asset(
                     _triangleTag,
-                    colorMapper: _TriangleTagColors(fill),
+                    colorMapper: _TriangleTagColors(
+                      fill,
+                      compact ? outline.color : null,
+                    ),
                     excludeFromSemantics: true,
                   ),
                 ),
-                label,
+                ?label,
               ],
             )
-          : Material(
-              color: fill,
-              shape: MaterialShapeBorder(shape: _outputShape(number)),
+          : DecoratedBox(
+              decoration: ShapeDecoration(
+                color: fill,
+                shape: MaterialShapeBorder(
+                  shape: _outputShape(number),
+                  side: compact ? outline : .none,
+                ),
+              ),
               child: label,
             ),
     );
@@ -63,9 +80,10 @@ class OutputMark extends StatelessWidget {
 }
 
 class _TriangleTagColors extends ColorMapper {
-  const _TriangleTagColors(this.fill);
+  const _TriangleTagColors(this.fill, this.stroke);
 
   final Color fill;
+  final Color? stroke;
 
   @override
   Color substitute(
@@ -73,14 +91,20 @@ class _TriangleTagColors extends ColorMapper {
     String elementName,
     String attributeName,
     Color color,
-  ) => id == 'Shape' && attributeName == 'fill' ? fill : color;
+  ) => id != 'Shape'
+      ? color
+      : attributeName == 'fill'
+      ? fill
+      : stroke ?? color;
 
   @override
   bool operator ==(Object other) =>
-      other is _TriangleTagColors && fill == other.fill;
+      other is _TriangleTagColors &&
+      fill == other.fill &&
+      stroke == other.stroke;
 
   @override
-  int get hashCode => fill.hashCode;
+  int get hashCode => Object.hash(fill, stroke);
 }
 
 RoundedPolygon _outputShape(int number) => switch ((number - 1) % 4) {
@@ -90,59 +114,34 @@ RoundedPolygon _outputShape(int number) => switch ((number - 1) % 4) {
   _ => MaterialShapes.sunny,
 };
 
-class _VisibleWorkspace extends StatelessWidget {
-  const _VisibleWorkspace({
-    required this.number,
-    required this.appCount,
-    required this.child,
-  });
+class _VisibleRing extends StatelessWidget {
+  const _VisibleRing({required this.number});
 
   final int number;
-  final int appCount;
-  final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     if (_isTriangle(number)) {
-      return SizedBox.square(
-        dimension: 24,
-        child: Stack(
-          alignment: .center,
-          children: [
-            child,
-            SvgPicture.asset(
-              _triangleOutline,
-              colorFilter: ColorFilter.mode(colors.tertiary, .srcIn),
-              excludeFromSemantics: true,
-            ),
-          ],
-        ),
+      return SvgPicture.asset(
+        _triangleOutline,
+        width: 24,
+        height: 24,
+        colorFilter: ColorFilter.mode(colors.tertiary, .srcIn),
+        excludeFromSemantics: true,
       );
     }
-
-    // Fit the app circles within the inner edge of the 24 px identity ring.
-    final (scale, offset) = switch (((number - 1) % 4, appCount)) {
-      (_, 0) || (0, 1) => (1.0, Offset.zero),
-      (1, 1) => (.85, Offset.zero),
-      (3, 1) => (.92, Offset.zero),
-      (0, _) => (.85, const Offset(-.5, -.75)),
-      (1, _) => (.75, Offset.zero),
-      _ => (.73, const Offset(-.5, -.5)),
-    };
     return SizedBox.square(
-      dimension: 24,
-      child: Material(
-        type: .transparency,
-        shape: MaterialShapeBorder(
-          shape: _outputShape(number),
-          side: BorderSide(color: colors.tertiary, width: 1.5),
-        ),
-        clipBehavior: .antiAlias,
-        child: Center(
-          child: Transform.translate(
-            offset: offset,
-            child: Transform.scale(scale: scale, child: child),
+      dimension: 22,
+      child: DecoratedBox(
+        decoration: ShapeDecoration(
+          shape: MaterialShapeBorder(
+            shape: _outputShape(number),
+            side: BorderSide(
+              color: colors.tertiary,
+              width: 1.5,
+              strokeAlign: BorderSide.strokeAlignCenter,
+            ),
           ),
         ),
       ),
@@ -207,7 +206,7 @@ class _WorkspaceSlotState extends State<WorkspaceSlot>
         : 'Display ${owner.outputNumber} (${owner.name})';
     final apps = slot.apps.where((name) => name.isNotEmpty).join(', ');
     final label =
-        'Workspace ${slot.name}\n$outputName${apps.isEmpty ? '' : '\n$apps'}';
+        'Workspace ${slot.name} · $outputName${apps.isEmpty ? '' : '\n$apps'}';
     final colors = Theme.of(context).colorScheme;
     final numbers = backend.superHeld;
     final color = slot.active
@@ -236,6 +235,7 @@ class _WorkspaceSlotState extends State<WorkspaceSlot>
           final focused = _states.value.contains(WidgetState.focused);
           return Stack(
             alignment: .center,
+            clipBehavior: .none,
             children: [
               Positioned.fill(
                 left: 2,
@@ -257,19 +257,17 @@ class _WorkspaceSlotState extends State<WorkspaceSlot>
                   ),
                 ),
               ),
+              // Only app icons of other outputs are dimmed; Super-held IDs
+              // and visible workspaces stay at full strength.
+              Opacity(
+                opacity: other && !visible && !numbers ? .6 : 1,
+                child: content,
+              ),
               if (visible && showOwner)
                 ScaleTransition(
                   scale: _ringScale,
-                  child: _VisibleWorkspace(
-                    number: owner.outputNumber,
-                    appCount: slot.occupied && !numbers
-                        ? slot.apps.length.clamp(1, 2)
-                        : 0,
-                    child: content,
-                  ),
-                )
-              else
-                Opacity(opacity: other ? .6 : 1, child: content),
+                  child: _VisibleRing(number: owner.outputNumber),
+                ),
               if (focused)
                 Positioned.fill(
                   child: DecoratedBox(
@@ -282,8 +280,8 @@ class _WorkspaceSlotState extends State<WorkspaceSlot>
                 ),
               if (numbers && showOwner)
                 Positioned(
-                  right: 2,
-                  bottom: 2,
+                  right: 0,
+                  bottom: 1,
                   child: OutputMark(number: owner.outputNumber, size: 9),
                 ),
               if (slot.urgent)
@@ -294,6 +292,11 @@ class _WorkspaceSlotState extends State<WorkspaceSlot>
                     decoration: BoxDecoration(
                       color: colors.error,
                       shape: .circle,
+                      border: Border.all(
+                        color: colors.surfaceContainerHigh,
+                        width: 1.5,
+                        strokeAlign: BorderSide.strokeAlignOutside,
+                      ),
                     ),
                     child: const SizedBox.square(dimension: 6),
                   ),
@@ -347,7 +350,7 @@ class _SlotContent extends StatelessWidget {
         maxLines: 1,
         textScaler: .noScaling,
         style: Theme.of(context).textTheme.labelMedium
-            ?.copyWith(color: color, fontSize: 12),
+            ?.copyWith(color: color, fontSize: 12, fontWeight: .w600),
       );
     }
     if (!slot.occupied) {
@@ -371,28 +374,45 @@ class _SlotContent extends StatelessWidget {
               _icon(apps.first, 18),
               _icon(apps[1], 18),
               if (apps.length > 2)
-                _Count(value: apps.length - 2, size: 18, active: true),
+                _Count(
+                  value: apps.length - 2,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  textColor: Theme.of(context).colorScheme.primary,
+                ),
             ],
           );
         },
       );
     }
+    // Primary 16 px at (3, 3); secondary 13 px at (11, 11) with a 1.5 px
+    // band-coloured outline outside it, as in the Slot spec.
     return SizedBox.square(
       dimension: 24,
       child: Stack(
+        clipBehavior: .none,
         children: [
           Positioned(top: 2, left: 2, child: _icon(apps.first, 16)),
           Positioned(
             right: 1,
             bottom: 1,
             child: DecoratedBox(
-              decoration: BoxDecoration(color: bandColor, shape: .circle),
-              child: Padding(
-                padding: const .all(1.5),
-                child: apps.length == 2
-                    ? _icon(apps[1], 10)
-                    : _Count(value: apps.length - 1, size: 10),
+              decoration: BoxDecoration(
+                shape: .circle,
+                border: Border.all(
+                  color: bandColor,
+                  width: 1.5,
+                  strokeAlign: BorderSide.strokeAlignOutside,
+                ),
               ),
+              child: apps.length == 2
+                  ? _icon(apps[1], 13)
+                  : _Count(
+                      value: apps.length - 1,
+                      size: 13,
+                      color: color,
+                      textColor: bandColor,
+                    ),
             ),
           ),
         ],
@@ -408,29 +428,32 @@ class _SlotContent extends StatelessWidget {
 }
 
 class _Count extends StatelessWidget {
-  const _Count({required this.value, required this.size, this.active = false});
+  const _Count({
+    required this.value,
+    required this.size,
+    required this.color,
+    required this.textColor,
+  });
   final int value;
   final double size;
-  final bool active;
+  final Color color;
+  final Color textColor;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return SizedBox.square(
       dimension: size,
       child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: active ? colors.onPrimary : colors.onSecondaryContainer,
-          shape: .circle,
-        ),
+        decoration: BoxDecoration(color: color, shape: .circle),
         child: Center(
           child: FittedBox(
             child: Text(
               '+$value',
               textScaler: .noScaling,
               style: TextStyle(
-                color: active ? colors.primary : colors.secondaryContainer,
-                fontSize: size * .55,
+                color: textColor,
+                fontSize: size == 18 ? 9 : 7,
+                fontWeight: .w600,
               ),
             ),
           ),
