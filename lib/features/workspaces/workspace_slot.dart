@@ -344,19 +344,13 @@ class _SlotContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (backend.superHeld || slot.active && !slot.occupied) {
+    if (backend.superHeld || !slot.occupied) {
       return Text(
         slot.id == 0 ? '—' : '${slot.id}',
         maxLines: 1,
         textScaler: .noScaling,
         style: Theme.of(context).textTheme.labelMedium
             ?.copyWith(color: color, fontSize: 12, fontWeight: .w600),
-      );
-    }
-    if (!slot.occupied) {
-      return DecoratedBox(
-        decoration: BoxDecoration(color: color, shape: .circle),
-        child: const SizedBox.square(dimension: 4),
       );
     }
     final apps = slot.apps;

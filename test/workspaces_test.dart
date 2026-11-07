@@ -820,6 +820,8 @@ void main() {
       expect(find.text('scratchpad'), findsOneWidget);
       expect(tester.getSize(find.byType(BarWorkspaces)), const Size(282, 32));
       expect(find.text('+2'), findsOneWidget);
+      // Empty workspaces show their number instead of a dot.
+      expect(find.text('8'), findsOneWidget);
 
       backend.superHeld = true;
       await backend.refresh();
