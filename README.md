@@ -17,8 +17,10 @@ A modern, fluid desktop status bar for **Hyprland on Linux**, crafted with **Flu
 
 Remy'a Bar blends refined desktop aesthetics with deep Linux system integration. Drawing visual inspiration from [illogical-impulse's Bar](https://github.com/end-4/dots-hyprland/tree/main/dots/.config/quickshell/ii/modules/ii/bar), it delivers smooth animations, real-time compositor awareness, artwork-adaptive media controls, rich hover dashboards, and an Android/macOS-style Quick Settings control center—all while keeping system overhead minimal.
 
-> [!NOTE]
-> **Status**: Remy'a Bar is actively developed for the Remya desktop ecosystem. Core bar modules, native popup hosts, and Quick Settings controls are fully functional. Notifications and select advanced toggles are planned for upcoming milestones.
+> [!CAUTION]
+> **Early Development & Preview Only — Not Ready for Daily Use**
+>
+> This repository is currently intended strictly for design preview and development reference. Use at your own risk on real systems.
 
 ---
 
