@@ -78,7 +78,7 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 - **Per-Monitor Layer Shell**: Automatic 40px capsule bar across every connected output with zero keyboard focus stealing and exclusive space reservation.
 - **Smart Fullscreen Auto-Hide**: The bar automatically conceals itself and releases reserved space when a fullscreen application is active on that output, smoothly returning when leaving fullscreen.
 - **Responsive Layout**: Adapts gracefully across display widths:
-  - $\ge$ 700 px: Pills in evenly spaced groups that you can reorder, regroup, or hide in Remy'a Settings (window, resources and media; workspaces and clock; tray; battery and Quick Settings by default); one group can be centered).
+  - $\ge$ 700 px: Pills in evenly spaced groups that you can reorder, regroup, or hide in Remy'a Settings (window, resources and media; workspaces and clock; tray; battery and Quick Settings by default; one group can be centered).
   - Content that does not fit scrolls horizontally instead of being clipped.
   - < 700 px: Compact mode showing centered clock and essential control center launcher.
 
