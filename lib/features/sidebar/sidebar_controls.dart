@@ -299,34 +299,51 @@ class _LargeTileState extends State<_LargeTile> {
   }
 }
 
-class _SmallTile extends StatefulWidget {
-  const _SmallTile({required this.icon, required this.editing});
+class _SmallTile extends StatelessWidget {
+  const _SmallTile({
+    required this.icon,
+    required this.title,
+    required this.selected,
+    required this.editing,
+    required this.onTap,
+  });
+
   final IconData icon;
+  final String title;
+  final bool? selected;
   final bool editing;
-
-  @override
-  State<_SmallTile> createState() => _SmallTileState();
-}
-
-class _SmallTileState extends State<_SmallTile> {
-  bool _hovered = false;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final base = colors.surfaceContainerHighest;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Material(
-        color: !widget.editing && _hovered
-            ? Color.alphaBlend(colors.onSurface.withValues(alpha: .08), base)
-            : base,
-        borderRadius: .circular(26),
+    final active = selected == true && !editing;
+    final tile = Material(
+      color: active ? colors.primaryContainer : colors.surfaceContainerHighest,
+      borderRadius: .circular(active ? 16 : 26),
+      clipBehavior: .antiAlias,
+      child: InkWell(
+        onTap: onTap,
         child: SizedBox(
           height: 52,
-          child: Icon(widget.icon, size: 22, color: colors.onSurfaceVariant),
+          child: Icon(
+            icon,
+            size: 22,
+            color: active ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+          ),
         ),
+      ),
+    );
+    if (editing) return tile;
+    return Tooltip(
+      message: title,
+      excludeFromSemantics: true,
+      child: Semantics(
+        label: title,
+        button: true,
+        enabled: onTap != null,
+        toggled: selected,
+        child: tile,
       ),
     );
   }

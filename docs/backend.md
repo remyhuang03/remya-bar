@@ -225,8 +225,11 @@ Settings' NetworkManager API. BlueZ state, scan, connect, disconnect, forget,
 and pairing prompts use the Bluetooth API. Night Light toggles the current
 hyprsunset state and follows the schedule already configured in Settings.
 Power Saver toggles between power-saver and balanced when both profiles exist,
-and the Power detail lists every available profile. Do Not Disturb and the
-compact toggles are displayed as unavailable.
+and the Power detail lists every available profile. Keep awake shares the
+Settings service's session-only hypridle inhibitor. Dark mode uses the Settings
+Light/Dark preference and applies it through the same appearance backend.
+Mic mute controls the current default PipeWire input through Settings Sound.
+Do Not Disturb and the other unimplemented toggles are displayed as unavailable.
 
 The editor sends the old and new visible tile order to Settings for an atomic
 update. Hidden IDs are inferred from the full tile list. The Power menu asks

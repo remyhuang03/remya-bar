@@ -71,8 +71,7 @@ class _RightSidebarState extends State<RightSidebar> {
   };
 
   static const _small = {
-    'caffeine': ('Caffeine', Icons.coffee_rounded),
-    'game': ('Game mode', Icons.sports_esports_rounded),
+    'caffeine': ('Keep awake', Icons.coffee_rounded),
     'record': ('Screen record', Icons.radio_button_checked_rounded),
     'screenshot': ('Screenshot', Icons.crop_free_rounded),
     'picker': ('Color picker', Icons.colorize_rounded),
@@ -82,8 +81,6 @@ class _RightSidebarState extends State<RightSidebar> {
     'keyboard': ('On-screen keyboard', Icons.keyboard_rounded),
     'clipboard': ('Clipboard', Icons.content_paste_rounded),
     'mic-mute': ('Mic mute', Icons.mic_off_rounded),
-    'lock': ('Lock screen', Icons.lock_rounded),
-    'audio-switcher': ('Audio switcher', Icons.headphones_rounded),
   };
 
   static const _powerActions = {
@@ -119,7 +116,7 @@ class _RightSidebarState extends State<RightSidebar> {
   List<String>? get _saved =>
       (widget.data['layout'] as List?)?.whereType<String>().toList();
   List<String> get _tiles =>
-      _draft ?? _saved ?? [..._large.keys, ..._small.keys.take(10)];
+      _draft ?? _saved ?? [..._large.keys, ..._small.keys];
   List<String> get _profiles => _rowsOf<String>(_powerSystem['profiles']);
   String? _adapterId;
   Map? get _adapter {
@@ -754,20 +751,34 @@ class _RightSidebarState extends State<RightSidebar> {
 
   Widget _smallTile(String id) {
     final (title, icon) = _small[id]!;
-    return _editable(
-      id,
-      title,
-      icon,
-      Tooltip(
-        message: '$title unavailable',
-        child: Semantics(
-          label: '$title unavailable',
-          button: true,
-          enabled: false,
-          child: _SmallTile(icon: icon, editing: _draft != null),
-        ),
-      ),
+    final input = _input;
+    final mode = _map(_map(widget.data['theme'])['theme'])['theme_mode'];
+    final awake = _map(widget.data['keep-awake'])['value'];
+    final bool? selected = switch (id) {
+      'caffeine' when awake is bool => awake,
+      'dark' when mode == 'light' || mode == 'dark' => mode == 'dark',
+      'mic-mute' => _map(input?['preferences'])['muted'] as bool?,
+      _ => null,
+    };
+    final tile = _SmallTile(
+      icon: icon,
+      title: selected == null ? '$title unavailable' : title,
+      selected: selected,
+      editing: _draft != null,
+      onTap: selected == null || _busy || _draft != null
+          ? null
+          : switch (id) {
+              'caffeine' => () => _send('sidebar.keep-awake', value: !selected),
+              'dark' => () => _send('sidebar.dark', value: !selected),
+              'mic-mute' => () => _send(
+                'sidebar.input-muted',
+                target: input!['name'],
+                value: !selected,
+              ),
+              _ => null,
+            },
     );
+    return _editable(id, title, icon, tile);
   }
 
   Widget _editable(String id, String title, IconData icon, Widget tile) {

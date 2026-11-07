@@ -27,6 +27,18 @@ class SidebarBackend extends ChangeNotifier {
     }
     _changes ??= _settings.changes.listen(
       (change) {
+        if (_poll == null) return;
+        final key = switch (change.topic) {
+          'theme' => 'theme',
+          keepAwakeSettingId => 'keep-awake',
+          _ => null,
+        };
+        if (key != null) {
+          _generation++;
+          _data[key] = change.value;
+          notifyListeners();
+          return;
+        }
         if (const {
           'sound',
           'power',
@@ -79,6 +91,8 @@ class SidebarBackend extends ChangeNotifier {
         read('bluetooth', _settings.readBluetooth()),
         read('night-light', _settings.call('Get', ['night-light'])),
         read('power', _settings.readPower()),
+        read('theme', _settings.call('Get', ['theme'])),
+        read('keep-awake', _settings.readKeepAwake()),
         read('layout', _settings.readSidebarLayout()),
         if (output != null)
           read('brightness', _brightness(output))
@@ -183,6 +197,17 @@ class SidebarBackend extends ChangeNotifier {
         'sidebar.night-light' when value is bool => (
           'night-light',
           await _settings.call('Set', ['night-light.e32be03e', '$value']),
+        ),
+        'sidebar.keep-awake' when value is bool => (
+          'keep-awake',
+          await _settings.setKeepAwake(value),
+        ),
+        'sidebar.dark' when value is bool => (
+          'theme',
+          await _settings.call('Set', [
+            materialThemeModeSettingId,
+            value ? 'dark' : 'light',
+          ]),
         ),
         'sidebar.profile' when value is String => (
           'power',

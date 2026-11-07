@@ -7,8 +7,9 @@ import 'package:remya_bar/features/sidebar/right_sidebar.dart';
 void main() {
   Future<void> showSidebar(
     WidgetTester tester,
-    List<Map<String, Object?>> actions,
-  ) async {
+    List<Map<String, Object?>> actions, {
+    Map<String, Object?> overrides = const {},
+  }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(420, 663);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -16,7 +17,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         home: RightSidebar(
-          data: const {
+          data: {
             'account': {'username': 'Tester'},
             'uptimeSeconds': 3600,
             'layout': ['internet', 'power', 'audio', 'caffeine'],
@@ -43,6 +44,7 @@ void main() {
                 },
               ],
             },
+            ...overrides,
           },
           onAction: (action) async => actions.add(action),
           onHeight: (_) {},
@@ -50,6 +52,46 @@ void main() {
       ),
     );
   }
+
+  testWidgets('compact toggles send the inverse of live Settings state', (
+    tester,
+  ) async {
+    final actions = <Map<String, Object?>>[];
+    await showSidebar(
+      tester,
+      actions,
+      overrides: {
+        'layout': ['caffeine', 'dark', 'mic-mute'],
+        'keep-awake': {'value': true},
+        'theme': {
+          'theme': {'theme_mode': 'light'},
+        },
+        'sound': {
+          'system': {
+            'default_input': 'mic',
+            'devices': [
+              {
+                'name': 'mic',
+                'direction': 'input',
+                'preferences': {'muted': true},
+              },
+            ],
+          },
+        },
+      },
+    );
+    for (final title in ['Keep awake', 'Dark mode', 'Mic mute']) {
+      await tester.tap(
+        find.byWidgetPredicate((w) => w is Tooltip && w.message == title),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(actions, [
+      {'action': 'sidebar.keep-awake', 'target': null, 'value': false},
+      {'action': 'sidebar.dark', 'target': null, 'value': true},
+      {'action': 'sidebar.input-muted', 'target': 'mic', 'value': false},
+    ]);
+  });
 
   testWidgets('Wi-Fi sorts connected first and dispatches disconnect', (
     tester,
