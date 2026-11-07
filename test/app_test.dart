@@ -31,6 +31,48 @@ Future<void> _openSettings(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('card state validates payloads and ignores stale close actions', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      RemyaBarApp(
+        preferences: SettingsThemeController(
+          () => File('/nonexistent/theme.toml'),
+        ),
+      ),
+    );
+    addTearDown(() => BarPopup.openCard.value = null);
+    Future<void> state(Map<String, Object?> data) async {
+      const codec = StandardMethodCodec();
+      final reply = await tester.binding.defaultBinaryMessenger
+          .handlePlatformMessage(
+            BarPopup.channel.name,
+            codec.encodeMethodCall(
+              MethodCall('action', {'action': 'card.state', ...data}),
+            ),
+            (_) {},
+          );
+      codec.decodeEnvelope(reply!);
+      await tester.pump();
+    }
+
+    await state({'kind': 'media', 'open': true});
+    expect(BarPopup.openCard.value, 'media');
+    await state({'kind': 'battery', 'open': true});
+    await state({'kind': 'media', 'open': false});
+    expect(BarPopup.openCard.value, 'battery');
+    await state({'kind': 'battery', 'open': false});
+    expect(BarPopup.openCard.value, isNull);
+    for (final data in [
+      {'kind': 'tooltip', 'open': true},
+      {'kind': 'media', 'open': 1},
+      {'open': false},
+    ]) {
+      await expectLater(state(data), throwsA(isA<PlatformException>()));
+    }
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
     'bar exposes Quick settings while its Settings action remains available',
     (tester) async {

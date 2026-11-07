@@ -6,14 +6,19 @@ import 'package:remya_bar/features/battery/bar_battery.dart';
 import 'package:remya_bar/features/media/bar_media.dart';
 import 'package:remya_bar/features/media/media_preview.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
+import 'package:remya_bar/features/popups/bar_card_surface.dart';
+import 'package:remya_bar/widgets/bar_pill.dart';
 import 'package:remya_bar/features/system/system_backend.dart';
 import 'package:remya_bar/features/system/system_popup_data.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
-Widget _host(Widget child, {double scale = 1}) => MaterialApp(
-  home: MediaQuery(
-    data: MediaQueryData(textScaler: .linear(scale)),
-    child: Material(child: child),
+Widget _host(Widget child, {double scale = 1}) => BarPopupScope(
+  theme: RemyaTheme(),
+  child: MaterialApp(
+    home: MediaQuery(
+      data: MediaQueryData(textScaler: .linear(scale)),
+      child: Material(child: child),
+    ),
   ),
 );
 
@@ -92,7 +97,7 @@ void main() {
     final fallback = preferences.theme(.dark);
     final cover = File('assets/icons/media-artwork.png').absolute;
 
-    Widget host(String artUrl) {
+    Widget host(String artUrl, {Color? seed}) {
       final players = [
         MediaPlayerSnapshot(
           busName: 'test',
@@ -125,6 +130,7 @@ void main() {
                   data: mediaPopupData(players),
                   onAction: (_) {},
                   styleVariant: preferences.styleVariant,
+                  seedColor: seed,
                 ),
               ),
             ],
@@ -145,8 +151,7 @@ void main() {
     await tester.runAsync(() async {
       await tester.pumpWidget(host(cover.uri.toString()));
       for (var attempt = 0; attempt < 50; attempt++) {
-        if (pillColor() != fallback.colorScheme.primary &&
-            cardColors() != fallback.colorScheme) {
+        if (pillColor() != fallback.colorScheme.primary) {
           break;
         }
         await Future<void>.delayed(const Duration(milliseconds: 20));
@@ -154,7 +159,33 @@ void main() {
       }
     });
     expect(pillColor(), isNot(fallback.colorScheme.primary));
-    expect(pillColor(), cardColors().primary);
+    final seed = tester
+        .widget<BarPill>(find.byType(BarPill).first)
+        .card!
+        .seedColor;
+    expect(seed, isNotNull);
+    await tester.pumpWidget(host(cover.uri.toString(), seed: seed));
+    final expected = BarCardSurface.colors(
+      fallback,
+      seed,
+      preferences.styleVariant,
+    );
+    expect(cardColors(), expected);
+    BarPopup.openCard.value = 'media';
+    await tester.pumpAndSettle();
+    final pill = tester.widget<AnimatedContainer>(
+      find
+          .descendant(
+            of: find.byType(BarPill),
+            matching: find.byType(AnimatedContainer),
+          )
+          .first,
+    );
+    expect(
+      (pill.decoration as BoxDecoration).color,
+      cardColors().surfaceContainer,
+    );
+    BarPopup.openCard.value = null;
 
     await tester.pumpWidget(host(''));
     expect(pillColor(), fallback.colorScheme.primary);

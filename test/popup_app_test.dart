@@ -2,6 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/features/popups/popup_app.dart';
+import 'package:remya_bar/features/popups/bar_card_surface.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 const _channel = MethodChannel('top.remya.bar/popup');
@@ -9,14 +10,17 @@ const _channel = MethodChannel('top.remya.bar/popup');
 Future<void> _content(
   WidgetTester tester,
   String kind,
-  Map<String, Object?> data,
-) async {
+  Map<String, Object?> data, {
+  bool opening = false,
+  bool settle = true,
+}) async {
   final reply = await tester.binding.defaultBinaryMessenger
       .handlePlatformMessage(
         _channel.name,
         const StandardMethodCodec().encodeMethodCall(
           MethodCall('content', {
             'kind': kind,
+            'opening': opening,
             'theme': const ThemeConfig().toMap(),
             'data': data,
           }),
@@ -27,7 +31,11 @@ Future<void> _content(
     () => const StandardMethodCodec().decodeEnvelope(reply!),
     returnsNormally,
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 Future<List<MethodCall>> _popup(WidgetTester tester, Size size) async {
@@ -54,6 +62,98 @@ Future<List<MethodCall>> _popup(WidgetTester tester, Size size) async {
 }
 
 void main() {
+  double progress(WidgetTester tester) => tester
+      .widget<BarCardSurface>(find.byType(BarCardSurface))
+      .emergence
+      .value;
+  const card = {
+    'pill': [180, 140],
+  };
+
+  Future<void> dismiss(WidgetTester tester) async {
+    final reply = await tester.binding.defaultBinaryMessenger
+        .handlePlatformMessage(
+          _channel.name,
+          const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('dismiss'),
+          ),
+          (_) {},
+        );
+    const StandardMethodCodec().decodeEnvelope(reply!);
+    await tester.pump();
+  }
+
+  testWidgets(
+    'card updates do not replay emergence or change measured height',
+    (tester) async {
+      final calls = await _popup(tester, const Size(500, 737));
+      await _content(tester, 'battery', card, opening: true, settle: false);
+      await tester.pump(const Duration(milliseconds: 80));
+      final before = progress(tester);
+      expect(before, inExclusiveRange(0, 1));
+      final height = calls
+          .lastWhere((call) => call.method == 'resize')
+          .arguments['height'];
+      await _content(tester, 'battery', card, settle: false);
+      expect(progress(tester), closeTo(before, .001));
+      await tester.pumpAndSettle();
+      expect(progress(tester), 1);
+      expect(
+        calls.lastWhere((call) => call.method == 'resize').arguments['height'],
+        height,
+      );
+      await _content(tester, 'battery', card);
+      expect(progress(tester), 1);
+    },
+  );
+
+  testWidgets('dismiss retracts then acknowledges hidden', (tester) async {
+    final calls = await _popup(tester, const Size(500, 737));
+    await _content(tester, 'battery', card, opening: true);
+    await dismiss(tester);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(progress(tester), inExclusiveRange(0, 1));
+    expect(calls.where((call) => call.method == 'hidden'), isEmpty);
+    await tester.pumpAndSettle();
+    expect(progress(tester), 0);
+    expect(calls.where((call) => call.method == 'hidden'), hasLength(1));
+    await _content(tester, 'battery', card, settle: false);
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(progress(tester), greaterThan(0));
+    await tester.pumpAndSettle();
+    expect(progress(tester), 1);
+  });
+
+  testWidgets('enter during dismiss resumes from the current shape', (
+    tester,
+  ) async {
+    final calls = await _popup(tester, const Size(500, 737));
+    await _content(tester, 'battery', card, opening: true);
+    await dismiss(tester);
+    await tester.pump(const Duration(milliseconds: 100));
+    final before = progress(tester);
+    expect(before, inExclusiveRange(0, 1));
+    await _content(tester, 'battery', card, settle: false);
+    expect(progress(tester), closeTo(before, .001));
+    await tester.pump(const Duration(milliseconds: 60));
+    expect(progress(tester), greaterThan(before));
+    await tester.pumpAndSettle();
+    expect(progress(tester), 1);
+    expect(calls.where((call) => call.method == 'hidden'), isEmpty);
+  });
+
+  testWidgets('cards jump to end values with reduced motion', (tester) async {
+    final calls = await _popup(tester, const Size(500, 737));
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await _content(tester, 'battery', card, opening: true, settle: false);
+    expect(progress(tester), 1);
+    await dismiss(tester);
+    expect(progress(tester), 0);
+    expect(calls.where((call) => call.method == 'hidden'), hasLength(1));
+  });
+
   testWidgets('datetime uses the snapshot offset and keeps the browsed month', (
     tester,
   ) async {

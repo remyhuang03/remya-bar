@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../features/popups/bar_card_surface.dart';
+import '../features/popups/bar_popup.dart';
 import 'bar_hover_card.dart';
 
 class BarPillCard {
@@ -79,29 +81,42 @@ class _BarPillState extends State<BarPill> {
       heightFactor: 1,
       child: card == null
           ? _buildPill(context, widget.onTap)
-          : BarHoverCard(
-              kind: card.kind,
-              size: card.size,
-              data: card.data,
-              seedColor: card.seedColor,
-              openOnTap: card.openOnTap,
-              onTap: widget.onTap,
-              builder: _buildPill,
+          : ValueListenableBuilder<String?>(
+              valueListenable: BarPopup.openCard,
+              builder: (context, _, _) => BarHoverCard(
+                kind: card.kind,
+                size: card.size,
+                data: card.data,
+                seedColor: card.seedColor,
+                openOnTap: card.openOnTap,
+                onTap: widget.onTap,
+                builder: _buildPill,
+              ),
             ),
     );
   }
 
   Widget _buildPill(BuildContext context, VoidCallback? onTap) {
     final scheme = widget.scheme ?? Theme.of(context).colorScheme;
-    final expanded = _hovered || _focused || _pressed || widget.attached;
-    final base = _pressed
+    final attached =
+        widget.attached ||
+        (widget.card != null && BarPopup.openCard.value == widget.card!.kind);
+    final cardScheme = widget.card == null
+        ? scheme
+        : BarCardSurface.colors(
+            Theme.of(context),
+            widget.card!.seedColor,
+            BarPopupScope.themeOf(context).styleVariant,
+          );
+    final expanded = _hovered || _focused || _pressed || attached;
+    final base = attached
+        ? cardScheme.surfaceContainer
+        : _pressed
         ? scheme.primaryContainer
         : widget.toggled == true
         ? scheme.primary
-        : widget.attached
-        ? scheme.surfaceContainer
         : widget.color ?? scheme.surfaceContainerHigh;
-    final surface = !_pressed && (_hovered || _focused)
+    final surface = !attached && !_pressed && (_hovered || _focused)
         ? Color.alphaBlend(scheme.onSurface.withValues(alpha: .08), base)
         : base;
     final foreground = _pressed
@@ -109,7 +124,7 @@ class _BarPillState extends State<BarPill> {
         : widget.toggled == true
         ? scheme.onPrimary
         : scheme.onSurface;
-    final radius = widget.attached
+    final radius = attached
         ? const BorderRadius.vertical(top: Radius.circular(20))
         : BorderRadius.circular(
             _pressed
@@ -144,7 +159,7 @@ class _BarPillState extends State<BarPill> {
           clipBehavior: .antiAlias,
           child: Stack(
             children: [
-              if (widget.background case final background?)
+              if (widget.background case final background? when !attached)
                 Positioned.fill(child: background),
               Material(
                 type: .transparency,

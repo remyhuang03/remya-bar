@@ -13,7 +13,12 @@ class MediaPreview extends StatelessWidget {
     required this.onAction,
     this.styleVariant = .tonalSpot,
     this.seedColor,
+    this.pill,
+    this.emergence = const AlwaysStoppedAnimation(1),
   });
+
+  final Rect? pill;
+  final Animation<double> emergence;
 
   final DynamicSchemeVariant styleVariant;
   final Color? seedColor;
@@ -29,29 +34,30 @@ class MediaPreview extends StatelessWidget {
     return MediaArtwork(
       url: _text(player?['artUrl']),
       styleVariant: styleVariant,
-      builder: (context, artwork, scheme) {
+      builder: (context, artwork, _) {
         final fallback = Theme.of(context);
-        final theme = scheme == null
-            ? fallback
-            : fallback.copyWith(
-                colorScheme: scheme,
-                textTheme: fallback.textTheme.apply(
-                  bodyColor: scheme.onSurface,
-                  displayColor: scheme.onSurface,
-                ),
-                primaryTextTheme: fallback.primaryTextTheme.apply(
-                  bodyColor: scheme.onPrimary,
-                  displayColor: scheme.onPrimary,
-                ),
-                iconTheme: fallback.iconTheme.copyWith(color: scheme.onSurface),
-                primaryIconTheme: fallback.primaryIconTheme.copyWith(
-                  color: scheme.onPrimary,
-                ),
-              );
+        final scheme = BarCardSurface.colors(fallback, seedColor, styleVariant);
+        final theme = fallback.copyWith(
+          colorScheme: scheme,
+          textTheme: fallback.textTheme.apply(
+            bodyColor: scheme.onSurface,
+            displayColor: scheme.onSurface,
+          ),
+          primaryTextTheme: fallback.primaryTextTheme.apply(
+            bodyColor: scheme.onPrimary,
+            displayColor: scheme.onPrimary,
+          ),
+          iconTheme: fallback.iconTheme.copyWith(color: scheme.onSurface),
+          primaryIconTheme: fallback.primaryIconTheme.copyWith(
+            color: scheme.onPrimary,
+          ),
+        );
         return Theme(
           data: theme,
           child: BarCardSurface(
             seedColor: seedColor,
+            pill: pill,
+            emergence: emergence,
             styleVariant: styleVariant,
             child: Column(
               crossAxisAlignment: .stretch,

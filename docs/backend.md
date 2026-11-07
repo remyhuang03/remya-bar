@@ -104,16 +104,44 @@ The tooltip uses the owning Settings palette's `surfaceContainerHigh` and
 
 `BarPopup.show` is the shared transport for floating components. Its request has
 a component `kind`, view-local anchor rectangle, logical size, component `data`,
-and the versioned Settings theme. `BarPopupApp` dispatches the kind to its Flutter
-renderer; currently only `tooltip` is implemented. New floating components add
-their renderer and payload validation here and reuse the same native host.
+and the versioned Settings theme. `BarPopupApp` dispatches each kind to its Flutter
+renderer. GTK owns placement, visibility, focus policy and lifetime only.
 
-The GTK runner owns positioning, visibility, transient ownership, and teardown of
-a non-focusable popup surface through gtk-layer-shell's supported popup path.
-It lazily creates one additional Flutter view per output and reuses it across
-shows and content/theme updates. The popup entry path (`--remya-popup`) does not
-initialize the bar's Rust event subscription or Settings controller. The owner
-passes its effective theme; the popup announces readiness before receiving data.
+The four hover cards (`media`, `battery`, `datetime`, `resources`) share one
+reusable per-output Flutter view in an OVERLAY layer surface, anchored top/left,
+with exclusive zone 0, top margin 0 and ON_DEMAND keyboard focus (Escape hides
+immediately). The window begins at the bar's exclusive edge. The left margin is
+`clamp(anchor.x + (anchor.width - width) / 2, 0, monitor.width - width)`;
+width/height remain monitor-clamped. Sidebar, tray/overview and tooltip surfaces
+retain their separate placement and animation. A sidebar or tray menu blocks
+card shows; opening either hides the current card.
+
+Native copies the request and its data map, injecting integer
+`data.pill: [anchor.x - left, anchor.width]` in popup-local coordinates. Flutter
+joins that neck to the card body with clamped concave fillets. Its spring emergence
+and 200 ms retraction change only the painted/clipped shape; `resize.height`
+always measures full content including the 12 px neck and shadow insets. Missing
+pill geometry falls back to a rounded card. The media pill sends its artwork
+palette's primary as `cardSeed`; pill and card regenerate the same surface palette
+using that seed, brightness and Settings style variant.
+
+The popup announces `ready` before receiving `content`. Native sets `opening: true`
+only when a card maps or switches kind; showing the same visible card replaces its
+content with `opening: false`. Updates never replay emergence. After the 180 ms
+leave delay, native sends `dismiss` and waits for Flutter's `hidden` acknowledgement
+before hiding, with a 400 ms fallback. `enter` or another same-kind `show` cancels
+the pending leave/dismiss and fallback, then sends `opening: false` to resume from
+the current progress. Data updates during retraction are retained for that resume
+without interrupting the close. Explicit `hide` remains immediate.
+
+The owner receives `action` with
+`{action: 'card.state', kind: <card kind>, open: true}` when shown and `open: false`
+when really hidden. `BarPopup.openCard` follows this per-engine state and ignores
+stale closes for another kind. Pills stay expanded and use the card's exact
+surface color while attached; hover-card updates are sent only for changed
+content (including the owning theme) while their kind is open. Reduced motion jumps to the animation endpoints.
+The popup entry path (`--remya-popup`) does not initialize the bar's Rust event
+subscription or Settings controller; the owner supplies its effective theme.
 
 The popup has no exclusive zone and is not a normal application window. The bar
 remains 40 pixels tall. Tooltip hover waits 500 ms and closes on pointer exit or

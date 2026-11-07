@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:collection/collection.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../features/popups/bar_card_surface.dart';
@@ -36,6 +37,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
   Timer? _timer;
   bool _hovered = false;
   bool _shown = false;
+  Map<String, Object?>? _lastContent;
 
   void _send(Future<void> request) {
     request.catchError((Object error) => debugPrint('Bar card: $error'));
@@ -46,6 +48,23 @@ class _BarHoverCardState extends State<BarHoverCard> {
     if ((!update && !activated && !_hovered) || box == null || !box.hasSize) {
       return;
     }
+    final data = {
+      ...widget.data,
+      if (widget.seedColor case final seed?)
+        'cardSeed': seed.toARGB32() & 0xFFFFFF,
+      'scale': MediaQuery.textScalerOf(context).scale(1),
+    };
+    final theme = BarPopupScope.themeOf(context);
+    final content = {
+      'data': data,
+      'theme': (theme.seedColor, theme.styleVariant, theme.mode),
+    };
+    if (update &&
+        (BarPopup.openCard.value != widget.kind ||
+            const DeepCollectionEquality().equals(content, _lastContent))) {
+      return;
+    }
+    _lastContent = content;
     final request = update ? BarPopup.update : BarPopup.show;
     _shown = true;
     _send(
@@ -56,13 +75,8 @@ class _BarHoverCardState extends State<BarHoverCard> {
           widget.size.width + BarCardSurface.shadowInsets.horizontal,
           widget.size.height + BarCardSurface.shadowInsets.vertical,
         ),
-        data: {
-          ...widget.data,
-          if (widget.seedColor case final seed?)
-            'cardSeed': seed.toARGB32() & 0xFFFFFF,
-          'scale': MediaQuery.textScalerOf(context).scale(1),
-        },
-        theme: BarPopupScope.themeOf(context),
+        data: data,
+        theme: theme,
       ),
     );
   }

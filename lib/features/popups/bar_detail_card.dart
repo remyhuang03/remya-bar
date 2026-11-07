@@ -16,7 +16,10 @@ class BarDetailCard extends StatelessWidget {
     required this.onAction,
     this.styleVariant = .tonalSpot,
     this.seedColor,
+    this.emergence = const AlwaysStoppedAnimation(1),
   });
+
+  final Animation<double> emergence;
 
   final DynamicSchemeVariant styleVariant;
   final Color? seedColor;
@@ -31,9 +34,13 @@ class BarDetailCard extends StatelessWidget {
           onAction: onAction,
           styleVariant: styleVariant,
           seedColor: seedColor,
+          pill: _pill(data['pill']),
+          emergence: emergence,
         )
       : BarCardSurface(
           seedColor: seedColor,
+          pill: _pill(data['pill']),
+          emergence: emergence,
           styleVariant: styleVariant,
           child: switch (kind) {
             'resources' => ResourceCard(
@@ -50,3 +57,17 @@ class BarDetailCard extends StatelessWidget {
           },
         );
 }
+
+Rect? _pill(Object? value) =>
+    value is List &&
+        value.length == 2 &&
+        value[0] is int &&
+        value[1] is int &&
+        (value[1] as int) > 0
+    ? Rect.fromLTWH(
+        (value[0] as int).toDouble(),
+        0,
+        (value[1] as int).toDouble(),
+        0,
+      )
+    : null;

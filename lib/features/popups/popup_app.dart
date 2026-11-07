@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter/physics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
@@ -18,7 +19,74 @@ class BarPopupApp extends StatefulWidget {
   State<BarPopupApp> createState() => _BarPopupAppState();
 }
 
-class _BarPopupAppState extends State<BarPopupApp> {
+class _BarPopupAppState extends State<BarPopupApp>
+    with SingleTickerProviderStateMixin {
+  late final _emergence = AnimationController(vsync: this);
+  bool _dismissing = false;
+  int _dismissGeneration = 0;
+  bool get _card =>
+      const {'media', 'battery', 'datetime', 'resources'}.contains(_kind);
+  bool get _reduceMotion =>
+      MediaQuery.maybeDisableAnimationsOf(context) == true ||
+      WidgetsBinding
+          .instance
+          .platformDispatcher
+          .accessibilityFeatures
+          .disableAnimations;
+
+  void _emerge({required bool opening}) {
+    final resume =
+        _dismissing || (!_emergence.isAnimating && _emergence.value == 0);
+    _dismissing = false;
+    _dismissGeneration++;
+    if (!opening && !resume) return;
+    if (_reduceMotion) {
+      _emergence.value = 1;
+      return;
+    }
+    if (opening) _emergence.value = 0;
+    _emergence
+        .animateWith(
+          SpringSimulation(
+            SpringDescription.withDampingRatio(
+              mass: 1,
+              stiffness: 380,
+              ratio: .8,
+            ),
+            _emergence.value,
+            1,
+            0,
+          ),
+        )
+        .then((_) {
+          if (mounted && !_dismissing) _emergence.value = 1;
+        });
+  }
+
+  Future<void> _dismiss() async {
+    if (!_card || _dismissing) return;
+    final generation = ++_dismissGeneration;
+    _dismissing = true;
+    try {
+      if (_reduceMotion) {
+        _emergence.value = 0;
+      } else {
+        await _emergence
+            .animateBack(
+              0,
+              duration: const Duration(milliseconds: 200),
+              curve: Easing.emphasizedAccelerate,
+            )
+            .orCancel;
+      }
+      if (mounted && _dismissing && generation == _dismissGeneration) {
+        await BarPopup.channel.invokeMethod<void>('hidden');
+      }
+    } on TickerCanceled {
+      // A new hover resumes the same shape from its current progress.
+    }
+  }
+
   final _navigator = GlobalKey<NavigatorState>();
   String? _kind;
   int _contentGeneration = 0;
@@ -32,6 +100,10 @@ class _BarPopupAppState extends State<BarPopupApp> {
   void initState() {
     super.initState();
     BarPopup.channel.setMethodCallHandler((call) async {
+      if (call.method == 'dismiss') {
+        _send(_dismiss());
+        return;
+      }
       if (call.method != 'content') throw MissingPluginException();
       final arguments = call.arguments;
       if (arguments is! Map ||
@@ -79,6 +151,8 @@ class _BarPopupAppState extends State<BarPopupApp> {
           if (_kind != arguments['kind'] || _data['token'] != data['token']) {
             _actionError = null;
           }
+          final opening =
+              arguments['opening'] == true || _kind != arguments['kind'];
           _contentGeneration++;
           if (arguments['opening'] == true || _kind != arguments['kind']) {
             _navigator.currentState?.popUntil((route) => route.isFirst);
@@ -87,6 +161,13 @@ class _BarPopupAppState extends State<BarPopupApp> {
           _kind = arguments['kind'] as String;
           _data = data;
           _theme = theme;
+          if (_card) {
+            _emerge(opening: opening);
+          } else {
+            _dismissing = false;
+            _dismissGeneration++;
+            _emergence.stop();
+          }
         });
       }
     });
@@ -96,6 +177,7 @@ class _BarPopupAppState extends State<BarPopupApp> {
   @override
   void dispose() {
     BarPopup.channel.setMethodCallHandler(null);
+    _emergence.dispose();
     super.dispose();
   }
 
@@ -165,7 +247,7 @@ class _BarPopupAppState extends State<BarPopupApp> {
                     'height': height.ceil(),
                   }),
                 ),
-                child: _kind == 'tooltip'
+                child: _kind == 'tooltip' || _card
                     ? _content(details, textScale)
                     : TweenAnimationBuilder<double>(
                         key: ValueKey(_opening),
@@ -226,6 +308,7 @@ class _BarPopupAppState extends State<BarPopupApp> {
             onAction: _action,
             styleVariant: _theme!.styleVariant,
             seedColor: _seedColor(details['cardSeed']),
+            emergence: _emergence,
           ),
         },
       ),

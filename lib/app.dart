@@ -242,7 +242,20 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     final args = call.arguments;
     if (args is! Map) throw const FormatException('Invalid popup action');
     final action = args['action'];
-    if (action == 'sidebar.closed') {
+    if (action == 'card.state') {
+      final kind = args['kind'];
+      final open = args['open'];
+      if (kind is! String ||
+          !const {'media', 'battery', 'datetime', 'resources'}.contains(kind) ||
+          open is! bool) {
+        throw const FormatException('Invalid card state');
+      }
+      if (open) {
+        BarPopup.openCard.value = kind;
+      } else if (BarPopup.openCard.value == kind) {
+        BarPopup.openCard.value = null;
+      }
+    } else if (action == 'sidebar.closed') {
       _sidebarOpen = false;
       _sidebar?.close();
     } else if (action == 'sidebar.settings') {

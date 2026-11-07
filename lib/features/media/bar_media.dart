@@ -33,6 +33,7 @@ class BarMedia extends StatelessWidget {
       builder: (_, _, scheme) => _MediaPill(
         card: BarPillCard(
           kind: 'media',
+          seedColor: scheme?.primary,
           size: const Size(420, 505),
           data: {
             ...mediaPopupData(players, error: error),
