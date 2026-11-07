@@ -12,14 +12,16 @@ class ClockCapsule extends StatelessWidget {
     super.key,
     required this.time,
     required this.showSeconds,
+    this.foreground,
   });
 
   final DateTime time;
   final bool showSeconds;
+  final Color? foreground;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final color = foreground ?? Theme.of(context).colorScheme.primary;
     final style = TextStyle(
       fontFamily: 'Inter',
       fontFamilyFallback: Theme.of(context)
@@ -30,75 +32,63 @@ class ClockCapsule extends StatelessWidget {
       fontWeight: .w500,
       height: 1.25,
       letterSpacing: 0,
-      color: colors.primary,
+      color: color,
     );
     String pad(int value) => value.toString().padLeft(2, '0');
 
-    return Material(
-      color: colors.surfaceContainerHigh,
-      shape: const StadiumBorder(),
-      child: SizedBox(
-        height: 32,
-        child: LayoutBuilder(
-          builder: (context, constraints) => Padding(
-            padding: .symmetric(
-              horizontal: ((constraints.maxWidth - _timeWidth) / 2).clamp(
-                0.0,
-                _horizontalPadding,
+    return LayoutBuilder(
+      builder: (context, constraints) => Padding(
+        padding: .symmetric(
+          horizontal: ((constraints.maxWidth - _timeWidth) / 2).clamp(
+            0.0,
+            _horizontalPadding,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: .min,
+          spacing: _spacing,
+          children: [
+            SizedBox(
+              width: _timeWidth,
+              child: FittedBox(
+                fit: .scaleDown,
+                alignment: .centerRight,
+                child: Text.rich(
+                  TextSpan(
+                    text: '${pad(time.hour)}:${pad(time.minute)}',
+                    children: [
+                      if (showSeconds)
+                        TextSpan(
+                          text: ':${pad(time.second)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: color.withValues(alpha: 0.7),
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                    ],
+                  ),
+                  style: style,
+                ),
               ),
             ),
-            child: Row(
-              mainAxisSize: .min,
-              spacing: _spacing,
-              children: [
-                SizedBox(
-                  width: _timeWidth,
-                  child: FittedBox(
-                    fit: .scaleDown,
-                    alignment: .centerRight,
-                    child: Text.rich(
-                      TextSpan(
-                        text: '${pad(time.hour)}:${pad(time.minute)}',
-                        children: [
-                          if (showSeconds)
-                            TextSpan(
-                              text: ':${pad(time.second)}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: colors.primary.withValues(alpha: 0.7),
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures(),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      style: style,
-                    ),
-                  ),
+            if (constraints.maxWidth > _minimumWidthWithDate) ...[
+              SizedBox.square(
+                dimension: _separatorSize,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(color: color, shape: .circle),
                 ),
-                if (constraints.maxWidth > _minimumWidthWithDate) ...[
-                  SizedBox.square(
-                    dimension: _separatorSize,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: colors.primary,
-                        shape: .circle,
-                      ),
-                    ),
-                  ),
-                  Flexible(
-                    child: Text(
-                      _dateLabel(time),
-                      style: style,
-                      maxLines: 1,
-                      overflow: .ellipsis,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+              ),
+              Flexible(
+                child: Text(
+                  _dateLabel(time),
+                  style: style,
+                  maxLines: 1,
+                  overflow: .ellipsis,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );

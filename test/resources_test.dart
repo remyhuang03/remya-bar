@@ -68,6 +68,9 @@ void main() {
     await mouse.addPointer(location: tester.getCenter(find.text('91%')));
     await tester.pump();
     expect(find.text('CPU'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 299));
+    expect(calls.where((call) => call.method == 'show'), isEmpty);
+    await tester.pump(const Duration(milliseconds: 1));
     final show = calls.firstWhere((call) => call.method == 'show');
     expect(show.arguments['kind'], 'resources');
     expect(show.arguments['data']['download'], isNull);

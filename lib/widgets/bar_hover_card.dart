@@ -12,16 +12,18 @@ class BarHoverCard extends StatefulWidget {
     required this.kind,
     required this.size,
     required this.data,
-    required this.child,
+    this.child,
+    this.builder,
     this.onTap,
     this.openOnTap = false,
     this.seedColor,
-  });
+  }) : assert((child == null) != (builder == null));
 
   final String kind;
   final Size size;
   final Map<String, Object?> data;
-  final Widget child;
+  final Widget? child;
+  final Widget Function(BuildContext context, VoidCallback? onTap)? builder;
   final VoidCallback? onTap;
   final bool openOnTap;
   final Color? seedColor;
@@ -102,15 +104,17 @@ class _BarHoverCardState extends State<BarHoverCard> {
       _hovered = true;
       _send(BarPopup.enter(kind: widget.kind));
       _timer?.cancel();
-      _timer = Timer(const Duration(milliseconds: 500), _show);
+      _timer = Timer(const Duration(milliseconds: 300), _show);
     },
     onExit: (_) {
       _hovered = false;
       _timer?.cancel();
       if (_shown) _send(BarPopup.leave(kind: widget.kind));
     },
-    child: widget.onTap == null && !widget.openOnTap
-        ? widget.child
+    child: widget.builder != null
+        ? widget.builder!(context, widget.openOnTap ? _activate : widget.onTap)
+        : widget.onTap == null && !widget.openOnTap
+        ? widget.child!
         : InkWell(
             onTap: widget.openOnTap ? _activate : widget.onTap,
             child: widget.child,

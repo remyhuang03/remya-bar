@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../widgets/bar_hover_card.dart';
+import '../../widgets/bar_pill.dart';
 import '../popups/bar_popup.dart';
 import '../system/system_backend.dart';
 import '../system/system_popup_data.dart';
@@ -27,50 +27,51 @@ class BarMedia extends StatelessWidget {
     if (player == null) return const SizedBox.shrink();
     final playing = player.playbackStatus == 'Playing';
     final toggle = onAction;
-    return BarHoverCard(
-      kind: 'media',
-      size: const Size(420, 505),
-      data: {
-        ...mediaPopupData(players, error: error),
-        'output': output,
-      },
-      child: MediaArtwork(
-        url: player.artUrl,
-        styleVariant: BarPopupScope.themeOf(context).styleVariant,
-        builder: (_, _, scheme) => _MediaPill(
-          scheme: scheme,
-          title: player.title.isEmpty ? player.identity : player.title,
-          playing: playing,
-          progress: switch ((player.positionSeconds, player.lengthSeconds)) {
-            (final position?, final length?) when length > 0 =>
-              (position / length).clamp(0, 1),
-            _ => 0,
+    return MediaArtwork(
+      url: player.artUrl,
+      styleVariant: BarPopupScope.themeOf(context).styleVariant,
+      builder: (_, _, scheme) => _MediaPill(
+        card: BarPillCard(
+          kind: 'media',
+          size: const Size(420, 505),
+          data: {
+            ...mediaPopupData(players, error: error),
+            'output': output,
           },
-          onToggle:
-              toggle != null &&
-                  player.canControl &&
-                  (playing ? player.canPause : player.canPlay)
-              ? () async {
-                  try {
-                    await toggle(player.busName, 'playPause');
-                  } catch (error) {
-                    debugPrint('Media action: $error');
-                  }
-                }
-              : null,
         ),
+        scheme: scheme,
+        title: player.title.isEmpty ? player.identity : player.title,
+        playing: playing,
+        progress: switch ((player.positionSeconds, player.lengthSeconds)) {
+          (final position?, final length?) when length > 0 =>
+            (position / length).clamp(0, 1),
+          _ => 0,
+        },
+        onToggle:
+            toggle != null &&
+                player.canControl &&
+                (playing ? player.canPause : player.canPlay)
+            ? () async {
+                try {
+                  await toggle(player.busName, 'playPause');
+                } catch (error) {
+                  debugPrint('Media action: $error');
+                }
+              }
+            : null,
       ),
     );
   }
 }
 
-class _MediaPill extends StatefulWidget {
+class _MediaPill extends StatelessWidget {
   const _MediaPill({
     required this.title,
     required this.playing,
     required this.progress,
     required this.onToggle,
     required this.scheme,
+    required this.card,
   });
 
   final String title;
@@ -78,151 +79,87 @@ class _MediaPill extends StatefulWidget {
   final double progress;
   final VoidCallback? onToggle;
   final ColorScheme? scheme;
-
-  @override
-  State<_MediaPill> createState() => _MediaPillState();
-}
-
-class _MediaPillState extends State<_MediaPill> {
-  bool _hovered = false;
-  bool _pressed = false;
-  bool _focused = false;
+  final BarPillCard card;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colors = widget.scheme ?? theme.colorScheme;
-    final enabled = widget.onToggle != null;
-    final expanded = enabled && (_hovered || _focused || _pressed);
-    final pressed = expanded && _pressed;
+    final colors = scheme ?? theme.colorScheme;
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : const Duration(milliseconds: 140);
-    final surface = pressed
-        ? colors.primaryContainer
-        : expanded
-        ? Color.alphaBlend(
-            colors.onSurface.withValues(alpha: 0.08),
-            colors.surfaceContainerHigh,
-          )
-        : colors.surfaceContainerHigh;
-    final progress = pressed
-        ? Color.alphaBlend(
-            colors.onPrimaryContainer.withValues(alpha: 0.14),
-            colors.primaryContainer,
-          )
-        : widget.playing
-        ? colors.secondaryContainer
-        : colors.surfaceContainerHighest;
-    final foreground = pressed
-        ? colors.onPrimaryContainer
-        : !widget.playing
-        ? colors.onSurfaceVariant
-        : expanded && theme.brightness == .dark
-        ? colors.primaryFixed
-        : colors.primary;
-    return Semantics(
-      label: widget.title,
-      hint: enabled ? (widget.playing ? 'Pause' : 'Play') : null,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: Material(
-          type: .transparency,
-          child: InkWell(
-            onTap: widget.onToggle,
-            onHighlightChanged: (value) => setState(() => _pressed = value),
-            onFocusChange: (value) => setState(() => _focused = value),
-            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-            splashFactory: NoSplash.splashFactory,
-            child: Center(
-              child: AnimatedContainer(
-                duration: duration,
-                // The layer-shell surface is 40 px tall.
-                height: expanded ? 40 : 32,
-                decoration: BoxDecoration(
-                  color: surface,
-                  borderRadius: .circular(
-                    pressed
-                        ? 12
-                        : expanded
-                        ? 22
-                        : 16,
-                  ),
+        : const Duration(milliseconds: 200);
+    return BarPill(
+      scheme: colors,
+      card: card,
+      semanticsLabel: title,
+      semanticsHint: onToggle == null
+          ? null
+          : playing
+          ? 'Pause'
+          : 'Play',
+      onTap: onToggle,
+      padding: const .symmetric(horizontal: 16),
+      expandedPadding: const .fromLTRB(8, 0, 14, 0),
+      background: FractionallySizedBox(
+        alignment: .centerLeft,
+        widthFactor: progress,
+        child: ColoredBox(
+          color: playing
+              ? colors.secondaryContainer
+              : colors.surfaceContainerHighest,
+        ),
+      ),
+      builder: (context, state) {
+        final foreground = state.pressed
+            ? state.foreground
+            : !playing
+            ? colors.onSurfaceVariant
+            : state.expanded && theme.brightness == .dark
+            ? colors.primaryFixed
+            : colors.primary;
+        return Row(
+          spacing: 8,
+          children: [
+            AnimatedContainer(
+              duration: duration,
+              width: state.expanded ? 28 : 24,
+              height: state.expanded ? 28 : 24,
+              decoration: BoxDecoration(
+                color: state.expanded ? colors.primary : Colors.transparent,
+                borderRadius: .circular(
+                  state.pressed
+                      ? 10
+                      : state.expanded
+                      ? 14
+                      : 12,
                 ),
-                clipBehavior: .antiAlias,
-                child: Stack(
-                  fit: .expand,
-                  children: [
-                    FractionallySizedBox(
-                      alignment: .centerLeft,
-                      widthFactor: widget.progress,
-                      child: ColoredBox(color: progress),
-                    ),
-                    if (_focused)
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          border: .all(color: colors.primary, width: 2),
-                          borderRadius: .circular(pressed ? 12 : 22),
-                        ),
-                      ),
-                    AnimatedPadding(
-                      duration: duration,
-                      padding: expanded
-                          ? const .fromLTRB(8, 0, 14, 0)
-                          : const .symmetric(horizontal: 16),
-                      child: Row(
-                        spacing: 8,
-                        children: [
-                          AnimatedContainer(
-                            duration: duration,
-                            width: expanded ? 28 : 24,
-                            height: expanded ? 28 : 24,
-                            decoration: BoxDecoration(
-                              color: expanded
-                                  ? colors.primary
-                                  : Colors.transparent,
-                              borderRadius: .circular(
-                                pressed
-                                    ? 10
-                                    : expanded
-                                    ? 14
-                                    : 12,
-                              ),
-                            ),
-                            child: Icon(
-                              !expanded
-                                  ? Icons.music_note
-                                  : widget.playing
-                                  ? Icons.pause
-                                  : Icons.play_arrow,
-                              size: 20,
-                              color: expanded ? colors.onPrimary : foreground,
-                            ),
-                          ),
-                          Expanded(
-                            child: ExcludeSemantics(
-                              child: _MediaTitle(
-                                text: widget.title,
-                                style: theme.textTheme.bodyMedium!.copyWith(
-                                  color: foreground,
-                                  fontSize: 15,
-                                  height: 1.25,
-                                  fontWeight: .w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+              ),
+              child: Icon(
+                !state.expanded
+                    ? Icons.music_note
+                    : playing
+                    ? Icons.pause
+                    : Icons.play_arrow,
+                size: 20,
+                color: state.expanded ? colors.onPrimary : foreground,
+              ),
+            ),
+            Expanded(
+              child: ExcludeSemantics(
+                child: _MediaTitle(
+                  text: title,
+                  style: theme.textTheme.bodyMedium!.copyWith(
+                    color: foreground,
+                    fontSize: 15,
+                    height: 1.25,
+                    fontWeight: .w500,
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ),
+          ],
+        );
+      },
     );
   }
 }

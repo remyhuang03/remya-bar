@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 
 import '../../bar_theme.dart';
-import '../../widgets/bar_hover_card.dart';
+import '../../widgets/bar_pill.dart';
 import '../system/system_backend.dart';
 
 const _batteryGreen = Color(0xFF0AC20A);
@@ -91,10 +91,9 @@ class BarBattery extends StatelessWidget {
 
     return Align(
       alignment: .center,
-      child: SizedBox(
-        width: 48,
-        height: 24,
-        child: BarHoverCard(
+      child: BarPill(
+        padding: const .symmetric(horizontal: 8),
+        card: BarPillCard(
           kind: 'battery',
           size: const Size(420, 506),
           data: {
@@ -107,28 +106,35 @@ class BarBattery extends StatelessWidget {
             'cycleCount': battery?.cycleCount,
             'power': power,
           },
-          child: Semantics(
-            label: 'Battery $percent%${charging ? ', charging' : ''}',
-            excludeSemantics: true,
-            child: ClipRRect(
-              borderRadius: .circular(12),
-              child: Stack(
-                fit: .expand,
-                children: [
-                  if (percent < 100)
-                    ColoredBox(
-                      color: trackColor,
-                      child: buildLabel(onTrackColor),
-                    ),
-                  if (percent > 0)
-                    ClipPath(
-                      clipper: _BatteryFillClipper(fraction),
-                      child: ColoredBox(
-                        color: fillColor,
-                        child: buildLabel(onFillColor),
+        ),
+        builder: (context, state) => Center(
+          widthFactor: 1,
+          child: SizedBox(
+            width: 48,
+            height: 24,
+            child: Semantics(
+              label: 'Battery $percent%${charging ? ', charging' : ''}',
+              excludeSemantics: true,
+              child: ClipRRect(
+                borderRadius: .circular(12),
+                child: Stack(
+                  fit: .expand,
+                  children: [
+                    if (percent < 100)
+                      ColoredBox(
+                        color: trackColor,
+                        child: buildLabel(onTrackColor),
                       ),
-                    ),
-                ],
+                    if (percent > 0)
+                      ClipPath(
+                        clipper: _BatteryFillClipper(fraction),
+                        child: ColoredBox(
+                          color: fillColor,
+                          child: buildLabel(onFillColor),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

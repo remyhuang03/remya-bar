@@ -17,6 +17,11 @@ Widget _host(Widget child, {double scale = 1}) => MaterialApp(
   ),
 );
 
+Finder _batteryFill() => find.descendant(
+  of: find.byType(ClipRRect),
+  matching: find.byType(ClipPath),
+);
+
 void main() {
   for (final seek in [true, false]) {
     testWidgets(
@@ -174,10 +179,7 @@ void main() {
     expect(find.byIcon(Icons.bolt_rounded), findsOneWidget);
     expect(find.text('100'), findsOneWidget);
     final fullFillBox = tester.widget<ColoredBox>(
-      find.descendant(
-        of: find.byType(ClipPath),
-        matching: find.byType(ColoredBox),
-      ),
+      find.descendant(of: _batteryFill(), matching: find.byType(ColoredBox)),
     );
     expect(fullFillBox.color, const Color(0xFF0AC20A));
     final track = tester.getRect(find.byType(ClipRRect));
@@ -190,13 +192,10 @@ void main() {
       _host(const BarBattery(level: 80, isPowerSaver: true, isCharging: false)),
     );
     final saverFillBox = tester.widget<ColoredBox>(
-      find.descendant(
-        of: find.byType(ClipPath),
-        matching: find.byType(ColoredBox),
-      ),
+      find.descendant(of: _batteryFill(), matching: find.byType(ColoredBox)),
     );
     expect(saverFillBox.color, const Color(0xFFF2E70D));
-    final clipper = tester.widget<ClipPath>(find.byType(ClipPath)).clipper!;
+    final clipper = tester.widget<ClipPath>(_batteryFill()).clipper!;
     final fill = clipper.getClip(const Size(48, 24));
     expect(fill.contains(const Offset(1, 12)), isTrue);
     expect(fill.contains(const Offset(38, 12)), isTrue);
@@ -219,10 +218,7 @@ void main() {
     expect(find.byIcon(Icons.bolt_rounded), findsNWidgets(2));
     expect(find.text('20'), findsNWidgets(2));
     final fillBox = tester.widget<ColoredBox>(
-      find.descendant(
-        of: find.byType(ClipPath),
-        matching: find.byType(ColoredBox),
-      ),
+      find.descendant(of: _batteryFill(), matching: find.byType(ColoredBox)),
     );
     expect(fillBox.color, const Color(0xFFC2230A));
 
@@ -239,7 +235,7 @@ void main() {
     );
     expect(find.text('0'), findsOneWidget);
     expect(find.byIcon(Icons.bolt_rounded), findsNothing);
-    expect(find.byType(ClipPath), findsNothing);
+    expect(_batteryFill(), findsNothing);
 
     await tester.pumpWidget(_host(const BarBattery()));
     expect(find.text('0'), findsNothing);

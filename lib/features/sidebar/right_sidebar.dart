@@ -7,6 +7,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../widgets/bar_pill.dart';
 import '../../widgets/bar_tooltip.dart';
 
 import '../popups/popup_measure.dart';
@@ -42,9 +43,6 @@ class BarSidebarButton extends StatefulWidget {
 
 class _BarSidebarButtonState extends State<BarSidebarButton> {
   final _pill = GlobalKey();
-  bool _hovered = false;
-  bool _focused = false;
-  bool _pressed = false;
 
   void _toggle() {
     final box = _pill.currentContext?.findRenderObject() as RenderBox?;
@@ -59,15 +57,6 @@ class _BarSidebarButtonState extends State<BarSidebarButton> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final expanded = _hovered || _focused || _pressed;
-    final (base, foreground) = _pressed
-        ? (colors.primaryContainer, colors.onPrimaryContainer)
-        : widget.open
-        ? (colors.primary, colors.onPrimary)
-        : (colors.surfaceContainerHighest, colors.onSurface);
-    final layer = _pressed ? .16 : (expanded ? .08 : 0.0);
-    final radius = _pressed ? 12.0 : (expanded ? 22.0 : 16.0);
     final icons = [
       if (widget.wifi case final on?)
         on ? Icons.wifi_rounded : Icons.wifi_off_rounded,
@@ -80,51 +69,19 @@ class _BarSidebarButtonState extends State<BarSidebarButton> {
     ];
     return BarTooltip(
       message: 'Quick settings',
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: Semantics(
-          button: true,
-          toggled: widget.open,
-          label: 'Quick settings',
-          child: InkWell(
-            onTap: _toggle,
-            onFocusChange: (value) => setState(() => _focused = value),
-            onHighlightChanged: (value) => setState(() => _pressed = value),
-            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-            splashFactory: NoSplash.splashFactory,
-            child: AnimatedContainer(
-              key: _pill,
-              duration: MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : const Duration(milliseconds: 140),
-              height: expanded ? 40 : 32,
-              padding: const .symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: Color.alphaBlend(
-                  (_pressed ? colors.onPrimaryContainer : foreground)
-                      .withValues(alpha: layer),
-                  base,
-                ),
-                borderRadius: .circular(radius),
-              ),
-              foregroundDecoration: _focused
-                  ? BoxDecoration(
-                      border: .all(color: colors.primary, width: 2),
-                      borderRadius: .circular(radius),
-                    )
-                  : null,
-              child: Row(
-                mainAxisSize: .min,
-                spacing: 6,
-                children: [
-                  for (final icon
-                      in icons.isEmpty ? [Icons.tune_rounded] : icons)
-                    Icon(icon, size: 18, color: foreground),
-                ],
-              ),
-            ),
-          ),
+      child: BarPill(
+        pillKey: _pill,
+        semanticsLabel: 'Quick settings',
+        toggled: widget.open,
+        onTap: _toggle,
+        padding: const .symmetric(horizontal: 12),
+        builder: (context, state) => Row(
+          mainAxisSize: .min,
+          spacing: 6,
+          children: [
+            for (final icon in icons.isEmpty ? [Icons.tune_rounded] : icons)
+              Icon(icon, size: 18, color: state.foreground),
+          ],
         ),
       ),
     );

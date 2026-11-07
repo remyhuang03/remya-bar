@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
-import '../../widgets/bar_hover_card.dart';
+import '../../widgets/bar_pill.dart';
 import 'clock_capsule.dart';
 
 class BarClock extends StatefulWidget {
@@ -42,14 +42,22 @@ class _BarClockState extends State<BarClock> {
   }
 
   @override
-  Widget build(BuildContext context) => BarHoverCard(
-    kind: 'datetime',
-    size: const Size(420, 673),
-    openOnTap: true,
-    data: {
-      'unixMillis': _now.millisecondsSinceEpoch,
-      'utcOffsetSeconds': _now.timeZoneOffset.inSeconds,
-    },
-    child: ClockCapsule(time: _now, showSeconds: widget.showSeconds),
+  Widget build(BuildContext context) => BarPill(
+    card: BarPillCard(
+      kind: 'datetime',
+      size: const Size(420, 673),
+      openOnTap: true,
+      data: {
+        'unixMillis': _now.millisecondsSinceEpoch,
+        'utcOffsetSeconds': _now.timeZoneOffset.inSeconds,
+      },
+    ),
+    builder: (context, state) => ClockCapsule(
+      time: _now,
+      showSeconds: widget.showSeconds,
+      foreground: state.pressed
+          ? state.foreground
+          : Theme.of(context).colorScheme.primary,
+    ),
   );
 }
