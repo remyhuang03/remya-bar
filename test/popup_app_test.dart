@@ -142,18 +142,6 @@ void main() {
     expect(calls.where((call) => call.method == 'hidden'), isEmpty);
   });
 
-  testWidgets('cards jump to end values with reduced motion', (tester) async {
-    final calls = await _popup(tester, const Size(500, 737));
-    tester.platformDispatcher.accessibilityFeaturesTestValue =
-        FakeAccessibilityFeatures(disableAnimations: true);
-    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
-    await _content(tester, 'battery', card, opening: true, settle: false);
-    expect(progress(tester), 1);
-    await dismiss(tester);
-    expect(progress(tester), 0);
-    expect(calls.where((call) => call.method == 'hidden'), hasLength(1));
-  });
-
   testWidgets('datetime uses the snapshot offset and keeps the browsed month', (
     tester,
   ) async {

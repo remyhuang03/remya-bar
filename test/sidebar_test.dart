@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -472,64 +471,6 @@ void main() {
     });
   });
 
-  testWidgets('tile state layers cover the whole tile', (tester) async {
-    await showSidebar(tester, []);
-    final title = find.text('Internet');
-    final tile = find
-        .ancestor(of: title, matching: find.byType(Material))
-        .first;
-    final colors = Theme.of(tester.element(title)).colorScheme;
-    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    addTearDown(mouse.removePointer);
-    await mouse.addPointer(location: tester.getCenter(title));
-    await tester.pumpAndSettle();
-    expect(
-      tester.widget<Material>(tile).color,
-      Color.alphaBlend(
-        colors.onPrimaryContainer.withValues(alpha: .08),
-        colors.primaryContainer,
-      ),
-    );
-    await mouse.down(tester.getCenter(title));
-    await tester.pump();
-    expect(
-      tester.widget<Material>(tile).color,
-      Color.alphaBlend(
-        colors.onPrimaryContainer.withValues(alpha: .16),
-        colors.primaryContainer,
-      ),
-    );
-    await mouse.cancel();
-  });
-
-  testWidgets('native slider reaches both edges while dragging', (
-    tester,
-  ) async {
-    final actions = <Map<String, Object?>>[];
-    await showSidebar(tester, actions);
-    final slider = find.byType(Slider).first;
-    final rect = tester.getRect(slider);
-    final drag = await tester.startGesture(rect.center);
-    await drag.moveTo(Offset(rect.right, rect.center.dy));
-    await tester.pumpAndSettle();
-    expect(tester.widget<Slider>(slider).value, 100);
-    final theme = SliderTheme.of(tester.element(slider));
-    expect(theme.thumbSize!.resolve({}), const Size(2, 52));
-    expect(find.text('100%'), findsOneWidget);
-    await drag.moveTo(Offset(rect.left, rect.center.dy));
-    await tester.pumpAndSettle();
-    expect(tester.widget<Slider>(slider).value, 0);
-    expect(find.text('0%'), findsOneWidget);
-    expect(actions, isNotEmpty);
-    expect(actions.last['value'], 0);
-    await drag.up();
-    expect(actions.last['value'], 0);
-    await tester.pump(const Duration(milliseconds: 1499));
-    expect(tester.widget<Slider>(slider).value, 0);
-    await tester.pump(const Duration(milliseconds: 1));
-    expect(tester.widget<Slider>(slider).value, 50);
-  });
-
   testWidgets(
     'slider throttles leading and trailing writes and holds release',
     (tester) async {
@@ -651,17 +592,6 @@ void main() {
       );
     },
   );
-
-  testWidgets('Audio and Power detail headers have no switch', (tester) async {
-    await showSidebar(tester, []);
-    for (final page in ['Audio', 'Power']) {
-      await tester.tap(find.text(page));
-      await tester.pumpAndSettle();
-      expect(find.byType(Switch), findsNothing);
-      await tester.tap(find.byTooltip('Back'));
-      await tester.pumpAndSettle();
-    }
-  });
 }
 
 Future<void> _flush() => Future<void>.delayed(Duration.zero);

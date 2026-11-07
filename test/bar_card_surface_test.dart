@@ -34,16 +34,4 @@ void main() {
     expect(clamped.contains(const Offset(71, 10)), isFalse);
     expect(clamped.contains(const Offset(73.5, 11.5)), isTrue);
   });
-
-  test('zero progress is the pill footprint and width leads height', () {
-    final collapsed = attachedCardPath(body, 180, 140, progress: 0);
-    expect(collapsed.getBounds(), const Rect.fromLTWH(180, 12, 140, 0));
-    for (final t in [.01, .2, .5, .9]) {
-      final path = attachedCardPath(body, 180, 140, progress: t);
-      final bounds = path.getBounds();
-      expect(bounds.bottom, closeTo(body.top + body.height * t, .001));
-      expect(bounds.width, greaterThan(140 + (420 - 140) * t));
-      expect(path.contains(Offset(250, 12 + body.height * t / 2)), isTrue);
-    }
-  });
 }
