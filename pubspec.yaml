@@ -15,7 +15,7 @@ dependencies:
   flutter_svg: ^2.3.0
   material_color_utilities: ^0.13.0
   remya_settings_client:
-    path: ../remya_settings/packages/remya_settings_client
+    path: ../remya-settings/packages/remya_settings_client
 
 dev_dependencies:
   flutter_test:

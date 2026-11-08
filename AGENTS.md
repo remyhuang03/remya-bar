@@ -4,7 +4,7 @@
 - `remya_bar` is a desktop bar project for Hyprland on Linux, using Flutter and Rust.
 - The current milestone includes a 40-pixel capsule bar, a Settings launcher, shared MD3E theme integration, and Rust Hyprland request/event IPC. Other system modules are not implemented.
 - Use the system `gtk-layer-shell` library in the native GTK runner for bar window behavior: top layer, top/left/right anchors, a 40-logical-pixel height, automatic exclusive space, no decorations, and no keyboard focus. Keep one bar window and bar Flutter view per GDK monitor; use GDK display signals for hotplug and keep the application alive with no connected outputs. Do not use display indices as persistent identities.
-- Reuse development practices from `../remya_settings`, not its settings UI, catalog renderer, assets, or window geometry. The Bar application ID is `top.remya.bar`; Settings uses `top.remya.settings`. Executables remain `remya_bar` and `remya_settings`.
+- Reuse development practices from `../remya-settings`, not its settings UI, catalog renderer, assets, or window geometry. The Bar application ID is `top.remya.bar`; Settings uses `top.remya.settings`. Executables remain `remya_bar` and `remya_settings`.
 - Add real bar behavior and platform integrations only when required by a concrete task. Do not automatically modify Hyprland configuration or other desktop settings.
 - Never present sample values as detected system state or claim an integration works merely because its UI renders.
 - Write rule documents, including `AGENTS.md`, in English.

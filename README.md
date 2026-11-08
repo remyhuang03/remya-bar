@@ -197,7 +197,7 @@ Remy'a Bar utilizes a hybrid architecture engineered for responsiveness and reli
 
 - **Low Resource Usage**: Rust handles all heavy lifting—sampling hardware sensors, parsing Hyprland socket streams, and hosting D-Bus interfaces—sharing a single cached state across all outputs.
 - **Native Wayland Integration**: Built directly against `gtk-layer-shell` for true Wayland surface management, automatic exclusive zone handling, and zero-flicker monitor hotplugging.
-- **Decoupled Architecture**: Configuration, themes, and persistence are cleanly managed via the companion [Remya Settings](https://github.com/remya/remya_settings) service.
+- **Decoupled Architecture**: Configuration, themes, and persistence are cleanly managed via the companion [Remya Settings](https://github.com/remyhuang03/remya-settings) service.
 
 ---
 

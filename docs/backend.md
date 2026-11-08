@@ -10,7 +10,7 @@ entry in XDG_DATA_HOME/XDG_DATA_DIRS.
 
 Use `remya_settings_client`, owned by the Settings repository, for all Settings
 interactions. The development source dependency is
-`../remya_settings/packages/remya_settings_client`. Installed bundles contain
+`../remya-settings/packages/remya_settings_client`. Installed bundles contain
 compiled code and do not require sibling source repositories.
 
 The package contains the versioned contract, D-Bus client, settings opener,
@@ -33,9 +33,9 @@ then the sibling Settings repository's local config, then installed XDG config.
 The native runner supplies the absolute repository root independently of cwd.
 Release builds always use the Settings service.
 
-See [the complete Settings API](../../remya_settings/docs/public-api.md) for both
+See [the complete Settings API](../../remya-settings/docs/public-api.md) for both
 CLI and D-Bus operations, schemas, availability, errors, and compatibility rules;
-see [XDG installation and paths](../../remya_settings/docs/xdg-layout.md).
+see [XDG installation and paths](../../remya-settings/docs/xdg-layout.md).
 Future components must extend the owning Settings feature and its common
 operation dispatcher, client contract, API documentation, and parity tests.
 Do not import Settings UI/controllers/backends into Bar or add component-specific
@@ -106,7 +106,7 @@ the notification; other actions are buttons and close the notification unless
 it is `resident`. History keeps the newest 200.
 
 Settings owns the preferences (`Get("notifications")`, see the Settings
-[notifications API](../../remya_settings/docs/public-api.md#notifications)).
+[notifications API](../../remya-settings/docs/public-api.md#notifications)).
 Every output engine reads them, follows `Changed` for the notification IDs and
 passes them to `notificationsConfigure`; read errors keep the last valid
 values. Each engine reports its output's Hyprland full screen state with
@@ -133,7 +133,7 @@ card is open, since the card lists the same notifications in that corner.
 
 ## Validation
 
-Run the checks in AGENTS.md and `python ../remya_settings/test/interface_smoke.py`
+Run the checks in AGENTS.md and `python ../remya-settings/test/interface_smoke.py`
 after building both release bundles. The integration test uses temporary XDG
 roots and an isolated session bus, verifies real bar theme changes on every
 connected output, and stops its own bars and settings service. Keep debug and
@@ -279,7 +279,7 @@ before sending `Event`. If an app has no usable DBusMenu, the local menu offers
 its native `ContextMenu` action. Legacy XEmbed items are outside this implementation.
 
 Items start pinned. Settings owns the folded IDs through
-[`remya-bar.folded-apps`](../../remya_settings/docs/public-api.md#remya-bar-folded-applications).
+[`remya-bar.folded-apps`](../../remya-settings/docs/public-api.md#remya-bar-folded-applications).
 Bar identifies apps by SNI ID with the executable name when available, since
 different Chromium-based apps can export the same ID. All outputs read the
 same Settings preference and reconcile on change. Appearance → Remya Bar

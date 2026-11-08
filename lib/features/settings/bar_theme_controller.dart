@@ -12,7 +12,7 @@ File resolveBarTheme({required bool isDebug, Directory? repositoryDirectory}) {
     final settings = settingsConfigFile(
       isDebug: true,
       repositoryDirectory: Directory(
-        '${repositoryDirectory.parent.path}/remya_settings',
+        '${repositoryDirectory.parent.path}/remya-settings',
       ),
     );
     if (settings.existsSync()) return settings;

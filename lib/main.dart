@@ -50,7 +50,7 @@ Future<void> main(List<String> arguments) async {
   final debugSettings = root == null
       ? null
       : File(
-          '${Directory(root).parent.path}/remya_settings/build/linux/x64/debug/bundle/remya_settings',
+          '${Directory(root).parent.path}/remya-settings/build/linux/x64/debug/bundle/remya_settings',
         );
   runApp(
     RemyaBarApp(
