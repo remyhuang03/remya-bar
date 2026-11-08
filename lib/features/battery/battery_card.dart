@@ -1,6 +1,6 @@
-import 'dart:math' as math;
-
 import 'package:material_ui/material_ui.dart';
+
+import '../../widgets/wave_progress.dart';
 
 class BatteryCard extends StatelessWidget {
   const BatteryCard({super.key, required this.data, required this.onAction});
@@ -236,7 +236,7 @@ class _BatteryHero extends StatelessWidget {
               SizedBox(
                 height: 14,
                 child: CustomPaint(
-                  painter: _ChargeWave(
+                  painter: WaveProgressPainter(
                     fraction: percent / 100,
                     active: colors.primary,
                     track: colors.surfaceContainerHighest,
@@ -248,57 +248,6 @@ class _BatteryHero extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ChargeWave extends CustomPainter {
-  const _ChargeWave({
-    required this.fraction,
-    required this.active,
-    required this.track,
-  });
-
-  final double fraction;
-  final Color active;
-  final Color track;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const radius = 4.0;
-    if (size.width <= 2 * radius) return;
-    final y = size.height / 2;
-    final end = size.width - radius;
-    final filled = radius + (end - radius) * fraction;
-    final paint = Paint()
-      ..strokeWidth = 2 * radius
-      ..strokeCap = .round;
-    final trackStart = fraction == 0 ? radius : filled + 2 * radius + 4;
-    if (trackStart <= end) {
-      canvas.drawLine(
-        Offset(trackStart, y),
-        Offset(end, y),
-        paint..color = track,
-      );
-      canvas.drawCircle(Offset(end, y), 2, paint..color = active);
-    }
-    if (fraction == 0) return;
-    final wave = Path()..moveTo(radius, y);
-    for (var x = radius + 1; x < filled; x++) {
-      wave.lineTo(x, y + 3 * math.sin((x - radius) * math.pi / 20));
-    }
-    wave.lineTo(filled, y + 3 * math.sin((filled - radius) * math.pi / 20));
-    canvas.drawPath(
-      wave,
-      paint
-        ..color = active
-        ..style = .stroke,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ChargeWave oldDelegate) =>
-      fraction != oldDelegate.fraction ||
-      active != oldDelegate.active ||
-      track != oldDelegate.track;
 }
 
 class _Stat extends StatelessWidget {
