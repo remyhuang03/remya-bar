@@ -87,4 +87,4 @@
 - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, and `revert`.
 - Inspect diffs, stage only intended paths, and preserve unrelated changes.
 - Commit approval is mandatory: show completed changes and validation results before requesting explicit user review approval to run `git commit`.
-- Do not push or merge without user authorization. Verify remote refs after authorized delivery.
+- Approval to commit also authorizes the branch follow-up: merge each branch that is ready into `main`, delete local branches (and their worktrees) that are fully merged, and push `main` to `origin`. Do not push or merge without such approval. Verify remote refs after delivery.
