@@ -374,8 +374,10 @@ void main() {
       tester,
       actions,
       overrides: {
-        'layout': ['caffeine', 'dark', 'mic-mute'],
+        'layout': ['caffeine', 'dark', 'mic-mute', 'dnd-quick', 'airplane'],
         'keep-awake': {'value': true},
+        'notification-dnd': {'value': true},
+        'airplane': {'available': true, 'enabled': false},
         'theme': {
           'theme': {'theme_mode': 'light'},
         },
@@ -393,7 +395,13 @@ void main() {
         },
       },
     );
-    for (final title in ['Keep awake', 'Dark mode', 'Mic mute']) {
+    for (final title in [
+      'Keep awake',
+      'Dark mode',
+      'Mic mute',
+      'Do Not Disturb',
+      'Airplane mode',
+    ]) {
       await tester.tap(
         find.byWidgetPredicate((w) => w is Tooltip && w.message == title),
       );
@@ -403,6 +411,8 @@ void main() {
       {'action': 'sidebar.keep-awake', 'target': null, 'value': false},
       {'action': 'sidebar.dark', 'target': null, 'value': true},
       {'action': 'sidebar.input-muted', 'target': 'mic', 'value': false},
+      {'action': 'sidebar.dnd', 'target': null, 'value': false},
+      {'action': 'sidebar.airplane', 'target': null, 'value': true},
     ]);
   });
 

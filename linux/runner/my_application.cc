@@ -136,6 +136,7 @@ static void monitor_added(GdkDisplay* display, GdkMonitor* monitor,
 
 static void monitor_removed(GdkDisplay* display, GdkMonitor* monitor,
                             MyApplication* self) {
+  bar_popup_monitor_removed(monitor);
   auto* window = GTK_WIDGET(g_hash_table_lookup(self->bar_windows, monitor));
   if (window == nullptr) return;
   gtk_widget_destroy(window);

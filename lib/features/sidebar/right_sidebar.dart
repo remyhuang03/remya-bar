@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../widgets/bar_pill.dart';
 import '../../widgets/bar_tooltip.dart';
 
+import '../popups/bar_popup_button.dart';
 import '../popups/popup_measure.dart';
 
 part 'sidebar_controls.dart';
@@ -120,7 +121,7 @@ class _RightSidebarState extends State<RightSidebar> {
     'screenshot': ('Screenshot', Icons.crop_free_rounded),
     'picker': ('Color picker', Icons.colorize_rounded),
     'dark': ('Dark mode', Icons.dark_mode_rounded),
-    'vpn': ('VPN', Icons.vpn_key_rounded),
+    'dnd-quick': ('Do Not Disturb', Icons.do_not_disturb_on_rounded),
     'airplane': ('Airplane mode', Icons.flight_rounded),
     'keyboard': ('On-screen keyboard', Icons.keyboard_rounded),
     'clipboard': ('Clipboard', Icons.content_paste_rounded),
@@ -156,6 +157,7 @@ class _RightSidebarState extends State<RightSidebar> {
   Map get _bluetooth => _map(widget.data['bluetooth']);
   Map get _sound => _map(widget.data['sound']);
   Map get _night => _map(widget.data['night-light']);
+  bool? get _dnd => _map(widget.data['notification-dnd'])['value'] as bool?;
   Map get _powerState => _map(widget.data['power']);
   Map get _powerSystem => _map(_powerState['system']);
   List<String>? get _saved =>
@@ -401,7 +403,11 @@ class _RightSidebarState extends State<RightSidebar> {
       return Row(
         spacing: 8,
         children: [
-          _HeaderButton(Icons.arrow_back_rounded, 'Back', () => _view(null)),
+          BarPopupButton(
+            const Icon(Icons.arrow_back_rounded, size: 20),
+            'Back',
+            () => _view(null),
+          ),
           Expanded(
             child: Text(
               _detailTitles[detail]!,
@@ -454,8 +460,8 @@ class _RightSidebarState extends State<RightSidebar> {
               bold: true,
             ),
           ),
-          _HeaderButton(
-            Icons.edit_rounded,
+          BarPopupButton(
+            const Icon(Icons.edit_rounded, size: 20),
             'Finish editing',
             _busy ? null : _edit,
             selected: true,
@@ -493,23 +499,23 @@ class _RightSidebarState extends State<RightSidebar> {
             child: Row(
               mainAxisSize: .min,
               children: [
-                _HeaderButton(
-                  Icons.edit_rounded,
+                BarPopupButton(
+                  const Icon(Icons.edit_rounded, size: 20),
                   'Edit layout',
                   _saved == null || _busy ? null : _edit,
                 ),
-                _HeaderButton(
-                  Icons.close_rounded,
+                BarPopupButton(
+                  const Icon(Icons.close_rounded, size: 20),
                   'Quit Remya Bar',
                   () => _send('quit'),
                 ),
-                _HeaderButton(
-                  Icons.settings_outlined,
+                BarPopupButton(
+                  const Icon(Icons.settings_outlined, size: 20),
                   'Settings',
                   () => _send('sidebar.settings', target: 'remya-bar'),
                 ),
-                _HeaderButton(
-                  Icons.power_settings_new_rounded,
+                BarPopupButton(
+                  const Icon(Icons.power_settings_new_rounded, size: 20),
                   'Power',
                   () => setState(() {
                     _power = !_power;
@@ -723,7 +729,7 @@ class _RightSidebarState extends State<RightSidebar> {
     final connected = _rowsOf<Map>(_bluetooth['devices'])
         .where((item) => item['connected'] == true)
         .length;
-    final dnd = _map(widget.data['notification-dnd'])['value'] as bool?;
+    final dnd = _dnd;
     final (bool active, String subtitle, VoidCallback? toggle) = switch (id) {
       'internet' => (
         wifi,
@@ -818,9 +824,14 @@ class _RightSidebarState extends State<RightSidebar> {
     final input = _input;
     final mode = _map(_map(widget.data['theme'])['theme'])['theme_mode'];
     final awake = _map(widget.data['keep-awake'])['value'];
+    final airplane = _map(widget.data['airplane']);
     final bool? selected = switch (id) {
       'caffeine' when awake is bool => awake,
       'dark' when mode == 'light' || mode == 'dark' => mode == 'dark',
+      'dnd-quick' => _dnd,
+      'airplane' when airplane['available'] == true =>
+        airplane['enabled'] as bool?,
+      'keyboard' => widget.data['keyboardOpen'] as bool?,
       'mic-mute' => _map(input?['preferences'])['muted'] as bool?,
       _ => null,
     };
@@ -834,6 +845,15 @@ class _RightSidebarState extends State<RightSidebar> {
           : switch (id) {
               'caffeine' => () => _send('sidebar.keep-awake', value: !selected),
               'dark' => () => _send('sidebar.dark', value: !selected),
+              'dnd-quick' => () => _send('sidebar.dnd', value: !selected),
+              'airplane' when !_busy => () => _send(
+                'sidebar.airplane',
+                value: !selected,
+              ),
+              'keyboard' when !_busy => () => _send(
+                'sidebar.keyboard',
+                value: !selected,
+              ),
               'mic-mute' => () => _send(
                 'sidebar.input-muted',
                 target: input!['name'],

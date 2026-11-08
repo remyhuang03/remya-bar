@@ -188,11 +188,16 @@ class _MediaTitle extends StatelessWidget {
           MediaQuery.disableAnimationsOf(context)) {
         return Text(text, style: style, maxLines: 1, overflow: .ellipsis);
       }
-      return _ScrollingTitle(
-        key: ValueKey(text),
-        textWidth: textWidth,
-        direction: direction,
-        child: label,
+      return ValueListenableBuilder<bool>(
+        valueListenable: BarPopup.keyboardOpen,
+        builder: (_, keyboardOpen, child) =>
+            TickerMode(enabled: !keyboardOpen, child: child!),
+        child: _ScrollingTitle(
+          key: ValueKey(text),
+          textWidth: textWidth,
+          direction: direction,
+          child: label,
+        ),
       );
     },
   );

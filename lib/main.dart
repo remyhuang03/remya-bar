@@ -11,6 +11,7 @@ import 'features/hyprland/hyprland_backend.dart';
 import 'features/notifications/notification_backend.dart';
 import 'features/settings/bar_theme_controller.dart';
 import 'features/popups/popup_app.dart';
+import 'features/popups/bar_popup.dart';
 import 'features/system/system_backend.dart';
 
 Future<void> main(List<String> arguments) async {
@@ -36,6 +37,8 @@ Future<void> main(List<String> arguments) async {
   await SystemBackend.initialize();
   final output = await const MethodChannel('top.remya.bar/window')
       .invokeMapMethod<String, int>('output');
+  BarPopup.keyboardOpen.value =
+      await BarPopup.channel.invokeMethod<bool>('keyboardVisible') ?? false;
   final hyprland = HyprlandBackend(outputX: output?['x'], outputY: output?['y'])
     ..start();
   final system = SystemBackend()..start();

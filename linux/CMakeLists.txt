@@ -123,6 +123,8 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/top.remya.bar.desktop"
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/../assets/icons/bar.svg"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/scalable/apps"
   RENAME "top.remya.bar.svg" COMPONENT Runtime)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/protocols/virtual-keyboard-unstable-v1.xml"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/licenses" COMPONENT Runtime)
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)

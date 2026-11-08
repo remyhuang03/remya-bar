@@ -16,6 +16,7 @@ class BarPopupScope extends InheritedWidget {
 
 abstract final class BarPopup {
   static final openCard = ValueNotifier<String?>(null);
+  static final keyboardOpen = ValueNotifier(false);
 
   static const channel = MethodChannel('top.remya.bar/popup');
 

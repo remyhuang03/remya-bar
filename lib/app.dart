@@ -18,6 +18,8 @@ import 'features/notifications/notification_view.dart';
 import 'features/system/system_backend.dart';
 import 'features/clock/bar_clock.dart';
 import 'features/hyprland/hyprland_backend.dart';
+import 'features/keyboard/keyboard_device.dart';
+import 'features/keyboard/keyboard_panel.dart';
 import 'features/popups/bar_popup.dart';
 import 'features/resources/bar_resources.dart';
 import 'features/resources/resource_data.dart';
@@ -62,6 +64,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   Timer? _pillRefresh;
   final _tray = GlobalKey<BarTrayState>();
   SidebarBackend? _sidebar;
+  final _keyboardDevice = KeyboardDevice();
+  static const _popupAnchor = Rect.fromLTWH(0, 0, 1, 1);
   bool _sidebarOpenValue = false;
   bool get _sidebarOpen => _sidebarOpenValue;
   // The toggle shows the open state, so changes rebuild the bar.
@@ -111,6 +115,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   }
 
   String? _sidebarOutput;
+  String? _sidebarFocus;
 
   Map<String, Object?> get _sidebarData => {
     'account': widget.account?.data ?? const {},
@@ -132,13 +137,14 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     _sidebar ??= SidebarBackend()..addListener(_updateSidebar);
     _sidebarOpen = true;
     try {
-      final monitor = await _sidebarMonitor();
+      final (monitor, focus) = await (_sidebarMonitor(), _focusedWindow()).wait;
       if (!mounted || !_sidebarOpen) return;
       if (focusedOutput != null && monitor?['name'] != focusedOutput) {
         _sidebarOpen = false;
         return;
       }
       _sidebarOutput = monitor?['name'] as String?;
+      _sidebarFocus = focus;
       final reserved = monitor?['reserved'];
       final reservedHeight = switch (reserved) {
         [_, final int top, _, final int bottom] => top + bottom,
@@ -165,6 +171,21 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 
   static const _window = MethodChannel('top.remya.bar/window');
 
+  Future<String?> _focusedWindow() async {
+    final backend = widget.hyprland;
+    if (backend == null) return null;
+    try {
+      final active = jsonDecode(await backend.request('j/activewindow'));
+      final address = active is Map ? active['address'] : null;
+      return address is String && RegExp(r'^0x[0-9a-fA-F]+$').hasMatch(address)
+          ? address
+          : null;
+    } catch (error) {
+      debugPrint('Sidebar focused window: $error');
+      return null;
+    }
+  }
+
   Future<Map?> _sidebarMonitor() async {
     final hyprland = widget.hyprland;
     if (hyprland == null) return null;
@@ -188,6 +209,19 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         data: _sidebarData,
         theme: widget.preferences.theme,
       ).catchError((Object error) => debugPrint('Sidebar update: $error')),
+    );
+  }
+
+  void _updatePopupThemes() {
+    _updateSidebar();
+    unawaited(
+      BarPopup.update(
+        kind: keyboardKind,
+        anchor: _popupAnchor,
+        size: keyboardSize,
+        data: const {},
+        theme: widget.preferences.theme,
+      ).catchError((Object error) => debugPrint('Keyboard theme: $error')),
     );
   }
 
@@ -216,7 +250,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     widget.account?.addListener(_updateSidebar);
     widget.notifications?.addListener(_syncToasts);
     BarPopup.openCard.addListener(_syncToasts);
-    widget.preferences.addListener(_updateSidebar);
+    widget.preferences.addListener(_updatePopupThemes);
     _window.setMethodCallHandler((call) async {
       if (call.method == 'outputChanged') {
         final geometry = Map<String, int>.from(call.arguments as Map);
@@ -316,7 +350,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     }
   }
 
-  Future<void> _popupAction(MethodCall call) async {
+  Future<Object?> _popupAction(MethodCall call) async {
     if (call.method != 'action') throw MissingPluginException();
     final args = call.arguments;
     if (args is! Map) throw const FormatException('Invalid popup action');
@@ -340,9 +374,48 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       } else if (BarPopup.openCard.value == kind) {
         BarPopup.openCard.value = null;
       }
+    } else if (action == 'keyboard.visibility' && args['open'] is bool) {
+      BarPopup.keyboardOpen.value = args['open'] as bool;
     } else if (action == 'sidebar.closed') {
       _sidebarOpen = false;
       _sidebar?.close();
+    } else if (action == 'sidebar.keyboard' && args['value'] is bool) {
+      if (!_sidebarOpen) throw StateError('Sidebar is closed');
+      if (args['value'] == false) {
+        await BarPopup.hide(kind: keyboardKind);
+        _updateSidebar();
+      } else {
+        final backend = widget.hyprland;
+        if (backend == null) throw StateError('Hyprland is unavailable');
+        final device = await _keyboardDevice.read(backend);
+        if (!mounted || !_sidebarOpen) return null;
+        final focus = _sidebarFocus;
+        await BarPopup.show(
+          kind: keyboardKind,
+          anchor: _popupAnchor,
+          size: keyboardSize,
+          data: {'device': device},
+          theme: widget.preferences.theme,
+        );
+        if (focus != null) {
+          try {
+            await backend.request(
+              'dispatch hl.dsp.focus({ window = "address:$focus" })',
+            );
+          } catch (error) {
+            debugPrint('Keyboard focus restore: $error');
+          }
+        }
+      }
+    } else if (action == 'keyboard.device' || action == 'keyboard.cursor') {
+      final backend = widget.hyprland;
+      if (backend == null) throw StateError('Hyprland is unavailable');
+      return action == 'keyboard.cursor'
+          ? jsonDecode(await backend.request('j/cursorpos'))
+          : _keyboardDevice.read(backend, select: args['value'] as int?);
+    } else if (action == 'keyboard.settings') {
+      await (widget.onOpenSettingsPage ??
+          (page) => openRemyaSettings(page: page))('remya-bar');
     } else if (action == 'sidebar.settings') {
       final page = args['target'];
       if (page is! String ||
@@ -423,6 +496,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     } else {
       throw const FormatException('Invalid popup action');
     }
+    return null;
   }
 
   Future<void> _notificationAction(String action, Map args) async {
@@ -458,9 +532,10 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     widget.hyprland?.removeListener(_scheduleFullscreenCheck);
     _pillRefresh?.cancel();
     _sidebar?.dispose();
+    unawaited(_keyboardDevice.close());
     widget.account?.removeListener(_updateSidebar);
     widget.account?.dispose();
-    widget.preferences.removeListener(_updateSidebar);
+    widget.preferences.removeListener(_updatePopupThemes);
     _window.setMethodCallHandler(null);
     widget.system?.removeListener(_showFirstResourceSample);
     widget.system?.removeListener(_applyWorkspaceCount);

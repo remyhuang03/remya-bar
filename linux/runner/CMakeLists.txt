@@ -1,5 +1,25 @@
 cmake_minimum_required(VERSION 3.13)
-project(runner LANGUAGES CXX)
+project(runner LANGUAGES C CXX)
+
+pkg_check_modules(VIRTUAL_KEYBOARD REQUIRED IMPORTED_TARGET wayland-client xkbcommon)
+find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
+set(KEYBOARD_XML "${CMAKE_CURRENT_SOURCE_DIR}/../protocols/virtual-keyboard-unstable-v1.xml")
+set(KEYBOARD_HEADER "${CMAKE_CURRENT_BINARY_DIR}/virtual-keyboard-client.h")
+set(KEYBOARD_CODE "${CMAKE_CURRENT_BINARY_DIR}/virtual-keyboard-protocol.c")
+add_custom_command(OUTPUT "${KEYBOARD_HEADER}" "${KEYBOARD_CODE}"
+  COMMAND "${WAYLAND_SCANNER}" client-header "${KEYBOARD_XML}" "${KEYBOARD_HEADER}"
+  COMMAND "${WAYLAND_SCANNER}" private-code "${KEYBOARD_XML}" "${KEYBOARD_CODE}"
+  DEPENDS "${KEYBOARD_XML}"
+  VERBATIM
+)
+add_library(bar_virtual_keyboard STATIC
+  virtual_keyboard.cc "${KEYBOARD_HEADER}" "${KEYBOARD_CODE}"
+)
+target_include_directories(bar_virtual_keyboard PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(bar_virtual_keyboard PRIVATE
+  flutter PkgConfig::GTK PkgConfig::VIRTUAL_KEYBOARD
+)
+apply_standard_settings(bar_virtual_keyboard)
 
 # Define the application target. To change its name, change BINARY_NAME in the
 # top-level CMakeLists.txt, not the value here, or `flutter run` will no longer
@@ -28,6 +48,7 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK_LAYER_SHELL)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GIO_UNIX)
+target_link_libraries(${BINARY_NAME} PRIVATE bar_virtual_keyboard)
 
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
@@ -39,7 +60,7 @@ add_executable(bar_lifecycle_test EXCLUDE_FROM_ALL
 apply_standard_settings(bar_lifecycle_test)
 target_include_directories(bar_lifecycle_test PRIVATE "${CMAKE_SOURCE_DIR}")
 target_link_libraries(bar_lifecycle_test PRIVATE
-  flutter PkgConfig::GTK PkgConfig::GTK_LAYER_SHELL PkgConfig::GIO_UNIX
+  flutter PkgConfig::GTK PkgConfig::GTK_LAYER_SHELL PkgConfig::GIO_UNIX bar_virtual_keyboard
 )
 set_target_properties(bar_lifecycle_test PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bundle"

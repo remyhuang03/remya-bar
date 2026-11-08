@@ -46,6 +46,8 @@ class SidebarBackend extends ChangeNotifier {
           return;
         }
         if (const {
+          airplaneEnabledSettingId,
+          airplaneWifiSettingId,
           'sound',
           'power',
           'network',
@@ -100,6 +102,7 @@ class SidebarBackend extends ChangeNotifier {
         read('uptimeSeconds', system.sidebarUptime()),
         read('sound', _settings.readSound()),
         read('network', _settings.readNetwork()),
+        read('airplane', _settings.readAirplane()),
         read('bluetooth', _settings.readBluetooth()),
         read('night-light', _settings.call('Get', ['night-light'])),
         read('power', _settings.readPower()),
@@ -321,6 +324,10 @@ class SidebarBackend extends ChangeNotifier {
       'sidebar.wifi' when value is bool => (
         'network',
         await _settings.setWifiEnabled(value),
+      ),
+      'sidebar.airplane' when value is bool => (
+        'airplane',
+        await _settings.setAirplaneEnabled(value),
       ),
       'sidebar.wifi-scan' => ('network', await _settings.scanWifi()),
       'sidebar.wifi-connect' when value is Map => (

@@ -101,6 +101,7 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 - **Desktop Environment**: Hyprland (or Wayland compositor supporting `wlr-layer-shell-unstable-v1`).
 - **Dependencies**:
   - `gtk-layer-shell` (system package)
+  - Wayland client and XKB libraries (`wayland`, `libxkbcommon` on Arch), with `wayland-scanner` at build time
   - `inter-font` and `noto-fonts-cjk`
   - NetworkManager and BlueZ (for network & Bluetooth toggles)
   - Remya Settings (`remya_settings`, provides theme & system D-Bus services)

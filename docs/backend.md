@@ -313,8 +313,8 @@ picker on secondary click.
 Sidebar writes run in FIFO order; queued volume and brightness writes coalesce
 per action and target to the latest value. Predictable controls update immediately
 and reconcile with Settings results; refresh reads wait until the queue drains.
-Only layout editing, session actions, Wi-Fi connection/forget flows and Bluetooth
-pairing/forget flows use the panel's busy guard.
+Layout editing, session actions, Wi-Fi connection/forget flows, Bluetooth
+pairing/forget flows, and the airplane and keyboard toggles use the busy guard.
 
 Wi-Fi scan, connection, disconnect, forget, and hidden-network activation use
 Settings' NetworkManager API. BlueZ state, scan, connect, disconnect, forget,
@@ -327,7 +327,10 @@ Settings to ensure hypridle is running. Settings reuses an existing daemon or
 starts the packaged user service. Dark mode uses the Settings
 Light/Dark preference and applies it through the same appearance backend.
 Mic mute controls the current default PipeWire input through Settings Sound.
-Do Not Disturb and the other unimplemented toggles are displayed as unavailable.
+The compact and large Do Not Disturb controls use the same manual Settings
+preference. Airplane mode reads live radio state via `readAirplane` and writes
+via `setAirplaneEnabled`. Settings owns radio readback, partial-failure
+handling, and migration of the former VPN tile in saved sidebar layouts.
 
 The editor sends the old and new visible tile order to Settings for an atomic
 update. Hidden IDs are inferred from the full tile list. The Power menu asks
@@ -344,6 +347,18 @@ hl.bind("SUPER + A", hl.dsp.exec_cmd(
 
 Replace any existing binding for that chord when adopting it. Bar listens only
 to the signal for its own Hyprland instance and opens on the focused output.
+
+## On-screen keyboard
+
+The on-screen keyboard is a shared Flutter popup with a non-focusable Wayland
+overlay surface. GTK opens it on the initiating output. Dropping the floating
+keyboard on another output moves the entire panel there. Docking reserves space
+on the current output. Media titles pause scrolling on all outputs while the
+keyboard is visible. The floating position is written atomically to
+`$XDG_STATE_HOME/remya/bar/keyboard.ini` (default `~/.local/state`).
+Hyprland supplies the current layout group and physical Caps Lock state. The
+runner compiles the XKB keymap and sends evdev key events with
+`zwp_virtual_keyboard_v1`. Settings owns the touch key preview preference.
 
 ## Fullscreen output visibility
 

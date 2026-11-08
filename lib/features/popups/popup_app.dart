@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 import '../../bar_theme.dart';
+import '../keyboard/keyboard_panel.dart';
 import '../notifications/notification_view.dart';
 import '../tray/tray_menu_popup.dart';
 import '../workspaces/bar_workspaces.dart';
@@ -106,6 +107,13 @@ class _BarPopupAppState extends State<BarPopupApp>
   void initState() {
     super.initState();
     BarPopup.channel.setMethodCallHandler((call) async {
+      if (call.method == 'keyboard.hidden' && _kind == keyboardKind) {
+        setState(() {
+          _kind = null;
+          _theme = null;
+        });
+        return;
+      }
       if (call.method == 'dismiss') {
         _send(_dismiss());
         return;
@@ -118,6 +126,7 @@ class _BarPopupAppState extends State<BarPopupApp>
           !const {
             'tooltip',
             'sidebar',
+            keyboardKind,
             'resources',
             'media',
             'battery',
@@ -220,7 +229,7 @@ class _BarPopupAppState extends State<BarPopupApp>
         child: MouseRegion(
           onEnter: (_) => _send(BarPopup.enter()),
           onExit: (_) {
-            if (_kind != 'sidebar') {
+            if (_kind != 'sidebar' && _kind != keyboardKind) {
               _navigator.currentState?.popUntil((route) => route.isFirst);
             }
             _send(BarPopup.leave());
@@ -228,7 +237,21 @@ class _BarPopupAppState extends State<BarPopupApp>
           child: child!,
         ),
       ),
-      home: _kind == 'sidebar'
+      home: _kind == keyboardKind
+          ? ClipRect(
+              child: TweenAnimationBuilder<double>(
+                key: ValueKey(_opening),
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+                tween: Tween(begin: 1, end: 0),
+                builder: (_, offset, child) => FractionalTranslation(
+                  translation: Offset(0, offset),
+                  child: child,
+                ),
+                child: KeyboardPanel(data: details),
+              ),
+            )
+          : _kind == 'sidebar'
           ? Align(
               alignment: .topRight,
               child: TweenAnimationBuilder<double>(
