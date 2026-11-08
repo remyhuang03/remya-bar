@@ -8,6 +8,7 @@ import tempfile
 
 APP_ID = "remya_bar"
 PACKAGE = "top.remya.bar"
+UNIT = f"{PACKAGE}.service"
 
 
 def data_home(environment):
@@ -28,6 +29,27 @@ def desktop_quote(path):
     return '"' + value.replace("\\", "\\\\") + '"'
 
 
+def unit_quote(path):
+    # systemd.syntax: double-quoted word; % and $ are specifier/variable prefixes.
+    value = str(path).replace("\\", "\\\\").replace('"', '\\"')
+    return '"' + value.replace("%", "%%").replace("$", "$$") + '"'
+
+
+def user_unit(executable):
+    # The session manager imports WAYLAND_DISPLAY and HYPRLAND_INSTANCE_SIGNATURE.
+    return (
+        "[Unit]\nDescription=Remy'a Bar\n"
+        "PartOf=graphical-session.target\nAfter=graphical-session.target\n"
+        "Wants=top.remya.settings.service\nAfter=top.remya.settings.service\n\n"
+        f"[Service]\nExecStart={unit_quote(executable)}\n"
+        "Restart=on-failure\nRestartSec=2\n\n"
+        "[Install]\nWantedBy=graphical-session.target\n")
+
+
+def systemctl(*arguments, check=True):
+    return subprocess.run(["systemctl", "--user", *arguments], check=check, capture_output=not check)
+
+
 def require_inter_font():
     try:
         result = subprocess.run(['fc-match', '--format=%{family}', 'Inter'], capture_output=True, text=True, check=True)
@@ -44,7 +66,11 @@ def install(root, environment):
     if not (source / APP_ID).is_file():
         raise RuntimeError("Run fvm flutter build linux --release first")
     destination = data / "remya" / APP_ID
-    # Refuse an update while this installed bundle is executing.
+    # The autostart unit is restarted with the new bundle; other instances block the update.
+    has_systemd = shutil.which("systemctl") is not None
+    was_active = has_systemd and systemctl("is-active", "--quiet", UNIT, check=False).returncode == 0
+    if was_active:
+        systemctl("stop", UNIT)
     for process in Path("/proc").iterdir():
         if not process.name.isdecimal():
             continue
@@ -93,9 +119,18 @@ def install(root, environment):
         command.symlink_to(destination / APP_ID)
     if shutil.which("update-desktop-database"):
         subprocess.run(["update-desktop-database", str(applications)], check=True)
+    units = data / "systemd/user"
+    units.mkdir(parents=True, exist_ok=True)
+    (units / UNIT).write_text(user_unit(destination / APP_ID))
+    if has_systemd:
+        systemctl("daemon-reload")
+        systemctl("enable", UNIT)
+        # Start with the graphical session; restart a running unit on the new bundle.
+        if was_active or systemctl("is-active", "--quiet", "graphical-session.target", check=False).returncode == 0:
+            systemctl("restart", UNIT)
     print(f"Installed {PACKAGE} in {destination}")
     print(f"Command: {command} (add ~/.local/bin to PATH if needed)")
-    print(f"Launch with: gtk-launch {PACKAGE}")
+    print(f"Autostart: {UNIT} starts with the graphical session")
 
 
 if __name__ == "__main__":

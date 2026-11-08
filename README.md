@@ -114,6 +114,14 @@ fvm flutter build linux --release
 python tool/install.py
 ```
 
+The installer also writes and enables the `top.remya.bar.service` systemd user
+unit, so the bar starts with the graphical session (`graphical-session.target`,
+which needs `WAYLAND_DISPLAY` and `HYPRLAND_INSTANCE_SIGNATURE` in the user
+manager environment, as uwsm provides). Reinstalling stops the unit, replaces
+the bundle and starts it again. Remove any other autostart entry for the bar so
+it does not start twice; `systemctl --user disable --now top.remya.bar.service`
+turns autostart off.
+
 The installer verifies runtime libraries, registers the desktop entry, installs icons, and places the executable `remya_bar` in your user PATH.
 
 ### Hyprland Configuration

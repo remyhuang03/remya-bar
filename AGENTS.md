@@ -77,7 +77,8 @@
 - Validate configuration input, preserve the last valid state on errors, and use atomic persistence when writing configuration is introduced. Never commit secrets or machine-specific configuration.
 
 - After every application code change, finish validation and rebuild the release bundle, then run `python tool/install.py` on this workstation as the final implementation step so the user can manually review the installed application. Source changes and successful builds alone do not complete the task.
-- Verify that the installed bundle, command, and desktop entry use the updated build, and exercise the installed application. Preserve user configuration and unrelated installations. When both Settings and Bar change, install Settings first and Bar second; retain the required cleanup of verification instances.
+- `tool/install.py` installs and enables the `top.remya.bar.service` systemd user unit (graphical-session.target) and restarts it on the new bundle. On this workstation the installed bar stays autostarting and running: do not disable or stop that unit during cleanup; stop only the extra development or verification instances you started.
+- Verify that the installed bundle, command, desktop entry, and running service use the updated build, and exercise the installed application. Preserve user configuration and unrelated installations. When both Settings and Bar change, install Settings first and Bar second; retain the required cleanup of verification instances.
 
 ## Git Workflow
 - Develop and validate on a separate branch using `<type>/<short-description>` with lowercase words and hyphens, such as `feat/appearance` or `chore/initialize-project`.
