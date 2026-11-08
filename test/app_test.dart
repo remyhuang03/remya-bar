@@ -349,7 +349,7 @@ void main() {
             // A vertical wheel over a non-scrolling pill scrolls the bar.
             await tester.sendEventToBinding(
               PointerScrollEvent(
-                position: tester.getCenter(find.byType(BarClock)),
+                position: tester.getCenter(find.byType(BarResources)),
                 scrollDelta: const Offset(0, 10000),
               ),
             );
@@ -408,6 +408,7 @@ void main() {
     expect(sidebar.left, 24);
     expect(resources.left, sidebar.right + 8);
     expect(tester.getRect(find.byType(BarClock)).right, 1920 - 24);
+    expect(tester.getSize(find.byType(BarClock)).width, greaterThan(180));
     expect(find.text('50%'), findsOneWidget);
     expect(tester.widget<BarResources>(find.byType(BarResources)).metrics, [
       'cpu',

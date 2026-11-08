@@ -505,10 +505,7 @@ class _BarContent extends StatelessWidget {
                 hyprland?.error == null &&
                 hyprland!.workspaceSlots.isNotEmpty =>
           BarWorkspaces(backend: hyprland),
-        'clock' => ConstrainedBox(
-          constraints: const .new(maxWidth: 180),
-          child: clock,
-        ),
+        'clock' => clock,
         'tray' when tray != null => ConstrainedBox(
           constraints: const .new(maxWidth: 290),
           child: LayoutBuilder(
