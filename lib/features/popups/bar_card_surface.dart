@@ -88,6 +88,24 @@ class BarCardSurface extends StatelessWidget {
   // The top inset is the neck; the other insets reserve shadow room.
   static const shadowInsets = EdgeInsets.fromLTRB(40, 12, 40, 52);
 
+  /// Near a screen edge the popup is clamped while the pill is not, so the body
+  /// shifts into the shadow room to stay under its pill.
+  static EdgeInsets insetsFor(Rect? pill, double width) {
+    if (pill == null) return shadowInsets;
+    final left = shadowInsets.left;
+    final right = width - shadowInsets.right;
+    final shift = pill.left < left
+        ? pill.left - left
+        : pill.right > right
+        ? pill.right - right
+        : 0.0;
+    final dx = shift.clamp(-left, shadowInsets.right);
+    return shadowInsets.copyWith(
+      left: left + dx,
+      right: shadowInsets.right - dx,
+    );
+  }
+
   static ColorScheme colors(
     ThemeData theme,
     Color? seed,
@@ -108,11 +126,16 @@ class BarCardSurface extends StatelessWidget {
       data: theme.copyWith(colorScheme: scheme),
       child: AnimatedBuilder(
         animation: emergence,
-        child: Padding(
-          padding: shadowInsets,
-          child: Material(
-            type: .transparency,
-            child: SingleChildScrollView(padding: const .all(24), child: child),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Padding(
+            padding: insetsFor(pill, constraints.maxWidth),
+            child: Material(
+              type: .transparency,
+              child: SingleChildScrollView(
+                padding: const .all(24),
+                child: child,
+              ),
+            ),
           ),
         ),
         builder: (context, child) {
@@ -141,7 +164,10 @@ class _CardClipper extends CustomClipper<Path> {
 
   @override
   Path getClip(Size size) {
-    final body = BarCardSurface.shadowInsets.deflateRect(Offset.zero & size);
+    final body = BarCardSurface.insetsFor(
+      pill,
+      size.width,
+    ).deflateRect(Offset.zero & size);
     final anchor = pill;
     return anchor == null
         ? (Path()..addRRect(

@@ -34,4 +34,24 @@ void main() {
     expect(clamped.contains(const Offset(71, 10)), isFalse);
     expect(clamped.contains(const Offset(73.5, 11.5)), isTrue);
   });
+
+  test('body shifts under a pill clamped at a screen edge', () {
+    const width = 500.0;
+    expect(BarCardSurface.insetsFor(null, width), BarCardSurface.shadowInsets);
+    final centered = BarCardSurface.insetsFor(
+      const Rect.fromLTWH(200, 0, 50, 0),
+      width,
+    );
+    expect(centered, BarCardSurface.shadowInsets);
+    final left = BarCardSurface.insetsFor(
+      const Rect.fromLTWH(24, 0, 50, 0),
+      width,
+    );
+    expect((left.left, left.right), (24, 56));
+    final right = BarCardSurface.insetsFor(
+      const Rect.fromLTWH(430, 0, 60, 0),
+      width,
+    );
+    expect((left.horizontal, right.left, right.right), (80, 70, 10));
+  });
 }
