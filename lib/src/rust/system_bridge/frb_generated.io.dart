@@ -30,6 +30,10 @@ abstract class SystemRustLibApiImplPlatform
   dco_decode_StreamSink_list_media_player_snapshot_Sse(dynamic raw);
 
   @protected
+  RustStreamSink<NotificationCenter>
+  dco_decode_StreamSink_notification_center_Sse(dynamic raw);
+
+  @protected
   String dco_decode_String(dynamic raw);
 
   @protected
@@ -48,6 +52,11 @@ abstract class SystemRustLibApiImplPlatform
   NetworkOverview dco_decode_box_autoadd_network_overview(dynamic raw);
 
   @protected
+  NotificationPreferences dco_decode_box_autoadd_notification_preferences(
+    dynamic raw,
+  );
+
+  @protected
   ResourceDetails dco_decode_box_autoadd_resource_details(dynamic raw);
 
   @protected
@@ -63,6 +72,9 @@ abstract class SystemRustLibApiImplPlatform
   int dco_decode_i_32(dynamic raw);
 
   @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
+
+  @protected
   List<BatterySnapshot> dco_decode_list_battery_snapshot(dynamic raw);
 
   @protected
@@ -72,7 +84,24 @@ abstract class SystemRustLibApiImplPlatform
   List<MediaPlayerSnapshot> dco_decode_list_media_player_snapshot(dynamic raw);
 
   @protected
+  List<NotificationAction> dco_decode_list_notification_action(dynamic raw);
+
+  @protected
+  List<NotificationPriorityApp> dco_decode_list_notification_priority_app(
+    dynamic raw,
+  );
+
+  @protected
+  List<NotificationSnapshot> dco_decode_list_notification_snapshot(dynamic raw);
+
+  @protected
+  List<NotificationText> dco_decode_list_notification_text(dynamic raw);
+
+  @protected
   List<double?> dco_decode_list_opt_box_autoadd_f_64(dynamic raw);
+
+  @protected
+  Uint32List dco_decode_list_prim_u_32_strict(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -88,6 +117,24 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   NetworkOverview dco_decode_network_overview(dynamic raw);
+
+  @protected
+  NotificationAction dco_decode_notification_action(dynamic raw);
+
+  @protected
+  NotificationCenter dco_decode_notification_center(dynamic raw);
+
+  @protected
+  NotificationPreferences dco_decode_notification_preferences(dynamic raw);
+
+  @protected
+  NotificationPriorityApp dco_decode_notification_priority_app(dynamic raw);
+
+  @protected
+  NotificationSnapshot dco_decode_notification_snapshot(dynamic raw);
+
+  @protected
+  NotificationText dco_decode_notification_text(dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
@@ -138,6 +185,10 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  RustStreamSink<NotificationCenter>
+  sse_decode_StreamSink_notification_center_Sse(SseDeserializer deserializer);
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
@@ -154,6 +205,11 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   NetworkOverview sse_decode_box_autoadd_network_overview(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  NotificationPreferences sse_decode_box_autoadd_notification_preferences(
     SseDeserializer deserializer,
   );
 
@@ -175,6 +231,9 @@ abstract class SystemRustLibApiImplPlatform
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
   List<BatterySnapshot> sse_decode_list_battery_snapshot(
     SseDeserializer deserializer,
   );
@@ -188,9 +247,32 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  List<NotificationAction> sse_decode_list_notification_action(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<NotificationPriorityApp> sse_decode_list_notification_priority_app(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<NotificationSnapshot> sse_decode_list_notification_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<NotificationText> sse_decode_list_notification_text(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<double?> sse_decode_list_opt_box_autoadd_f_64(
     SseDeserializer deserializer,
   );
+
+  @protected
+  Uint32List sse_decode_list_prim_u_32_strict(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
@@ -210,6 +292,34 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   NetworkOverview sse_decode_network_overview(SseDeserializer deserializer);
+
+  @protected
+  NotificationAction sse_decode_notification_action(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  NotificationCenter sse_decode_notification_center(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  NotificationPreferences sse_decode_notification_preferences(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  NotificationPriorityApp sse_decode_notification_priority_app(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  NotificationSnapshot sse_decode_notification_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  NotificationText sse_decode_notification_text(SseDeserializer deserializer);
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
@@ -267,6 +377,12 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  void sse_encode_StreamSink_notification_center_Sse(
+    RustStreamSink<NotificationCenter> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
@@ -291,6 +407,12 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  void sse_encode_box_autoadd_notification_preferences(
+    NotificationPreferences self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_resource_details(
     ResourceDetails self,
     SseSerializer serializer,
@@ -307,6 +429,9 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_battery_snapshot(
@@ -327,8 +452,38 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  void sse_encode_list_notification_action(
+    List<NotificationAction> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_notification_priority_app(
+    List<NotificationPriorityApp> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_notification_snapshot(
+    List<NotificationSnapshot> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_notification_text(
+    List<NotificationText> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_opt_box_autoadd_f_64(
     List<double?> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_prim_u_32_strict(
+    Uint32List self,
     SseSerializer serializer,
   );
 
@@ -356,6 +511,42 @@ abstract class SystemRustLibApiImplPlatform
   @protected
   void sse_encode_network_overview(
     NetworkOverview self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_notification_action(
+    NotificationAction self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_notification_center(
+    NotificationCenter self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_notification_preferences(
+    NotificationPreferences self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_notification_priority_app(
+    NotificationPriorityApp self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_notification_snapshot(
+    NotificationSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_notification_text(
+    NotificationText self,
     SseSerializer serializer,
   );
 

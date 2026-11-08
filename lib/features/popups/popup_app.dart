@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 import '../../bar_theme.dart';
+import '../notifications/notification_view.dart';
 import '../tray/tray_menu_popup.dart';
 import '../workspaces/bar_workspaces.dart';
 import '../workspaces/workspace_overview.dart';
@@ -24,8 +25,13 @@ class _BarPopupAppState extends State<BarPopupApp>
   late final _emergence = AnimationController(vsync: this);
   bool _dismissing = false;
   int _dismissGeneration = 0;
-  bool get _card =>
-      const {'media', 'battery', 'datetime', 'resources'}.contains(_kind);
+  bool get _card => const {
+    'media',
+    'battery',
+    'datetime',
+    'resources',
+    'notifications',
+  }.contains(_kind);
   bool get _reduceMotion =>
       MediaQuery.maybeDisableAnimationsOf(context) == true ||
       WidgetsBinding
@@ -117,6 +123,8 @@ class _BarPopupAppState extends State<BarPopupApp>
             'battery',
             'datetime',
             'tray-menu',
+            'notifications',
+            notificationToastsKind,
             workspaceOverviewKind,
           }.contains(arguments['kind'])) {
         throw PlatformException(
@@ -247,7 +255,10 @@ class _BarPopupAppState extends State<BarPopupApp>
                     'height': height.ceil(),
                   }),
                 ),
-                child: _kind == 'tooltip' || _card
+                child:
+                    _kind == 'tooltip' ||
+                        _card ||
+                        _kind == notificationToastsKind
                     ? _content(details, textScale)
                     : TweenAnimationBuilder<double>(
                         key: ValueKey(_opening),
@@ -295,6 +306,10 @@ class _BarPopupAppState extends State<BarPopupApp>
           ),
           workspaceOverviewKind => WorkspaceOverview(
             workspaces: details['workspaces'] as List? ?? const [],
+            onAction: _action,
+          ),
+          notificationToastsKind => NotificationToasts(
+            data: details,
             onAction: _action,
           ),
           'tray-menu' => TrayMenuPopup(

@@ -73,7 +73,7 @@ class SystemRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1151459288;
+  int get rustContentHash => 1692616024;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -100,6 +100,26 @@ abstract class SystemRustLibApi extends BaseApi {
     required double seconds,
   });
 
+  Future<void> crateApiNotificationDismiss({int? id});
+
+  Future<void> crateApiNotificationInvoke({
+    required int id,
+    required String action,
+  });
+
+  Future<bool> crateApiNotificationsClaimPopups({required String output});
+
+  Future<void> crateApiNotificationsConfigure({
+    required NotificationPreferences preferences,
+  });
+
+  Future<void> crateApiNotificationsFullscreen({
+    required String output,
+    required bool fullscreen,
+  });
+
+  Future<void> crateApiNotificationsHover({required bool hovered});
+
   Future<ResourceDetails> crateApiResourceDetailsDefault();
 
   Future<void> crateApiSidebarSessionAction({required String action});
@@ -107,6 +127,8 @@ abstract class SystemRustLibApi extends BaseApi {
   Future<double?> crateApiSidebarUptime();
 
   Stream<List<MediaPlayerSnapshot>> crateApiSubscribeMedia();
+
+  Stream<NotificationCenter> crateApiSubscribeNotifications();
 
   Future<void> crateApiTrayAction({
     required String id,
@@ -262,6 +284,200 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   );
 
   @override
+  Future<void> crateApiNotificationDismiss({int? id}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_box_autoadd_u_32(id, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 5,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiNotificationDismissConstMeta,
+        argValues: [id],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNotificationDismissConstMeta =>
+      const TaskConstMeta(debugName: "notification_dismiss", argNames: ["id"]);
+
+  @override
+  Future<void> crateApiNotificationInvoke({
+    required int id,
+    required String action,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_32(id, serializer);
+          sse_encode_String(action, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 6,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiNotificationInvokeConstMeta,
+        argValues: [id, action],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNotificationInvokeConstMeta => const TaskConstMeta(
+    debugName: "notification_invoke",
+    argNames: ["id", "action"],
+  );
+
+  @override
+  Future<bool> crateApiNotificationsClaimPopups({required String output}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(output, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 7,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiNotificationsClaimPopupsConstMeta,
+        argValues: [output],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNotificationsClaimPopupsConstMeta =>
+      const TaskConstMeta(
+        debugName: "notifications_claim_popups",
+        argNames: ["output"],
+      );
+
+  @override
+  Future<void> crateApiNotificationsConfigure({
+    required NotificationPreferences preferences,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_notification_preferences(
+            preferences,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiNotificationsConfigureConstMeta,
+        argValues: [preferences],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNotificationsConfigureConstMeta =>
+      const TaskConstMeta(
+        debugName: "notifications_configure",
+        argNames: ["preferences"],
+      );
+
+  @override
+  Future<void> crateApiNotificationsFullscreen({
+    required String output,
+    required bool fullscreen,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(output, serializer);
+          sse_encode_bool(fullscreen, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 9,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiNotificationsFullscreenConstMeta,
+        argValues: [output, fullscreen],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNotificationsFullscreenConstMeta =>
+      const TaskConstMeta(
+        debugName: "notifications_fullscreen",
+        argNames: ["output", "fullscreen"],
+      );
+
+  @override
+  Future<void> crateApiNotificationsHover({required bool hovered}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_bool(hovered, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 10,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiNotificationsHoverConstMeta,
+        argValues: [hovered],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNotificationsHoverConstMeta => const TaskConstMeta(
+    debugName: "notifications_hover",
+    argNames: ["hovered"],
+  );
+
+  @override
   Future<ResourceDetails> crateApiResourceDetailsDefault() {
     return handler.executeNormal(
       NormalTask(
@@ -270,7 +486,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 11,
             port: port_,
           );
         },
@@ -298,7 +514,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 12,
             port: port_,
           );
         },
@@ -328,7 +544,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 13,
             port: port_,
           );
         },
@@ -361,7 +577,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 8,
+              funcId: 14,
               port: port_,
             );
           },
@@ -382,6 +598,41 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       const TaskConstMeta(debugName: "subscribe_media", argNames: ["sink"]);
 
   @override
+  Stream<NotificationCenter> crateApiSubscribeNotifications() {
+    final sink = RustStreamSink<NotificationCenter>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_StreamSink_notification_center_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 15,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: null,
+          ),
+          constMeta: kCrateApiSubscribeNotificationsConstMeta,
+          argValues: [sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiSubscribeNotificationsConstMeta =>
+      const TaskConstMeta(
+        debugName: "subscribe_notifications",
+        argNames: ["sink"],
+      );
+
+  @override
   Future<void> crateApiTrayAction({
     required String id,
     required String action,
@@ -397,7 +648,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 16,
             port: port_,
           );
         },
@@ -426,7 +677,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 17,
             port: port_,
           );
         },
@@ -458,7 +709,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 18,
             port: port_,
           );
         },
@@ -492,7 +743,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 19,
             port: port_,
           );
         },
@@ -521,6 +772,13 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   @protected
   RustStreamSink<List<MediaPlayerSnapshot>>
   dco_decode_StreamSink_list_media_player_snapshot_Sse(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
+  RustStreamSink<NotificationCenter>
+  dco_decode_StreamSink_notification_center_Sse(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     throw UnimplementedError();
   }
@@ -573,6 +831,14 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  NotificationPreferences dco_decode_box_autoadd_notification_preferences(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_notification_preferences(raw);
+  }
+
+  @protected
   ResourceDetails dco_decode_box_autoadd_resource_details(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_resource_details(raw);
@@ -613,6 +879,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeI64(raw);
+  }
+
+  @protected
   List<BatterySnapshot> dco_decode_list_battery_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_battery_snapshot).toList();
@@ -633,9 +905,47 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  List<NotificationAction> dco_decode_list_notification_action(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_notification_action).toList();
+  }
+
+  @protected
+  List<NotificationPriorityApp> dco_decode_list_notification_priority_app(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_notification_priority_app)
+        .toList();
+  }
+
+  @protected
+  List<NotificationSnapshot> dco_decode_list_notification_snapshot(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_notification_snapshot)
+        .toList();
+  }
+
+  @protected
+  List<NotificationText> dco_decode_list_notification_text(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_notification_text).toList();
+  }
+
+  @protected
   List<double?> dco_decode_list_opt_box_autoadd_f_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_opt_box_autoadd_f_64).toList();
+  }
+
+  @protected
+  Uint32List dco_decode_list_prim_u_32_strict(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as Uint32List;
   }
 
   @protected
@@ -690,6 +1000,108 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     return NetworkOverview(
       downloadBytesPerSecond: dco_decode_opt_box_autoadd_f_64(arr[0]),
       uploadBytesPerSecond: dco_decode_opt_box_autoadd_f_64(arr[1]),
+    );
+  }
+
+  @protected
+  NotificationAction dco_decode_notification_action(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return NotificationAction(
+      key: dco_decode_String(arr[0]),
+      label: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  NotificationCenter dco_decode_notification_center(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return NotificationCenter(
+      notifications: dco_decode_list_notification_snapshot(arr[0]),
+      quietReason: dco_decode_String(arr[1]),
+      popupHost: dco_decode_opt_String(arr[2]),
+      error: dco_decode_opt_String(arr[3]),
+    );
+  }
+
+  @protected
+  NotificationPreferences dco_decode_notification_preferences(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    return NotificationPreferences(
+      doNotDisturb: dco_decode_bool(arr[0]),
+      timeoutSeconds: dco_decode_u_32(arr[1]),
+      sounds: dco_decode_bool(arr[2]),
+      schedule: dco_decode_bool(arr[3]),
+      scheduleStartMinutes: dco_decode_u_32(arr[4]),
+      scheduleEndMinutes: dco_decode_u_32(arr[5]),
+      scheduleDays: dco_decode_list_prim_u_32_strict(arr[6]),
+      fullscreen: dco_decode_bool(arr[7]),
+      priorityCalls: dco_decode_bool(arr[8]),
+      priorityApps: dco_decode_list_notification_priority_app(arr[9]),
+    );
+  }
+
+  @protected
+  NotificationPriorityApp dco_decode_notification_priority_app(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return NotificationPriorityApp(
+      id: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  NotificationSnapshot dco_decode_notification_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 19)
+      throw Exception('unexpected arr length: expect 19 but see ${arr.length}');
+    return NotificationSnapshot(
+      id: dco_decode_u_32(arr[0]),
+      appName: dco_decode_String(arr[1]),
+      appIcon: dco_decode_String(arr[2]),
+      desktopEntry: dco_decode_String(arr[3]),
+      summary: dco_decode_String(arr[4]),
+      body: dco_decode_list_notification_text(arr[5]),
+      actions: dco_decode_list_notification_action(arr[6]),
+      defaultAction: dco_decode_bool(arr[7]),
+      urgency: dco_decode_u_8(arr[8]),
+      receivedUnixMs: dco_decode_i_64(arr[9]),
+      imageArgb: dco_decode_list_prim_u_8_strict(arr[10]),
+      imageWidth: dco_decode_u_32(arr[11]),
+      imageHeight: dco_decode_u_32(arr[12]),
+      imagePath: dco_decode_String(arr[13]),
+      progress: dco_decode_opt_box_autoadd_i_32(arr[14]),
+      popup: dco_decode_bool(arr[15]),
+      transient: dco_decode_bool(arr[16]),
+      resident: dco_decode_bool(arr[17]),
+      category: dco_decode_String(arr[18]),
+    );
+  }
+
+  @protected
+  NotificationText dco_decode_notification_text(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return NotificationText(
+      text: dco_decode_String(arr[0]),
+      bold: dco_decode_bool(arr[1]),
+      italic: dco_decode_bool(arr[2]),
+      underline: dco_decode_bool(arr[3]),
+      href: dco_decode_String(arr[4]),
     );
   }
 
@@ -847,6 +1259,13 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  RustStreamSink<NotificationCenter>
+  sse_decode_StreamSink_notification_center_Sse(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_list_prim_u_8_strict(deserializer);
@@ -901,6 +1320,14 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  NotificationPreferences sse_decode_box_autoadd_notification_preferences(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_notification_preferences(deserializer));
+  }
+
+  @protected
   ResourceDetails sse_decode_box_autoadd_resource_details(
     SseDeserializer deserializer,
   ) {
@@ -946,6 +1373,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getPlatformInt64();
+  }
+
+  @protected
   List<BatterySnapshot> sse_decode_list_battery_snapshot(
     SseDeserializer deserializer,
   ) {
@@ -986,6 +1419,62 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  List<NotificationAction> sse_decode_list_notification_action(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <NotificationAction>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_notification_action(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<NotificationPriorityApp> sse_decode_list_notification_priority_app(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <NotificationPriorityApp>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_notification_priority_app(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<NotificationSnapshot> sse_decode_list_notification_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <NotificationSnapshot>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_notification_snapshot(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<NotificationText> sse_decode_list_notification_text(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <NotificationText>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_notification_text(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<double?> sse_decode_list_opt_box_autoadd_f_64(
     SseDeserializer deserializer,
   ) {
@@ -997,6 +1486,13 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       ans_.add(sse_decode_opt_box_autoadd_f_64(deserializer));
     }
     return ans_;
+  }
+
+  @protected
+  Uint32List sse_decode_list_prim_u_32_strict(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var len_ = sse_decode_i_32(deserializer);
+    return deserializer.buffer.getUint32List(len_);
   }
 
   @protected
@@ -1083,6 +1579,138 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     return NetworkOverview(
       downloadBytesPerSecond: var_downloadBytesPerSecond,
       uploadBytesPerSecond: var_uploadBytesPerSecond,
+    );
+  }
+
+  @protected
+  NotificationAction sse_decode_notification_action(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_key = sse_decode_String(deserializer);
+    var var_label = sse_decode_String(deserializer);
+    return NotificationAction(key: var_key, label: var_label);
+  }
+
+  @protected
+  NotificationCenter sse_decode_notification_center(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_notifications = sse_decode_list_notification_snapshot(deserializer);
+    var var_quietReason = sse_decode_String(deserializer);
+    var var_popupHost = sse_decode_opt_String(deserializer);
+    var var_error = sse_decode_opt_String(deserializer);
+    return NotificationCenter(
+      notifications: var_notifications,
+      quietReason: var_quietReason,
+      popupHost: var_popupHost,
+      error: var_error,
+    );
+  }
+
+  @protected
+  NotificationPreferences sse_decode_notification_preferences(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_doNotDisturb = sse_decode_bool(deserializer);
+    var var_timeoutSeconds = sse_decode_u_32(deserializer);
+    var var_sounds = sse_decode_bool(deserializer);
+    var var_schedule = sse_decode_bool(deserializer);
+    var var_scheduleStartMinutes = sse_decode_u_32(deserializer);
+    var var_scheduleEndMinutes = sse_decode_u_32(deserializer);
+    var var_scheduleDays = sse_decode_list_prim_u_32_strict(deserializer);
+    var var_fullscreen = sse_decode_bool(deserializer);
+    var var_priorityCalls = sse_decode_bool(deserializer);
+    var var_priorityApps = sse_decode_list_notification_priority_app(
+      deserializer,
+    );
+    return NotificationPreferences(
+      doNotDisturb: var_doNotDisturb,
+      timeoutSeconds: var_timeoutSeconds,
+      sounds: var_sounds,
+      schedule: var_schedule,
+      scheduleStartMinutes: var_scheduleStartMinutes,
+      scheduleEndMinutes: var_scheduleEndMinutes,
+      scheduleDays: var_scheduleDays,
+      fullscreen: var_fullscreen,
+      priorityCalls: var_priorityCalls,
+      priorityApps: var_priorityApps,
+    );
+  }
+
+  @protected
+  NotificationPriorityApp sse_decode_notification_priority_app(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    return NotificationPriorityApp(id: var_id, name: var_name);
+  }
+
+  @protected
+  NotificationSnapshot sse_decode_notification_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_u_32(deserializer);
+    var var_appName = sse_decode_String(deserializer);
+    var var_appIcon = sse_decode_String(deserializer);
+    var var_desktopEntry = sse_decode_String(deserializer);
+    var var_summary = sse_decode_String(deserializer);
+    var var_body = sse_decode_list_notification_text(deserializer);
+    var var_actions = sse_decode_list_notification_action(deserializer);
+    var var_defaultAction = sse_decode_bool(deserializer);
+    var var_urgency = sse_decode_u_8(deserializer);
+    var var_receivedUnixMs = sse_decode_i_64(deserializer);
+    var var_imageArgb = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_imageWidth = sse_decode_u_32(deserializer);
+    var var_imageHeight = sse_decode_u_32(deserializer);
+    var var_imagePath = sse_decode_String(deserializer);
+    var var_progress = sse_decode_opt_box_autoadd_i_32(deserializer);
+    var var_popup = sse_decode_bool(deserializer);
+    var var_transient = sse_decode_bool(deserializer);
+    var var_resident = sse_decode_bool(deserializer);
+    var var_category = sse_decode_String(deserializer);
+    return NotificationSnapshot(
+      id: var_id,
+      appName: var_appName,
+      appIcon: var_appIcon,
+      desktopEntry: var_desktopEntry,
+      summary: var_summary,
+      body: var_body,
+      actions: var_actions,
+      defaultAction: var_defaultAction,
+      urgency: var_urgency,
+      receivedUnixMs: var_receivedUnixMs,
+      imageArgb: var_imageArgb,
+      imageWidth: var_imageWidth,
+      imageHeight: var_imageHeight,
+      imagePath: var_imagePath,
+      progress: var_progress,
+      popup: var_popup,
+      transient: var_transient,
+      resident: var_resident,
+      category: var_category,
+    );
+  }
+
+  @protected
+  NotificationText sse_decode_notification_text(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_text = sse_decode_String(deserializer);
+    var var_bold = sse_decode_bool(deserializer);
+    var var_italic = sse_decode_bool(deserializer);
+    var var_underline = sse_decode_bool(deserializer);
+    var var_href = sse_decode_String(deserializer);
+    return NotificationText(
+      text: var_text,
+      bold: var_bold,
+      italic: var_italic,
+      underline: var_underline,
+      href: var_href,
     );
   }
 
@@ -1326,6 +1954,23 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_StreamSink_notification_center_Sse(
+    RustStreamSink<NotificationCenter> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_notification_center,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
   void sse_encode_String(String self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer);
@@ -1374,6 +2019,15 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_box_autoadd_notification_preferences(
+    NotificationPreferences self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_notification_preferences(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_resource_details(
     ResourceDetails self,
     SseSerializer serializer,
@@ -1409,6 +2063,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
+  }
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putPlatformInt64(self);
   }
 
   @protected
@@ -1448,6 +2108,54 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_list_notification_action(
+    List<NotificationAction> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_notification_action(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_notification_priority_app(
+    List<NotificationPriorityApp> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_notification_priority_app(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_notification_snapshot(
+    List<NotificationSnapshot> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_notification_snapshot(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_notification_text(
+    List<NotificationText> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_notification_text(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_opt_box_autoadd_f_64(
     List<double?> self,
     SseSerializer serializer,
@@ -1457,6 +2165,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     for (final item in self) {
       sse_encode_opt_box_autoadd_f_64(item, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_list_prim_u_32_strict(
+    Uint32List self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    serializer.buffer.putUint32List(self);
   }
 
   @protected
@@ -1524,6 +2242,96 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_opt_box_autoadd_f_64(self.downloadBytesPerSecond, serializer);
     sse_encode_opt_box_autoadd_f_64(self.uploadBytesPerSecond, serializer);
+  }
+
+  @protected
+  void sse_encode_notification_action(
+    NotificationAction self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.key, serializer);
+    sse_encode_String(self.label, serializer);
+  }
+
+  @protected
+  void sse_encode_notification_center(
+    NotificationCenter self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_notification_snapshot(self.notifications, serializer);
+    sse_encode_String(self.quietReason, serializer);
+    sse_encode_opt_String(self.popupHost, serializer);
+    sse_encode_opt_String(self.error, serializer);
+  }
+
+  @protected
+  void sse_encode_notification_preferences(
+    NotificationPreferences self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.doNotDisturb, serializer);
+    sse_encode_u_32(self.timeoutSeconds, serializer);
+    sse_encode_bool(self.sounds, serializer);
+    sse_encode_bool(self.schedule, serializer);
+    sse_encode_u_32(self.scheduleStartMinutes, serializer);
+    sse_encode_u_32(self.scheduleEndMinutes, serializer);
+    sse_encode_list_prim_u_32_strict(self.scheduleDays, serializer);
+    sse_encode_bool(self.fullscreen, serializer);
+    sse_encode_bool(self.priorityCalls, serializer);
+    sse_encode_list_notification_priority_app(self.priorityApps, serializer);
+  }
+
+  @protected
+  void sse_encode_notification_priority_app(
+    NotificationPriorityApp self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+  }
+
+  @protected
+  void sse_encode_notification_snapshot(
+    NotificationSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.id, serializer);
+    sse_encode_String(self.appName, serializer);
+    sse_encode_String(self.appIcon, serializer);
+    sse_encode_String(self.desktopEntry, serializer);
+    sse_encode_String(self.summary, serializer);
+    sse_encode_list_notification_text(self.body, serializer);
+    sse_encode_list_notification_action(self.actions, serializer);
+    sse_encode_bool(self.defaultAction, serializer);
+    sse_encode_u_8(self.urgency, serializer);
+    sse_encode_i_64(self.receivedUnixMs, serializer);
+    sse_encode_list_prim_u_8_strict(self.imageArgb, serializer);
+    sse_encode_u_32(self.imageWidth, serializer);
+    sse_encode_u_32(self.imageHeight, serializer);
+    sse_encode_String(self.imagePath, serializer);
+    sse_encode_opt_box_autoadd_i_32(self.progress, serializer);
+    sse_encode_bool(self.popup, serializer);
+    sse_encode_bool(self.transient, serializer);
+    sse_encode_bool(self.resident, serializer);
+    sse_encode_String(self.category, serializer);
+  }
+
+  @protected
+  void sse_encode_notification_text(
+    NotificationText self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.text, serializer);
+    sse_encode_bool(self.bold, serializer);
+    sse_encode_bool(self.italic, serializer);
+    sse_encode_bool(self.underline, serializer);
+    sse_encode_String(self.href, serializer);
   }
 
   @protected

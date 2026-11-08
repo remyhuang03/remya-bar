@@ -65,6 +65,12 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 - **Pinned & Folded Apps**: Keep your most important icons visible while folding secondary apps into an expandable tray with smooth reveal animations.
 - **Context Menus**: Right-click any tray icon to open native application menus alongside pin/fold management.
 
+### 🔔 Notifications
+- **Built-in Notification Service**: Remy'a Bar is the `org.freedesktop.Notifications` server, with actions, body markup and links, images, and progress (`value` hint). Stop dunst, mako, swaync or another shell's notification service first; while another one owns the name, the bell is crossed out and the card says so.
+- **Popups**: New notifications slide in at the top left of the output focused when they arrive, with an optional sound. Hovering pauses their timers; Critical notifications stay until closed.
+- **Notification Center**: Hover or click the bell to see history grouped by app, run actions, dismiss or clear all.
+- **Do Not Disturb**: Toggle it in the card, the Quick Settings tile or Remy'a Settings → Notifications, or turn it on automatically on a schedule or while an app is full screen. It silences popups and sounds except Critical notifications, incoming calls and priority apps; history still collects everything. Popup duration and sounds are also set there.
+
 ### 🔋 Battery & Power Management
 - **Battery Capsule**: Clear visual readout with percentage, dynamic charging bolt, and remaining runtime estimates.
 - **Detailed Power Card**: Hover to inspect battery health, charge cycle counts, current power draw, and Energy Saver thresholds.
@@ -78,7 +84,7 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 - **Per-Monitor Layer Shell**: Automatic 40px capsule bar across every connected output with zero keyboard focus stealing and exclusive space reservation.
 - **Smart Fullscreen Auto-Hide**: The bar automatically conceals itself and releases reserved space when a fullscreen application is active on that output, smoothly returning when leaving fullscreen.
 - **Responsive Layout**: Adapts gracefully across display widths:
-  - $\ge$ 700 px: Pills in evenly spaced groups that you can reorder, regroup, or hide in Remy'a Settings (window, resources and media; workspaces and clock; tray; battery and Quick Settings by default; one group can be centered).
+  - $\ge$ 700 px: Pills in evenly spaced groups that you can reorder, regroup, or hide in Remy'a Settings (notifications, window, resources and media; workspaces and clock; tray; battery and Quick Settings by default; one group can be centered).
   - Content that does not fit scrolls horizontally instead of being clipped.
   - < 700 px: Compact mode showing centered clock and essential control center launcher.
 
@@ -143,6 +149,8 @@ bind = SUPER, A, exec, gdbus emit --session --object-path /top/remya/bar --signa
 | | **Hover** | Open media card with track scrubber and volume |
 | **Resources** | **Hover** | Open 60-second live performance graphs |
 | **Clock** | **Click / Hover** | Open datetime dashboard and interactive calendar |
+| **Notifications** | **Click / Hover** | Open the notification center and Do not disturb |
+| | **Click a notification** | Run its default action, if it has one |
 | **Quick Settings** | **Click Icon / Clock** | Toggle the Quick Settings control center |
 | | **`Super + A`** | Toggle the Quick Settings control center from anywhere |
 | | **Volume Slider Right-Click** | Open audio output device picker |

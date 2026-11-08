@@ -35,6 +35,7 @@ class SidebarBackend extends ChangeNotifier {
         final key = switch (change.topic) {
           'theme' => 'theme',
           keepAwakeSettingId => 'keep-awake',
+          notificationDndSettingId => 'notification-dnd',
           _ => null,
         };
         if (_writing || _queue.isNotEmpty) return;
@@ -104,6 +105,10 @@ class SidebarBackend extends ChangeNotifier {
         read('power', _settings.readPower()),
         read('theme', _settings.call('Get', ['theme'])),
         read('keep-awake', _settings.readKeepAwake()),
+        read(
+          'notification-dnd',
+          _settings.call('Get', [notificationDndSettingId]),
+        ),
         read('layout', _settings.readSidebarLayout()),
         if (output != null)
           read('brightness', _brightness(output))
@@ -234,6 +239,8 @@ class SidebarBackend extends ChangeNotifier {
         patch('night-light', {'enabled': value});
       case 'sidebar.keep-awake' when value is bool:
         patch('keep-awake', {'value': value});
+      case 'sidebar.dnd' when value is bool:
+        patch('notification-dnd', {'value': value});
       case 'sidebar.dark' when value is bool:
         final theme = copy(_data['theme']);
         _data['theme'] = {
@@ -356,6 +363,10 @@ class SidebarBackend extends ChangeNotifier {
       'sidebar.keep-awake' when value is bool => (
         'keep-awake',
         await _settings.setKeepAwake(value),
+      ),
+      'sidebar.dnd' when value is bool => (
+        'notification-dnd',
+        await _settings.call('Set', [notificationDndSettingId, '$value']),
       ),
       'sidebar.dark' when value is bool => (
         'theme',

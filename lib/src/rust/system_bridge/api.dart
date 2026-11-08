@@ -8,7 +8,7 @@ import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `batteries`, `percentage`, `read_number`, `remaining_seconds`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Future<List<MediaPlayerSnapshot>> mediaPlayers() =>
     SystemRustLib.instance.api.crateApiMediaPlayers();
@@ -69,6 +69,43 @@ Future<void> sidebarSessionAction({required String action}) =>
 
 Future<double?> sidebarUptime() =>
     SystemRustLib.instance.api.crateApiSidebarUptime();
+
+/// Starts the shared notification server and streams its state.
+Stream<NotificationCenter> subscribeNotifications() =>
+    SystemRustLib.instance.api.crateApiSubscribeNotifications();
+
+Future<void> notificationsConfigure({
+  required NotificationPreferences preferences,
+}) => SystemRustLib.instance.api.crateApiNotificationsConfigure(
+  preferences: preferences,
+);
+
+/// Reports whether an output shows a full screen window.
+Future<void> notificationsFullscreen({
+  required String output,
+  required bool fullscreen,
+}) => SystemRustLib.instance.api.crateApiNotificationsFullscreen(
+  output: output,
+  fullscreen: fullscreen,
+);
+
+/// Claims the popup stack for an output; false when another output hosts it.
+Future<bool> notificationsClaimPopups({required String output}) =>
+    SystemRustLib.instance.api.crateApiNotificationsClaimPopups(output: output);
+
+/// Pauses popup expiry while the pointer is over the popups.
+Future<void> notificationsHover({required bool hovered}) =>
+    SystemRustLib.instance.api.crateApiNotificationsHover(hovered: hovered);
+
+/// Dismisses one notification, or all of them when `id` is null.
+Future<void> notificationDismiss({int? id}) =>
+    SystemRustLib.instance.api.crateApiNotificationDismiss(id: id);
+
+Future<void> notificationInvoke({required int id, required String action}) =>
+    SystemRustLib.instance.api.crateApiNotificationInvoke(
+      id: id,
+      action: action,
+    );
 
 class BatterySnapshot {
   final String name;
@@ -247,6 +284,277 @@ class NetworkOverview {
           runtimeType == other.runtimeType &&
           downloadBytesPerSecond == other.downloadBytesPerSecond &&
           uploadBytesPerSecond == other.uploadBytesPerSecond;
+}
+
+class NotificationAction {
+  final String key;
+  final String label;
+
+  const NotificationAction({required this.key, required this.label});
+
+  @override
+  int get hashCode => key.hashCode ^ label.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NotificationAction &&
+          runtimeType == other.runtimeType &&
+          key == other.key &&
+          label == other.label;
+}
+
+class NotificationCenter {
+  /// Newest first.
+  final List<NotificationSnapshot> notifications;
+
+  /// Why Do Not Disturb is in effect: empty, `manual`, `schedule` or
+  /// `fullscreen`.
+  final String quietReason;
+
+  /// The output that shows the popup stack, if any.
+  final String? popupHost;
+
+  /// Set while the bar does not own the notification service name.
+  final String? error;
+
+  const NotificationCenter({
+    required this.notifications,
+    required this.quietReason,
+    this.popupHost,
+    this.error,
+  });
+
+  @override
+  int get hashCode =>
+      notifications.hashCode ^
+      quietReason.hashCode ^
+      popupHost.hashCode ^
+      error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NotificationCenter &&
+          runtimeType == other.runtimeType &&
+          notifications == other.notifications &&
+          quietReason == other.quietReason &&
+          popupHost == other.popupHost &&
+          error == other.error;
+}
+
+/// Settings notification preferences; times are minutes after midnight and
+/// days are ISO weekdays (1 Monday) on which the schedule starts.
+class NotificationPreferences {
+  final bool doNotDisturb;
+  final int timeoutSeconds;
+  final bool sounds;
+  final bool schedule;
+  final int scheduleStartMinutes;
+  final int scheduleEndMinutes;
+  final Uint32List scheduleDays;
+  final bool fullscreen;
+  final bool priorityCalls;
+  final List<NotificationPriorityApp> priorityApps;
+
+  const NotificationPreferences({
+    required this.doNotDisturb,
+    required this.timeoutSeconds,
+    required this.sounds,
+    required this.schedule,
+    required this.scheduleStartMinutes,
+    required this.scheduleEndMinutes,
+    required this.scheduleDays,
+    required this.fullscreen,
+    required this.priorityCalls,
+    required this.priorityApps,
+  });
+
+  @override
+  int get hashCode =>
+      doNotDisturb.hashCode ^
+      timeoutSeconds.hashCode ^
+      sounds.hashCode ^
+      schedule.hashCode ^
+      scheduleStartMinutes.hashCode ^
+      scheduleEndMinutes.hashCode ^
+      scheduleDays.hashCode ^
+      fullscreen.hashCode ^
+      priorityCalls.hashCode ^
+      priorityApps.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NotificationPreferences &&
+          runtimeType == other.runtimeType &&
+          doNotDisturb == other.doNotDisturb &&
+          timeoutSeconds == other.timeoutSeconds &&
+          sounds == other.sounds &&
+          schedule == other.schedule &&
+          scheduleStartMinutes == other.scheduleStartMinutes &&
+          scheduleEndMinutes == other.scheduleEndMinutes &&
+          scheduleDays == other.scheduleDays &&
+          fullscreen == other.fullscreen &&
+          priorityCalls == other.priorityCalls &&
+          priorityApps == other.priorityApps;
+}
+
+class NotificationPriorityApp {
+  final String id;
+  final String name;
+
+  const NotificationPriorityApp({required this.id, required this.name});
+
+  @override
+  int get hashCode => id.hashCode ^ name.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NotificationPriorityApp &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name;
+}
+
+class NotificationSnapshot {
+  final int id;
+  final String appName;
+  final String appIcon;
+  final String desktopEntry;
+  final String summary;
+  final List<NotificationText> body;
+
+  /// Button actions; the `default` action is reported separately.
+  final List<NotificationAction> actions;
+  final bool defaultAction;
+
+  /// 0 Low, 1 Normal, 2 Critical.
+  final int urgency;
+  final PlatformInt64 receivedUnixMs;
+
+  /// `image-data` as tray-compatible ARGB; empty when absent.
+  final Uint8List imageArgb;
+  final int imageWidth;
+  final int imageHeight;
+  final String imagePath;
+  final int? progress;
+
+  /// Whether the notification is currently shown as a popup.
+  final bool popup;
+  final bool transient;
+  final bool resident;
+
+  /// The freedesktop `category` hint, such as `call.incoming`.
+  final String category;
+
+  const NotificationSnapshot({
+    required this.id,
+    required this.appName,
+    required this.appIcon,
+    required this.desktopEntry,
+    required this.summary,
+    required this.body,
+    required this.actions,
+    required this.defaultAction,
+    required this.urgency,
+    required this.receivedUnixMs,
+    required this.imageArgb,
+    required this.imageWidth,
+    required this.imageHeight,
+    required this.imagePath,
+    this.progress,
+    required this.popup,
+    required this.transient,
+    required this.resident,
+    required this.category,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      appName.hashCode ^
+      appIcon.hashCode ^
+      desktopEntry.hashCode ^
+      summary.hashCode ^
+      body.hashCode ^
+      actions.hashCode ^
+      defaultAction.hashCode ^
+      urgency.hashCode ^
+      receivedUnixMs.hashCode ^
+      imageArgb.hashCode ^
+      imageWidth.hashCode ^
+      imageHeight.hashCode ^
+      imagePath.hashCode ^
+      progress.hashCode ^
+      popup.hashCode ^
+      transient.hashCode ^
+      resident.hashCode ^
+      category.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NotificationSnapshot &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          appName == other.appName &&
+          appIcon == other.appIcon &&
+          desktopEntry == other.desktopEntry &&
+          summary == other.summary &&
+          body == other.body &&
+          actions == other.actions &&
+          defaultAction == other.defaultAction &&
+          urgency == other.urgency &&
+          receivedUnixMs == other.receivedUnixMs &&
+          imageArgb == other.imageArgb &&
+          imageWidth == other.imageWidth &&
+          imageHeight == other.imageHeight &&
+          imagePath == other.imagePath &&
+          progress == other.progress &&
+          popup == other.popup &&
+          transient == other.transient &&
+          resident == other.resident &&
+          category == other.category;
+}
+
+/// A run of notification body text with the supported markup applied.
+class NotificationText {
+  final String text;
+  final bool bold;
+  final bool italic;
+  final bool underline;
+
+  /// An http(s) or mailto link; empty when the run is not a link.
+  final String href;
+
+  const NotificationText({
+    required this.text,
+    required this.bold,
+    required this.italic,
+    required this.underline,
+    required this.href,
+  });
+
+  @override
+  int get hashCode =>
+      text.hashCode ^
+      bold.hashCode ^
+      italic.hashCode ^
+      underline.hashCode ^
+      href.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NotificationText &&
+          runtimeType == other.runtimeType &&
+          text == other.text &&
+          bold == other.bold &&
+          italic == other.italic &&
+          underline == other.underline &&
+          href == other.href;
 }
 
 class ResourceDetails {

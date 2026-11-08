@@ -8,6 +8,7 @@ import 'package:remya_settings_client/remya_settings_client.dart';
 import 'app.dart';
 import 'features/account/account_profile_controller.dart';
 import 'features/hyprland/hyprland_backend.dart';
+import 'features/notifications/notification_backend.dart';
 import 'features/settings/bar_theme_controller.dart';
 import 'features/popups/popup_app.dart';
 import 'features/system/system_backend.dart';
@@ -57,6 +58,7 @@ Future<void> main(List<String> arguments) async {
       hyprland: hyprland,
       system: system,
       account: AccountProfileController()..start(),
+      notifications: NotificationBackend()..start(),
       onOpenSettingsPage: (page) =>
           openRemyaSettings(debugExecutable: debugSettings, page: page),
       showTray: true,

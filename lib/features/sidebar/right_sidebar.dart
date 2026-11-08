@@ -723,6 +723,7 @@ class _RightSidebarState extends State<RightSidebar> {
     final connected = _rowsOf<Map>(_bluetooth['devices'])
         .where((item) => item['connected'] == true)
         .length;
+    final dnd = _map(widget.data['notification-dnd'])['value'] as bool?;
     final (bool active, String subtitle, VoidCallback? toggle) = switch (id) {
       'internet' => (
         wifi,
@@ -787,6 +788,15 @@ class _RightSidebarState extends State<RightSidebar> {
                 value: saver ? 'balanced' : 'power-saver',
               )
             : null,
+      ),
+      'dnd' => (
+        dnd == true,
+        dnd == null
+            ? 'Unavailable'
+            : dnd
+            ? 'On'
+            : 'Off',
+        dnd == null ? null : () => _send('sidebar.dnd', value: !dnd),
       ),
       _ => (false, 'Not implemented', null),
     };

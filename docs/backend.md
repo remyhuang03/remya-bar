@@ -79,6 +79,58 @@ socket implementation and the documented protocol. Rust dependencies have bundle
 notices under `assets/licenses/rust-dependencies.txt`; gtk-layer-shell remains a
 dynamically linked system library.
 
+## Notifications
+
+The `remya_bar_system` crate owns `org.freedesktop.Notifications` for the whole
+process (`lib/src/rust/system/src/notifications.rs`). The first
+`subscribeNotifications()` call registers the server on the session bus with
+`DoNotQueue`; while another daemon owns the name it retries every five seconds
+and reports `error` instead of claiming to work. It never replaces another
+owner. Capabilities are exactly `actions body body-markup body-hyperlinks
+icon-static persistence`; `ActivationToken` is not sent.
+
+IDs start at 1, skip 0 and live IDs, and `replaces_id` updates a notification
+in place. The daemon records the receive time. `image-data` (honoring
+rowstride, at most 128 px) becomes tray-style ARGB; `image-path` and file
+`app_icon` values become the image; other icons resolve through the native
+icon channel. Body markup keeps only `<b> <i> <u> <a href>` (http, https and
+mailto links), turns `<br>` into a line break and falls back to the raw text
+when malformed. The non-standard `value` hint is shown as progress.
+
+`expire_timeout` -1 uses the Settings popup duration, 0 never expires, and
+Critical never expires. Expiry hides the popup and keeps the notification in
+history; `transient` notifications leave with their popup (reason 1).
+`notificationsHover` pauses all popup timers. `CloseNotification` emits reason
+3, user dismissal and Clear all reason 2. The `default` action is a click on
+the notification; other actions are buttons and close the notification unless
+it is `resident`. History keeps the newest 200.
+
+Settings owns the preferences (`Get("notifications")`, see the Settings
+[notifications API](../../remya_settings/docs/public-api.md#notifications)).
+Every output engine reads them, follows `Changed` for the notification IDs and
+passes them to `notificationsConfigure`; read errors keep the last valid
+values. Each engine reports its output's Hyprland full screen state with
+`notificationsFullscreen`. Rust computes Do Not Disturb from the manual switch,
+the schedule (checked every 30 seconds) and full screen outputs, and reports
+`quietReason` (`manual`, `schedule`, `fullscreen`). While it is in effect,
+popups and sounds are suppressed except for Critical, priority-call
+(`call`, `call.incoming`) and priority-app notifications; history keeps
+everything. New notifications that pop up play their `sound-file` or
+`sound-name`, or the theme's `message-new-instant`, through
+`canberra-gtk-play` (libcanberra, a separate process) unless sounds are off or
+the sender sets `suppress-sound`; replacements stay silent.
+
+The `notifications` pill shows the bell and the history count, and opens the
+`notifications` hover card. Popups use the separate `notification-toasts`
+popup kind: native GTK places an OVERLAY layer surface (`top.remya.bar/notifications`)
+anchored top-left, sliding in from the left edge, 8 px from the edges, with no keyboard focus or exclusive
+zone. It is not hidden by hover cards, menus, the sidebar or fullscreen, and
+closes only when no popup remains. The output focused when the first popup
+arrives claims the stack through `notificationsClaimPopups`; Rust keeps that
+single `popupHost` until no popup remains, so outputs racing on a focus change
+cannot both show it. The host hides the stack while its own `notifications`
+card is open, since the card lists the same notifications in that corner.
+
 ## Validation
 
 Run the checks in AGENTS.md and `python ../remya_settings/test/interface_smoke.py`

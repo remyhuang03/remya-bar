@@ -12,6 +12,9 @@ import 'features/sidebar/right_sidebar.dart';
 import 'features/sidebar/sidebar_backend.dart';
 import 'features/battery/bar_battery.dart';
 import 'features/media/bar_media.dart';
+import 'features/notifications/bar_notifications.dart';
+import 'features/notifications/notification_backend.dart';
+import 'features/notifications/notification_view.dart';
 import 'features/system/system_backend.dart';
 import 'features/clock/bar_clock.dart';
 import 'features/hyprland/hyprland_backend.dart';
@@ -33,6 +36,7 @@ class RemyaBarApp extends StatefulWidget {
     this.hyprland,
     this.system,
     this.account,
+    this.notifications,
     this.onOpenSettingsPage,
     this.showTray = false,
     this.onOpenSettings = openRemyaSettings,
@@ -43,6 +47,7 @@ class RemyaBarApp extends StatefulWidget {
   final HyprlandBackend? hyprland;
   final SystemBackend? system;
   final AccountProfileController? account;
+  final NotificationBackend? notifications;
   final Future<void> Function(String page)? onOpenSettingsPage;
   final bool showTray;
   final Future<void> Function() onOpenSettings;
@@ -67,6 +72,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   }
 
   bool _fullscreen = false;
+  bool? _reportedFullscreen;
   bool _checkingFullscreen = false;
   Timer? _fullscreenCheck;
   Timer? _fullscreenReconcile;
@@ -91,6 +97,11 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       if (mounted && hidden != _fullscreen) {
         await _window.invokeMethod<void>('setFullscreen', hidden);
         _fullscreen = hidden;
+      }
+      final output = widget.hyprland!.output?.name;
+      if (output != null && hidden != _reportedFullscreen) {
+        _reportedFullscreen = hidden;
+        await widget.notifications?.setFullscreen(output, hidden);
       }
     } catch (error) {
       debugPrint('Bar fullscreen state: $error');
@@ -203,6 +214,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       _scheduleFullscreenCheck();
     }
     widget.account?.addListener(_updateSidebar);
+    widget.notifications?.addListener(_syncToasts);
+    BarPopup.openCard.addListener(_syncToasts);
     widget.preferences.addListener(_updateSidebar);
     _window.setMethodCallHandler((call) async {
       if (call.method == 'outputChanged') {
@@ -223,6 +236,72 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       }
     });
     BarPopup.channel.setMethodCallHandler(_popupAction);
+  }
+
+  bool _showingToasts = false;
+  bool _syncingToasts = false;
+  bool _toastsDirty = false;
+
+  /// One output, the focused one when the stack starts, hosts the popups until
+  /// they end; it hides them while its notification card is open.
+  Future<void> _syncToasts() async {
+    final backend = widget.notifications;
+    final output = widget.hyprland?.output?.name;
+    if (backend == null || !mounted) return;
+    if (_syncingToasts) {
+      _toastsDirty = true;
+      return;
+    }
+    _syncingToasts = true;
+    try {
+      final popups = backend.popups.take(4).toList();
+      var host = backend.center?.popupHost;
+      if (popups.isNotEmpty && host == null && output != null) {
+        final active = jsonDecode(
+          await widget.hyprland!.request('j/activeworkspace'),
+        );
+        if (active is Map &&
+            active['monitor'] == output &&
+            await backend.claimPopups(output)) {
+          host = output;
+        }
+      }
+      final visible =
+          popups.isNotEmpty &&
+          host == output &&
+          BarPopup.openCard.value != 'notifications';
+      if (!visible) {
+        if (_showingToasts) {
+          _showingToasts = false;
+          await BarPopup.hide(kind: notificationToastsKind);
+        }
+        return;
+      }
+      if (!mounted) return;
+      final request = _showingToasts ? BarPopup.update : BarPopup.show;
+      _showingToasts = true;
+      await request(
+        kind: notificationToastsKind,
+        anchor: const Rect.fromLTWH(0, 0, 1, 1),
+        size: Size(
+          NotificationToasts.width + NotificationToasts.insets.horizontal,
+          200,
+        ),
+        data: {
+          'notifications': [for (final item in popups) backend.toData(item)],
+          'scale': MediaQuery.textScalerOf(context).scale(1),
+        },
+        theme: widget.preferences.theme,
+      );
+    } catch (error) {
+      debugPrint('Notification popups: $error');
+    } finally {
+      _syncingToasts = false;
+      if (_toastsDirty) {
+        _toastsDirty = false;
+        unawaited(_syncToasts());
+      }
+    }
   }
 
   void _applyWorkspaceCount() {
@@ -246,7 +325,13 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       final kind = args['kind'];
       final open = args['open'];
       if (kind is! String ||
-          !const {'media', 'battery', 'datetime', 'resources'}.contains(kind) ||
+          !const {
+            'media',
+            'battery',
+            'datetime',
+            'resources',
+            'notifications',
+          }.contains(kind) ||
           open is! bool) {
         throw const FormatException('Invalid card state');
       }
@@ -312,6 +397,10 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       } else {
         await system.mediaAction(player, action.substring(6));
       }
+    } else if (action is String &&
+        (action.startsWith('notification.') ||
+            action == 'notifications.hover')) {
+      await _notificationAction(action, args);
     } else if (action is String && action.startsWith('tray.')) {
       await _tray.currentState?.popupAction(args);
     } else if (action == 'resources.monitor') {
@@ -336,8 +425,34 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     }
   }
 
+  Future<void> _notificationAction(String action, Map args) async {
+    final backend = widget.notifications;
+    if (backend == null) throw StateError('Notifications unavailable');
+    final id = args['id'];
+    final value = args['value'];
+    switch (action) {
+      case 'notification.dismiss' when id is int:
+        await backend.dismiss(id);
+      case 'notification.clear':
+        await backend.dismiss(null);
+      case 'notification.invoke' when id is int && args['key'] is String:
+        await backend.invoke(id, args['key'] as String);
+      case 'notification.dnd' when value is bool:
+        await backend.setDoNotDisturb(value);
+      case 'notification.link' when args['href'] is String:
+        await openNotificationLink(args['href'] as String);
+      case 'notifications.hover' when value is bool:
+        await backend.hover(value);
+      default:
+        throw const FormatException('Invalid notification action');
+    }
+  }
+
   @override
   void dispose() {
+    widget.notifications?.removeListener(_syncToasts);
+    BarPopup.openCard.removeListener(_syncToasts);
+    widget.notifications?.dispose();
     _fullscreenCheck?.cancel();
     _fullscreenReconcile?.cancel();
     widget.hyprland?.removeListener(_scheduleFullscreenCheck);
@@ -363,6 +478,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         widget.preferences,
         widget.hyprland,
         widget.system,
+        widget.notifications,
       ]),
       builder: (context, _) => BarPopupScope(
         theme: widget.preferences.theme,
@@ -379,6 +495,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
                 error: widget.preferences.error,
                 hyprland: widget.hyprland,
                 system: widget.system,
+                notifications: widget.notifications,
                 pillSnapshot: _pillSnapshot,
                 sidebarOpen: _sidebarOpen,
                 tray: widget.showTray ? BarTray(key: _tray) : null,
@@ -400,6 +517,7 @@ class _BarContent extends StatelessWidget {
     required this.sidebarOpen,
     this.hyprland,
     this.system,
+    this.notifications,
     this.tray,
   });
 
@@ -407,6 +525,7 @@ class _BarContent extends StatelessWidget {
   final SystemSnapshot? pillSnapshot;
   final HyprlandBackend? hyprland;
   final SystemBackend? system;
+  final NotificationBackend? notifications;
   final Widget? tray;
   final bool sidebarOpen;
   final Future<void> Function(Rect, double) onToggleSidebar;
@@ -507,6 +626,9 @@ class _BarContent extends StatelessWidget {
                 hyprland!.workspaceSlots.isNotEmpty =>
           BarWorkspaces(backend: hyprland),
         'clock' => clock,
+        'notifications' when notifications != null => BarNotifications(
+          backend: notifications!,
+        ),
         'tray' when tray != null => ConstrainedBox(
           constraints: const .new(maxWidth: 290),
           child: LayoutBuilder(

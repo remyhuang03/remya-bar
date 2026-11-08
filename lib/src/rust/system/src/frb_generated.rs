@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1151459288;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1692616024;
 
 // Section: executor
 
@@ -193,6 +193,232 @@ fn wire__crate__api__media_seek_impl(
         },
     )
 }
+fn wire__crate__api__notification_dismiss_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "notification_dismiss",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_id = <Option<u32>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::notification_dismiss(api_id).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__notification_invoke_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "notification_invoke",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_id = <u32>::sse_decode(&mut deserializer);
+            let api_action = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::notification_invoke(api_id, api_action).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__notifications_claim_popups_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "notifications_claim_popups",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_output = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok =
+                            Ok::<_, ()>(crate::api::notifications_claim_popups(api_output).await)?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__notifications_configure_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "notifications_configure",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_preferences =
+                <crate::api::NotificationPreferences>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Ok::<_, ()>({
+                            crate::api::notifications_configure(api_preferences).await;
+                        })?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__notifications_fullscreen_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "notifications_fullscreen",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_output = <String>::sse_decode(&mut deserializer);
+            let api_fullscreen = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Ok::<_, ()>({
+                            crate::api::notifications_fullscreen(api_output, api_fullscreen).await;
+                        })?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__notifications_hover_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "notifications_hover",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_hovered = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Ok::<_, ()>({
+                            crate::api::notifications_hover(api_hovered).await;
+                        })?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__resource_details_default_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -325,6 +551,47 @@ fn wire__crate__api__subscribe_media_impl(
                     (move || async move {
                         let output_ok = Ok::<_, ()>({
                             crate::api::subscribe_media(api_sink).await;
+                        })?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__subscribe_notifications_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "subscribe_notifications",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_sink = <StreamSink<
+                crate::api::NotificationCenter,
+                flutter_rust_bridge::for_generated::SseCodec,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Ok::<_, ()>({
+                            crate::api::subscribe_notifications(api_sink).await;
                         })?;
                         std::result::Result::Ok(output_ok)
                     })()
@@ -508,6 +775,16 @@ impl SseDecode
     }
 }
 
+impl SseDecode
+    for StreamSink<crate::api::NotificationCenter, flutter_rust_bridge::for_generated::SseCodec>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <String>::sse_decode(deserializer);
+        return StreamSink::deserialize(inner);
+    }
+}
+
 impl SseDecode for String {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -579,6 +856,13 @@ impl SseDecode for i32 {
     }
 }
 
+impl SseDecode for i64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_i64::<NativeEndian>().unwrap()
+    }
+}
+
 impl SseDecode for Vec<crate::api::BatterySnapshot> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -615,6 +899,56 @@ impl SseDecode for Vec<crate::api::MediaPlayerSnapshot> {
     }
 }
 
+impl SseDecode for Vec<crate::api::NotificationAction> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::NotificationAction>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::NotificationPriorityApp> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::NotificationPriorityApp>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::NotificationSnapshot> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::NotificationSnapshot>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::NotificationText> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::NotificationText>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<Option<f64>> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -622,6 +956,18 @@ impl SseDecode for Vec<Option<f64>> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<Option<f64>>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<u32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<u32>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -709,6 +1055,140 @@ impl SseDecode for crate::api::NetworkOverview {
         return crate::api::NetworkOverview {
             download_bytes_per_second: var_downloadBytesPerSecond,
             upload_bytes_per_second: var_uploadBytesPerSecond,
+        };
+    }
+}
+
+impl SseDecode for crate::api::NotificationAction {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_key = <String>::sse_decode(deserializer);
+        let mut var_label = <String>::sse_decode(deserializer);
+        return crate::api::NotificationAction {
+            key: var_key,
+            label: var_label,
+        };
+    }
+}
+
+impl SseDecode for crate::api::NotificationCenter {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_notifications =
+            <Vec<crate::api::NotificationSnapshot>>::sse_decode(deserializer);
+        let mut var_quietReason = <String>::sse_decode(deserializer);
+        let mut var_popupHost = <Option<String>>::sse_decode(deserializer);
+        let mut var_error = <Option<String>>::sse_decode(deserializer);
+        return crate::api::NotificationCenter {
+            notifications: var_notifications,
+            quiet_reason: var_quietReason,
+            popup_host: var_popupHost,
+            error: var_error,
+        };
+    }
+}
+
+impl SseDecode for crate::api::NotificationPreferences {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_doNotDisturb = <bool>::sse_decode(deserializer);
+        let mut var_timeoutSeconds = <u32>::sse_decode(deserializer);
+        let mut var_sounds = <bool>::sse_decode(deserializer);
+        let mut var_schedule = <bool>::sse_decode(deserializer);
+        let mut var_scheduleStartMinutes = <u32>::sse_decode(deserializer);
+        let mut var_scheduleEndMinutes = <u32>::sse_decode(deserializer);
+        let mut var_scheduleDays = <Vec<u32>>::sse_decode(deserializer);
+        let mut var_fullscreen = <bool>::sse_decode(deserializer);
+        let mut var_priorityCalls = <bool>::sse_decode(deserializer);
+        let mut var_priorityApps =
+            <Vec<crate::api::NotificationPriorityApp>>::sse_decode(deserializer);
+        return crate::api::NotificationPreferences {
+            do_not_disturb: var_doNotDisturb,
+            timeout_seconds: var_timeoutSeconds,
+            sounds: var_sounds,
+            schedule: var_schedule,
+            schedule_start_minutes: var_scheduleStartMinutes,
+            schedule_end_minutes: var_scheduleEndMinutes,
+            schedule_days: var_scheduleDays,
+            fullscreen: var_fullscreen,
+            priority_calls: var_priorityCalls,
+            priority_apps: var_priorityApps,
+        };
+    }
+}
+
+impl SseDecode for crate::api::NotificationPriorityApp {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        return crate::api::NotificationPriorityApp {
+            id: var_id,
+            name: var_name,
+        };
+    }
+}
+
+impl SseDecode for crate::api::NotificationSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <u32>::sse_decode(deserializer);
+        let mut var_appName = <String>::sse_decode(deserializer);
+        let mut var_appIcon = <String>::sse_decode(deserializer);
+        let mut var_desktopEntry = <String>::sse_decode(deserializer);
+        let mut var_summary = <String>::sse_decode(deserializer);
+        let mut var_body = <Vec<crate::api::NotificationText>>::sse_decode(deserializer);
+        let mut var_actions = <Vec<crate::api::NotificationAction>>::sse_decode(deserializer);
+        let mut var_defaultAction = <bool>::sse_decode(deserializer);
+        let mut var_urgency = <u8>::sse_decode(deserializer);
+        let mut var_receivedUnixMs = <i64>::sse_decode(deserializer);
+        let mut var_imageArgb = <Vec<u8>>::sse_decode(deserializer);
+        let mut var_imageWidth = <u32>::sse_decode(deserializer);
+        let mut var_imageHeight = <u32>::sse_decode(deserializer);
+        let mut var_imagePath = <String>::sse_decode(deserializer);
+        let mut var_progress = <Option<i32>>::sse_decode(deserializer);
+        let mut var_popup = <bool>::sse_decode(deserializer);
+        let mut var_transient = <bool>::sse_decode(deserializer);
+        let mut var_resident = <bool>::sse_decode(deserializer);
+        let mut var_category = <String>::sse_decode(deserializer);
+        return crate::api::NotificationSnapshot {
+            id: var_id,
+            app_name: var_appName,
+            app_icon: var_appIcon,
+            desktop_entry: var_desktopEntry,
+            summary: var_summary,
+            body: var_body,
+            actions: var_actions,
+            default_action: var_defaultAction,
+            urgency: var_urgency,
+            received_unix_ms: var_receivedUnixMs,
+            image_argb: var_imageArgb,
+            image_width: var_imageWidth,
+            image_height: var_imageHeight,
+            image_path: var_imagePath,
+            progress: var_progress,
+            popup: var_popup,
+            transient: var_transient,
+            resident: var_resident,
+            category: var_category,
+        };
+    }
+}
+
+impl SseDecode for crate::api::NotificationText {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_text = <String>::sse_decode(deserializer);
+        let mut var_bold = <bool>::sse_decode(deserializer);
+        let mut var_italic = <bool>::sse_decode(deserializer);
+        let mut var_underline = <bool>::sse_decode(deserializer);
+        let mut var_href = <String>::sse_decode(deserializer);
+        return crate::api::NotificationText {
+            text: var_text,
+            bold: var_bold,
+            italic: var_italic,
+            underline: var_underline,
+            href: var_href,
         };
     }
 }
@@ -930,14 +1410,21 @@ fn pde_ffi_dispatcher_primary_impl(
         2 => wire__crate__api__media_action_impl(port, ptr, rust_vec_len, data_len),
         3 => wire__crate__api__media_players_impl(port, ptr, rust_vec_len, data_len),
         4 => wire__crate__api__media_seek_impl(port, ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__resource_details_default_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__sidebar_session_action_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__sidebar_uptime_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__subscribe_media_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__tray_action_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__tray_items_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__tray_menu_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__tray_menu_action_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__notification_dismiss_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__notification_invoke_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__notifications_claim_popups_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__notifications_configure_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__notifications_fullscreen_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__notifications_hover_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__resource_details_default_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__sidebar_session_action_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__sidebar_uptime_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__subscribe_media_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__subscribe_notifications_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__tray_action_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__tray_items_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__tray_menu_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__tray_menu_action_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1048,6 +1535,159 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::NetworkOverview>
     for crate::api::NetworkOverview
 {
     fn into_into_dart(self) -> crate::api::NetworkOverview {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::NotificationAction {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.key.into_into_dart().into_dart(),
+            self.label.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::NotificationAction
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::NotificationAction>
+    for crate::api::NotificationAction
+{
+    fn into_into_dart(self) -> crate::api::NotificationAction {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::NotificationCenter {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.notifications.into_into_dart().into_dart(),
+            self.quiet_reason.into_into_dart().into_dart(),
+            self.popup_host.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::NotificationCenter
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::NotificationCenter>
+    for crate::api::NotificationCenter
+{
+    fn into_into_dart(self) -> crate::api::NotificationCenter {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::NotificationPreferences {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.do_not_disturb.into_into_dart().into_dart(),
+            self.timeout_seconds.into_into_dart().into_dart(),
+            self.sounds.into_into_dart().into_dart(),
+            self.schedule.into_into_dart().into_dart(),
+            self.schedule_start_minutes.into_into_dart().into_dart(),
+            self.schedule_end_minutes.into_into_dart().into_dart(),
+            self.schedule_days.into_into_dart().into_dart(),
+            self.fullscreen.into_into_dart().into_dart(),
+            self.priority_calls.into_into_dart().into_dart(),
+            self.priority_apps.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::NotificationPreferences
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::NotificationPreferences>
+    for crate::api::NotificationPreferences
+{
+    fn into_into_dart(self) -> crate::api::NotificationPreferences {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::NotificationPriorityApp {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::NotificationPriorityApp
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::NotificationPriorityApp>
+    for crate::api::NotificationPriorityApp
+{
+    fn into_into_dart(self) -> crate::api::NotificationPriorityApp {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::NotificationSnapshot {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.app_name.into_into_dart().into_dart(),
+            self.app_icon.into_into_dart().into_dart(),
+            self.desktop_entry.into_into_dart().into_dart(),
+            self.summary.into_into_dart().into_dart(),
+            self.body.into_into_dart().into_dart(),
+            self.actions.into_into_dart().into_dart(),
+            self.default_action.into_into_dart().into_dart(),
+            self.urgency.into_into_dart().into_dart(),
+            self.received_unix_ms.into_into_dart().into_dart(),
+            self.image_argb.into_into_dart().into_dart(),
+            self.image_width.into_into_dart().into_dart(),
+            self.image_height.into_into_dart().into_dart(),
+            self.image_path.into_into_dart().into_dart(),
+            self.progress.into_into_dart().into_dart(),
+            self.popup.into_into_dart().into_dart(),
+            self.transient.into_into_dart().into_dart(),
+            self.resident.into_into_dart().into_dart(),
+            self.category.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::NotificationSnapshot
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::NotificationSnapshot>
+    for crate::api::NotificationSnapshot
+{
+    fn into_into_dart(self) -> crate::api::NotificationSnapshot {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::NotificationText {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.text.into_into_dart().into_dart(),
+            self.bold.into_into_dart().into_dart(),
+            self.italic.into_into_dart().into_dart(),
+            self.underline.into_into_dart().into_dart(),
+            self.href.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::NotificationText {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::NotificationText>
+    for crate::api::NotificationText
+{
+    fn into_into_dart(self) -> crate::api::NotificationText {
         self
     }
 }
@@ -1174,6 +1814,15 @@ impl SseEncode
     }
 }
 
+impl SseEncode
+    for StreamSink<crate::api::NotificationCenter, flutter_rust_bridge::for_generated::SseCodec>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        unimplemented!("")
+    }
+}
+
 impl SseEncode for String {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1227,6 +1876,13 @@ impl SseEncode for i32 {
     }
 }
 
+impl SseEncode for i64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_i64::<NativeEndian>(self).unwrap();
+    }
+}
+
 impl SseEncode for Vec<crate::api::BatterySnapshot> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1257,12 +1913,62 @@ impl SseEncode for Vec<crate::api::MediaPlayerSnapshot> {
     }
 }
 
+impl SseEncode for Vec<crate::api::NotificationAction> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::NotificationAction>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::NotificationPriorityApp> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::NotificationPriorityApp>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::NotificationSnapshot> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::NotificationSnapshot>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::NotificationText> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::NotificationText>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<Option<f64>> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <Option<f64>>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<u32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <u32>::sse_encode(item, serializer);
         }
     }
 }
@@ -1323,6 +2029,84 @@ impl SseEncode for crate::api::NetworkOverview {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <Option<f64>>::sse_encode(self.download_bytes_per_second, serializer);
         <Option<f64>>::sse_encode(self.upload_bytes_per_second, serializer);
+    }
+}
+
+impl SseEncode for crate::api::NotificationAction {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.key, serializer);
+        <String>::sse_encode(self.label, serializer);
+    }
+}
+
+impl SseEncode for crate::api::NotificationCenter {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<crate::api::NotificationSnapshot>>::sse_encode(self.notifications, serializer);
+        <String>::sse_encode(self.quiet_reason, serializer);
+        <Option<String>>::sse_encode(self.popup_host, serializer);
+        <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
+impl SseEncode for crate::api::NotificationPreferences {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.do_not_disturb, serializer);
+        <u32>::sse_encode(self.timeout_seconds, serializer);
+        <bool>::sse_encode(self.sounds, serializer);
+        <bool>::sse_encode(self.schedule, serializer);
+        <u32>::sse_encode(self.schedule_start_minutes, serializer);
+        <u32>::sse_encode(self.schedule_end_minutes, serializer);
+        <Vec<u32>>::sse_encode(self.schedule_days, serializer);
+        <bool>::sse_encode(self.fullscreen, serializer);
+        <bool>::sse_encode(self.priority_calls, serializer);
+        <Vec<crate::api::NotificationPriorityApp>>::sse_encode(self.priority_apps, serializer);
+    }
+}
+
+impl SseEncode for crate::api::NotificationPriorityApp {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+    }
+}
+
+impl SseEncode for crate::api::NotificationSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u32>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.app_name, serializer);
+        <String>::sse_encode(self.app_icon, serializer);
+        <String>::sse_encode(self.desktop_entry, serializer);
+        <String>::sse_encode(self.summary, serializer);
+        <Vec<crate::api::NotificationText>>::sse_encode(self.body, serializer);
+        <Vec<crate::api::NotificationAction>>::sse_encode(self.actions, serializer);
+        <bool>::sse_encode(self.default_action, serializer);
+        <u8>::sse_encode(self.urgency, serializer);
+        <i64>::sse_encode(self.received_unix_ms, serializer);
+        <Vec<u8>>::sse_encode(self.image_argb, serializer);
+        <u32>::sse_encode(self.image_width, serializer);
+        <u32>::sse_encode(self.image_height, serializer);
+        <String>::sse_encode(self.image_path, serializer);
+        <Option<i32>>::sse_encode(self.progress, serializer);
+        <bool>::sse_encode(self.popup, serializer);
+        <bool>::sse_encode(self.transient, serializer);
+        <bool>::sse_encode(self.resident, serializer);
+        <String>::sse_encode(self.category, serializer);
+    }
+}
+
+impl SseEncode for crate::api::NotificationText {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.text, serializer);
+        <bool>::sse_encode(self.bold, serializer);
+        <bool>::sse_encode(self.italic, serializer);
+        <bool>::sse_encode(self.underline, serializer);
+        <String>::sse_encode(self.href, serializer);
     }
 }
 

@@ -28,12 +28,14 @@ struct BarPopup {
   BarPopup* tray_popup = nullptr;
   BarPopup* tooltip_popup = nullptr;
   BarPopup* tray_overflow = nullptr;
+  BarPopup* toast_popup = nullptr;
   guint hide_timer = 0;
   bool ready = false;
   bool visible = false;
   bool sidebar = false;
   bool tray = false;
   bool tooltip = false;
+  bool toast = false;
   std::vector<GtkWidget*> dismiss_windows;
   bool dismissing = false;
   bool owner_hovered = false;
@@ -115,6 +117,7 @@ struct BarPopup {
     delete tray_popup;
     delete tooltip_popup;
     delete tray_overflow;
+    delete toast_popup;
     destroy_window();
     g_clear_object(&owner_channel);
     g_clear_pointer(&content, fl_value_unref);
@@ -130,7 +133,8 @@ const char* kind_of(FlValue* content) {
 
 bool is_card(const char* kind) {
   return g_strcmp0(kind, "media") == 0 || g_strcmp0(kind, "battery") == 0 ||
-      g_strcmp0(kind, "datetime") == 0 || g_strcmp0(kind, "resources") == 0;
+      g_strcmp0(kind, "datetime") == 0 || g_strcmp0(kind, "resources") == 0 ||
+      g_strcmp0(kind, "notifications") == 0;
 }
 
 FlValue* copy_map(FlValue* source) {
@@ -178,7 +182,8 @@ void send_content(BarPopup* state) {
 }
 
 void schedule_hide(BarPopup* state) {
-  if (state->sidebar || state->tray || state->dismissing) return;
+  // Notification popups close only when their notifications do.
+  if (state->sidebar || state->tray || state->toast || state->dismissing) return;
   state->cancel_hide();
   state->hide_timer = g_timeout_add(180, [](gpointer data) -> gboolean {
     auto* state = static_cast<BarPopup*>(data);
@@ -269,12 +274,13 @@ void popup_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   }
 }
 
-void create_popup(BarPopup* state, bool sidebar, bool tray, bool tooltip) {
-  const bool card = !sidebar && !tray && !tooltip;
-  const bool interactive = !tooltip;
+void create_popup(BarPopup* state, bool sidebar, bool tray, bool tooltip, bool toast) {
+  const bool card = !sidebar && !tray && !tooltip && !toast;
+  const bool interactive = !tooltip && !toast;
   state->sidebar = sidebar;
   state->tray = tray;
   state->tooltip = tooltip;
+  state->toast = toast;
   state->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   g_object_ref_sink(state->window);
   auto* window = GTK_WINDOW(state->window);
@@ -286,13 +292,19 @@ void create_popup(BarPopup* state, bool sidebar, bool tray, bool tooltip) {
   gtk_window_set_focus_on_map(window, FALSE);
   gtk_layer_init_for_window(window);
   gtk_layer_set_namespace(window, sidebar ? "top.remya.bar/sidebar"
+      : toast ? "top.remya.bar/notifications"
       : tray ? "top.remya.bar/tray-menu"
       : card ? "top.remya.bar/card" : "top.remya.bar/tooltip");
   gtk_layer_set_monitor(window, gtk_layer_get_monitor(owner));
   gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_OVERLAY);
   gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_TOP, TRUE);
   gtk_layer_set_exclusive_zone(window, 0);
-  if (sidebar) {
+  if (toast) {
+    gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
+    gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_LEFT, 8);
+    gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_TOP, 8);
+    gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
+  } else if (sidebar) {
     gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_RIGHT, TRUE);
     gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_RIGHT, kSidebarRightMargin);
     gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_TOP, 8);
@@ -403,6 +415,7 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   const bool tray = overview || g_strcmp0(kind, "tray-menu") == 0;
   const bool card = is_card(kind);
   const bool tooltip = g_strcmp0(kind, "tooltip") == 0;
+  const bool toast = g_strcmp0(kind, "notification-toasts") == 0;
   if (g_strcmp0(method, "watchTrayOutside") == 0) {
     auto* overflow = child_popup(root, root->tray_overflow);
     if (args != nullptr && fl_value_get_type(args) == FL_VALUE_TYPE_BOOL &&
@@ -415,15 +428,16 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
     fl_method_call_respond_success(call, nullptr, nullptr);
     return;
   }
-  if (sidebar || tray || tooltip) {
-    auto*& child = sidebar ? root->sidebar_popup : tray ? root->tray_popup : root->tooltip_popup;
+  if (sidebar || tray || tooltip || toast) {
+    auto*& child = sidebar ? root->sidebar_popup : tray ? root->tray_popup
+        : toast ? root->toast_popup : root->tooltip_popup;
     if (child == nullptr && !show) {
       fl_method_call_respond_success(call, nullptr, nullptr);
       return;
     }
     state = child_popup(root, child);
   }
-  if (show && !sidebar && root->sidebar_popup != nullptr && root->sidebar_popup->visible) {
+  if (show && !sidebar && !toast && root->sidebar_popup != nullptr && root->sidebar_popup->visible) {
     if (tray) {
       fl_method_call_respond_error(call, "popup-busy", "Sidebar is open", nullptr, nullptr);
     } else {
@@ -431,7 +445,7 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
     }
     return;
   }
-  if (show && !sidebar && !tray &&
+  if (show && !sidebar && !tray && !toast &&
       (root->tray_popup != nullptr && root->tray_popup->visible)) {
     fl_method_call_respond_success(call, nullptr, nullptr);
     return;
@@ -467,7 +481,7 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
     fl_method_call_respond_not_implemented(call, nullptr);
     return;
   }
-  if (!gtk_widget_get_visible(gtk_widget_get_toplevel(GTK_WIDGET(state->owner)))) {
+  if (!toast && !gtk_widget_get_visible(gtk_widget_get_toplevel(GTK_WIDGET(state->owner)))) {
     if (tray || sidebar) fl_method_call_respond_error(call, "popup-hidden", "Bar is hidden", nullptr, nullptr);
     else fl_method_call_respond_success(call, nullptr, nullptr);
     return;
@@ -501,7 +515,27 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   if (tray && state->visible && g_strcmp0(kind, kind_of(state->content)) != 0) state->hide();
   state->cancel_hide();
   if (sidebar || tray) watch_outside(state);
-  if (state->window == nullptr) create_popup(state, sidebar, tray, tooltip);
+  if (toast) {
+    // The stack is independent of hover cards, menus and the sidebar.
+    if (state->window == nullptr) create_popup(state, false, false, false, true);
+    auto* owner = GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(state->owner)));
+    GdkRectangle monitor;
+    gdk_monitor_get_geometry(gtk_layer_get_monitor(owner), &monitor);
+    state->width = MIN(width, MAX(1, monitor.width - 16));
+    state->monitor_width = monitor.width;
+    if (!state->visible) {
+      height = MIN(height, MAX(1, monitor.height - state->vertical_insets));
+      gtk_widget_set_size_request(GTK_WIDGET(state->view), state->width, height);
+      gtk_window_resize(GTK_WINDOW(state->window), state->width, height);
+    }
+    replace_content(state, args, !state->visible);
+    state->visible = true;
+    gtk_widget_show_all(state->window);
+    send_content(state);
+    fl_method_call_respond_success(call, nullptr, nullptr);
+    return;
+  }
+  if (state->window == nullptr) create_popup(state, sidebar, tray, tooltip, false);
   if (sidebar || tray || tooltip) root->hide();
   if (card && root->tray_overflow != nullptr && !root->tray_overflow->dismiss_windows.empty()) {
     g_autoptr(FlValue) args = fl_value_new_map();

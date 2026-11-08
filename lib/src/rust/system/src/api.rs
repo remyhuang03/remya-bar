@@ -298,3 +298,116 @@ pub fn sidebar_uptime() -> Option<f64> {
         .ok()
         .filter(|value| value.is_finite() && *value >= 0.0)
 }
+
+/// A run of notification body text with the supported markup applied.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NotificationText {
+    pub text: String,
+    pub bold: bool,
+    pub italic: bool,
+    pub underline: bool,
+    /// An http(s) or mailto link; empty when the run is not a link.
+    pub href: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct NotificationAction {
+    pub key: String,
+    pub label: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct NotificationSnapshot {
+    pub id: u32,
+    pub app_name: String,
+    pub app_icon: String,
+    pub desktop_entry: String,
+    pub summary: String,
+    pub body: Vec<NotificationText>,
+    /// Button actions; the `default` action is reported separately.
+    pub actions: Vec<NotificationAction>,
+    pub default_action: bool,
+    /// 0 Low, 1 Normal, 2 Critical.
+    pub urgency: u8,
+    pub received_unix_ms: i64,
+    /// `image-data` as tray-compatible ARGB; empty when absent.
+    pub image_argb: Vec<u8>,
+    pub image_width: u32,
+    pub image_height: u32,
+    pub image_path: String,
+    pub progress: Option<i32>,
+    /// Whether the notification is currently shown as a popup.
+    pub popup: bool,
+    pub transient: bool,
+    pub resident: bool,
+    /// The freedesktop `category` hint, such as `call.incoming`.
+    pub category: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct NotificationCenter {
+    /// Newest first.
+    pub notifications: Vec<NotificationSnapshot>,
+    /// Why Do Not Disturb is in effect: empty, `manual`, `schedule` or
+    /// `fullscreen`.
+    pub quiet_reason: String,
+    /// The output that shows the popup stack, if any.
+    pub popup_host: Option<String>,
+    /// Set while the bar does not own the notification service name.
+    pub error: Option<String>,
+}
+
+/// Starts the shared notification server and streams its state.
+pub async fn subscribe_notifications(sink: crate::frb_generated::StreamSink<NotificationCenter>) {
+    crate::notifications::subscribe(sink).await;
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct NotificationPriorityApp {
+    pub id: String,
+    pub name: String,
+}
+
+/// Settings notification preferences; times are minutes after midnight and
+/// days are ISO weekdays (1 Monday) on which the schedule starts.
+#[derive(Clone, Debug, PartialEq)]
+pub struct NotificationPreferences {
+    pub do_not_disturb: bool,
+    pub timeout_seconds: u32,
+    pub sounds: bool,
+    pub schedule: bool,
+    pub schedule_start_minutes: u32,
+    pub schedule_end_minutes: u32,
+    pub schedule_days: Vec<u32>,
+    pub fullscreen: bool,
+    pub priority_calls: bool,
+    pub priority_apps: Vec<NotificationPriorityApp>,
+}
+
+pub async fn notifications_configure(preferences: NotificationPreferences) {
+    crate::notifications::configure(preferences).await;
+}
+
+/// Reports whether an output shows a full screen window.
+pub async fn notifications_fullscreen(output: String, fullscreen: bool) {
+    crate::notifications::fullscreen(output, fullscreen).await;
+}
+
+/// Claims the popup stack for an output; false when another output hosts it.
+pub async fn notifications_claim_popups(output: String) -> bool {
+    crate::notifications::claim_popups(output).await
+}
+
+/// Pauses popup expiry while the pointer is over the popups.
+pub async fn notifications_hover(hovered: bool) {
+    crate::notifications::hover(hovered).await;
+}
+
+/// Dismisses one notification, or all of them when `id` is null.
+pub async fn notification_dismiss(id: Option<u32>) -> Result<(), String> {
+    crate::notifications::dismiss(id).await
+}
+
+pub async fn notification_invoke(id: u32, action: String) -> Result<(), String> {
+    crate::notifications::invoke(id, &action).await
+}
