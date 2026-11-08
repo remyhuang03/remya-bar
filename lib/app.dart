@@ -462,15 +462,16 @@ class _BarContent extends StatelessWidget {
       final metrics = layout.resources;
       final compactResources = scaledWidth < 1600;
       Widget? pill(String id) => switch (id) {
-        // A fixed slot, kept while no window is focused, so title changes
-        // never move other pills.
-        'window' when hyprland != null && hyprland!.error == null => SizedBox(
-          width: BarActiveWindow.width,
-          child: BarActiveWindow(
-            backend: hyprland,
-            showAppName: layout.windowAppName,
+        // Keep title changes from resizing the pill; omit empty workspaces.
+        'window'
+            when hyprland?.currentWindow != null && hyprland!.error == null =>
+          SizedBox(
+            width: BarActiveWindow.width,
+            child: BarActiveWindow(
+              backend: hyprland,
+              showAppName: layout.windowAppName,
+            ),
           ),
-        ),
         'resources' when BarResources.hasData(pillSnapshot, metrics: metrics) =>
           SizedBox(
             width: BarResources.widthFor(

@@ -312,8 +312,9 @@ When they fit, they are spaced evenly; Settings may center one group, and the
 groups before and after it are then spaced evenly within their own side, as long
 as both sides fit. Otherwise groups sit 16 pixels apart and the bar scrolls
 horizontally; the mouse wheel scrolls it unless a pill such as the workspaces
-claims the wheel. The active window keeps a fixed 128-pixel slot, even with no
-focused window, so title changes never move other pills. Resources compact below 1600
+claims the wheel. The active window keeps a fixed 128-pixel slot while present,
+so title changes never move other pills; empty workspaces omit the slot entirely.
+Resources compact below 1600
 logical pixels. Layout options select resource metrics, the active window app
 name, and the workspace slot count, which Rust applies to every output engine.
 Narrower outputs show the centered clock and the quick settings toggle.

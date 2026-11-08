@@ -423,9 +423,10 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    var hasWindow = true;
     final hyprland = HyprlandBackend(
       outputName: 'DP-1',
-      readSnapshot: () async => const HyprlandSnapshot(
+      readSnapshot: () async => HyprlandSnapshot(
         monitors: [
           HyprlandMonitor(
             name: 'DP-1',
@@ -433,13 +434,16 @@ void main() {
             x: 0,
             y: 0,
             activeWorkspaceId: 1,
-            currentWindow: HyprlandWindow(
-              address: '0x1',
-              title: 'A very long window title that must not widen the slot',
-              appId: 'kitty',
-              workspaceId: 1,
-              monitorName: 'DP-1',
-            ),
+            currentWindow: hasWindow
+                ? const HyprlandWindow(
+                    address: '0x1',
+                    title:
+                        'A very long window title that must not widen the slot',
+                    appId: 'kitty',
+                    workspaceId: 1,
+                    monitorName: 'DP-1',
+                  )
+                : null,
             workspaceSlots: [],
           ),
         ],
@@ -471,6 +475,15 @@ void main() {
     expect(window.left, 24);
     expect(window.width, BarActiveWindow.width);
     expect(tester.getRect(find.byType(BarSidebarButton)).right, 1920 - 24);
+    hasWindow = false;
+    await hyprland.refresh();
+    await tester.pump();
+    expect(find.byType(BarActiveWindow), findsNothing);
+    expect(tester.getCenter(find.byType(BarClock)).dx, 960);
+    hasWindow = true;
+    await hyprland.refresh();
+    await tester.pump();
+    expect(find.byType(BarActiveWindow), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
