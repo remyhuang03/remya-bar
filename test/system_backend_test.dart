@@ -46,7 +46,9 @@ class _Settings extends SettingsClient {
   final updates = StreamController<SettingsChange>();
   final writes = <({double percent, Completer<Map<String, dynamic>> result})>[];
   Completer<Map<String, dynamic>>? read;
+  Completer<Map<String, dynamic>>? layout;
   int reads = 0;
+  final gets = <String>[];
 
   @override
   Stream<SettingsChange> get changes => updates.stream;
@@ -56,6 +58,7 @@ class _Settings extends SettingsClient {
     String method, [
     List<String> arguments = const [],
   ]) async {
+    if (method == 'Get') gets.add(arguments.single);
     if (method == 'Get' && arguments.single == 'sound') {
       reads++;
       return read?.future ?? Future.value(_sound(20));
@@ -74,7 +77,7 @@ class _Settings extends SettingsClient {
       return {'value': true};
     }
     if (method == 'Get' && arguments.single == barLayoutSettingId) {
-      return {'value': BarLayout.defaults.toJson()};
+      return layout?.future ?? {'value': BarLayout.defaults.toJson()};
     }
     return {};
   }
@@ -251,4 +254,25 @@ void main() {
       await write;
     },
   );
+
+  test('Settings values follow signals instead of polling', () async {
+    await Future<void>.delayed(const Duration(milliseconds: 2100));
+    expect(
+      settings.gets.where((id) => id != 'sound').toSet().length,
+      settings.gets.where((id) => id != 'sound').length,
+    );
+    settings.gets.clear();
+    settings.layout = Completer<Map<String, dynamic>>();
+    settings.updates.add((topic: barLayoutSettingId, value: {}));
+    await _flush();
+    // A second change during the read must not be lost.
+    settings.updates.add((topic: barLayoutSettingId, value: {}));
+    await _flush();
+    final layout = settings.layout!;
+    settings.layout = null;
+    layout.complete({'value': BarLayout.defaults.toJson()});
+    await _flush();
+    await _flush();
+    expect(settings.gets, [barLayoutSettingId, barLayoutSettingId]);
+  });
 }

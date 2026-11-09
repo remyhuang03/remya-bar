@@ -49,10 +49,11 @@ class BarTrayState extends State<BarTray> {
         .listen((_) => _readPreferences(), onError: (Object _) {});
     unawaited(_readPreferences());
     unawaited(_refresh());
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      unawaited(_refresh());
-      if (timer.tick % 5 == 0) unawaited(_readPreferences());
-    });
+    // Folded apps follow Settings signals; only tray items are polled.
+    _timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => unawaited(_refresh()),
+    );
   }
 
   Future<void> _readPreferences() async {

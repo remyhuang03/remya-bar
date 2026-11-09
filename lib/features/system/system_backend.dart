@@ -42,7 +42,8 @@ class SystemBackend extends ChangeNotifier {
   bool _refreshingLayout = false;
   BarLayout layout = BarLayout.defaults;
   bool _refreshingStatus = false;
-  int _ticks = 0;
+  // Signals that arrive during a read rerun it, since nothing polls anymore.
+  final _stale = <Future<void> Function()>{};
 
   /// Wi-Fi radio and Bluetooth power for the quick settings toggle; null when
   /// Settings cannot report them.
@@ -80,13 +81,14 @@ class SystemBackend extends ChangeNotifier {
       }
     }, onError: (Object error) => debugPrint('Settings changes: $error'));
     _subscribeMedia();
+    // Settings values are read once, then follow its Changed signals.
+    unawaited(_refreshPower());
+    unawaited(_refreshClockPreference());
+    unawaited(_refreshLayout());
+    unawaited(_refreshQuickStatus());
     void refresh() {
       unawaited(_refresh());
       unawaited(_refreshSound());
-      unawaited(_refreshPower());
-      unawaited(_refreshClockPreference());
-      unawaited(_refreshLayout());
-      if (_ticks++ % 5 == 0) unawaited(_refreshQuickStatus());
     }
 
     refresh();
@@ -109,7 +111,11 @@ class SystemBackend extends ChangeNotifier {
   }
 
   Future<void> _refreshClockPreference() async {
-    if (_disposed || _refreshingClock) return;
+    if (_disposed) return;
+    if (_refreshingClock) {
+      _stale.add(_refreshClockPreference);
+      return;
+    }
     _refreshingClock = true;
     try {
       final next = await _settings.readBarClockSeconds();
@@ -120,12 +126,19 @@ class SystemBackend extends ChangeNotifier {
       if (!_disposed) debugPrint('Settings clock: $failure');
     } finally {
       _refreshingClock = false;
+      if (_stale.remove(_refreshClockPreference)) {
+        unawaited(_refreshClockPreference());
+      }
     }
   }
 
   // Errors keep the last valid layout, like the theme.
   Future<void> _refreshLayout() async {
-    if (_disposed || _refreshingLayout) return;
+    if (_disposed) return;
+    if (_refreshingLayout) {
+      _stale.add(_refreshLayout);
+      return;
+    }
     _refreshingLayout = true;
     try {
       final next = await _settings.readBarLayout();
@@ -136,11 +149,16 @@ class SystemBackend extends ChangeNotifier {
       if (!_disposed) debugPrint('Settings bar layout: $failure');
     } finally {
       _refreshingLayout = false;
+      if (_stale.remove(_refreshLayout)) unawaited(_refreshLayout());
     }
   }
 
   Future<void> _refreshQuickStatus() async {
-    if (_disposed || _refreshingStatus) return;
+    if (_disposed) return;
+    if (_refreshingStatus) {
+      _stale.add(_refreshQuickStatus);
+      return;
+    }
     _refreshingStatus = true;
     Future<Map?> read(Future<Map> request) =>
         request.then<Map?>((value) => value).catchError((Object error) {
@@ -166,11 +184,16 @@ class SystemBackend extends ChangeNotifier {
       notifyListeners();
     } finally {
       _refreshingStatus = false;
+      if (_stale.remove(_refreshQuickStatus)) unawaited(_refreshQuickStatus());
     }
   }
 
   Future<void> _refreshPower() async {
-    if (_disposed || _refreshingPower || _writingPower) return;
+    if (_disposed) return;
+    if (_refreshingPower || _writingPower) {
+      _stale.add(_refreshPower);
+      return;
+    }
     _refreshingPower = true;
     final revision = _powerRevision;
     try {
@@ -181,6 +204,7 @@ class SystemBackend extends ChangeNotifier {
       if (!_disposed) debugPrint('Settings power: $failure');
     } finally {
       _refreshingPower = false;
+      if (_stale.remove(_refreshPower)) unawaited(_refreshPower());
     }
   }
 
@@ -236,6 +260,7 @@ class SystemBackend extends ChangeNotifier {
       _applyPower(await _settings.setPower(setting, requested));
     } finally {
       _writingPower = false;
+      if (_stale.remove(_refreshPower)) unawaited(_refreshPower());
     }
   }
 

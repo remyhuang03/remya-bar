@@ -249,8 +249,12 @@ time page through the public Settings opener.
 
 The clock capsule shows local time and the date. Bar reads
 `remya-bar.clock-seconds` from the public Settings service and follows its
-change notifications, with periodic reconciliation and a default of showing
-seconds.
+change notifications, with a default of showing seconds.
+
+Bar reads the clock, layout, power, and Wi-Fi/Bluetooth quick status once at
+startup and then only on Settings `Changed` signals; a signal that arrives
+during a read reruns it. Only the account profile keeps a one-minute fallback,
+because avatar or name edits made outside Settings emit no signal.
 
 The battery card reads charge, estimated time, draw, health and cycle count
 from the system battery when those fields are available. It reads and changes

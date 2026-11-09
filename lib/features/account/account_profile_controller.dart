@@ -21,7 +21,8 @@ class AccountProfileController extends ChangeNotifier {
       if (change.topic == accountInformationKey) unawaited(refresh());
     }, onError: (Object error) => debugPrint('Account profile: $error'));
     unawaited(refresh());
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) => refresh());
+    // Only edits made outside Settings (another accounts tool) lack a signal.
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) => refresh());
   }
 
   Future<void> refresh() async {
