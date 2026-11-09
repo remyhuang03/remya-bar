@@ -23,10 +23,16 @@ void send_content(BarPopup* state);
 void report_keyboard_visibility(FlView* owner);
 bool int_at(FlValue* list, size_t index, int64_t minimum, int64_t maximum, int* output);
 
+gchar* popup_channel_name(int64_t view_id) {
+  return g_strdup_printf("top.remya.bar/popup/%" G_GINT64_FORMAT, view_id);
+}
+
 struct BarPopup {
   FlView* owner;
+  FlEngine* engine = nullptr;
   GtkWidget* window = nullptr;
   FlView* view = nullptr;
+  int64_t view_id = -1;
   FlMethodChannel* channel = nullptr;
   FlMethodChannel* owner_channel = nullptr;
   FlValue* content = nullptr;
@@ -116,18 +122,21 @@ struct BarPopup {
     if (open_keyboard == this) {
       open_keyboard = nullptr;
       report_keyboard_visibility(owner);
-      if (ready) fl_method_channel_invoke_method(channel, "keyboard.hidden", nullptr,
-                                                 nullptr, nullptr, nullptr);
     }
     keyboard.reset();
-    clear_dismiss_windows();
-    if (window != nullptr) gtk_widget_hide(window);
+    destroy_window();
+    g_clear_pointer(&content, fl_value_unref);
   }
   void destroy_window() {
     cancel_hide();
     cancel_dismiss();
     clear_dismiss_windows();
-    g_clear_object(&channel);
+    if (channel != nullptr) {
+      g_autofree gchar* name = popup_channel_name(view_id);
+      fl_binary_messenger_set_message_handler_on_channel(
+          fl_engine_get_binary_messenger(engine), name, nullptr, nullptr, nullptr);
+      g_clear_object(&channel);
+    }
     if (window != nullptr) {
       gtk_widget_destroy(window);
       g_object_unref(window);
@@ -539,20 +548,16 @@ void create_popup(BarPopup* state, bool sidebar, bool tray, bool tooltip, bool t
   GdkVisual* visual = gdk_screen_get_rgba_visual(gtk_window_get_screen(window));
   if (visual != nullptr) gtk_widget_set_visual(GTK_WIDGET(window), visual);
 
-  g_autoptr(FlDartProject) project = fl_dart_project_new();
-  gchar popup_argument[] = "--remya-popup";
-  gchar* arguments[] = {popup_argument, nullptr};
-  fl_dart_project_set_dart_entrypoint_arguments(project, arguments);
-  state->view = fl_view_new(project);
+  state->view = fl_view_new_for_engine(state->engine);
   const GdkRGBA transparent = {0, 0, 0, 0};
   fl_view_set_background_color(state->view, &transparent);
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(state->view));
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  state->view_id = fl_view_get_id(state->view);
+  g_autofree gchar* channel_name = popup_channel_name(state->view_id);
   state->channel = fl_method_channel_new(
-      fl_engine_get_binary_messenger(fl_view_get_engine(state->view)),
-      "top.remya.bar/popup", FL_METHOD_CODEC(codec));
+      fl_engine_get_binary_messenger(state->engine), channel_name, FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(state->channel, popup_method, state, nullptr);
-  fl_register_plugins(FL_PLUGIN_REGISTRY(state->view));
 }
 
 bool int_at(FlValue* list, size_t index, int64_t minimum, int64_t maximum, int* output) {
@@ -607,7 +612,7 @@ void watch_outside(BarPopup* state) {
 
 BarPopup* child_popup(BarPopup* root, BarPopup*& child) {
   if (child == nullptr) {
-    child = new BarPopup{root->owner};
+    child = new BarPopup{root->owner, root->engine};
     child->owner_channel = FL_METHOD_CHANNEL(g_object_ref(root->owner_channel));
   }
   return child;
@@ -876,8 +881,27 @@ void bar_popup_monitor_removed(GdkMonitor* monitor) {
   }
 }
 
-void register_bar_popup(FlView* owner) {
-  auto* state = new BarPopup{owner};
+GtkWidget* create_bar_popup_engine() {
+  g_autoptr(FlDartProject) project = fl_dart_project_new();
+  gchar popup_argument[] = "--remya-popup";
+  gchar* arguments[] = {popup_argument, nullptr};
+  fl_dart_project_set_dart_entrypoint_arguments(project, arguments);
+
+  // GTK realization starts the Linux engine. Keep its implicit view realized
+  // and unmapped so it owns a GL context without putting a window on screen.
+  auto* window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+  g_object_ref_sink(window);
+  gtk_window_set_default_size(GTK_WINDOW(window), 1, 1);
+  auto* view = fl_view_new(project);
+  gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
+  fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+  gtk_widget_realize(window);
+  gtk_widget_realize(GTK_WIDGET(view));
+  return window;
+}
+
+void register_bar_popup(FlView* owner, FlEngine* popup_engine) {
+  auto* state = new BarPopup{owner, popup_engine};
   g_object_set_data_full(G_OBJECT(owner), "remya-popup", state,
                          [](gpointer data) { delete static_cast<BarPopup*>(data); });
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();

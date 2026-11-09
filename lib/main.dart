@@ -17,7 +17,7 @@ import 'features/system/system_backend.dart';
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
   if (arguments.contains('--remya-popup')) {
-    runApp(const BarPopupApp());
+    runWidget(const BarPopupHost());
     return;
   }
   final root = kDebugMode

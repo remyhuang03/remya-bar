@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../popups/bar_popup.dart';
 import '../popups/bar_popup_button.dart';
 
 part 'keyboard_key.dart';
@@ -29,9 +29,10 @@ enum _Modifier {
 enum _KeyState { idle, latched, locked }
 
 class KeyboardPanel extends StatefulWidget {
-  const KeyboardPanel({super.key, required this.data});
+  const KeyboardPanel({super.key, required this.data, required this.channel});
 
   final Map<String, Object?> data;
+  final MethodChannel channel;
 
   @override
   State<KeyboardPanel> createState() => _KeyboardPanelState();
@@ -75,14 +76,14 @@ class _KeyboardPanelState extends State<KeyboardPanel> {
   }
 
   Future<Map<Object?, Object?>?> _call(String action, [Object? value]) =>
-      BarPopup.channel.invokeMapMethod('action', {
+      widget.channel.invokeMapMethod('action', {
         'action': 'keyboard.$action',
         'value': value,
       });
 
   Future<void> _action(String action, [Object? value]) async {
     try {
-      await BarPopup.action({
+      await widget.channel.invokeMethod<void>('action', {
         'action': action == 'close' ? action : 'keyboard.$action',
         'value': value,
       });

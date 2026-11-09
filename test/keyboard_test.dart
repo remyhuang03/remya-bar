@@ -95,6 +95,7 @@ Widget _keyboard() {
   );
   return MaterialApp(
     home: KeyboardPanel(
+      channel: BarPopup.channel,
       data: {
         'device': {
           'config': {'group': 0, 'layout': 'us'},
