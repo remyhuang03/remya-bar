@@ -159,8 +159,8 @@ a component `kind`, view-local anchor rectangle, logical size, component `data`,
 and the versioned Settings theme. `BarPopupApp` dispatches each kind to its Flutter
 renderer. GTK owns placement, visibility, focus policy and lifetime only.
 
-The four hover cards (`media`, `battery`, `datetime`, `resources`) share one
-per-output popup slot. Its Flutter view uses an OVERLAY layer surface anchored top/left,
+Detail cards share one per-output popup slot. The AI Usage card opens on click.
+The other detail cards can open on hover. Its Flutter view uses an OVERLAY layer surface anchored top/left,
 with exclusive zone 0, top margin 0 and ON_DEMAND keyboard focus (Escape hides
 immediately). The window begins at the bar's exclusive edge. The left margin is
 `clamp(anchor.x + (anchor.width - width) / 2, 0, monitor.width - width)`;
@@ -443,3 +443,25 @@ Battery and resource data share one cached hardware sample across outputs. Media
 discovery keeps its own refresh and retains its last successful player list if a
 read fails. The resource card closes on Escape and dismisses the tray overflow
 when it opens.
+
+
+## AI Quota
+
+The optional `codexbar-cli` dependency supplies the `codexbar` executable. A
+worker in the warm popup engine coalesces requests from all outputs into one
+sample every five minutes. Rust starts and supervises the CLI child, binds its
+HTTP server to a reserved port on `127.0.0.1` and ties the child to the bar
+process. The worker uses the authenticated dashboard shell for enabled provider
+order and the usage fill preference, and reads the usage and cost JSON routes.
+CodexBar exposes its ordinary usage and cost routes to local loopback clients.
+If a route is unavailable, the worker falls back to the corresponding CLI
+command. The optional dependency is detected at runtime.
+
+Each provider retains its own data availability. Errors and samples older than
+ten minutes show an unavailable reading. Missing reset, pace, and spend fields
+stay unknown. CodexBar 0.84 omits incident status from its HTTP usage response.
+The card shows an incident when the payload supplies it, including CLI fallback
+with `--status`. The manual refresh bypasses the usage cache. For cost it uses
+`codexbar cost --refresh` because the HTTP cost endpoint in 0.84 does not force
+a rescan. Freedesktop alerts are deduplicated by provider, window, reset time
+and threshold for the lifetime of the bar process.

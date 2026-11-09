@@ -8,6 +8,9 @@ import 'package:remya_settings_client/remya_settings_client.dart';
 
 import 'bar_theme.dart';
 import 'features/account/account_profile_controller.dart';
+import 'features/ai_usage/ai_usage_backend.dart';
+import 'features/ai_usage/ai_usage_data.dart';
+import 'features/ai_usage/bar_ai_quota.dart';
 import 'features/sidebar/right_sidebar.dart';
 import 'features/sidebar/sidebar_backend.dart';
 import 'features/battery/bar_battery.dart';
@@ -38,6 +41,7 @@ class RemyaBarApp extends StatefulWidget {
     this.hyprland,
     this.system,
     this.account,
+    this.aiUsage,
     this.notifications,
     this.onOpenSettingsPage,
     this.showTray = false,
@@ -49,6 +53,7 @@ class RemyaBarApp extends StatefulWidget {
   final HyprlandBackend? hyprland;
   final SystemBackend? system;
   final AccountProfileController? account;
+  final AiUsageBackend? aiUsage;
   final NotificationBackend? notifications;
   final Future<void> Function(String page)? onOpenSettingsPage;
   final bool showTray;
@@ -365,6 +370,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
             'datetime',
             'resources',
             'notifications',
+            aiUsageKind,
           }.contains(kind) ||
           open is! bool) {
         throw const FormatException('Invalid card state');
@@ -476,6 +482,9 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       await _notificationAction(action, args);
     } else if (action is String && action.startsWith('tray.')) {
       await _tray.currentState?.popupAction(args);
+    } else if (action == 'ai-usage.refresh' &&
+        BarPopup.openCard.value == aiUsageKind) {
+      await widget.aiUsage?.refresh();
     } else if (action == 'resources.monitor') {
       await openSystemMonitor();
       await BarPopup.hide(kind: 'resources');
@@ -543,6 +552,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     widget.preferences.dispose();
     widget.hyprland?.dispose();
     widget.system?.dispose();
+    widget.aiUsage?.dispose();
     super.dispose();
   }
 
@@ -554,6 +564,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         widget.hyprland,
         widget.system,
         widget.notifications,
+        widget.aiUsage,
       ]),
       builder: (context, _) => BarPopupScope(
         theme: widget.preferences.theme,
@@ -571,6 +582,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
                 hyprland: widget.hyprland,
                 system: widget.system,
                 notifications: widget.notifications,
+                aiUsage: widget.aiUsage,
                 pillSnapshot: _pillSnapshot,
                 sidebarOpen: _sidebarOpen,
                 tray: widget.showTray ? BarTray(key: _tray) : null,
@@ -593,6 +605,7 @@ class _BarContent extends StatelessWidget {
     this.hyprland,
     this.system,
     this.notifications,
+    this.aiUsage,
     this.tray,
   });
 
@@ -601,6 +614,7 @@ class _BarContent extends StatelessWidget {
   final HyprlandBackend? hyprland;
   final SystemBackend? system;
   final NotificationBackend? notifications;
+  final AiUsageBackend? aiUsage;
   final Widget? tray;
   final bool sidebarOpen;
   final Future<void> Function(Rect, double) onToggleSidebar;
@@ -720,10 +734,22 @@ class _BarContent extends StatelessWidget {
         'sidebar' => sidebar,
         _ => null,
       };
+      final quota = aiUsage?.visible == true
+          ? BarAiQuota(backend: aiUsage!)
+          : null;
+      final quotaAnchor = layout.groups.any((group) => group.contains('media'))
+          ? 'media'
+          : 'sidebar';
       final groups = <Widget>[];
       int? center;
       for (var i = 0; i < layout.groups.length; i++) {
-        final pills = [...layout.groups[i].map(pill).nonNulls];
+        final pills = [
+          for (final id in layout.groups[i]) ...[
+            if (id == quotaAnchor && id == 'sidebar') ?quota,
+            ?pill(id),
+            if (id == quotaAnchor && id == 'media') ?quota,
+          ],
+        ];
         if (pills.isEmpty) continue;
         if (i == layout.center) center = groups.length;
         groups.add(Row(mainAxisSize: .min, spacing: 8, children: pills));

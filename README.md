@@ -71,6 +71,18 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 - **Notification Center**: Hover or click the bell to see history grouped by app, run actions, dismiss or clear all.
 - **Do Not Disturb**: Toggle it in the card, the Quick Settings tile or Remy'a Settings → Notifications, or turn it on automatically on a schedule or while an app is full screen. It silences popups and sounds except Critical notifications, incoming calls and priority apps; history still collects everything. Popup duration and sounds are also set there.
 
+### AI Quota
+- Install the optional `codexbar-cli` system package and make its `codexbar`
+  executable available on the bar service's `PATH`. Enable and authenticate the
+  providers you want in [CodexBar](https://github.com/steipete/CodexBar).
+- The pill shows up to three enabled providers and highlights the tightest quota.
+  Click it for all providers, reset times, pace, and estimated Claude and Codex
+  spend. Right-click the pill or use **Refresh** in the card to update immediately.
+- The pill follows Media in the wide bar layout. It appears before Quick Settings
+  when Media is absent from the configured layout. The low-quota threshold is
+  20% by default and can be set with `REMYA_BAR_AI_QUOTA_LOW_PERCENT` (1–100)
+  in the bar process environment.
+
 ### 🔋 Battery & Power Management
 - **Battery Capsule**: Clear visual readout with percentage, dynamic charging bolt, and remaining runtime estimates.
 - **Detailed Power Card**: Hover to inspect battery health, charge cycle counts, current power draw, and Energy Saver thresholds.

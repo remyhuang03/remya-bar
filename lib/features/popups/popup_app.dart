@@ -8,6 +8,7 @@ import 'package:remya_settings_client/remya_settings_client.dart';
 
 import '../../bar_theme.dart';
 import '../keyboard/keyboard_panel.dart';
+import '../ai_usage/ai_usage_data.dart';
 import '../notifications/notification_view.dart';
 import '../tray/tray_menu_popup.dart';
 import '../workspaces/bar_workspaces.dart';
@@ -88,6 +89,7 @@ class _BarPopupAppState extends State<BarPopupApp>
     'datetime',
     'resources',
     'notifications',
+    aiUsageKind,
   }.contains(_kind);
   bool get _reduceMotion =>
       MediaQuery.maybeDisableAnimationsOf(context) == true ||
@@ -182,6 +184,7 @@ class _BarPopupAppState extends State<BarPopupApp>
             'datetime',
             'tray-menu',
             'notifications',
+            aiUsageKind,
             notificationToastsKind,
             workspaceOverviewKind,
           }.contains(arguments['kind'])) {

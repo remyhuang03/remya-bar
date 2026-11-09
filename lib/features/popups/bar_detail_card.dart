@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../ai_usage/ai_usage_card.dart';
+import '../ai_usage/ai_usage_data.dart';
 import '../battery/battery_card.dart';
 import '../clock/datetime_card.dart';
 import '../media/media_preview.dart';
@@ -48,6 +50,10 @@ class BarDetailCard extends StatelessWidget {
               data: data,
               onOpenMonitor: () =>
                   onAction(const {'action': 'resources.monitor'}),
+            ),
+            aiUsageKind => AiUsageCard(
+              data: data,
+              onRefresh: () => onAction(const {'action': 'ai-usage.refresh'}),
             ),
             'battery' => BatteryCard(data: data, onAction: onAction),
             'notifications' => NotificationCenterCard(

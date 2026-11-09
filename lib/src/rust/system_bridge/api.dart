@@ -107,6 +107,25 @@ Future<void> notificationInvoke({required int id, required String action}) =>
       action: action,
     );
 
+Future<int?> codexbarServerPort({required String token}) =>
+    SystemRustLib.instance.api.crateApiCodexbarServerPort(token: token);
+
+Future<String?> codexbarJson({required String kind, required bool refresh}) =>
+    SystemRustLib.instance.api.crateApiCodexbarJson(
+      kind: kind,
+      refresh: refresh,
+    );
+
+Future<void> codexbarNotify({
+  required String provider,
+  required String window,
+  required int remaining,
+}) => SystemRustLib.instance.api.crateApiCodexbarNotify(
+  provider: provider,
+  window: window,
+  remaining: remaining,
+);
+
 class BatterySnapshot {
   final String name;
   final double? percent;

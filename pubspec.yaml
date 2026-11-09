@@ -27,9 +27,11 @@ flutter:
   assets:
     - LICENSE
     - assets/licenses/rust-dependencies.txt
+    - assets/licenses/codexbar.txt
     - assets/icons/media-artwork.png
     - assets/icons/media-live-dot.png
     - assets/icons/battery-card-status.png
+    - assets/icons/ai_usage/
     - assets/icons/resources/
     - assets/icons/datetime/
     - assets/icons/workspaces/

@@ -7,6 +7,7 @@ import 'package:remya_settings_client/remya_settings_client.dart';
 
 import 'app.dart';
 import 'features/account/account_profile_controller.dart';
+import 'features/ai_usage/ai_usage_backend.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/notifications/notification_backend.dart';
 import 'features/settings/bar_theme_controller.dart';
@@ -18,6 +19,7 @@ Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
   if (arguments.contains('--remya-popup')) {
     runWidget(const BarPopupHost());
+    startAiUsageWorker();
     return;
   }
   final root = kDebugMode
@@ -55,11 +57,17 @@ Future<void> main(List<String> arguments) async {
       : File(
           '${Directory(root).parent.path}/remya-settings/build/linux/x64/debug/bundle/remya_settings',
         );
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'CodexBar provider icons',
+    ], await rootBundle.loadString('assets/licenses/codexbar.txt'));
+  });
   runApp(
     RemyaBarApp(
       preferences: preferences,
       hyprland: hyprland,
       system: system,
+      aiUsage: AiUsageBackend()..start(),
       account: AccountProfileController()..start(),
       notifications: NotificationBackend()..start(),
       onOpenSettingsPage: (page) =>

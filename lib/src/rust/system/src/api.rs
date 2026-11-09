@@ -405,3 +405,15 @@ pub async fn notification_dismiss(id: Option<u32>) -> Result<(), String> {
 pub async fn notification_invoke(id: u32, action: String) -> Result<(), String> {
     crate::notifications::invoke(id, &action).await
 }
+
+pub async fn codexbar_server_port(token: String) -> Option<i32> {
+    crate::codexbar::server_port(&token).await
+}
+
+pub async fn codexbar_json(kind: String, refresh: bool) -> Result<Option<String>, String> {
+    crate::codexbar::json(&kind, refresh).await
+}
+
+pub async fn codexbar_notify(provider: String, window: String, remaining: i32) {
+    crate::codexbar::notify(&provider, &window, remaining).await
+}

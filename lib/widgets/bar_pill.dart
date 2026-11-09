@@ -11,6 +11,8 @@ class BarPillCard {
     required this.data,
     this.seedColor,
     this.openOnTap = false,
+    this.openOnHover = true,
+    this.tonalWhenAttached = false,
   });
 
   final String kind;
@@ -18,6 +20,8 @@ class BarPillCard {
   final Map<String, Object?> data;
   final Color? seedColor;
   final bool openOnTap;
+  final bool openOnHover;
+  final bool tonalWhenAttached;
 }
 
 class BarPillState {
@@ -42,6 +46,7 @@ class BarPill extends StatefulWidget {
     this.padding = EdgeInsets.zero,
     this.expandedPadding,
     this.onTap,
+    this.onSecondaryTap,
     this.toggled,
     this.semanticsLabel,
     this.semanticsHint,
@@ -56,6 +61,7 @@ class BarPill extends StatefulWidget {
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry? expandedPadding;
   final VoidCallback? onTap;
+  final VoidCallback? onSecondaryTap;
   final bool? toggled;
   final String? semanticsLabel;
   final String? semanticsHint;
@@ -87,6 +93,7 @@ class _BarPillState extends State<BarPill> {
                 data: card.data,
                 seedColor: card.seedColor,
                 openOnTap: card.openOnTap,
+                openOnHover: card.openOnHover,
                 onTap: widget.onTap,
                 builder: _buildPill,
               ),
@@ -106,7 +113,10 @@ class _BarPillState extends State<BarPill> {
             BarPopupScope.themeOf(context).styleVariant,
           );
     final expanded = _hovered || _focused || _pressed || attached;
-    final base = attached
+    final tonal = attached && widget.card!.tonalWhenAttached;
+    final base = tonal
+        ? scheme.primaryContainer
+        : attached
         ? cardScheme.surfaceContainer
         : _pressed
         ? scheme.primaryContainer
@@ -116,7 +126,7 @@ class _BarPillState extends State<BarPill> {
     final surface = !attached && !_pressed && (_hovered || _focused)
         ? Color.alphaBlend(scheme.onSurface.withValues(alpha: .08), base)
         : base;
-    final foreground = _pressed
+    final foreground = _pressed || tonal
         ? scheme.onPrimaryContainer
         : widget.toggled == true
         ? scheme.onPrimary
@@ -162,6 +172,7 @@ class _BarPillState extends State<BarPill> {
                 type: .transparency,
                 child: InkWell(
                   onTap: onTap,
+                  onSecondaryTap: widget.onSecondaryTap,
                   onFocusChange: (value) => setState(() => _focused = value),
                   onHighlightChanged: (value) =>
                       setState(() => _pressed = value),

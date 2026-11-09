@@ -287,7 +287,7 @@ const char* kind_of(FlValue* content) {
 bool is_card(const char* kind) {
   return g_strcmp0(kind, "media") == 0 || g_strcmp0(kind, "battery") == 0 ||
       g_strcmp0(kind, "datetime") == 0 || g_strcmp0(kind, "resources") == 0 ||
-      g_strcmp0(kind, "notifications") == 0;
+      g_strcmp0(kind, "notifications") == 0 || g_strcmp0(kind, "ai-usage") == 0;
 }
 
 FlValue* copy_map(FlValue* source) {
