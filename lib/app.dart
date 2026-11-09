@@ -688,6 +688,7 @@ class _BarContent extends StatelessWidget {
             builder: (context, constraints) => constraints.maxWidth < 112
                 ? const SizedBox.shrink()
                 : BarMedia(
+                    marquee: layout.mediaMarquee,
                     players: system!.players,
                     output: system!.mediaOutput,
                     error: system!.mediaError,

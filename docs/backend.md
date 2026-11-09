@@ -388,6 +388,9 @@ so title changes never move other pills; empty workspaces omit the slot entirely
 Resources compact below 1600
 logical pixels. Layout options select resource metrics, the active window app
 name, and the workspace slot count, which Rust applies to every output engine.
+The media title uses an ellipsis by default. The experimental media marquee
+option scrolls long titles at 20 Hz and leaves the media controls available
+in both modes.
 Narrower outputs show the centered clock and the quick settings toggle.
 The toggle shows live Wi-Fi, Bluetooth and volume state from Settings and
 omits icons whose state is unknown.
