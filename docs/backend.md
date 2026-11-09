@@ -386,16 +386,18 @@ On outputs at least 700 logical pixels wide (after text scaling), pills follow
 Settings' `remya-bar.layout` (read through `BarLayoutClient`, refreshed on
 `Changed`, with the last valid layout kept on errors). Groups are spaced evenly
 across the bar with 24-pixel side padding, and pills inside a group are 8 pixels
-apart. The default groups are window, resources and media; workspaces and clock;
-tray; battery and the quick settings toggle. Groups keep their natural widths.
-When they fit, they are spaced evenly; Settings may center one group, and the
+apart. The default layout has four groups: notifications, window, resources and
+media in the first group, workspaces and clock in the centered group, the tray
+in the third group, and battery and Quick Settings in the last group. Groups
+keep their natural widths. When they fit, Settings can center one group, and the
 groups before and after it are then spaced evenly within their own side, as long
 as both sides fit. Otherwise groups sit 16 pixels apart and the bar scrolls
 horizontally; the mouse wheel scrolls it unless a pill such as the workspaces
 claims the wheel. The active window keeps a fixed 128-pixel slot while present,
 so title changes never move other pills; empty workspaces omit the slot entirely.
 Resources compact below 1600
-logical pixels. Layout options select resource metrics, the active window app
+logical pixels. The default metrics are CPU, memory and network. Layout options
+select resource metrics, the active window app
 name, and the workspace slot count, which Rust applies to every output engine.
 The media title uses an ellipsis by default. The experimental media marquee
 option scrolls long titles at 20 Hz and leaves the media controls available

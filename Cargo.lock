@@ -848,11 +848,11 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "remya_bar_core"
-version = "0.1.0"
+version = "0.1.0-dev.20261109.0"
 
 [[package]]
 name = "remya_bar_hyprland"
-version = "0.1.0"
+version = "0.1.0-dev.20261109.0"
 dependencies = [
  "flutter_rust_bridge",
  "serde",
@@ -863,7 +863,7 @@ dependencies = [
 
 [[package]]
 name = "remya_bar_system"
-version = "0.1.0"
+version = "0.1.0-dev.20261109.0"
 dependencies = [
  "chrono",
  "flutter_rust_bridge",
