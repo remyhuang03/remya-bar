@@ -6,6 +6,7 @@ mod notifications;
 mod tray;
 
 mod metrics;
+mod nvml;
 mod resources;
 
 mod session;

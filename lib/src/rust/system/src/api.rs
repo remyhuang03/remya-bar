@@ -273,12 +273,6 @@ pub async fn hardware_snapshot() -> Result<SystemSnapshot, String> {
     })
     .await
     .map_err(|error| error.to_string())??;
-    let gpus = crate::metrics::nvidia_gpus().await;
-    if let Ok(gpus) = gpus {
-        // The NVIDIA tool provides a richer identity than the matching DRM entry.
-        snapshot.gpus.retain(|gpu| !gpu.id.starts_with("nvidia:"));
-        snapshot.gpus.extend(gpus);
-    }
     cache.resources.record(sampled_at, &mut snapshot);
     cache.updated = Some(Instant::now());
     cache.snapshot = Some(snapshot.clone());

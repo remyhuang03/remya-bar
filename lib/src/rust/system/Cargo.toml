@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 flutter_rust_bridge = "=2.13.0"
 
 chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
+libloading = "0.8.9"
 tokio = { version = "1", features = ["process", "sync", "time", "rt"] }
 zbus = { version = "5.15.0", default-features = false, features = ["tokio"] }
 

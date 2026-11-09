@@ -2,7 +2,7 @@ use crate::api::*;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[derive(Clone, Debug)]
 pub(crate) struct NetworkSnapshot {
@@ -66,6 +66,10 @@ impl Sampler {
         );
         self.networks = current;
         self.sampled = Some(now);
+        let mut gpus = drm_gpus();
+        if let Some(nvidia) = crate::nvml::gpus() {
+            gpus.extend(nvidia);
+        }
         Ok((
             now,
             SystemSnapshot {
@@ -83,7 +87,7 @@ impl Sampler {
                     .and_then(|(total, free)| total.checked_sub(*free))
                     .map(|v| v as f64),
                 swap_total_bytes: memory.get("SwapTotal").map(|v| *v as f64),
-                gpus: drm_gpus(),
+                gpus,
                 network_overview: Some(overview),
                 resources: Some(resources),
             },
@@ -233,18 +237,17 @@ fn drm_gpus() -> Vec<GpuSnapshot> {
         let device = entry.path().join("device");
         let vendor = fs::read_to_string(device.join("vendor")).unwrap_or_default();
         let vendor = vendor.trim();
+        if vendor == "0x10de" {
+            continue;
+        }
         let product = fs::read_to_string(device.join("device")).unwrap_or_default();
         let vendor_name = match vendor {
             "0x1002" => "AMD",
-            "0x10de" => "NVIDIA",
             "0x8086" => "Intel",
             _ => "GPU",
         };
         gpus.push(GpuSnapshot {
-            id: format!(
-                "{}:{name}",
-                if vendor == "0x10de" { "nvidia" } else { "drm" }
-            ),
+            id: format!("drm:{name}"),
             name: format!("{vendor_name} {} ({name})", product.trim()),
             utilization_percent: read_number(device.join("gpu_busy_percent"))
                 .filter(|v| *v <= 100.0),
@@ -252,51 +255,13 @@ fn drm_gpus() -> Vec<GpuSnapshot> {
             memory_total_bytes: read_number(device.join("mem_info_vram_total")),
             temperature_celsius: crate::resources::hwmon_temperature(
                 &device.join("hwmon"),
-                &["amdgpu", "i915", "xe", "nouveau"],
+                &["amdgpu", "i915", "xe"],
                 &["edge", "gpu"],
             ),
         });
     }
     gpus.sort_by(|a, b| a.id.cmp(&b.id));
     gpus
-}
-
-pub(crate) async fn nvidia_gpus() -> Result<Vec<GpuSnapshot>, String> {
-    let mut command = tokio::process::Command::new("nvidia-smi");
-    command
-        .args([
-            "--query-gpu=uuid,name,utilization.gpu,memory.used,memory.total,temperature.gpu",
-            "--format=csv,noheader,nounits",
-        ])
-        .kill_on_drop(true);
-    let output = tokio::time::timeout(Duration::from_millis(800), command.output())
-        .await
-        .map_err(|_| "NVIDIA query timed out")?
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err("NVIDIA query unavailable".into());
-    }
-    Ok(parse_nvidia(&String::from_utf8_lossy(&output.stdout)))
-}
-
-fn parse_nvidia(text: &str) -> Vec<GpuSnapshot> {
-    text.lines()
-        .filter_map(|line| {
-            let fields: Vec<_> = line.split(',').map(str::trim).collect();
-            if fields.len() != 6 || fields[0].is_empty() {
-                return None;
-            }
-            let number = |s: &str| s.parse::<f64>().ok().filter(|v| v.is_finite() && *v >= 0.0);
-            Some(GpuSnapshot {
-                id: fields[0].into(),
-                name: fields[1].into(),
-                utilization_percent: number(fields[2]).filter(|v| *v <= 100.0),
-                memory_used_bytes: number(fields[3]).map(|v| v * 1024.0 * 1024.0),
-                memory_total_bytes: number(fields[4]).map(|v| v * 1024.0 * 1024.0),
-                temperature_celsius: number(fields[5]),
-            })
-        })
-        .collect()
 }
 
 #[cfg(test)]
@@ -365,18 +330,5 @@ mod tests {
         assert_eq!(memory.len(), 2);
         assert_eq!(memory["MemTotal"], 2097152);
         assert_eq!(memory["MemAvailable"], 524288);
-    }
-
-    #[test]
-    fn nvidia_unsupported_fields_remain_unavailable() {
-        let gpus = parse_nvidia(
-            "GPU-123, Example GPU, 52, 10, 100, 46\nGPU-456, Other GPU, [N/A], [N/A], [N/A], [N/A]\nmalformed",
-        );
-        assert_eq!(gpus.len(), 2);
-        assert_eq!(gpus[0].utilization_percent, Some(52.0));
-        assert_eq!(gpus[0].temperature_celsius, Some(46.0));
-        assert_eq!(gpus[0].memory_used_bytes, Some(10485760.0));
-        assert_eq!(gpus[1].utilization_percent, None);
-        assert_eq!(gpus[1].memory_total_bytes, None);
     }
 }

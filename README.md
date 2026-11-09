@@ -104,6 +104,7 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
   - Wayland client and XKB libraries (`wayland`, `libxkbcommon` on Arch), with `wayland-scanner` at build time
   - `inter-font` and `noto-fonts-cjk`
   - NetworkManager and BlueZ (for network & Bluetooth toggles)
+  - NVIDIA Management Library (`libnvidia-ml.so.1`, provided by `nvidia-utils` on Arch) for NVIDIA GPU metrics. Without NVML, the resource monitor hides NVIDIA GPUs.
   - Remya Settings (`remya_settings`, provides theme & system D-Bus services)
 
 ### Installation

@@ -298,6 +298,11 @@ plots 60 seconds of CPU, GPU and network history. Missing sensors stay
 unavailable. Network totals cover observations for the current local date,
 with partial coverage marked in the card.
 
+NVIDIA GPU metrics require the driver's NVML runtime (`libnvidia-ml.so.1`).
+The Rust backend shares one initialized library and queries it on a blocking
+worker. NVIDIA GPU entries are omitted when NVML cannot provide a sample.
+Other GPU entries continue to come from DRM.
+
 The System card uses a zero-exclusive-zone layer-shell surface on the pill's
 output. The popup stays open as the pointer moves between the pill and card.
 Its monitor button opens a supported desktop system monitor.
