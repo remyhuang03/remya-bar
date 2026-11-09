@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/bar_pill.dart';
@@ -10,6 +12,7 @@ class BarMedia extends StatelessWidget {
   const BarMedia({
     super.key,
     required this.players,
+    this.marquee = false,
     this.output = const {},
     this.error,
     this.onAction,
@@ -17,6 +20,7 @@ class BarMedia extends StatelessWidget {
 
   static const width = 204.0;
   final List<MediaPlayerSnapshot> players;
+  final bool marquee;
   final Map<String, Object?> output;
   final String? error;
   final Future<void> Function(String player, String action)? onAction;
@@ -41,6 +45,7 @@ class BarMedia extends StatelessWidget {
           },
         ),
         scheme: scheme,
+        marquee: marquee,
         title: player.title.isEmpty ? player.identity : player.title,
         playing: playing,
         progress: switch ((player.positionSeconds, player.lengthSeconds)) {
@@ -68,6 +73,7 @@ class BarMedia extends StatelessWidget {
 class _MediaPill extends StatelessWidget {
   const _MediaPill({
     required this.title,
+    required this.marquee,
     required this.playing,
     required this.progress,
     required this.onToggle,
@@ -76,6 +82,7 @@ class _MediaPill extends StatelessWidget {
   });
 
   final String title;
+  final bool marquee;
   final bool playing;
   final double progress;
   final VoidCallback? onToggle;
@@ -149,6 +156,7 @@ class _MediaPill extends StatelessWidget {
               child: ExcludeSemantics(
                 child: _MediaTitle(
                   text: title,
+                  marquee: marquee,
                   style: theme.textTheme.bodyMedium!.copyWith(
                     color: foreground,
                     fontSize: 15,
@@ -166,41 +174,50 @@ class _MediaPill extends StatelessWidget {
 }
 
 class _MediaTitle extends StatelessWidget {
-  const _MediaTitle({required this.text, required this.style});
+  const _MediaTitle({
+    required this.text,
+    required this.style,
+    required this.marquee,
+  });
 
   final String text;
   final TextStyle style;
+  final bool marquee;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final label = Text(text, style: style, maxLines: 1, softWrap: false);
-      final direction = Directionality.of(context);
-      final painter = TextPainter(
-        text: TextSpan(text: text, style: style),
-        textDirection: direction,
-        textScaler: MediaQuery.textScalerOf(context),
-        maxLines: 1,
-      )..layout();
-      final textWidth = painter.width;
-      painter.dispose();
-      if (textWidth <= constraints.maxWidth ||
-          MediaQuery.disableAnimationsOf(context)) {
-        return Text(text, style: style, maxLines: 1, overflow: .ellipsis);
-      }
-      return ValueListenableBuilder<bool>(
-        valueListenable: BarPopup.keyboardOpen,
-        builder: (_, keyboardOpen, child) =>
-            TickerMode(enabled: !keyboardOpen, child: child!),
-        child: _ScrollingTitle(
-          key: ValueKey(text),
-          textWidth: textWidth,
-          direction: direction,
-          child: label,
-        ),
-      );
-    },
-  );
+  Widget build(BuildContext context) {
+    if (!marquee || MediaQuery.disableAnimationsOf(context)) {
+      return Text(text, style: style, maxLines: 1, overflow: .ellipsis);
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final label = Text(text, style: style, maxLines: 1, softWrap: false);
+        final direction = Directionality.of(context);
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: style),
+          textDirection: direction,
+          textScaler: MediaQuery.textScalerOf(context),
+          maxLines: 1,
+        )..layout();
+        final textWidth = painter.width;
+        painter.dispose();
+        if (textWidth <= constraints.maxWidth) {
+          return Text(text, style: style, maxLines: 1, overflow: .ellipsis);
+        }
+        return ValueListenableBuilder<bool>(
+          valueListenable: BarPopup.keyboardOpen,
+          builder: (_, keyboardOpen, child) =>
+              TickerMode(enabled: !keyboardOpen, child: child!),
+          child: _ScrollingTitle(
+            key: ValueKey(text),
+            textWidth: textWidth,
+            direction: direction,
+            child: label,
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _ScrollingTitle extends StatefulWidget {
@@ -219,48 +236,49 @@ class _ScrollingTitle extends StatefulWidget {
   State<_ScrollingTitle> createState() => _ScrollingTitleState();
 }
 
-class _ScrollingTitleState extends State<_ScrollingTitle>
-    with SingleTickerProviderStateMixin {
+class _ScrollingTitleState extends State<_ScrollingTitle> {
   static const _gap = 32.0;
   static const _speed = 16.0;
-  late final AnimationController _scroll = AnimationController(vsync: this);
-
-  double get _distance => widget.textWidth + _gap;
-
-  @override
-  void initState() {
-    super.initState();
-    _scroll.repeat(period: _period);
-  }
-
-  Duration get _period =>
-      Duration(milliseconds: (_distance / _speed * 1000).round());
+  static const _frameInterval = Duration(milliseconds: 50);
+  final _elapsed = Stopwatch()..start();
+  final _travel = ValueNotifier(0.0);
+  Timer? _timer;
 
   @override
-  void didUpdateWidget(_ScrollingTitle oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if ((widget.textWidth - oldWidget.textWidth).abs() >= 0.5) {
-      _scroll.repeat(period: _period);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (TickerMode.valuesOf(context).enabled) {
+      // Measure time independently so a delayed tick doesn't slow the scroll.
+      _timer ??= Timer.periodic(_frameInterval, (_) {
+        _travel.value =
+            _speed *
+            _elapsed.elapsedMicroseconds /
+            Duration.microsecondsPerSecond;
+      });
+    } else {
+      _timer?.cancel();
+      _timer = null;
     }
   }
 
   @override
   void dispose() {
-    _scroll.dispose();
+    _timer?.cancel();
+    _travel.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _scroll,
+  Widget build(BuildContext context) => ValueListenableBuilder<double>(
+    valueListenable: _travel,
     child: Row(
       mainAxisSize: .min,
       spacing: _gap,
       textDirection: widget.direction,
       children: [widget.child, widget.child],
     ),
-    builder: (context, child) {
-      final offset = _scroll.value * _distance;
+    builder: (context, travel, child) {
+      final offset = travel % (widget.textWidth + _gap);
       final leftToRight = widget.direction == .ltr;
       return ClipRect(
         child: ShaderMask(

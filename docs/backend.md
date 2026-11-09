@@ -160,7 +160,7 @@ and the versioned Settings theme. `BarPopupApp` dispatches each kind to its Flut
 renderer. GTK owns placement, visibility, focus policy and lifetime only.
 
 The four hover cards (`media`, `battery`, `datetime`, `resources`) share one
-reusable per-output Flutter view in an OVERLAY layer surface, anchored top/left,
+per-output popup slot. Its Flutter view uses an OVERLAY layer surface anchored top/left,
 with exclusive zone 0, top margin 0 and ON_DEMAND keyboard focus (Escape hides
 immediately). The window begins at the bar's exclusive edge. The left margin is
 `clamp(anchor.x + (anchor.width - width) / 2, 0, monitor.width - width)`;
@@ -192,14 +192,18 @@ when really hidden. `BarPopup.openCard` follows this per-engine state and ignore
 stale closes for another kind. Pills stay expanded and use the card's exact
 surface color while attached; hover-card updates are sent only for changed
 content (including the owning theme) while their kind is open. Reduced motion jumps to the animation endpoints.
-The popup entry path (`--remya-popup`) does not initialize the bar's Rust event
-subscription or Settings controller; the owner supplies its effective theme.
+The process starts one shared popup engine with a realized, unmapped implicit
+GTK view. The popup entry path (`--remya-popup`) runs a Flutter `ViewCollection`
+of the explicit popup views. Each open popup has its own view and method channel
+named by its view ID. Native forwards actions to the owning bar view, which also
+supplies the effective Settings theme. The popup engine runs no bar Rust event
+subscription or Settings controller.
 
-The popup has no exclusive zone and is not a normal application window. The bar
-remains 40 pixels tall. Tooltip hover waits 500 ms and closes on pointer exit or
-widget disposal. Popup resources are destroyed with their owning output view.
-GTK 3 still supplies the platform surface's integer scale; this change unifies
-text rendering with Flutter and does not change desktop scale or font settings.
+Each popup has zero exclusive space. The bar stays 40 pixels tall. Tooltip hover
+waits 500 ms and closes on pointer exit or widget disposal. Closing a popup or
+removing its output releases its GTK window, Flutter view, and channel. The engine
+stays warm until the bar process exits. GTK 3 supplies each popup surface's integer
+scale.
 
 ## Clock
 
@@ -393,6 +397,9 @@ so title changes never move other pills; empty workspaces omit the slot entirely
 Resources compact below 1600
 logical pixels. Layout options select resource metrics, the active window app
 name, and the workspace slot count, which Rust applies to every output engine.
+The media title uses an ellipsis by default. The experimental media marquee
+option scrolls long titles at 20 Hz and leaves the media controls available
+in both modes.
 Narrower outputs show the centered clock and the quick settings toggle.
 The toggle shows live Wi-Fi, Bluetooth and volume state from Settings and
 omits icons whose state is unknown.

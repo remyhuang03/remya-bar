@@ -56,7 +56,7 @@ Future<List<MethodCall>> _popup(WidgetTester tester, Size size) async {
       null,
     ),
   );
-  await tester.pumpWidget(const BarPopupApp());
+  await tester.pumpWidget(const BarPopupApp(channel: _channel));
   await tester.pump();
   return calls;
 }
@@ -204,7 +204,7 @@ void main() {
         null,
       ),
     );
-    await tester.pumpWidget(const BarPopupApp());
+    await tester.pumpWidget(const BarPopupApp(channel: _channel));
     await tester.pump();
     expect(calls, ['ready']);
     const message =

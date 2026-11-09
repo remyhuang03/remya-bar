@@ -1,3 +1,6 @@
+import 'dart:ui' show FlutterView;
+
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/services.dart';
 import 'package:flutter/physics.dart';
 import 'package:material_ui/material_ui.dart';
@@ -14,8 +17,61 @@ import 'bar_popup.dart';
 import 'popup_measure.dart';
 import '../sidebar/right_sidebar.dart';
 
+class BarPopupHost extends StatefulWidget {
+  const BarPopupHost({super.key});
+
+  @override
+  State<BarPopupHost> createState() => _BarPopupHostState();
+}
+
+class _BarPopupHostState extends State<BarPopupHost>
+    with WidgetsBindingObserver {
+  late List<FlutterView> _views;
+
+  List<FlutterView> _popupViews() {
+    final dispatcher = WidgetsBinding.instance.platformDispatcher;
+    return [
+      for (final view in dispatcher.views)
+        if (view != dispatcher.implicitView) view,
+    ];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _views = _popupViews();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    final views = _popupViews();
+    if (!listEquals(_views, views)) setState(() => _views = views);
+  }
+
+  @override
+  Widget build(BuildContext context) => ViewCollection(
+    views: [
+      for (final view in _views)
+        View(
+          key: ValueKey(view.viewId),
+          view: view,
+          child: BarPopupApp(channel: BarPopup.viewChannel(view.viewId)),
+        ),
+    ],
+  );
+}
+
 class BarPopupApp extends StatefulWidget {
-  const BarPopupApp({super.key});
+  const BarPopupApp({super.key, required this.channel});
+
+  final MethodChannel channel;
 
   @override
   State<BarPopupApp> createState() => _BarPopupAppState();
@@ -87,7 +143,7 @@ class _BarPopupAppState extends State<BarPopupApp>
             .orCancel;
       }
       if (mounted && _dismissing && generation == _dismissGeneration) {
-        await BarPopup.channel.invokeMethod<void>('hidden');
+        await widget.channel.invokeMethod<void>('hidden');
       }
     } on TickerCanceled {
       // A new hover resumes the same shape from its current progress.
@@ -106,14 +162,7 @@ class _BarPopupAppState extends State<BarPopupApp>
   @override
   void initState() {
     super.initState();
-    BarPopup.channel.setMethodCallHandler((call) async {
-      if (call.method == 'keyboard.hidden' && _kind == keyboardKind) {
-        setState(() {
-          _kind = null;
-          _theme = null;
-        });
-        return;
-      }
+    widget.channel.setMethodCallHandler((call) async {
       if (call.method == 'dismiss') {
         _send(_dismiss());
         return;
@@ -188,12 +237,12 @@ class _BarPopupAppState extends State<BarPopupApp>
         });
       }
     });
-    BarPopup.channel.invokeMethod<void>('ready');
+    _send(widget.channel.invokeMethod<void>('ready'));
   }
 
   @override
   void dispose() {
-    BarPopup.channel.setMethodCallHandler(null);
+    widget.channel.setMethodCallHandler(null);
     _emergence.dispose();
     super.dispose();
   }
@@ -227,12 +276,12 @@ class _BarPopupAppState extends State<BarPopupApp>
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(textScaler: .linear(textScale)),
         child: MouseRegion(
-          onEnter: (_) => _send(BarPopup.enter()),
+          onEnter: (_) => _send(widget.channel.invokeMethod<void>('enter')),
           onExit: (_) {
             if (_kind != 'sidebar' && _kind != keyboardKind) {
               _navigator.currentState?.popUntil((route) => route.isFirst);
             }
-            _send(BarPopup.leave());
+            _send(widget.channel.invokeMethod<void>('leave'));
           },
           child: child!,
         ),
@@ -248,7 +297,7 @@ class _BarPopupAppState extends State<BarPopupApp>
                   translation: Offset(0, offset),
                   child: child,
                 ),
-                child: KeyboardPanel(data: details),
+                child: KeyboardPanel(data: details, channel: widget.channel),
               ),
             )
           : _kind == 'sidebar'
@@ -265,7 +314,8 @@ class _BarPopupAppState extends State<BarPopupApp>
                 ),
                 child: RightSidebar(
                   data: details,
-                  onAction: BarPopup.action,
+                  onAction: (action) =>
+                      widget.channel.invokeMethod<void>('action', action),
                   onHeight: _resize,
                 ),
               ),
@@ -274,7 +324,7 @@ class _BarPopupAppState extends State<BarPopupApp>
               child: PopupMeasure(
                 generation: _contentGeneration,
                 onHeight: (height) => _send(
-                  BarPopup.channel.invokeMethod<void>('resize', {
+                  widget.channel.invokeMethod<void>('resize', {
                     'height': height.ceil(),
                   }),
                 ),
@@ -354,7 +404,7 @@ class _BarPopupAppState extends State<BarPopupApp>
   );
 
   void _resize(double height) => _send(
-    BarPopup.channel.invokeMethod<void>('resize', {'height': height.ceil()}),
+    widget.channel.invokeMethod<void>('resize', {'height': height.ceil()}),
   );
 
   void _send(Future<void> request) {
@@ -370,7 +420,7 @@ class _BarPopupAppState extends State<BarPopupApp>
       setState(() => _batteryActionPending = true);
     }
     try {
-      await BarPopup.action(action);
+      await widget.channel.invokeMethod<void>('action', action);
       if (mounted && _kind == kind && _data['token'] == token) {
         setState(() => _actionError = null);
       }

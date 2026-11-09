@@ -20,6 +20,9 @@ abstract final class BarPopup {
 
   static const channel = MethodChannel('top.remya.bar/popup');
 
+  static MethodChannel viewChannel(int viewId) =>
+      MethodChannel('${channel.name}/$viewId');
+
   static Future<void> show({
     required String kind,
     required Rect anchor,
@@ -82,6 +85,4 @@ abstract final class BarPopup {
       channel.invokeMethod<void>('enter', kind == null ? null : {'kind': kind});
   static Future<void> leave({String? kind}) =>
       channel.invokeMethod<void>('leave', kind == null ? null : {'kind': kind});
-  static Future<void> action(Map<String, Object?> action) =>
-      channel.invokeMethod<void>('action', action);
 }

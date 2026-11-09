@@ -11,6 +11,7 @@ struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
   GHashTable* bar_windows;
+  GtkWidget* popup_engine_window;
   GDBusConnection* shortcut_bus;
   guint shortcut_subscription;
 };
@@ -72,7 +73,8 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   FlView* view = fl_view_new(project);
   const GdkRGBA transparent = {0, 0, 0, 0};
   fl_view_set_background_color(view, &transparent);
-  register_bar_popup(view);
+  auto* popup_view = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->popup_engine_window)));
+  register_bar_popup(view, fl_view_get_engine(popup_view));
   register_bar_icons(view);
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
   g_autoptr(FlStandardMethodCodec) window_codec = fl_standard_method_codec_new();
@@ -146,6 +148,9 @@ static void monitor_removed(GdkDisplay* display, GdkMonitor* monitor,
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
+  if (self->popup_engine_window == nullptr) {
+    self->popup_engine_window = create_bar_popup_engine();
+  }
   GdkDisplay* display = gdk_display_get_default();
   for (int index = 0; index < gdk_display_get_n_monitors(display); index++) {
     create_bar_window(self, gdk_display_get_monitor(display, index));
@@ -244,6 +249,10 @@ static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   g_clear_pointer(&self->bar_windows, g_hash_table_unref);
+  if (self->popup_engine_window != nullptr) {
+    gtk_widget_destroy(self->popup_engine_window);
+    g_clear_object(&self->popup_engine_window);
+  }
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
 

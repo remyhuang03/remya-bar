@@ -3,16 +3,98 @@
 #include "../linux/runner/bar_popup.cc"
 
 static guint released_engines = 0;
+static constexpr int kInitialTooltipHeight = 80;
+
+static void show_test_tooltip(BarPopup* popup, const char* message) {
+  create_popup(popup, false, false, true, false);
+  g_autoptr(FlValue) args = fl_value_new_map();
+  g_autoptr(FlValue) details = fl_value_new_map();
+  fl_value_set_string_take(args, "kind", fl_value_new_string("tooltip"));
+  g_autoptr(FlValue) theme = fl_value_new_map();
+  fl_value_set_string_take(theme, "version", fl_value_new_int(1));
+  fl_value_set_string(args, "theme", theme);
+  fl_value_set_string_take(details, "scale", fl_value_new_float(1.0));
+  fl_value_set_string_take(details, "message", fl_value_new_string(message));
+  fl_value_set_string(args, "data", details);
+  replace_content(popup, args, true);
+  popup->visible = true;
+  popup->width = 200;
+  gtk_widget_set_size_request(GTK_WIDGET(popup->view), popup->width, kInitialTooltipHeight);
+  gtk_window_resize(GTK_WINDOW(popup->window), popup->width, kInitialTooltipHeight);
+  gtk_widget_show_all(popup->window);
+}
+
+static bool check_popup_views(MyApplication* app, FlView* owner) {
+  auto* root = static_cast<BarPopup*>(g_object_get_data(G_OBJECT(owner), "remya-popup"));
+  auto* engine_window = app->popup_engine_window;
+  g_assert_false(gtk_widget_get_mapped(engine_window));
+  auto* implicit_view = FL_VIEW(gtk_bin_get_child(GTK_BIN(engine_window)));
+  auto* engine = fl_view_get_engine(implicit_view);
+  auto* tooltip = child_popup(root, root->tooltip_popup);
+  static gint64 deadline = 0;
+  if (deadline == 0) {
+    show_test_tooltip(root, "First view");
+    show_test_tooltip(tooltip, "Second view");
+    g_assert_true(fl_view_get_engine(root->view) == engine);
+    g_assert_true(fl_view_get_engine(tooltip->view) == engine);
+    g_assert_cmpint(fl_view_get_id(root->view), !=, fl_view_get_id(tooltip->view));
+    deadline = g_get_monotonic_time() + 10 * G_TIME_SPAN_SECOND;
+    return false;
+  }
+
+  // The first rendered tooltip content triggers Dart's measurement and a
+  // native resize. Each view must have completed its own channel handshake.
+  if (g_get_monotonic_time() < deadline &&
+      (!root->ready || !tooltip->ready ||
+       gtk_widget_get_allocated_height(GTK_WIDGET(root->view)) >= kInitialTooltipHeight ||
+       gtk_widget_get_allocated_height(GTK_WIDGET(tooltip->view)) >= kInitialTooltipHeight)) {
+    return false;
+  }
+  g_assert_true(root->ready);
+  g_assert_true(tooltip->ready);
+  g_assert_cmpint(gtk_widget_get_allocated_height(GTK_WIDGET(root->view)), <, kInitialTooltipHeight);
+  g_assert_cmpint(gtk_widget_get_allocated_height(GTK_WIDGET(tooltip->view)), <, kInitialTooltipHeight);
+  const auto first_id = fl_view_get_id(root->view);
+  guint released_channels = 0;
+  auto watch_channel = [&released_channels](BarPopup* popup) {
+    g_object_weak_ref(G_OBJECT(popup->channel),
+        [](gpointer data, GObject*) { ++*static_cast<guint*>(data); },
+        &released_channels);
+  };
+  watch_channel(root);
+  root->hide();
+  g_assert_null(root->window);
+  g_assert_null(root->view);
+  g_assert_null(root->content);
+  g_assert_true(tooltip->visible);
+  g_assert_true(tooltip->ready);
+  for (int iteration = 0; iteration < 5; ++iteration) {
+    create_popup(root, false, false, true, false);
+    watch_channel(root);
+    root->hide();
+  }
+  g_assert_cmpuint(released_channels, ==, 6);
+  show_test_tooltip(root, "Reopened view");
+  g_assert_cmpint(fl_view_get_id(root->view), >, first_id);
+  g_print("PASS: concurrent popup content, independent dismissal and fresh view ID\n");
+  // Leave both popups open to exercise the synthetic monitor removal below.
+  return true;
+}
 
 static gboolean check_monitor_lifecycle(gpointer data) {
   auto* self = MY_APPLICATION(data);
   GdkDisplay* display = gdk_display_get_default();
   const int count = gdk_display_get_n_monitors(display);
   g_assert_cmpint(count, >, 0);
-  static bool removed = false;
+  static gint64 release_deadline = 0;
 
-  if (!removed) {
+  if (release_deadline == 0) {
     g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, count);
+    auto* monitor = gdk_display_get_monitor(display, 0);
+    auto* window = GTK_BIN(g_hash_table_lookup(self->bar_windows, monitor));
+    if (!check_popup_views(self, FL_VIEW(gtk_bin_get_child(window)))) {
+      return G_SOURCE_CONTINUE;
+    }
     // Emit client-side GDK events without changing the desktop's outputs.
     for (int index = 0; index < count; index++) {
       GdkMonitor* monitor = gdk_display_get_monitor(display, index);
@@ -31,12 +113,19 @@ static gboolean check_monitor_lifecycle(gpointer data) {
       g_signal_emit_by_name(display, "monitor-removed", monitor);
     }
     g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, 0);
-    removed = true;
+    release_deadline = g_get_monotonic_time() + 10 * G_TIME_SPAN_SECOND;
     return G_SOURCE_CONTINUE;
   }
 
-  // Reaching this next timer tick also verifies survival with no bar windows.
+  // Flutter can still be completing platform work after GTK destroys a view.
+  // Let the main loop process those callbacks while all outputs are absent.
+  g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, 0);
+  if (released_engines < count && g_get_monotonic_time() < release_deadline) {
+    return G_SOURCE_CONTINUE;
+  }
   g_assert_cmpuint(released_engines, ==, count);
+  g_assert_true(gtk_widget_get_realized(self->popup_engine_window));
+  g_assert_false(gtk_widget_get_mapped(self->popup_engine_window));
   for (int index = 0; index < count; index++) {
     g_signal_emit_by_name(display, "monitor-added",
                           gdk_display_get_monitor(display, index));
