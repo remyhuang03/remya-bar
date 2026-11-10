@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import sqlite3
 import subprocess
 import tempfile
 import time
@@ -10,14 +11,27 @@ import dbus
 
 from bar_window_smoke import check_bars, hyprctl
 
+NOTIFICATIONS = 'org.freedesktop.Notifications'
+NOTIFICATION_PATH = '/org/freedesktop/Notifications'
+BUS_CONFIG = """
+<busconfig>
+  <type>session</type>
+  <listen>unix:tmpdir=/tmp</listen>
+  <policy context="default">
+    <allow own="*"/>
+    <allow send_destination="*"/>
+    <allow receive_sender="*"/>
+  </policy>
+</busconfig>
+"""
+
 
 def wait_for_bar(process, log, driver, before, previous_name=None):
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline and process.poll() is None:
-        for name in driver.ListNames():
-            if not name.startswith(':') or name == previous_name:
-                continue
-            if driver.GetConnectionUnixProcessID(name) == process.pid:
+        if driver.NameHasOwner(NOTIFICATIONS):
+            name = driver.GetNameOwner(NOTIFICATIONS)
+            if name != previous_name and driver.GetConnectionUnixProcessID(name) == process.pid:
                 try:
                     check_bars(process, before)
                 except AssertionError:
@@ -32,19 +46,30 @@ def main():
     binary = Path(__file__).resolve().parents[1] / 'build/linux/x64/debug/bundle/remya_bar'
     before = {monitor['name']: monitor['reserved'] for monitor in hyprctl('monitors')}
     assert before, 'No connected outputs'
-    with subprocess.Popen(['dbus-daemon', '--session', '--nofork', '--print-address=1'],
-                          stdout=subprocess.PIPE, text=True) as daemon:
-        try:
-            address = daemon.stdout.readline().strip()
-            bus = dbus.bus.BusConnection(address)
-            assert bus.request_name('org.freedesktop.login1') == dbus.bus.REQUEST_NAME_REPLY_PRIMARY_OWNER
-            driver = dbus.Interface(bus.get_object('org.freedesktop.DBus', '/org/freedesktop/DBus'),
-                                    'org.freedesktop.DBus')
-            with tempfile.TemporaryFile(mode='w+') as log:
+    with tempfile.TemporaryDirectory() as state, tempfile.TemporaryFile(mode='w+') as log:
+        config = Path(state) / 'bus.conf'
+        config.write_text(BUS_CONFIG)
+        with subprocess.Popen(['dbus-daemon', f'--config-file={config}', '--nofork', '--print-address=1'],
+                              stdout=subprocess.PIPE, text=True) as daemon:
+            try:
+                address = daemon.stdout.readline().strip()
+                bus = dbus.bus.BusConnection(address)
+                assert bus.request_name('org.freedesktop.login1') == dbus.bus.REQUEST_NAME_REPLY_PRIMARY_OWNER
+                driver = dbus.Interface(bus.get_object('org.freedesktop.DBus', '/org/freedesktop/DBus'),
+                                        'org.freedesktop.DBus')
+                env = {**os.environ, 'DBUS_SYSTEM_BUS_ADDRESS': address,
+                       'DBUS_SESSION_BUS_ADDRESS': address, 'XDG_STATE_HOME': state}
                 with subprocess.Popen([binary], stdout=log, stderr=log,
-                                      env={**os.environ, 'DBUS_SYSTEM_BUS_ADDRESS': address}) as bar:
+                                      env=env) as bar:
                     try:
                         name = wait_for_bar(bar, log, driver, before)
+                        notifications = dbus.Interface(
+                            bus.get_object(name, NOTIFICATION_PATH), NOTIFICATIONS)
+                        note = notifications.Notify('Bar smoke test', 0, '', 'Before sleep', '',
+                            dbus.Array([], signature='s'), {'suppress-sound': True}, 100)
+                        database = Path(state) / 'remya/bar/notifications.sqlite3'
+                        with sqlite3.connect(database) as history:
+                            assert history.execute('SELECT id FROM history').fetchall() == [(note,)]
                         for sleeping in (True, False):
                             signal = dbus.lowlevel.SignalMessage('/org/freedesktop/login1',
                                 'org.freedesktop.login1.Manager', 'PrepareForSleep')
@@ -54,7 +79,12 @@ def main():
                             if sleeping:
                                 time.sleep(0.5)
                                 assert name == wait_for_bar(bar, log, driver, before)
-                        wait_for_bar(bar, log, driver, before, previous_name=name)
+                        resumed = wait_for_bar(bar, log, driver, before, previous_name=name)
+                        # Only the restored daemon can dismiss a notification from before resume.
+                        bus.call_blocking(resumed, NOTIFICATION_PATH, NOTIFICATIONS,
+                                          'CloseNotification', 'u', (note,))
+                        with sqlite3.connect(database) as history:
+                            assert history.execute('SELECT id FROM history').fetchall() == []
                     finally:
                         if bar.poll() is None:
                             bar.terminate()
@@ -63,10 +93,10 @@ def main():
                             except subprocess.TimeoutExpired:
                                 bar.kill()
                                 bar.wait()
-        finally:
-            daemon.terminate()
+            finally:
+                daemon.terminate()
     assert all(m['reserved'] == before[m['name']] for m in hyprctl('monitors'))
-    print('PASS: sleep leaves the bar running, resume recreates its session and all bar surfaces')
+    print('PASS: resume recreates all bar surfaces and restores dismissible notification history')
 
 
 if __name__ == '__main__':

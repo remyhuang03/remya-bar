@@ -105,6 +105,15 @@ history; `transient` notifications leave with their popup (reason 1).
 the notification; other actions are buttons and close the notification unless
 it is `resident`. History keeps the newest 200.
 
+The notification daemon stores history and the next notification ID in
+`$XDG_STATE_HOME/remya/bar/notifications.sqlite3` (default
+`$HOME/.local/state/remya/bar/notifications.sqlite3`). Relative XDG paths are
+ignored. History updates, including replacements and dismissals, commit in a
+single SQLite transaction. Transient notifications stay in memory. Restored
+entries show their saved content in the center without replaying popups, sounds,
+or action buttons tied to the previous daemon instance. Use an isolated
+`XDG_STATE_HOME` when testing with a separate session bus.
+
 Settings owns the preferences (`Get("notifications")`, see the Settings
 [notifications API](../../remya-settings/docs/public-api.md#notifications)).
 Every output engine reads them, follows `Changed` for the notification IDs and
@@ -142,9 +151,8 @@ native ephemeral engine files across build modes.
 
 The Linux runner listens for logind's `PrepareForSleep(false)` signal on the
 system bus. It re-executes Bar with the same arguments so GTK and all Flutter
-views get a fresh EGL display. This closes open popups and resets in-memory
-state, including the current notification history. Installed preferences are
-loaded again from Settings. Run `python test/bar_resume_smoke.py` with
+views get a fresh EGL display. Bar restores its notification history from disk
+and reloads preferences from Settings. Run `python test/bar_resume_smoke.py` with
 `python-dbus` on Hyprland to exercise the wake path without suspending the host.
 
 `fvm dart run test/hyprland_ipc_smoke.dart` verifies both real IPC endpoints

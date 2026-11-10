@@ -294,7 +294,7 @@ pub fn sidebar_uptime() -> Option<f64> {
 }
 
 /// A run of notification body text with the supported markup applied.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NotificationText {
     pub text: String,
     pub bold: bool,
@@ -310,7 +310,7 @@ pub struct NotificationAction {
     pub label: String,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NotificationSnapshot {
     pub id: u32,
     pub app_name: String,
@@ -319,20 +319,26 @@ pub struct NotificationSnapshot {
     pub summary: String,
     pub body: Vec<NotificationText>,
     /// Button actions; the `default` action is reported separately.
+    #[serde(skip)]
     pub actions: Vec<NotificationAction>,
+    #[serde(skip)]
     pub default_action: bool,
     /// 0 Low, 1 Normal, 2 Critical.
     pub urgency: u8,
     pub received_unix_ms: i64,
     /// `image-data` as tray-compatible ARGB; empty when absent.
+    #[serde(skip)]
     pub image_argb: Vec<u8>,
     pub image_width: u32,
     pub image_height: u32,
     pub image_path: String,
     pub progress: Option<i32>,
     /// Whether the notification is currently shown as a popup.
+    #[serde(skip)]
     pub popup: bool,
+    #[serde(skip)]
     pub transient: bool,
+    #[serde(skip)]
     pub resident: bool,
     /// The freedesktop `category` hint, such as `call.incoming`.
     pub category: String,

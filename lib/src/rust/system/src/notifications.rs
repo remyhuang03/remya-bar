@@ -1,10 +1,13 @@
 //! Process-wide `org.freedesktop.Notifications` server shared by every output.
+mod history;
+
 use crate::api::{
     NotificationAction, NotificationCenter, NotificationPreferences, NotificationSnapshot,
     NotificationText,
 };
 use crate::frb_generated::StreamSink;
 use chrono::{Datelike, Local, NaiveDateTime, Timelike};
+use history::History;
 use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -22,6 +25,7 @@ const CLOSED: u32 = 3;
 
 struct Entry {
     snapshot: NotificationSnapshot,
+    order: i64,
     timeout: Option<Duration>,
     deadline: Option<Instant>,
     remaining: Option<Duration>,
@@ -30,6 +34,7 @@ struct Entry {
 struct Daemon {
     entries: Vec<Entry>,
     next_id: u32,
+    history: Option<History>,
     preferences: NotificationPreferences,
     fullscreen: HashSet<String>,
     quiet: Option<&'static str>,
@@ -45,6 +50,7 @@ impl Daemon {
         Self {
             entries: Vec::new(),
             next_id: 1,
+            history: None,
             preferences: NotificationPreferences {
                 do_not_disturb: false,
                 timeout_seconds: 5,
@@ -112,6 +118,14 @@ impl Daemon {
         let before = self.entries.len();
         self.entries.retain(|entry| entry.snapshot.id != id);
         self.entries.len() != before
+    }
+
+    fn save_history(&mut self, changed: Option<u32>, removed: &[u32]) {
+        if let Some(history) = &mut self.history
+            && let Err(error) = history.save(&self.entries, self.next_id, changed, removed)
+        {
+            eprintln!("Notification history save: {error}");
+        }
     }
 
     /// Ends due popups. Transient notifications leave with them.
@@ -381,6 +395,10 @@ impl Server {
                 snapshot.id = daemon.allocate_id();
                 let entry = Entry {
                     snapshot,
+                    order: daemon
+                        .entries
+                        .first()
+                        .map_or(0, |entry| entry.order.saturating_add(1)),
                     timeout,
                     deadline: None,
                     remaining: None,
@@ -412,6 +430,7 @@ impl Server {
         daemon
             .entries
             .retain(|entry| !dropped.contains(&entry.snapshot.id));
+        daemon.save_history(Some(id), &dropped);
         publish(&mut daemon);
         let connection = daemon.connection.clone();
         drop(daemon);
@@ -424,6 +443,7 @@ impl Server {
     async fn close_notification(&self, id: u32) {
         let mut daemon = daemon().lock().await;
         if daemon.remove(id) {
+            daemon.save_history(None, &[id]);
             publish(&mut daemon);
             let connection = daemon.connection.clone();
             drop(daemon);
@@ -724,22 +744,30 @@ fn ensure_started() {
 
 async fn serve() {
     loop {
+        let mut daemon = daemon().lock().await;
         match own_name().await {
             Ok(connection) => {
-                let mut daemon = daemon().lock().await;
+                match history::open() {
+                    Ok((history, entries, next_id)) => {
+                        daemon.history = Some(history);
+                        daemon.entries = entries;
+                        daemon.next_id = next_id;
+                    }
+                    Err(error) => eprintln!("Notification history open: {error}"),
+                }
                 daemon.connection = Some(connection);
                 daemon.error = None;
                 publish(&mut daemon);
                 return;
             }
             Err(error) => {
-                let mut daemon = daemon().lock().await;
                 if daemon.error.as_deref() != Some(error.as_str()) {
                     daemon.error = Some(error);
                     publish(&mut daemon);
                 }
             }
         }
+        drop(daemon);
         // Another daemon may release the name later.
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
@@ -779,6 +807,9 @@ async fn expire_popups() {
         let before = daemon.center();
         let mut ended = daemon.refresh_quiet(Local::now().naive_local());
         ended.extend(daemon.expire(Instant::now()));
+        if daemon.history.as_ref().is_some_and(History::needs_retry) {
+            daemon.save_history(None, &[]);
+        }
         release_host(&mut daemon);
         let after = daemon.center();
         if after != before {
@@ -865,6 +896,7 @@ pub(crate) async fn dismiss(id: Option<u32>) -> Result<(), String> {
     if removed.is_empty() && id.is_some() {
         return Err("Notification is gone".into());
     }
+    daemon.save_history(None, &removed);
     publish(&mut daemon);
     let connection = daemon.connection.clone();
     drop(daemon);
@@ -891,6 +923,7 @@ pub(crate) async fn invoke(id: u32, action: &str) -> Result<(), String> {
     let resident = entry.snapshot.resident;
     if !resident {
         daemon.remove(id);
+        daemon.save_history(None, &[id]);
         publish(&mut daemon);
     }
     let connection = daemon.connection.clone();
@@ -964,6 +997,7 @@ mod tests {
 
     fn entry(id: u32, urgency: u8, transient: bool) -> Entry {
         Entry {
+            order: i64::from(id),
             snapshot: NotificationSnapshot {
                 id,
                 app_name: String::new(),
@@ -989,6 +1023,90 @@ mod tests {
             deadline: None,
             remaining: None,
         }
+    }
+
+    #[test]
+    fn history_survives_reopen_without_replaying_actions_or_transient_popups() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path();
+        let (mut history, empty, next_id) = History::open(path).unwrap();
+        assert!(empty.is_empty());
+        assert_eq!(next_id, 1);
+        assert!(
+            History::open(path).is_err(),
+            "one writer per state directory"
+        );
+
+        let mut older = entry(1, 1, false);
+        older.snapshot.popup = true;
+        older.snapshot.default_action = true;
+        older.snapshot.body = parse_body("<b>Hello</b>");
+        older.snapshot.image_width = 1;
+        older.snapshot.image_height = 1;
+        older.snapshot.image_argb = vec![255, 1, 2, 3];
+        history.save(&[older], 2, Some(1), &[]).unwrap();
+        history
+            .save(&[entry(2, 1, false)], 3, Some(2), &[])
+            .unwrap();
+        history.save(&[entry(3, 1, true)], 4, Some(3), &[]).unwrap();
+        drop(history);
+
+        let (mut history, mut entries, next_id) = History::open(path).unwrap();
+        assert_eq!(next_id, 4);
+        assert_eq!(
+            entries
+                .iter()
+                .map(|entry| entry.snapshot.id)
+                .collect::<Vec<_>>(),
+            [2, 1]
+        );
+        let restored = &entries[1].snapshot;
+        assert!(!restored.popup && !restored.default_action);
+        assert!(restored.body[0].bold);
+        assert_eq!(restored.image_argb, [255, 1, 2, 3]);
+        entries[1].snapshot.summary = "Updated".into();
+        history.save(&entries, 4, Some(1), &[]).unwrap();
+        drop(history);
+
+        let (mut history, entries, _) = History::open(path).unwrap();
+        assert_eq!(
+            entries[1].snapshot.summary, "Updated",
+            "replacement keeps its place"
+        );
+        history.save(&[], 4, None, &[1, 2]).unwrap();
+        drop(history);
+        let (_, empty, next_id) = History::open(path).unwrap();
+        assert!(empty.is_empty(), "Clear all survives restart");
+        assert_eq!(next_id, 4, "Clearing history does not recycle IDs");
+    }
+
+    #[test]
+    fn failed_history_transaction_rolls_back_and_retries_current_state() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path();
+        let (mut history, _, _) = History::open(path).unwrap();
+        history
+            .save(&[entry(1, 1, false)], 2, Some(1), &[])
+            .unwrap();
+        let db = rusqlite::Connection::open(path.join("notifications.sqlite3")).unwrap();
+        db.execute_batch(
+            "CREATE TRIGGER fail_insert BEFORE INSERT ON history
+             BEGIN SELECT RAISE(ABORT, 'test write failure'); END;",
+        )
+        .unwrap();
+        let entries = [entry(2, 1, false)];
+        assert!(history.save(&entries, 3, Some(2), &[1]).is_err());
+        assert_eq!(
+            db.query_row("SELECT id FROM history", [], |row| row.get::<_, u32>(0))
+                .unwrap(),
+            1
+        );
+        db.execute_batch("DROP TRIGGER fail_insert;").unwrap();
+        history.save(&entries, 3, None, &[]).unwrap();
+        drop(history);
+        let (_, restored, next_id) = History::open(path).unwrap();
+        assert_eq!(restored[0].snapshot.id, 2);
+        assert_eq!(next_id, 3);
     }
 
     #[test]
