@@ -16,6 +16,7 @@ G_DECLARE_FINAL_TYPE(MyApplication,
  *
  * Returns: a new #MyApplication.
  */
-MyApplication* my_application_new();
+using RestartBar = void (*)(const char* reason, gpointer data);
+MyApplication* my_application_new(RestartBar restart_bar, gpointer restart_data);
 
 #endif  // FLUTTER_MY_APPLICATION_H_

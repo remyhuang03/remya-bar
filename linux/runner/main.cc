@@ -4,24 +4,25 @@
 
 #include "my_application.h"
 
+static void restart_bar(const char* reason, gpointer data) {
+  g_message("%s. Restarting Bar to recreate graphics contexts", reason);
+  if (g_fdwalk_set_cloexec(3) == 0) {
+    execv("/proc/self/exe", static_cast<char**>(data));
+  }
+  g_warning("Could not restart Bar: %s", g_strerror(errno));
+}
+
 static void prepare_for_sleep(GDBusConnection*, const gchar*, const gchar*,
                               const gchar*, const gchar*, GVariant* parameters,
                               gpointer data) {
   if (!g_variant_is_of_type(parameters, G_VARIANT_TYPE("(b)"))) return;
   gboolean sleeping;
   g_variant_get(parameters, "(b)", &sleeping);
-  if (sleeping) return;
-
-  // GTK and the Flutter engines share the EGL display. Reopen it on resume.
-  g_message("System resumed; restarting Bar to recreate graphics contexts");
-  if (g_fdwalk_set_cloexec(3) == 0) {
-    execv("/proc/self/exe", static_cast<char**>(data));
-  }
-  g_warning("Could not restart Bar after resume: %s", g_strerror(errno));
+  if (!sleeping) restart_bar("System resumed", data);
 }
 
 int main(int argc, char** argv) {
-  g_autoptr(MyApplication) app = my_application_new();
+  g_autoptr(MyApplication) app = my_application_new(restart_bar, argv);
   g_autoptr(GError) error = nullptr;
   g_autoptr(GDBusConnection) bus = g_bus_get_sync(G_BUS_TYPE_SYSTEM, nullptr, &error);
   guint subscription = 0;

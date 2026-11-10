@@ -149,10 +149,12 @@ connected output, and stops its own bars and settings service. Keep debug and
 release builds/tests sequential within a repository because Flutter shares its
 native ephemeral engine files across build modes.
 
-The Linux runner listens for logind's `PrepareForSleep(false)` signal on the
-system bus. It re-executes Bar with the same arguments so GTK and all Flutter
-views get a fresh EGL display. Bar restores its notification history from disk
-and reloads preferences from Settings. Run `python test/bar_resume_smoke.py` with
+The Linux runner re-executes Bar with the same arguments after logind's
+`PrepareForSleep(false)` signal or when GDK removes an output with a bar.
+Re-exec happens before destroying the disconnected output's Flutter engine
+because its destructor terminates the EGL display still shared by other bars
+and popups. The new process reads the current outputs, restores notification
+history and reloads preferences from Settings. Run `python test/bar_resume_smoke.py` with
 `python-dbus` on Hyprland to exercise the wake path without suspending the host.
 
 `fvm dart run test/hyprland_ipc_smoke.dart` verifies both real IPC endpoints

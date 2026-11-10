@@ -3,6 +3,7 @@
 #include "../linux/runner/bar_popup.cc"
 
 static guint released_engines = 0;
+static guint restart_requests = 0;
 static constexpr int kInitialTooltipHeight = 80;
 
 static void show_test_tooltip(BarPopup* popup, const char* message) {
@@ -112,6 +113,7 @@ static gboolean check_monitor_lifecycle(gpointer data) {
       g_signal_emit_by_name(display, "monitor-removed", monitor);
       g_signal_emit_by_name(display, "monitor-removed", monitor);
     }
+    g_assert_cmpuint(restart_requests, ==, count);
     g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, 0);
     release_deadline = g_get_monotonic_time() + 10 * G_TIME_SPAN_SECOND;
     return G_SOURCE_CONTINUE;
@@ -206,7 +208,19 @@ int main(int argc, char** argv) {
   const auto app_id = normalized("com.Example.App");
   g_assert_cmpstr(desktop_id.c_str(), ==, "code");
   g_assert_cmpstr(app_id.c_str(), ==, "com.example.app");
-  g_autoptr(MyApplication) app = my_application_new();
+  g_autoptr(MyApplication) app = nullptr;
+  app = my_application_new(
+      [](const char* reason, gpointer data) {
+        auto* self = *static_cast<MyApplication**>(data);
+        GdkMonitor* monitor =
+            gdk_display_get_monitor(gdk_display_get_default(), restart_requests);
+        auto* window = GTK_WIDGET(g_hash_table_lookup(self->bar_windows, monitor));
+        g_assert_cmpstr(reason, ==, "Display disconnected");
+        g_assert_nonnull(window);
+        g_assert_true(gtk_widget_get_realized(window));
+        ++restart_requests;
+      },
+      &app);
   g_timeout_add(500, check_monitor_lifecycle, app);
   int status = g_application_run(G_APPLICATION(app), argc, argv);
   g_assert_cmpuint(g_hash_table_size(app->bar_windows), ==, 0);

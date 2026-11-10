@@ -14,6 +14,8 @@ struct _MyApplication {
   GtkWidget* popup_engine_window;
   GDBusConnection* shortcut_bus;
   guint shortcut_subscription;
+  RestartBar restart_bar;
+  gpointer restart_data;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
@@ -138,8 +140,12 @@ static void monitor_added(GdkDisplay* display, GdkMonitor* monitor,
 
 static void monitor_removed(GdkDisplay* display, GdkMonitor* monitor,
                             MyApplication* self) {
-  bar_popup_monitor_removed(monitor);
   auto* window = GTK_WIDGET(g_hash_table_lookup(self->bar_windows, monitor));
+  if (window != nullptr) {
+    // Disposing one Flutter engine terminates the EGL display shared by all views.
+    self->restart_bar("Display disconnected", self->restart_data);
+  }
+  bar_popup_monitor_removed(monitor);
   if (window == nullptr) return;
   gtk_widget_destroy(window);
   g_hash_table_remove(self->bar_windows, monitor);
@@ -270,14 +276,17 @@ static void my_application_init(MyApplication* self) {
                                             g_object_unref, g_object_unref);
 }
 
-MyApplication* my_application_new() {
+MyApplication* my_application_new(RestartBar restart_bar, gpointer restart_data) {
   // Set the program name to the application ID, which helps various systems
   // like GTK and desktop environments map this running application to its
   // corresponding .desktop file. This ensures better integration by allowing
   // the application to be recognized beyond its binary name.
   g_set_prgname(APPLICATION_ID);
 
-  return MY_APPLICATION(g_object_new(my_application_get_type(),
-                                     "application-id", APPLICATION_ID, "flags",
-                                     G_APPLICATION_NON_UNIQUE, nullptr));
+  auto* self = MY_APPLICATION(g_object_new(my_application_get_type(),
+                                           "application-id", APPLICATION_ID, "flags",
+                                           G_APPLICATION_NON_UNIQUE, nullptr));
+  self->restart_bar = restart_bar;
+  self->restart_data = restart_data;
+  return self;
 }
