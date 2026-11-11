@@ -3,7 +3,7 @@ members = ["lib/src/rust/core", "lib/src/rust/hyprland", "lib/src/rust/system"]
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0-dev.20261109.0"
+version = "0.1.0-dev.20261111.0"
 edition = "2024"
 publish = false
 license = "PolyForm-Noncommercial-1.0.0"

@@ -26,10 +26,10 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 
 ## Features
 
-- **Workspaces and Displays**. Each output features a 40 px bar that auto-hides in fullscreen mode, with Workspaces and Clock centered by default. Bar layouts and theme follow Remya Settings across connected displays.
-- **Media and System Status**. The media player provides playback controls alongside resource gauges for CPU, memory, and network by default, with GPU monitoring optional. Hovering reveals detailed metric graphs and hardware history.
+- **Workspaces and Displays**. Each output features a 40 px bar that auto-hides in fullscreen mode. On standard displays (≥ 700 logical px), the default layout arranges pills into four distinct groups: (1) notifications, active window, system resources, and media; (2) centered workspaces and clock; (3) application tray; and (4) battery and Quick Settings. Narrower displays fall back to a centered clock and Quick Settings toggle. Bar layout configuration, Material 3 theme tokens, and dynamic appearance policies are owned by the companion Remya Settings service.
+- **Media and System Status**. The media player provides playback controls alongside gauges for default metrics (CPU, memory, and network), with an optional GPU display (via DRM or NVML for NVIDIA). Hovering reveals detailed metric graphs and hardware history.
 - **Quick Settings**. A slide-out panel houses configurable quick settings toggles, hardware sliders, session actions, and an on-screen keyboard. Users can reorder tiles and hide unused options to customize the layout.
-- **Tray and Notifications**. The system tray supports pinned or folded applications alongside an integrated notification center. Do Not Disturb filters popups and sounds while retaining notification history.
+- **Tray and Notifications**. The system tray supports pinned or folded applications alongside an integrated notification center. Do Not Disturb filters popups and sounds while retaining persistent notification history.
 - **AI Quota**. Colored provider rings show the remaining 5-hour and weekly quota of up to three AI subscriptions pinned in Remya Settings > AI, with a usage card on hover. Requires the optional `codexbar-cli` package with providers signed in.
 
 ---
@@ -46,7 +46,7 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
   - `inter-font` and `noto-fonts-cjk`
   - NetworkManager and BlueZ (for network & Bluetooth toggles)
   - NVIDIA Management Library (`libnvidia-ml.so.1`, provided by `nvidia-utils` on Arch) for optional NVIDIA GPU metrics. Without NVML, the resource monitor hides NVIDIA GPUs.
-  - Remya Settings (`remya_settings`, provides theme & system D-Bus services)
+  - Remya Settings (`remya_settings`, provides theme, layout, & system D-Bus services)
   - Optional: `codexbar-cli` (provides the `codexbar` executable) for AI Quota
 
 ### Installation
@@ -55,15 +55,15 @@ For paired setups, install **Remya Settings** before installing **Remy'a Bar** s
 
 #### From Release Archive (Linux x86_64)
 
-To install using a release archive from [Releases](https://github.com/remyhuang03/remya-bar/releases):
+For paired setups, install Remya Settings before Bar. To install using a Linux x86_64 release archive downloaded from [Releases](https://github.com/remyhuang03/remya-bar/releases) using its bundled `tool/install.py`:
 
 ```bash
 # Verify checksum
 sha256sum -c SHA256SUMS --ignore-missing
 
 # Extract and install
-tar --zstd -xf remya_bar-0.1.0-dev.20261109.0-linux-x86_64.tar.zst
-cd remya_bar-0.1.0-dev.20261109.0-linux-x86_64
+tar --zstd -xf remya_bar-0.1.0-dev.20261111.0-linux-x86_64.tar.zst
+cd remya_bar-0.1.0-dev.20261111.0-linux-x86_64
 python tool/install.py
 ```
 
@@ -142,7 +142,7 @@ Remy'a Bar utilizes a hybrid architecture engineered for responsiveness and reli
 
 - **Low Resource Usage**: Rust handles all heavy lifting—sampling hardware sensors, parsing Hyprland socket streams, and hosting D-Bus interfaces—sharing a single cached state across all outputs.
 - **Native Wayland Integration**: Built directly against `gtk-layer-shell` for true Wayland surface management, automatic exclusive zone handling, and zero-flicker monitor hotplugging.
-- **Decoupled Architecture**: Configuration, themes, and persistence are managed via the companion [Remya Settings](https://github.com/remyhuang03/remya-settings) service (`top.remya.settings`), which emits D-Bus signals that Bar follows to update state.
+- **Decoupled Architecture**: Configuration, themes, power profiles, and layout persistence are managed via the companion [Remya Settings](https://github.com/remyhuang03/remya-settings) service (`top.remya.settings`), which emits D-Bus signals that Bar follows to update state.
 
 ---
 
