@@ -25,6 +25,17 @@ double? aiPercent(Object? value) {
 DateTime? aiDate(Object? value) =>
     value is String ? DateTime.tryParse(value) : null;
 
+Iterable<AiQuotaProvider> aiVisibleProviders(
+  Map<String, Object?> data,
+  DateTime now,
+) sync* {
+  final threshold = aiPercent(data['threshold']) ?? 20;
+  for (final row in aiRows(data['providers'])) {
+    final provider = AiQuotaProvider(row, now, threshold);
+    if (provider.pillWindows.isNotEmpty) yield provider;
+  }
+}
+
 class AiQuotaProvider {
   AiQuotaProvider(this.data, this.now, this.threshold);
 
@@ -49,9 +60,10 @@ class AiQuotaProvider {
         : null;
   }
 
-  List<AiQuotaWindow> get pillWindows => [
-    for (final slot in quotaSlots.take(2)) ?window(slot),
-  ];
+  List<AiQuotaWindow> get pillWindows {
+    final windows = [?window('primary'), ?window('secondary')];
+    return windows.isEmpty ? [?window('tertiary')] : windows;
+  }
 
   AiQuotaWindow? get tightest => pillWindows.fold<AiQuotaWindow?>(
     null,
@@ -154,6 +166,51 @@ String aiDuration(Duration duration) {
   ].join(' ');
 }
 
+/// Retain a previously discovered provider through a failed fetch, while
+/// honoring explicit disables in CodexBar's saved configuration.
+List<Map<String, Object?>> aiProviderSamples(
+  List<Map<String, Object?>> configured,
+  List<Map<String, Object?>>? usage, {
+  required List<Map<String, Object?>> previous,
+  required bool automatic,
+}) {
+  bool hasUsage(Map<String, Object?> row) =>
+      row['error'] == null && _hasQuota(aiMap(row['usage']));
+
+  final readings = <String, Map<String, Object?>>{};
+  for (final row in usage ?? const <Map<String, Object?>>[]) {
+    final id = aiText(row['provider']);
+    if (id == null) continue;
+    final prior = readings[id];
+    if (prior == null || (!hasUsage(prior) && hasUsage(row))) {
+      readings[id] = row;
+    }
+  }
+  final providers = {
+    for (final row in configured) ?aiText(row['id'] ?? row['provider']): row,
+  };
+  final prior = {for (final row in previous) row['id']: row};
+  final ids = {
+    ...providers.keys,
+    ...readings.keys,
+    ...prior.keys.whereType<String>(),
+  };
+  return [
+    for (final id in ids)
+      if ((automatic || providers[id]?['enabled'] == true) &&
+          (hasUsage(readings[id] ?? const {}) ||
+              (prior.containsKey(id) &&
+                  (usage == null || readings.containsKey(id)))))
+        aiProviderData({
+          'id': id,
+          'name':
+              aiText(providers[id]?['name'] ?? providers[id]?['displayName']) ??
+              aiText(prior[id]?['name']) ??
+              id,
+        }, readings[id] ?? const {}),
+  ];
+}
+
 Map<String, Object?> aiProviderData(
   Map<String, Object?> provider,
   Map<String, Object?> row,
@@ -178,13 +235,12 @@ Map<String, Object?> aiProviderData(
     'credits': credits['balanceReadSucceeded'] == false
         ? aiNumber(aiMap(credits['codexCreditLimit'])['remaining'])
         : aiNumber(credits['remaining']),
+    if (aiMap(row['resetCredits'])['available'] case final int count
+        when count > 0)
+      'bankedResets': count,
     'error':
         aiText(aiMap(row['error'])['message']) ??
-        (quotaSlots.any(
-              (slot) => aiPercent(aiMap(usage[slot])['usedPercent']) != null,
-            )
-            ? null
-            : 'Usage unavailable'),
+        (_hasQuota(usage) ? null : 'Usage unavailable'),
     for (final slot in quotaSlots)
       if (usage[slot] is Map)
         slot: _windowData(
@@ -194,6 +250,10 @@ Map<String, Object?> aiProviderData(
         ),
   };
 }
+
+bool _hasQuota(Map<String, Object?> usage) => quotaSlots.any(
+  (slot) => aiPercent(aiMap(usage[slot])['usedPercent']) != null,
+);
 
 Map<String, Object?> _windowData(
   Map<String, Object?> row,

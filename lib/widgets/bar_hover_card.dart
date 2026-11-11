@@ -17,7 +17,6 @@ class BarHoverCard extends StatefulWidget {
     this.builder,
     this.onTap,
     this.openOnTap = false,
-    this.openOnHover = true,
     this.seedColor,
   }) : assert((child == null) != (builder == null));
 
@@ -28,7 +27,6 @@ class BarHoverCard extends StatefulWidget {
   final Widget Function(BuildContext context, VoidCallback? onTap)? builder;
   final VoidCallback? onTap;
   final bool openOnTap;
-  final bool openOnHover;
   final Color? seedColor;
 
   @override
@@ -50,6 +48,10 @@ class _BarHoverCardState extends State<BarHoverCard> {
     if ((!update && !activated && !_hovered) || box == null || !box.hasSize) {
       return;
     }
+    final view = View.of(context);
+    final viewport = Offset.zero & (view.physicalSize / view.devicePixelRatio);
+    final anchor = (box.localToGlobal(.zero) & box.size).intersect(viewport);
+    if (anchor.isEmpty) return;
     final data = {
       ...widget.data,
       if (widget.seedColor case final seed?)
@@ -72,7 +74,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
     _send(
       request(
         kind: widget.kind,
-        anchor: box.localToGlobal(.zero) & box.size,
+        anchor: anchor,
         size: Size(
           widget.size.width + BarCardSurface.shadowInsets.horizontal,
           widget.size.height + BarCardSurface.shadowInsets.vertical,
@@ -85,11 +87,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
 
   void _activate() {
     _timer?.cancel();
-    if (!widget.openOnHover && BarPopup.openCard.value == widget.kind) {
-      _send(BarPopup.hide(kind: widget.kind));
-    } else {
-      _show(activated: true);
-    }
+    _show(activated: true);
   }
 
   void _refresh() {
@@ -124,9 +122,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
       _hovered = true;
       _send(BarPopup.enter(kind: widget.kind));
       _timer?.cancel();
-      if (widget.openOnHover) {
-        _timer = Timer(const Duration(milliseconds: 300), _show);
-      }
+      _timer = Timer(const Duration(milliseconds: 300), _show);
     },
     onExit: (_) {
       _hovered = false;

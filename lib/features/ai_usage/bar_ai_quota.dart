@@ -1,8 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/bar_pill.dart';
-import '../../widgets/bar_tooltip.dart';
-import '../popups/bar_popup.dart';
 import 'ai_quota_ring.dart';
 import 'ai_usage_backend.dart';
 import 'ai_usage_data.dart';
@@ -16,11 +14,7 @@ class BarAiQuota extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final data = backend.data;
-    final threshold = aiPercent(data['threshold']) ?? 20;
-    final providers = [
-      for (final row in aiRows(data['providers']).take(3))
-        AiQuotaProvider(row, now, threshold),
-    ];
+    final providers = aiVisibleProviders(data, now).toList();
     final scheme = Theme.of(context).colorScheme;
     return BarPill(
       color: scheme.surfaceContainerHighest,
@@ -33,8 +27,6 @@ class BarAiQuota extends StatelessWidget {
         kind: aiUsageKind,
         size: const Size(420, 826),
         openOnTap: true,
-        openOnHover: false,
-        tonalWhenAttached: true,
         data: {...data, 'tick': backend.tick, 'refreshing': backend.refreshing},
       ),
       builder: (context, state) => FittedBox(
@@ -88,8 +80,8 @@ class _Segment extends StatelessWidget {
         : values.map((window) => window.percent).join(' / ');
     final dim = Theme.of(context).textTheme.bodySmall!
         .copyWith(color: colors.onSurfaceVariant, fontSize: 12, height: 1.25);
-    return BarTooltip(
-      message: BarPopup.openCard.value == aiUsageKind ? '' : provider.tooltip,
+    return Semantics(
+      label: provider.tooltip,
       child: Opacity(
         opacity: tightest == null ? .6 : 1,
         child: Row(

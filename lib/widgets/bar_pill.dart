@@ -11,8 +11,6 @@ class BarPillCard {
     required this.data,
     this.seedColor,
     this.openOnTap = false,
-    this.openOnHover = true,
-    this.tonalWhenAttached = false,
   });
 
   final String kind;
@@ -20,8 +18,6 @@ class BarPillCard {
   final Map<String, Object?> data;
   final Color? seedColor;
   final bool openOnTap;
-  final bool openOnHover;
-  final bool tonalWhenAttached;
 }
 
 class BarPillState {
@@ -93,7 +89,6 @@ class _BarPillState extends State<BarPill> {
                 data: card.data,
                 seedColor: card.seedColor,
                 openOnTap: card.openOnTap,
-                openOnHover: card.openOnHover,
                 onTap: widget.onTap,
                 builder: _buildPill,
               ),
@@ -113,10 +108,7 @@ class _BarPillState extends State<BarPill> {
             BarPopupScope.themeOf(context).styleVariant,
           );
     final expanded = _hovered || _focused || _pressed || attached;
-    final tonal = attached && widget.card!.tonalWhenAttached;
-    final base = tonal
-        ? scheme.primaryContainer
-        : attached
+    final base = attached
         ? cardScheme.surfaceContainer
         : _pressed
         ? scheme.primaryContainer
@@ -126,7 +118,7 @@ class _BarPillState extends State<BarPill> {
     final surface = !attached && !_pressed && (_hovered || _focused)
         ? Color.alphaBlend(scheme.onSurface.withValues(alpha: .08), base)
         : base;
-    final foreground = _pressed || tonal
+    final foreground = _pressed
         ? scheme.onPrimaryContainer
         : widget.toggled == true
         ? scheme.onPrimary

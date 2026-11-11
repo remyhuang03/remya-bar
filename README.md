@@ -73,13 +73,13 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 
 ### AI Quota
 - Install the optional `codexbar-cli` system package and make its `codexbar`
-  executable available on the bar service's `PATH`. Enable and authenticate the
-  providers you want in [CodexBar](https://github.com/steipete/CodexBar).
-- The pill shows up to three enabled providers and highlights the tightest quota.
-  Click it for all providers, reset times, pace, and estimated Claude and Codex
-  spend. Right-click the pill or use **Refresh** in the card to update immediately.
-- The pill follows Media in the wide bar layout. It appears before Quick Settings
-  when Media is absent from the configured layout. The low-quota threshold is
+  executable available on the bar service's `PATH`. Authenticate your providers
+  in [CodexBar](https://github.com/steipete/CodexBar).
+- The pill tracks all detected providers by default. Use **AI Providers** in
+  Remya Settings to manage the switches shared with CodexBar. Hover over or click
+  the pill for details. Right-click or use **Refresh** to update immediately.
+- The default layout places AI Usage immediately before Battery in the same
+  group. Use the pill layout editor to move or hide it. The low-quota threshold is
   20% by default and can be set with `REMYA_BAR_AI_QUOTA_LOW_PERCENT` (1–100)
   in the bar process environment.
 

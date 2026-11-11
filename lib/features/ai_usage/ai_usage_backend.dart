@@ -6,6 +6,7 @@ import 'dart:math';
 import 'dart:ui' show IsolateNameServer;
 
 import 'package:flutter/foundation.dart';
+import 'package:remya_settings_client/settings_contract.dart';
 
 import '../../src/rust/system_bridge/api.dart' as rust;
 import '../system/system_backend.dart';
@@ -22,7 +23,7 @@ class AiUsageBackend extends ChangeNotifier {
   bool refreshing = false;
   int tick = 0;
 
-  bool get visible => aiRows(data['providers']).isNotEmpty;
+  bool get visible => aiVisibleProviders(data, DateTime.now()).isNotEmpty;
 
   void start() {
     unawaited(_read());
@@ -50,10 +51,10 @@ class AiUsageBackend extends ChangeNotifier {
       worker.send([reply.sendPort, force]);
       final value = await reply.first.timeout(const Duration(seconds: 90));
       if (!_disposed) {
-        final wasVisible = visible;
+        final hadProviders = aiRows(data['providers']).isNotEmpty;
         data = aiMap(value);
         tick++;
-        if (visible || wasVisible) notifyListeners();
+        if (visible || hadProviders) notifyListeners();
       }
     } on TimeoutException {
       // The next poll can reconnect after an engine restart.
@@ -89,6 +90,26 @@ void startAiUsageWorker() {
 }
 
 class _AiUsageWorker {
+  _AiUsageWorker() {
+    _settings.changes.listen((change) {
+      if (change.topic == aiProvidersSettingId) _nextPoll = null;
+    }, onError: (Object _) {});
+  }
+
+  final _settings = SettingsClient();
+  Map<String, dynamic>? _tracking;
+
+  Future<List<Map<String, Object?>>?> _readTracking() async {
+    try {
+      _tracking = await _settings.readAiProviders();
+    } catch (_) {
+      // Keep the last tracking configuration while Settings reconnects.
+    }
+    return _tracking == null ? null : aiRows(_tracking?['providers']);
+  }
+
+  bool get _automatic => _tracking?['automatic'] != false;
+
   static final _random = Random.secure();
   final _token = base64UrlEncode(
     List<int>.generate(32, (_) => _random.nextInt(256)),
@@ -130,44 +151,23 @@ class _AiUsageWorker {
           authenticate: true,
         ),
       );
-      final configured = shell['providers'] is List
-          ? aiRows(shell['providers'])
-          : await _cli('providers');
-      if (configured != null &&
-          !configured.any((row) => row['enabled'] == true)) {
+      final configured = await _readTracking() ?? await _cli('providers');
+      if (!_automatic &&
+          configured?.any((row) => row['enabled'] == true) == false) {
         _sample = const {};
         _alerts.update(const []);
         return;
       }
-
       final (usage, cost) = await (
         _endpoint(client, port, 'usage', refresh: true),
         _endpoint(client, port, 'cost', refresh: force),
       ).wait;
-      final byProvider = <String, Map<String, Object?>>{};
-      for (final row in usage ?? const <Map<String, Object?>>[]) {
-        if (aiText(row['provider']) case final id?) {
-          byProvider.putIfAbsent(id, () => row);
-        }
-      }
-      final providers = configured == null
-          ? [
-              if (usage == null) ...aiRows(_sample['providers']),
-              for (final id in byProvider.keys) {'id': id, 'name': id},
-            ]
-          : [
-              for (final row in configured)
-                if (row['enabled'] == true)
-                  if (aiText(row['id'] ?? row['provider']) case final id?)
-                    {
-                      'id': id,
-                      'name': aiText(row['name'] ?? row['displayName']) ?? id,
-                    },
-            ];
-      final data = [
-        for (final provider in providers)
-          aiProviderData(provider, byProvider[provider['id']] ?? const {}),
-      ];
+      final data = aiProviderSamples(
+        configured ?? aiRows(shell['providers']),
+        usage,
+        previous: aiRows(_sample['providers']),
+        automatic: _automatic,
+      );
       final now = DateTime.now();
       final updated =
           [
@@ -209,13 +209,23 @@ class _AiUsageWorker {
       final fresh = await _cli(endpoint, refresh: true);
       if (fresh != null) return fresh;
     }
+    final selection = endpoint == 'cost'
+        ? 'provider=both&'
+        : _automatic
+        ? 'provider=all&'
+        : '';
     final value = await _get(
       client,
       port,
-      '/$endpoint${refresh ? '?refresh=1' : ''}',
+      '/$endpoint?$selection${refresh ? 'refresh=1' : ''}',
     );
     if (value is List) return aiRows(value);
-    return refreshCost ? null : _cli(endpoint, refresh: refresh);
+    return refreshCost
+        ? null
+        : _cli(
+            endpoint == 'usage' && !_automatic ? 'enabled-usage' : endpoint,
+            refresh: refresh,
+          );
   }
 
   Future<Object?> _get(

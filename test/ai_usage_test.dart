@@ -3,7 +3,9 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:remya_bar/features/ai_usage/ai_quota_ring.dart';
 import 'package:remya_bar/features/ai_usage/ai_usage_backend.dart';
 import 'package:remya_bar/features/ai_usage/ai_usage_data.dart';
 import 'package:remya_bar/features/ai_usage/bar_ai_quota.dart';
@@ -36,6 +38,7 @@ Map<String, Object?> _usage(DateTime now, {num used = 86}) => {
   },
   'status': {'indicator': 'minor', 'description': 'Partial outage'},
   'credits': {'remaining': 112.4},
+  'resetCredits': {'available': 2},
 };
 
 void main() {
@@ -120,63 +123,114 @@ void main() {
     ]);
   });
 
-  testWidgets('pill hover shows quota details and click opens the card', (
-    tester,
-  ) async {
-    final calls = <MethodCall>[];
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      BarPopup.channel,
-      (call) async {
-        calls.add(call);
-        return null;
+  test('discovers local providers by default and honors saved switches', () {
+    const configured = [
+      {'id': 'codex', 'name': 'Codex', 'enabled': true},
+      {'id': 'claude', 'name': 'Claude', 'enabled': false},
+      {'id': 'gemini', 'name': 'Gemini', 'enabled': false},
+    ];
+    final usage = [
+      {'provider': 'codex', ..._usage(now)},
+      {
+        'provider': 'claude',
+        'error': {'message': 'First account failed'},
       },
-    );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        BarPopup.channel,
-        null,
-      ),
-    );
-    final backend = _AiUsageBackend()
-      ..data = {
-        'providers': [aiProviderData(_codex, _usage(DateTime.now()))],
-      };
-    addTearDown(backend.dispose);
-    await tester.pumpWidget(
-      BarPopupScope(
-        theme: const RemyaTheme(),
-        child: MaterialApp(
-          home: Center(
-            child: SizedBox(height: 40, child: BarAiQuota(backend: backend)),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final pill = find.byType(BarAiQuota);
-    final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    await pointer.addPointer(location: tester.getCenter(pill));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 550));
-    expect(
-      calls
-          .where((call) => call.method == 'show')
-          .map((call) => call.arguments['kind']),
-      ['tooltip'],
-    );
-    await tester.tap(pill, buttons: kSecondaryMouseButton);
-    expect(backend.refreshes, 1);
-    await tester.tap(pill);
-    expect(
-      calls.lastWhere((call) => call.method == 'show').arguments['kind'],
-      aiUsageKind,
-    );
-    await pointer.removePointer();
-    await tester.pumpWidget(const SizedBox());
+      {'provider': 'claude', ..._usage(now)},
+      {
+        'provider': 'gemini',
+        'error': {'message': 'Sign in required'},
+      },
+      {'provider': 'other', ..._usage(now)},
+      {
+        'provider': 'vertexai',
+        'usage': {'primary': null, 'secondary': null},
+      },
+      {
+        'provider': 'tertiary-only',
+        'usage': {
+          'tertiary': {'usedPercent': 30},
+        },
+      },
+    ];
+    List<Object?> ids(bool automatic) => aiProviderSamples(
+      configured,
+      usage,
+      previous: const [],
+      automatic: automatic,
+    ).map((row) => row['id']).toList();
+
+    expect(ids(true), ['codex', 'claude', 'other', 'tertiary-only']);
+    expect(ids(false), ['codex']);
   });
 
   testWidgets(
-    'detail card renders window, incident, failure and refresh actions',
+    'pill renders every provider and opens the card on hover or click',
+    (tester) async {
+      final calls = <MethodCall>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        BarPopup.channel,
+        (call) async {
+          calls.add(call);
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          BarPopup.channel,
+          null,
+        ),
+      );
+      final backend = _AiUsageBackend()
+        ..data = {
+          'providers': [
+            for (final id in ['codex', 'claude', 'antigravity', 'other'])
+              aiProviderData({'id': id, 'name': id}, _usage(DateTime.now())),
+            aiProviderData({'id': 'pi', 'name': 'Pi'}, {'usage': {}}),
+          ],
+        };
+      addTearDown(backend.dispose);
+      await tester.pumpWidget(
+        BarPopupScope(
+          theme: const RemyaTheme(),
+          child: MaterialApp(
+            home: Center(
+              child: SizedBox(height: 40, child: BarAiQuota(backend: backend)),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AiQuotaRing), findsNWidgets(4));
+      final images = tester.widgetList<SvgPicture>(find.byType(SvgPicture));
+      expect(
+        images.map((image) => (image.bytesLoader as SvgAssetLoader).assetName),
+        contains('assets/icons/ai_usage/antigravity.svg'),
+      );
+      final pill = find.byType(BarAiQuota);
+      final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await pointer.addPointer(location: tester.getCenter(pill));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 550));
+      expect(
+        calls
+            .where((call) => call.method == 'show')
+            .map((call) => call.arguments['kind']),
+        [aiUsageKind],
+      );
+      await tester.tap(pill, buttons: kSecondaryMouseButton);
+      expect(backend.refreshes, 1);
+      await tester.tap(pill);
+      expect(
+        calls.lastWhere((call) => call.method == 'show').arguments['kind'],
+        aiUsageKind,
+      );
+      await pointer.removePointer();
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets(
+    'detail card hides empty providers and balances and aligns pace',
     (tester) async {
       final actions = <Map<String, Object?>>[];
       final now = DateTime.now();
@@ -189,12 +243,18 @@ void main() {
                 child: BarDetailCard(
                   kind: aiUsageKind,
                   data: {
+                    'updatedAt': now
+                        .subtract(const Duration(minutes: 3))
+                        .toIso8601String(),
                     'providers': [
-                      aiProviderData(_codex, _usage(now)),
+                      aiProviderData(_codex, {
+                        ..._usage(now),
+                        'credits': {'remaining': 0},
+                      }),
                       aiProviderData(
-                        {'id': 'claude', 'name': 'Claude'},
+                        {'id': 'vertexai', 'name': 'Vertex AI'},
                         {
-                          'error': {'message': 'Sign in required'},
+                          'usage': {'primary': null},
                         },
                       ),
                     ],
@@ -216,18 +276,36 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('AI Usage'), findsOneWidget);
+      expect(find.text('Updated 3 min ago'), findsOneWidget);
       expect(find.text('Partial outage'), findsOneWidget);
       expect(find.text('Empty in ~28m'), findsOneWidget);
-      expect(find.text('Sign in required'), findsOneWidget);
+      expect(find.text('Vertex AI'), findsNothing);
+      expect(find.text('Credits'), findsNothing);
+      expect(find.text('Banked resets'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+      final pace = find.text('Empty in ~28m');
+      expect(tester.widget<Text>(pace).textAlign, TextAlign.end);
+      expect(
+        tester.getTopRight(pace).dx,
+        closeTo(tester.getTopRight(find.text('2')).dx, 1),
+      );
+
       expect(
         find.text('Code review  weekly', findRichText: true),
         findsOneWidget,
       );
       expect(find.text(r'$3.42 today', findRichText: true), findsOneWidget);
+      final spendCaption = find.text('Local estimate · API rates');
+      final spendLeft = tester.getTopLeft(find.text('Spend')).dx;
+      final viewWidth =
+          tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      expect(tester.widget<Text>(spendCaption).textAlign, TextAlign.end);
+      expect(
+        tester.getTopRight(spendCaption).dx,
+        closeTo(viewWidth - spendLeft, 1),
+      );
       await tester.tap(find.byTooltip('Refresh'));
-      await tester.tap(find.text('Retry'));
       expect(actions, [
-        {'action': 'ai-usage.refresh'},
         {'action': 'ai-usage.refresh'},
       ]);
       expect(tester.takeException(), isNull);

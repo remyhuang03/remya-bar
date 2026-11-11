@@ -726,6 +726,9 @@ class _BarContent extends StatelessWidget {
                 constraints.maxWidth < 44 ? const SizedBox.shrink() : tray!,
           ),
         ),
+        aiUsageKind when aiUsage?.visible == true => BarAiQuota(
+          backend: aiUsage!,
+        ),
         'battery' when system?.battery?.percent?.isFinite == true => BarBattery(
           battery: system!.battery,
           isPowerSaver: system!.isPowerSaver,
@@ -734,22 +737,10 @@ class _BarContent extends StatelessWidget {
         'sidebar' => sidebar,
         _ => null,
       };
-      final quota = aiUsage?.visible == true
-          ? BarAiQuota(backend: aiUsage!)
-          : null;
-      final quotaAnchor = layout.groups.any((group) => group.contains('media'))
-          ? 'media'
-          : 'sidebar';
       final groups = <Widget>[];
       int? center;
       for (var i = 0; i < layout.groups.length; i++) {
-        final pills = [
-          for (final id in layout.groups[i]) ...[
-            if (id == quotaAnchor && id == 'sidebar') ?quota,
-            ?pill(id),
-            if (id == quotaAnchor && id == 'media') ?quota,
-          ],
-        ];
+        final pills = [...layout.groups[i].map(pill).nonNulls];
         if (pills.isEmpty) continue;
         if (i == layout.center) center = groups.length;
         groups.add(Row(mainAxisSize: .min, spacing: 8, children: pills));

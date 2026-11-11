@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/physics.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -15,8 +16,10 @@ class AiQuotaRing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final outer = provider.window('primary');
     final inner = provider.window('secondary');
+    final outer =
+        provider.window('primary') ??
+        (inner == null ? provider.window('tertiary') : null);
     final tightest = provider.tightest;
     final exhausted = tightest?.left == 0;
     final color = exhausted
@@ -42,30 +45,48 @@ class AiQuotaRing extends StatelessWidget {
               _AnimatedArc(outer, 11.5, 3, showUsed: showUsed),
               _AnimatedArc(inner, 7.75, 2.5, showUsed: showUsed),
             ],
-            Center(
-              child: switch (provider.id) {
-                'claude' || 'codex' || 'gemini' => SvgPicture.asset(
-                  'assets/icons/ai_usage/${provider.id}.svg',
-                  width: 10,
-                  height: 10,
-                  colorFilter: ColorFilter.mode(color, .srcIn),
-                ),
-                _ => Text(
-                  String.fromCharCodes(
-                    provider.name.toUpperCase().runes.take(2),
-                  ),
-                  textScaler: TextScaler.noScaling,
-                  style: TextStyle(
-                    fontSize: 7,
-                    fontWeight: .w700,
-                    color: color,
-                  ),
-                ),
-              },
-            ),
+            Center(child: _ProviderGlyph(provider, color)),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProviderGlyph extends StatelessWidget {
+  const _ProviderGlyph(this.provider, this.color);
+
+  final AiQuotaProvider provider;
+  final Color color;
+
+  static final _assets = AssetManifest.loadFromAssetBundle(rootBundle)
+      .then((manifest) => manifest.listAssets().toSet());
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (provider.id) {
+      'alibabatokenplan' => 'alibaba',
+      'azureopenai' || 'openai' => 'codex',
+      'moonshot' => 'kimi',
+      final id => id,
+    };
+    final asset = 'assets/icons/ai_usage/$icon.svg';
+    final fallback = Text(
+      String.fromCharCodes(provider.name.toUpperCase().runes.take(2)),
+      textScaler: TextScaler.noScaling,
+      style: TextStyle(fontSize: 7, fontWeight: .w700, color: color),
+    );
+    return FutureBuilder<Set<String>>(
+      future: _assets,
+      builder: (context, snapshot) => snapshot.data?.contains(asset) == true
+          ? SvgPicture.asset(
+              asset,
+              width: 10,
+              height: 10,
+              colorFilter: ColorFilter.mode(color, .srcIn),
+              errorBuilder: (_, _, _) => fallback,
+            )
+          : fallback,
     );
   }
 }

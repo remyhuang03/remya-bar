@@ -16,7 +16,6 @@ class AiUsageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final colors = Theme.of(context).colorScheme;
-    final threshold = aiPercent(data['threshold']) ?? 20;
     final updated = aiDate(data['updatedAt']);
     final age = updated == null ? null : now.difference(updated);
     final refresh = data['refreshing'] == true ? null : onRefresh;
@@ -61,24 +60,16 @@ class AiUsageCard extends StatelessWidget {
             ),
           ],
         ),
-        for (final row in aiRows(data['providers']))
-          _ProviderTile(
-            provider: AiQuotaProvider(row, now, threshold),
-            showUsed: data['showUsed'] == true,
-            onRefresh: refresh,
-          ),
+        for (final provider in aiVisibleProviders(data, now))
+          _ProviderTile(provider: provider, showUsed: data['showUsed'] == true),
         _SpendTile(rows: aiRows(data['cost']), now: now),
-        Text(
-          [
-            'Via CodexBar',
-            if (age case final age? when age <= aiStaleAfter)
-              age.inMinutes <= 0
-                  ? 'updated just now'
-                  : 'updated ${age.inMinutes} min ago',
-            'every ${aiRefreshInterval.inMinutes} min',
-          ].join(' · '),
-          style: _style(context, 12),
-        ),
+        if (age != null)
+          Text(
+            age.inMinutes <= 0
+                ? 'Updated <1 min ago'
+                : 'Updated ${age.inMinutes} min ago',
+            style: _style(context, 12),
+          ),
       ],
     );
   }
@@ -124,21 +115,15 @@ class _Tile extends StatelessWidget {
 }
 
 class _ProviderTile extends StatelessWidget {
-  const _ProviderTile({
-    required this.provider,
-    required this.showUsed,
-    required this.onRefresh,
-  });
+  const _ProviderTile({required this.provider, required this.showUsed});
 
   final AiQuotaProvider provider;
   final bool showUsed;
-  final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final data = provider.data;
-    final error = provider.error;
     final nameStyle = _style(
       context,
       14,
@@ -183,42 +168,42 @@ class _ProviderTile extends StatelessWidget {
               }, style: _style(context, 12)),
           ],
         ),
-        if (error != null)
-          Row(
-            spacing: 8,
-            children: [
-              Expanded(
-                child: Text(
-                  error,
-                  style: _style(context, 12, color: colors.error),
-                ),
-              ),
-              TextButton(onPressed: onRefresh, child: const Text('Retry')),
-            ],
-          )
-        else ...[
-          for (final slot in quotaSlots)
-            if (provider.window(slot) case final window?)
-              _WindowRow(window, showUsed: showUsed),
-          if (aiNumber(data['credits']) case final credits?)
-            Row(
-              children: [
-                Expanded(child: Text('Credits', style: _style(context, 12))),
-                Text(
-                  '${credits.toStringAsFixed(credits == credits.round() ? 0 : 1)} left',
-                  style: _style(
-                    context,
-                    12,
-                    color: colors.onSurface,
-                    weight: .w500,
-                  ),
-                ),
-              ],
-            ),
-        ],
+        for (final slot in quotaSlots)
+          if (provider.window(slot) case final window?)
+            _WindowRow(window, showUsed: showUsed),
+        if (aiNumber(data['credits']) case final credits? when credits > 0)
+          _BalanceRow(
+            'Credits',
+            '${credits.toStringAsFixed(credits == credits.round() ? 0 : 1)} left',
+          ),
+        if (data['bankedResets'] case final int count when count > 0)
+          _BalanceRow('Banked resets', '$count'),
       ],
     );
   }
+}
+
+class _BalanceRow extends StatelessWidget {
+  const _BalanceRow(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(child: Text(label, style: _style(context, 12))),
+      Text(
+        value,
+        style: _style(
+          context,
+          12,
+          color: Theme.of(context).colorScheme.onSurface,
+          weight: .w500,
+        ),
+      ),
+    ],
+  );
 }
 
 class _Chip extends StatelessWidget {
@@ -332,7 +317,7 @@ class _WindowRow extends StatelessWidget {
                 ),
               Expanded(child: Text(reset ?? '', style: small)),
               if (pace != null)
-                Flexible(
+                Expanded(
                   child: Text(
                     pace,
                     textAlign: .end,
@@ -491,7 +476,7 @@ class _SpendTile extends StatelessWidget {
                 style: _style(context, 14, color: colors.onSurface),
               ),
             ),
-            Flexible(
+            Expanded(
               child: Text(
                 partial
                     ? 'Partial local estimate'
