@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/bar_pill.dart';
@@ -219,48 +221,49 @@ class _ScrollingTitle extends StatefulWidget {
   State<_ScrollingTitle> createState() => _ScrollingTitleState();
 }
 
-class _ScrollingTitleState extends State<_ScrollingTitle>
-    with SingleTickerProviderStateMixin {
+class _ScrollingTitleState extends State<_ScrollingTitle> {
   static const _gap = 32.0;
   static const _speed = 16.0;
-  late final AnimationController _scroll = AnimationController(vsync: this);
-
-  double get _distance => widget.textWidth + _gap;
-
-  @override
-  void initState() {
-    super.initState();
-    _scroll.repeat(period: _period);
-  }
-
-  Duration get _period =>
-      Duration(milliseconds: (_distance / _speed * 1000).round());
+  static const _frameInterval = Duration(milliseconds: 50);
+  final _elapsed = Stopwatch()..start();
+  final _travel = ValueNotifier(0.0);
+  Timer? _timer;
 
   @override
-  void didUpdateWidget(_ScrollingTitle oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if ((widget.textWidth - oldWidget.textWidth).abs() >= 0.5) {
-      _scroll.repeat(period: _period);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (TickerMode.valuesOf(context).enabled) {
+      // Measure time independently so a delayed tick doesn't slow the scroll.
+      _timer ??= Timer.periodic(_frameInterval, (_) {
+        _travel.value =
+            _speed *
+            _elapsed.elapsedMicroseconds /
+            Duration.microsecondsPerSecond;
+      });
+    } else {
+      _timer?.cancel();
+      _timer = null;
     }
   }
 
   @override
   void dispose() {
-    _scroll.dispose();
+    _timer?.cancel();
+    _travel.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _scroll,
+  Widget build(BuildContext context) => ValueListenableBuilder<double>(
+    valueListenable: _travel,
     child: Row(
       mainAxisSize: .min,
       spacing: _gap,
       textDirection: widget.direction,
       children: [widget.child, widget.child],
     ),
-    builder: (context, child) {
-      final offset = _scroll.value * _distance;
+    builder: (context, travel, child) {
+      final offset = travel % (widget.textWidth + _gap);
       final leftToRight = widget.direction == .ltr;
       return ClipRect(
         child: ShaderMask(
