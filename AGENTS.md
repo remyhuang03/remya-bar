@@ -80,6 +80,9 @@
 - `tool/install.py` installs and enables the `top.remya.bar.service` systemd user unit (graphical-session.target) and restarts it on the new bundle. On this workstation the installed bar stays autostarting and running: do not disable or stop that unit during cleanup; stop only the extra development or verification instances you started.
 - Verify that the installed bundle, command, desktop entry, and running service use the updated build, and exercise the installed application. Preserve user configuration and unrelated installations. When both Settings and Bar change, install Settings first and Bar second; retain the required cleanup of verification instances.
 
+## Releases
+- Use the user-level `remya-release` skill from [remya-apps-skills](https://github.com/remyhuang03/remya-apps-skills) for Linux release work. Install it with `npx skills add remyhuang03/remya-apps-skills --skill remya-release --agent codex --global`, then invoke `$remya-release` from this checkout.
+
 ## Git Workflow
 - Develop and validate on a separate branch using `<type>/<short-description>` with lowercase words and hyphens, such as `feat/appearance` or `chore/initialize-project`.
 - Use stacked commits when appropriate to split multi-step, dependent changes into small, focused, reviewable commits.
