@@ -37,12 +37,12 @@ class BarDetailCard extends StatelessWidget {
           onAction: onAction,
           styleVariant: styleVariant,
           seedColor: seedColor,
-          pill: _pill(data['pill']),
+          pill: cardPill(data['pill']),
           emergence: emergence,
         )
       : BarCardSurface(
           seedColor: seedColor,
-          pill: _pill(data['pill']),
+          pill: cardPill(data['pill']),
           emergence: emergence,
           styleVariant: styleVariant,
           child: switch (kind) {
@@ -69,7 +69,8 @@ class BarDetailCard extends StatelessWidget {
         );
 }
 
-Rect? _pill(Object? value) =>
+/// The pill rect a card popup is anchored under, from its `pill` payload.
+Rect? cardPill(Object? value) =>
     value is List &&
         value.length == 2 &&
         value[0] is int &&
