@@ -14,11 +14,11 @@ class BarAiQuota extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final data = backend.data;
-    final providers = aiVisibleProviders(data, now).toList();
+    final providers = aiPillProviders(data, now);
     final scheme = Theme.of(context).colorScheme;
     return BarPill(
       color: scheme.surfaceContainerHighest,
-      padding: const .only(left: 4, right: 12),
+      padding: const .only(left: 2, right: 12),
       expandedPadding: const .only(left: 10, right: 16),
       semanticsLabel: 'AI Quota',
       semanticsHint: 'Open AI Usage',
@@ -33,12 +33,13 @@ class BarAiQuota extends StatelessWidget {
         fit: .scaleDown,
         child: Row(
           mainAxisSize: .min,
-          spacing: state.expanded ? 14 : 12,
+          spacing: state.expanded ? 14 : 8,
           children: [
-            for (final provider in providers)
+            for (final (index, provider) in providers.indexed)
               _Segment(
                 key: ValueKey(provider.id),
                 provider: provider,
+                index: index,
                 state: state,
                 showUsed: data['showUsed'] == true,
               ),
@@ -53,11 +54,13 @@ class _Segment extends StatelessWidget {
   const _Segment({
     super.key,
     required this.provider,
+    required this.index,
     required this.state,
     required this.showUsed,
   });
 
   final AiQuotaProvider provider;
+  final int index;
   final BarPillState state;
   final bool showUsed;
 
@@ -88,7 +91,7 @@ class _Segment extends StatelessWidget {
           mainAxisSize: .min,
           spacing: 6,
           children: [
-            AiQuotaRing(provider, showUsed: showUsed),
+            AiQuotaRing(provider, showUsed: showUsed, index: index),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 114),
               child: Column(

@@ -254,7 +254,7 @@ packages:
       path: "../remya-settings/packages/remya_settings_client"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "0.1.0-dev.20261109.0"
   sky_engine:
     dependency: transitive
     description: flutter

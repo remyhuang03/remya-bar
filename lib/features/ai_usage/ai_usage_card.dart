@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:remya_settings_client/remya_settings_client.dart';
 
 import 'ai_quota_ring.dart';
 import 'ai_usage_data.dart';
@@ -60,8 +61,12 @@ class AiUsageCard extends StatelessWidget {
             ),
           ],
         ),
-        for (final provider in aiVisibleProviders(data, now))
-          _ProviderTile(provider: provider, showUsed: data['showUsed'] == true),
+        for (final (index, provider) in aiVisibleProviders(data, now).indexed)
+          _ProviderTile(
+            provider: provider,
+            accent: aiProviderAccent(provider.id, colors, index: index),
+            showUsed: data['showUsed'] == true,
+          ),
         _SpendTile(rows: aiRows(data['cost']), now: now),
         if (age != null)
           Text(
@@ -115,9 +120,14 @@ class _Tile extends StatelessWidget {
 }
 
 class _ProviderTile extends StatelessWidget {
-  const _ProviderTile({required this.provider, required this.showUsed});
+  const _ProviderTile({
+    required this.provider,
+    required this.accent,
+    required this.showUsed,
+  });
 
   final AiQuotaProvider provider;
+  final Color accent;
   final bool showUsed;
 
   @override
@@ -135,7 +145,7 @@ class _ProviderTile extends StatelessWidget {
         Row(
           spacing: 8,
           children: [
-            AiQuotaRing(provider, showUsed: showUsed),
+            AiProviderLogo(provider, size: 24, color: colors.onSurface),
             Expanded(
               child: Wrap(
                 spacing: 8,
@@ -170,7 +180,7 @@ class _ProviderTile extends StatelessWidget {
         ),
         for (final slot in quotaSlots)
           if (provider.window(slot) case final window?)
-            _WindowRow(window, showUsed: showUsed),
+            _WindowRow(window, accent: accent, showUsed: showUsed),
         if (aiNumber(data['credits']) case final credits? when credits > 0)
           _BalanceRow(
             'Credits',
@@ -228,9 +238,10 @@ class _Chip extends StatelessWidget {
 }
 
 class _WindowRow extends StatelessWidget {
-  const _WindowRow(this.window, {required this.showUsed});
+  const _WindowRow(this.window, {required this.accent, required this.showUsed});
 
   final AiQuotaWindow window;
+  final Color accent;
   final bool showUsed;
 
   @override
@@ -300,7 +311,12 @@ class _WindowRow extends StatelessWidget {
             ),
           ],
         ),
-        _QuotaMeter(window, compact: compact, showUsed: showUsed),
+        _QuotaMeter(
+          window,
+          accent: accent,
+          compact: compact,
+          showUsed: showUsed,
+        ),
         if (!compact && (reset != null || pace != null))
           Row(
             spacing: 4,
@@ -337,11 +353,13 @@ class _WindowRow extends StatelessWidget {
 class _QuotaMeter extends StatelessWidget {
   const _QuotaMeter(
     this.window, {
+    required this.accent,
     required this.compact,
     required this.showUsed,
   });
 
   final AiQuotaWindow window;
+  final Color accent;
   final bool compact, showUsed;
 
   @override
@@ -353,7 +371,7 @@ class _QuotaMeter extends StatelessWidget {
         ? null
         : (showUsed ? 100 - expected : expected) / 100;
     final height = compact ? 4.0 : 8.0;
-    final activeColor = window.low ? colors.error : colors.primary;
+    final activeColor = window.low ? colors.error : accent;
     final outer = Radius.circular(height / 2);
     final inner = Radius.circular(height / 4);
     return ExcludeSemantics(
@@ -462,7 +480,7 @@ class _SpendTile extends StatelessWidget {
     );
     final partial = rows.any((row) => row['partial'] == true);
     Color seriesColor(Map<String, Object?> row) =>
-        row['id'] == 'codex' ? colors.tertiary : colors.primary;
+        aiProviderAccent('${row['id']}', colors, index: rows.indexOf(row));
     String dollars(double value) => '\$${value.toStringAsFixed(2)}';
     return _Tile(
       spacing: 10,

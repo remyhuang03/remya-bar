@@ -17,6 +17,10 @@ import 'features/system/system_backend.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Unknown providers fall back to initials if the manifest cannot load.
+  await loadAiIdentity().catchError(
+    (Object error) => debugPrint('AI provider identity unavailable: $error'),
+  );
   if (arguments.contains('--remya-popup')) {
     runWidget(const BarPopupHost());
     startAiUsageWorker();
@@ -57,11 +61,6 @@ Future<void> main(List<String> arguments) async {
       : File(
           '${Directory(root).parent.path}/remya-settings/build/linux/x64/debug/bundle/remya_settings',
         );
-  LicenseRegistry.addLicense(() async* {
-    yield LicenseEntryWithLineBreaks([
-      'CodexBar provider icons',
-    ], await rootBundle.loadString('assets/licenses/codexbar.txt'));
-  });
   runApp(
     RemyaBarApp(
       preferences: preferences,

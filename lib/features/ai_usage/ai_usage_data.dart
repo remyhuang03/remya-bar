@@ -36,6 +36,24 @@ Iterable<AiQuotaProvider> aiVisibleProviders(
   }
 }
 
+/// Pinned providers in pinned order, else the first three with data.
+List<AiQuotaProvider> aiPillProviders(Map<String, Object?> data, DateTime now) {
+  final visible = {
+    for (final provider in aiVisibleProviders(data, now)) provider.id: provider,
+  };
+  final pinned = data['pinned'] is List ? data['pinned'] as List : const [];
+  return [
+    if (pinned.isEmpty)
+      ...visible.values
+    else
+      ...pinned.map((id) => visible[id]).nonNulls,
+  ].take(3).toList();
+}
+
+/// Settings `bar.lowPercent`, defaulting to 20 when unset or invalid.
+double aiLowPercent(Object? bar) =>
+    aiNumber(aiMap(bar)['lowPercent'])?.clamp(1, 100).toDouble() ?? 20;
+
 class AiQuotaProvider {
   AiQuotaProvider(this.data, this.now, this.threshold);
 
@@ -97,7 +115,15 @@ class AiQuotaWindow {
   DateTime? get reset => aiDate(data['resetsAt']);
   double? get expectedLeft {
     final used = aiPercent(data['expectedUsed']);
-    return used == null ? null : 100 - used;
+    if (used != null) return 100 - used;
+    // CodexBar omits pace for some providers; a linear pace is the share of
+    // the window's time still left.
+    final minutes = aiNumber(data['minutes']);
+    final reset = this.reset;
+    if (minutes == null || minutes <= 0 || reset == null) return null;
+    final remaining = reset.difference(now).inSeconds / 60;
+    if (remaining < 0 || remaining > minutes) return null;
+    return remaining / minutes * 100;
   }
 
   bool get runningOut => data['willLast'] == false;

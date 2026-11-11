@@ -41,8 +41,108 @@ Map<String, Object?> _usage(DateTime now, {num used = 86}) => {
   'resetCredits': {'available': 2},
 };
 
+Future<void> _pumpRings(WidgetTester tester, List<AiQuotaProvider> providers) =>
+    tester.pumpWidget(
+      MaterialApp(
+        home: Row(
+          children: [
+            for (final (index, provider) in providers.indexed)
+              AiQuotaRing(provider, showUsed: false, index: index),
+          ],
+        ),
+      ),
+    );
+
 void main() {
   final now = DateTime.utc(2026, 11, 9, 9);
+
+  setUpAll(loadAiIdentity);
+
+  test('derives a linear pace when CodexBar omits it', () {
+    final row = {..._usage(now)}..remove('pace');
+    final window = AiQuotaProvider(
+      aiProviderData(_codex, row),
+      now,
+      20,
+    ).window('primary')!;
+    // 41 of 300 minutes remain, so a linear pace leaves about 13.7%.
+    expect(window.expectedLeft, closeTo(41 / 300 * 100, .01));
+    // CodexBar's own pace wins when present.
+    expect(
+      AiQuotaProvider(
+        aiProviderData(_codex, _usage(now)),
+        now,
+        20,
+      ).window('primary')!.expectedLeft,
+      32,
+    );
+  });
+
+  test('reads the Settings threshold', () {
+    final ai = {
+      'bar': {'pinned': [], 'lowPercent': 35},
+    };
+    expect(aiLowPercent(ai['bar']), 35);
+    expect(aiLowPercent({'lowPercent': 400}), 100);
+    expect(aiLowPercent(null), 20);
+    final data = {
+      'threshold': aiLowPercent(ai['bar']),
+      'providers': [aiProviderData(_codex, _usage(now, used: 70))],
+    };
+    expect(aiVisibleProviders(data, now).single.tightest!.low, isTrue);
+    expect(
+      aiVisibleProviders({
+        ...data,
+        'threshold': 20.0,
+      }, now).single.tightest!.low,
+      isFalse,
+    );
+  });
+
+  test('pill follows the pinned order and caps at three providers', () {
+    List<Object?> pill(List<String> pinned) => aiPillProviders({
+      'pinned': pinned,
+      'providers': [
+        for (final id in ['a', 'b', 'c', 'd'])
+          aiProviderData({'id': id, 'name': id}, _usage(now)),
+        aiProviderData({'id': 'empty', 'name': 'Empty'}, {'usage': {}}),
+      ],
+    }, now).map((provider) => provider.id).toList();
+
+    expect(pill(const []), ['a', 'b', 'c']);
+    expect(pill(const ['d', 'empty', 'b']), ['d', 'b']);
+    expect(pill(const ['c', 'a', 'd', 'b']), ['c', 'a', 'd']);
+  });
+
+  testWidgets('ring arcs use the provider accent unless the quota is low', (
+    tester,
+  ) async {
+    AiQuotaProvider provider(String id, num used) => AiQuotaProvider(
+      aiProviderData({'id': id, 'name': id}, _usage(now, used: used)),
+      now,
+      20,
+    );
+    await _pumpRings(tester, [provider('claude', 30), provider('codex', 90)]);
+    await tester.pumpAndSettle();
+    final scheme = Theme.of(tester.element(find.byType(Row))).colorScheme;
+    final rings = find.byType(AiQuotaRing);
+    final accent = aiProviderAccent('claude', scheme);
+    expect(accent, isNot(scheme.error));
+    // Each arc paints its track first, then the active sweep.
+    final track = scheme.onSurface.withValues(alpha: .16);
+    expect(
+      rings.first,
+      paints
+        ..arc(color: track)
+        ..arc(color: accent),
+    );
+    expect(
+      rings.last,
+      paints
+        ..arc(color: track)
+        ..arc(color: scheme.error),
+    );
+  });
 
   test(
     'projects quota fields and never substitutes missing or stale readings',
@@ -200,12 +300,16 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.byType(AiQuotaRing), findsNWidgets(4));
+      expect(find.byType(AiQuotaRing), findsNWidgets(3));
+      expect(find.text('OT'), findsNothing);
       final images = tester.widgetList<SvgPicture>(find.byType(SvgPicture));
-      expect(
-        images.map((image) => (image.bytesLoader as SvgAssetLoader).assetName),
-        contains('assets/icons/ai_usage/antigravity.svg'),
+      final claude = images.singleWhere(
+        (image) =>
+            (image.bytesLoader as SvgAssetLoader).assetName ==
+            aiProviderIcon('claude'),
       );
+      // Color logos keep their own colors; mono ones follow currentColor.
+      expect(claude.colorFilter, isNull);
       final pill = find.byType(BarAiQuota);
       final pointer = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await pointer.addPointer(location: tester.getCenter(pill));

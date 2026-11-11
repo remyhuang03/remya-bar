@@ -23,7 +23,7 @@ class AiUsageBackend extends ChangeNotifier {
   bool refreshing = false;
   int tick = 0;
 
-  bool get visible => aiVisibleProviders(data, DateTime.now()).isNotEmpty;
+  bool get visible => aiPillProviders(data, DateTime.now()).isNotEmpty;
 
   void start() {
     unawaited(_read());
@@ -92,23 +92,25 @@ void startAiUsageWorker() {
 class _AiUsageWorker {
   _AiUsageWorker() {
     _settings.changes.listen((change) {
-      if (change.topic == aiProvidersSettingId) _nextPoll = null;
+      if (change.topic == aiProvidersSettingId ||
+          change.topic == aiBarSettingId) {
+        _nextPoll = null;
+      }
     }, onError: (Object _) {});
   }
 
   final _settings = SettingsClient();
-  Map<String, dynamic>? _tracking;
+  Map<String, dynamic>? _bar;
 
-  Future<List<Map<String, Object?>>?> _readTracking() async {
+  /// Bar preferences from Settings; the last value is kept while Settings
+  /// reconnects. Tracking itself is CodexBar's enabled set, which Settings
+  /// writes, so polling never makes Settings probe every provider.
+  Future<Map<String, dynamic>?> _readBar() async {
     try {
-      _tracking = await _settings.readAiProviders();
-    } catch (_) {
-      // Keep the last tracking configuration while Settings reconnects.
-    }
-    return _tracking == null ? null : aiRows(_tracking?['providers']);
+      _bar = await _settings.readAiBar();
+    } catch (_) {}
+    return _bar;
   }
-
-  bool get _automatic => _tracking?['automatic'] != false;
 
   static final _random = Random.secure();
   final _token = base64UrlEncode(
@@ -116,11 +118,6 @@ class _AiUsageWorker {
   );
   final _alerts = AiQuotaAlerts();
   late final _rustReady = SystemBackend.initialize();
-  final _threshold =
-      int.tryParse(Platform.environment['REMYA_BAR_AI_QUOTA_LOW_PERCENT'] ?? '')
-          ?.clamp(1, 100)
-          .toDouble() ??
-      20.0;
   Map<String, Object?> _sample = const {};
   DateTime? _nextPoll;
   Future<void>? _pending;
@@ -151,13 +148,9 @@ class _AiUsageWorker {
           authenticate: true,
         ),
       );
-      final configured = await _readTracking() ?? await _cli('providers');
-      if (!_automatic &&
-          configured?.any((row) => row['enabled'] == true) == false) {
-        _sample = const {};
-        _alerts.update(const []);
-        return;
-      }
+      final (bar, configured) = await (_readBar(), _cli('providers')).wait;
+      final automatic = configured == null;
+      final threshold = aiLowPercent(bar);
       final (usage, cost) = await (
         _endpoint(client, port, 'usage', refresh: true),
         _endpoint(client, port, 'cost', refresh: force),
@@ -166,7 +159,7 @@ class _AiUsageWorker {
         configured ?? aiRows(shell['providers']),
         usage,
         previous: aiRows(_sample['providers']),
-        automatic: _automatic,
+        automatic: automatic,
       );
       final now = DateTime.now();
       final updated =
@@ -181,12 +174,13 @@ class _AiUsageWorker {
       _sample = {
         'providers': data,
         'showUsed': aiMap(shell['host'])['usageBarsShowUsed'] == true,
-        'threshold': _threshold,
+        'threshold': threshold,
+        'pinned': [...?(bar?['pinned'] as List?)?.whereType<String>()],
         'updatedAt': updated?.toIso8601String(),
         'cost': _costData(cost, data),
       };
       for (final (name, window, left) in _alerts.update([
-        for (final row in data) AiQuotaProvider(row, now, _threshold),
+        for (final row in data) AiQuotaProvider(row, now, threshold),
       ])) {
         unawaited(
           rust.codexbarNotify(provider: name, window: window, remaining: left),
@@ -209,23 +203,15 @@ class _AiUsageWorker {
       final fresh = await _cli(endpoint, refresh: true);
       if (fresh != null) return fresh;
     }
-    final selection = endpoint == 'cost'
-        ? 'provider=both&'
-        : _automatic
-        ? 'provider=all&'
-        : '';
+    // Tracked providers are filtered locally, so always probe all of them.
+    final selection = endpoint == 'cost' ? 'provider=both&' : 'provider=all&';
     final value = await _get(
       client,
       port,
       '/$endpoint?$selection${refresh ? 'refresh=1' : ''}',
     );
     if (value is List) return aiRows(value);
-    return refreshCost
-        ? null
-        : _cli(
-            endpoint == 'usage' && !_automatic ? 'enabled-usage' : endpoint,
-            refresh: refresh,
-          );
+    return refreshCost ? null : _cli(endpoint, refresh: refresh);
   }
 
   Future<Object?> _get(

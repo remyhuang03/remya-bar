@@ -450,11 +450,17 @@ The optional `codexbar-cli` dependency supplies the `codexbar` executable. A
 worker in the warm popup engine coalesces requests from all outputs into one
 sample every five minutes. Rust starts and supervises the CLI child, binds its
 HTTP server to a reserved port on `127.0.0.1` and ties the child to the bar
-process. Settings exposes CodexBar's provider switches through
-`Get("ai-providers.tracking")` and signals changes made in Settings. The worker
-queries all providers in automatic mode and follows CodexBar's saved switches
-when configured. It uses the authenticated dashboard shell for the fill
-preference and reads usage and cost from the JSON routes.
+process. The worker reads `Get("ai.bar")` from Settings (pins and threshold,
+without a provider probe) and re-polls when Settings signals `Changed` for
+`ai.providers` or `ai.bar`. Tracked providers are CodexBar's enabled set from
+`codexbar config providers`, which Settings > AI writes. The pill shows
+`pinned` in order (at most three, each only while it has data) or, without
+pins, the first three tracked providers with data; the card shows every tracked
+provider. `lowPercent` sets the low-quota threshold. While Settings is
+unreachable the worker keeps its last Settings value; before the first one it
+uses a 20% threshold. Usage is always probed for all providers and filtered locally.
+It uses the authenticated dashboard shell for the fill preference and reads
+usage and cost from the JSON routes.
 CodexBar exposes its ordinary usage and cost routes to local loopback clients.
 If a route is unavailable, the worker falls back to the corresponding CLI
 command. The optional dependency is detected at runtime.
@@ -463,9 +469,14 @@ The pill and card show providers with at least one valid quota percentage.
 Errors and samples older than ten minutes hide the affected provider until a
 valid sample returns. Missing reset, pace, and spend fields stay unknown.
 The card shows positive credit balances and banked resets reported by CodexBar.
-The bundled monochrome provider icons come from CodexBar v0.84.0. The existing
-CodexBar license notice covers the bundle, and third-party marks remain the
-property of their owners. Providers without bundled artwork use initials. CodexBar 0.84 omits incident status from its HTTP usage response.
+Provider logos, brand colors and the Lobe Icons notice come from the Settings
+client package (`loadAiIdentity()`, called at startup in the bar and popup
+engines). Rings, meters and spend series use `aiProviderAccent`; low quotas use
+the error colors. Logos are drawn without a color filter so color logos keep
+their colors; monochrome ones follow `currentColor`. Providers without a known
+logo use initials. Third-party marks remain the property of their owners. The
+bar bundles no CodexBar-derived assets; it only runs the separately installed
+`codexbar` executable. CodexBar 0.84 omits incident status from its HTTP usage response.
 The card shows an incident when the payload supplies it. The manual refresh bypasses the usage cache. For cost it uses
 `codexbar cost --refresh` because the HTTP cost endpoint in 0.84 does not force
 a rescan. Freedesktop alerts are deduplicated by provider, window, reset time

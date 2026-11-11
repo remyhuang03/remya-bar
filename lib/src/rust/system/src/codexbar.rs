@@ -87,7 +87,6 @@ pub async fn json(kind: &str, refresh: bool) -> Result<Option<String>, String> {
     let mut command = command();
     match kind {
         "providers" => command.args(["config", "providers"]),
-        "enabled-usage" => command.arg("usage"),
         "usage" => command.args(["usage", "--provider", "all"]),
         "cost" => {
             command.args(["cost", "--provider", "both", "--days", "30"]);

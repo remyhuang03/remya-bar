@@ -75,13 +75,13 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 - Install the optional `codexbar-cli` system package and make its `codexbar`
   executable available on the bar service's `PATH`. Authenticate your providers
   in [CodexBar](https://github.com/steipete/CodexBar).
-- The pill tracks all detected providers by default. Use **AI Providers** in
-  Remya Settings to manage the switches shared with CodexBar. Hover over or click
-  the pill for details. Right-click or use **Refresh** to update immediately.
+- Use **AI** in Remya Settings to choose the tracked providers, pin up
+  to three to the pill and set the low-quota threshold (20% by default). Without
+  pins the pill shows the first three providers with data; the card shows every
+  tracked provider. Hover over or click the pill for details. Right-click or use
+  **Refresh** to update immediately.
 - The default layout places AI Usage immediately before Battery in the same
-  group. Use the pill layout editor to move or hide it. The low-quota threshold is
-  20% by default and can be set with `REMYA_BAR_AI_QUOTA_LOW_PERCENT` (1–100)
-  in the bar process environment.
+  group. Use the pill layout editor to move or hide it.
 
 ### 🔋 Battery & Power Management
 - **Battery Capsule**: Clear visual readout with percentage, dynamic charging bolt, and remaining runtime estimates.

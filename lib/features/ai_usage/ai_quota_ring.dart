@@ -1,36 +1,39 @@
 import 'dart:math' as math;
 
 import 'package:flutter/physics.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:remya_settings_client/remya_settings_client.dart';
 
 import 'ai_usage_data.dart';
 
 class AiQuotaRing extends StatelessWidget {
-  const AiQuotaRing(this.provider, {super.key, required this.showUsed});
+  const AiQuotaRing(
+    this.provider, {
+    super.key,
+    required this.showUsed,
+    this.index = 0,
+  });
 
   final AiQuotaProvider provider;
   final bool showUsed;
 
+  /// Position among the shown providers; picks the fallback accent.
+  final int index;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final inner = provider.window('secondary');
-    final outer =
-        provider.window('primary') ??
-        (inner == null ? provider.window('tertiary') : null);
     final tightest = provider.tightest;
+    final other = provider.pillWindows.where(
+      (window) => window.slot != tightest?.slot,
+    );
     final exhausted = tightest?.left == 0;
-    final color = exhausted
-        ? scheme.onErrorContainer
-        : tightest?.low == true
-        ? scheme.error
-        : scheme.onSurface;
+    final accent = aiProviderAccent(provider.id, scheme, index: index);
     return _RingPulse(
       low: tightest?.low == true,
       child: SizedBox.square(
-        dimension: 26,
+        dimension: 28,
         child: Stack(
           fit: .expand,
           children: [
@@ -42,10 +45,19 @@ class AiQuotaRing extends StatelessWidget {
                 ),
               )
             else ...[
-              _AnimatedArc(outer, 11.5, 3, showUsed: showUsed),
-              _AnimatedArc(inner, 7.75, 2.5, showUsed: showUsed),
+              _AnimatedArc(tightest, 12.5, 3, accent, showUsed: showUsed),
+              _AnimatedArc(other.firstOrNull, 9, 2, accent, showUsed: showUsed),
             ],
-            Center(child: _ProviderGlyph(provider, color)),
+            Center(
+              child: Opacity(
+                opacity: exhausted ? .38 : 1,
+                child: AiProviderLogo(
+                  provider,
+                  size: 16,
+                  color: exhausted ? scheme.onErrorContainer : scheme.onSurface,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -53,41 +65,38 @@ class AiQuotaRing extends StatelessWidget {
   }
 }
 
-class _ProviderGlyph extends StatelessWidget {
-  const _ProviderGlyph(this.provider, this.color);
+/// The provider's brand logo, or its initials when no icon is known.
+class AiProviderLogo extends StatelessWidget {
+  const AiProviderLogo(
+    this.provider, {
+    super.key,
+    required this.size,
+    required this.color,
+  });
 
   final AiQuotaProvider provider;
-  final Color color;
+  final double size;
 
-  static final _assets = AssetManifest.loadFromAssetBundle(rootBundle)
-      .then((manifest) => manifest.listAssets().toSet());
+  /// Fills monochrome logos and initials; color logos keep their colors.
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final icon = switch (provider.id) {
-      'alibabatokenplan' => 'alibaba',
-      'azureopenai' || 'openai' => 'codex',
-      'moonshot' => 'kimi',
-      final id => id,
-    };
-    final asset = 'assets/icons/ai_usage/$icon.svg';
     final fallback = Text(
       String.fromCharCodes(provider.name.toUpperCase().runes.take(2)),
       textScaler: TextScaler.noScaling,
-      style: TextStyle(fontSize: 7, fontWeight: .w700, color: color),
+      style: TextStyle(fontSize: size * .56, fontWeight: .w700, color: color),
     );
-    return FutureBuilder<Set<String>>(
-      future: _assets,
-      builder: (context, snapshot) => snapshot.data?.contains(asset) == true
-          ? SvgPicture.asset(
-              asset,
-              width: 10,
-              height: 10,
-              colorFilter: ColorFilter.mode(color, .srcIn),
-              errorBuilder: (_, _, _) => fallback,
-            )
-          : fallback,
-    );
+    return switch (aiProviderIcon(provider.id)) {
+      final asset? => SvgPicture.asset(
+        asset,
+        width: size,
+        height: size,
+        theme: SvgTheme(currentColor: color),
+        errorBuilder: (_, _, _) => fallback,
+      ),
+      null => fallback,
+    };
   }
 }
 
@@ -156,13 +165,15 @@ class _AnimatedArc extends StatelessWidget {
   const _AnimatedArc(
     this.window,
     this.radius,
-    this.stroke, {
+    this.stroke,
+    this.accent, {
     required this.showUsed,
   });
 
   final AiQuotaWindow? window;
   final double radius;
   final double stroke;
+  final Color accent;
   final bool showUsed;
 
   @override
@@ -185,9 +196,13 @@ class _AnimatedArc extends StatelessWidget {
           radius,
           stroke,
           fill.clamp(0.0, 1.0),
-          left == null ? scheme.outlineVariant : scheme.secondaryContainer,
-          window?.low == true ? scheme.error : scheme.primary,
+          // A neutral track keeps every accent readable on the pill.
+          left == null
+              ? scheme.outlineVariant
+              : scheme.onSurface.withValues(alpha: .16),
+          window?.low == true ? scheme.error : accent,
           scheme.onSurface,
+          scheme.surfaceContainerHighest,
           expected == null
               ? null
               : (showUsed ? 100 - expected : expected) / 100,
@@ -205,11 +220,12 @@ class _ArcPainter extends CustomPainter {
     this.track,
     this.active,
     this.tick,
+    this.halo,
     this.pace,
   );
 
   final double radius, stroke, fill;
-  final Color track, active, tick;
+  final Color track, active, tick, halo;
   final double? pace;
 
   @override
@@ -240,19 +256,32 @@ class _ArcPainter extends CustomPainter {
     if (pace case final fraction?) {
       final target = start + fraction * full;
       final unit = Offset(math.cos(target), math.sin(target));
-      canvas.drawLine(
-        center + unit * (radius - stroke / 2),
-        center + unit * (radius + stroke / 2),
-        Paint()
-          ..color = tick
-          ..strokeWidth = 1,
-      );
+      // A surface halo under a 2px tick keeps it visible on fill and track.
+      final from = center + unit * (radius - stroke / 2 - 1.5);
+      final to = center + unit * (radius + stroke / 2 + 1.5);
+      canvas
+        ..drawLine(
+          from,
+          to,
+          Paint()
+            ..color = halo
+            ..strokeWidth = 4
+            ..strokeCap = .round,
+        )
+        ..drawLine(
+          from,
+          to,
+          Paint()
+            ..color = tick
+            ..strokeWidth = 2
+            ..strokeCap = .round,
+        );
     }
   }
 
   @override
   bool shouldRepaint(_ArcPainter oldDelegate) =>
-      (radius, stroke, fill, track, active, tick, pace) !=
+      (radius, stroke, fill, track, active, tick, halo, pace) !=
       (
         oldDelegate.radius,
         oldDelegate.stroke,
@@ -260,6 +289,7 @@ class _ArcPainter extends CustomPainter {
         oldDelegate.track,
         oldDelegate.active,
         oldDelegate.tick,
+        oldDelegate.halo,
         oldDelegate.pace,
       );
 }
