@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show FrameTiming, PlatformDispatcher;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -16,7 +19,9 @@ import 'features/system/system_backend.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (arguments.contains('--remya-popup')) {
+  final popup = arguments.contains('--remya-popup');
+  if (Platform.environment['REMYA_BAR_PERF'] == '1') _recordFrames(popup);
+  if (popup) {
     runApp(const BarPopupApp());
     return;
   }
@@ -70,4 +75,23 @@ Future<void> main(List<String> arguments) async {
           openRemyaSettings(debugExecutable: debugSettings, page: 'power'),
     ),
   );
+}
+
+void _recordFrames(bool popup) {
+  final engine = PlatformDispatcher.instance.engineId;
+  final samples = <FrameTiming>[];
+  WidgetsBinding.instance.addTimingsCallback(samples.addAll);
+  Timer.periodic(const Duration(seconds: 5), (_) {
+    int p95(Duration Function(FrameTiming) duration) {
+      if (samples.isEmpty) return 0;
+      final values = samples.map((f) => duration(f).inMicroseconds).toList()
+        ..sort();
+      return values[(values.length * .95).ceil() - 1];
+    }
+
+    debugPrintSynchronously(
+      'BAR_PERF ${jsonEncode({'engine': engine, 'popup': popup, 'end_ms': DateTime.now().millisecondsSinceEpoch, 'frames': samples.length, 'build_p95_us': p95((f) => f.buildDuration), 'raster_p95_us': p95((f) => f.rasterDuration), 'total_p95_us': p95((f) => f.totalSpan)})}',
+    );
+    samples.clear();
+  });
 }

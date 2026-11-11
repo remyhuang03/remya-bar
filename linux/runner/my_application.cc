@@ -28,6 +28,10 @@ static FlValue* output_geometry(GdkMonitor* monitor) {
   return result;
 }
 
+static bool perf_enabled() {
+  return g_strcmp0(g_getenv("REMYA_BAR_PERF"), "1") == 0;
+}
+
 static void set_bar_fullscreen(GtkWindow* window, bool fullscreen) {
   if (fullscreen == (g_object_get_data(G_OBJECT(window), "fullscreen") != nullptr)) return;
   g_object_set_data(G_OBJECT(window), "fullscreen", fullscreen ? GINT_TO_POINTER(1) : nullptr);
@@ -36,13 +40,19 @@ static void set_bar_fullscreen(GtkWindow* window, bool fullscreen) {
     gtk_layer_set_exclusive_zone(window, 0);
     gtk_widget_hide(GTK_WIDGET(window));
   } else {
-    gtk_layer_auto_exclusive_zone_enable(window);
+    if (!perf_enabled()) gtk_layer_auto_exclusive_zone_enable(window);
     gtk_widget_show(GTK_WIDGET(window));
   }
 }
 
 static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   if (g_hash_table_contains(self->bar_windows, monitor)) return;
+  if (perf_enabled()) {
+    const char* output = g_getenv("REMYA_BAR_PERF_OUTPUT_X");
+    GdkRectangle geometry;
+    gdk_monitor_get_geometry(monitor, &geometry);
+    if (output != nullptr && geometry.x != g_ascii_strtoll(output, nullptr, 10)) return;
+  }
 
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(self)));
@@ -56,18 +66,22 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   gtk_widget_set_size_request(GTK_WIDGET(window), -1, 40);
 
   gtk_layer_init_for_window(window);
-  gtk_layer_set_namespace(window, APPLICATION_ID);
+  gtk_layer_set_namespace(window, perf_enabled() ? "remya-bar-profiling" : APPLICATION_ID);
   gtk_layer_set_monitor(window, monitor);
   gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_TOP);
   gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_TOP, TRUE);
   gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
   gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_RIGHT, TRUE);
   gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
-  gtk_layer_auto_exclusive_zone_enable(window);
+  if (perf_enabled()) gtk_layer_set_exclusive_zone(window, 0);
+  else gtk_layer_auto_exclusive_zone_enable(window);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);
+
+  if (perf_enabled() && g_getenv("REMYA_BAR_PERF_SKIA") != nullptr)
+    fl_dart_project_set_enable_impeller(project, FALSE);
 
   FlView* view = fl_view_new(project);
   const GdkRGBA transparent = {0, 0, 0, 0};

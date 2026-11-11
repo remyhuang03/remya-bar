@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show debugPrintSynchronously;
 import 'package:flutter/services.dart';
 import 'package:flutter/physics.dart';
 import 'package:material_ui/material_ui.dart';
@@ -164,6 +167,15 @@ class _BarPopupAppState extends State<BarPopupApp>
         data['scale'] = _data['scale'];
       }
       if (mounted) {
+        if (Platform.environment['REMYA_BAR_PERF'] == '1' &&
+            (arguments['opening'] == true || _kind != arguments['kind'])) {
+          final kind = arguments['kind'] as String;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            debugPrintSynchronously(
+              'BAR_PERF_CONTENT $kind ${DateTime.now().microsecondsSinceEpoch}',
+            );
+          });
+        }
         setState(() {
           if (_kind != arguments['kind'] || _data['token'] != data['token']) {
             _actionError = null;

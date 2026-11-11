@@ -543,6 +543,10 @@ void create_popup(BarPopup* state, bool sidebar, bool tray, bool tooltip, bool t
   gchar popup_argument[] = "--remya-popup";
   gchar* arguments[] = {popup_argument, nullptr};
   fl_dart_project_set_dart_entrypoint_arguments(project, arguments);
+  if (g_strcmp0(g_getenv("REMYA_BAR_PERF"), "1") == 0 &&
+      g_getenv("REMYA_BAR_PERF_SKIA") != nullptr) {
+    fl_dart_project_set_enable_impeller(project, FALSE);
+  }
   state->view = fl_view_new(project);
   const GdkRGBA transparent = {0, 0, 0, 0};
   fl_view_set_background_color(state->view, &transparent);

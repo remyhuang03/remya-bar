@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/bar_pill.dart';
@@ -165,6 +168,8 @@ class _MediaPill extends StatelessWidget {
   }
 }
 
+enum _MarqueeProbe { baseline, boundary, cached, noMask, flow, hz30 }
+
 class _MediaTitle extends StatelessWidget {
   const _MediaTitle({required this.text, required this.style});
 
@@ -174,10 +179,20 @@ class _MediaTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final label = Text(text, style: style, maxLines: 1, softWrap: false);
+      var title = text;
+      var probe = _MarqueeProbe.baseline;
+      if (Platform.environment['REMYA_BAR_PERF'] == '1' &&
+          text.startsWith('BAR_PERF:')) {
+        final separator = text.indexOf(':', 'BAR_PERF:'.length);
+        if (separator != -1) {
+          probe = _MarqueeProbe.values.byName(text.substring(9, separator));
+          title = text.substring(separator + 1);
+        }
+      }
+      final label = Text(title, style: style, maxLines: 1, softWrap: false);
       final direction = Directionality.of(context);
       final painter = TextPainter(
-        text: TextSpan(text: text, style: style),
+        text: TextSpan(text: title, style: style),
         textDirection: direction,
         textScaler: MediaQuery.textScalerOf(context),
         maxLines: 1,
@@ -186,14 +201,15 @@ class _MediaTitle extends StatelessWidget {
       painter.dispose();
       if (textWidth <= constraints.maxWidth ||
           MediaQuery.disableAnimationsOf(context)) {
-        return Text(text, style: style, maxLines: 1, overflow: .ellipsis);
+        return Text(title, style: style, maxLines: 1, overflow: .ellipsis);
       }
       return ValueListenableBuilder<bool>(
         valueListenable: BarPopup.keyboardOpen,
         builder: (_, keyboardOpen, child) =>
             TickerMode(enabled: !keyboardOpen, child: child!),
         child: _ScrollingTitle(
-          key: ValueKey(text),
+          key: ValueKey((title, probe)),
+          probe: probe,
           textWidth: textWidth,
           direction: direction,
           child: label,
@@ -209,8 +225,10 @@ class _ScrollingTitle extends StatefulWidget {
     required this.textWidth,
     required this.direction,
     required this.child,
+    required this.probe,
   });
 
+  final _MarqueeProbe probe;
   final double textWidth;
   final TextDirection direction;
   final Widget child;
@@ -225,12 +243,44 @@ class _ScrollingTitleState extends State<_ScrollingTitle>
   static const _speed = 16.0;
   late final AnimationController _scroll = AnimationController(vsync: this);
 
+  final _fade = ValueNotifier(false);
+  final _limited = ValueNotifier(0.0);
+  final _elapsed = Stopwatch();
+  Timer? _timer;
+  Rect? _maskBounds;
+  final _shaders = <bool, Shader>{};
+
   double get _distance => widget.textWidth + _gap;
 
   @override
   void initState() {
     super.initState();
-    _scroll.repeat(period: _period);
+    if (widget.probe == .hz30) {
+      _elapsed.start();
+    } else {
+      if (widget.probe == .flow) _scroll.addListener(_updateFade);
+      _scroll.repeat(period: _period);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.probe != .hz30) return;
+    _timer?.cancel();
+    _timer = TickerMode.valuesOf(context).enabled
+        ? Timer.periodic(const Duration(microseconds: 33333), (_) {
+            final micros = _elapsed.elapsedMicroseconds;
+            _limited.value =
+                (micros % _period.inMicroseconds) / _period.inMicroseconds;
+          })
+        : null;
+  }
+
+  bool _leadingFade(double offset) => offset > 0 && offset < widget.textWidth;
+
+  void _updateFade() {
+    _fade.value = _leadingFade(_scroll.value * _distance);
   }
 
   Duration get _period =>
@@ -239,56 +289,129 @@ class _ScrollingTitleState extends State<_ScrollingTitle>
   @override
   void didUpdateWidget(_ScrollingTitle oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if ((widget.textWidth - oldWidget.textWidth).abs() >= 0.5) {
+    if (widget.direction != oldWidget.direction) _shaders.clear();
+    if (widget.probe != .hz30 &&
+        (widget.textWidth - oldWidget.textWidth).abs() >= 0.5) {
       _scroll.repeat(period: _period);
     }
   }
 
   @override
   void dispose() {
+    _timer?.cancel();
+    _limited.dispose();
+    _fade.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
+  Shader _mask(Rect bounds, bool leadingFade) {
+    Shader create() {
+      final leftToRight = widget.direction == .ltr;
+      return LinearGradient(
+        begin: leftToRight ? .centerLeft : .centerRight,
+        end: leftToRight ? .centerRight : .centerLeft,
+        colors: [
+          leadingFade ? Colors.transparent : Colors.white,
+          Colors.white,
+          Colors.white,
+          Colors.transparent,
+        ],
+        stops: const [0, 0.12, 0.88, 1],
+      ).createShader(bounds);
+    }
+
+    if (widget.probe != .cached && widget.probe != .flow) return create();
+    if (bounds != _maskBounds) {
+      _maskBounds = bounds;
+      _shaders.clear();
+    }
+    return _shaders.putIfAbsent(leadingFade, create);
+  }
+
+  Widget _masked(Widget child, bool leadingFade) => ShaderMask(
+    blendMode: .dstIn,
+    shaderCallback: (bounds) => _mask(bounds, leadingFade),
+    child: child,
+  );
+
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _scroll,
-    child: Row(
+  Widget build(BuildContext context) {
+    final strip = Row(
       mainAxisSize: .min,
       spacing: _gap,
       textDirection: widget.direction,
       children: [widget.child, widget.child],
-    ),
-    builder: (context, child) {
-      final offset = _scroll.value * _distance;
-      final leftToRight = widget.direction == .ltr;
+    );
+    if (widget.probe == .flow) {
       return ClipRect(
-        child: ShaderMask(
-          blendMode: .dstIn,
-          shaderCallback: (bounds) => LinearGradient(
-            begin: leftToRight ? .centerLeft : .centerRight,
-            end: leftToRight ? .centerRight : .centerLeft,
-            colors: [
-              if (offset > 0 && offset < widget.textWidth)
-                Colors.transparent
-              else
-                Colors.white,
-              Colors.white,
-              Colors.white,
-              Colors.transparent,
-            ],
-            stops: const [0, 0.12, 0.88, 1],
-          ).createShader(bounds),
-          child: OverflowBox(
-            maxWidth: double.infinity,
-            alignment: leftToRight ? .centerLeft : .centerRight,
-            child: Transform.translate(
-              offset: Offset(leftToRight ? -offset : offset, 0),
-              child: child,
-            ),
+        child: ValueListenableBuilder<bool>(
+          valueListenable: _fade,
+          child: Flow(
+            clipBehavior: .none,
+            delegate: _TitleFlow(_scroll, _distance, widget.direction),
+            children: [strip],
           ),
+          builder: (_, leadingFade, child) => _masked(child!, leadingFade),
         ),
       );
-    },
-  );
+    }
+    final phase = widget.probe == .hz30 ? _limited : _scroll;
+    return AnimatedBuilder(
+      animation: phase,
+      child: widget.probe == .boundary ? RepaintBoundary(child: strip) : strip,
+      builder: (_, child) {
+        final offset = phase.value * _distance;
+        final leftToRight = widget.direction == .ltr;
+        final translated = OverflowBox(
+          maxWidth: double.infinity,
+          alignment: leftToRight ? .centerLeft : .centerRight,
+          child: Transform.translate(
+            offset: Offset(leftToRight ? -offset : offset, 0),
+            child: child,
+          ),
+        );
+        return ClipRect(
+          child: widget.probe == .noMask
+              ? translated
+              : _masked(translated, _leadingFade(offset)),
+        );
+      },
+    );
+  }
+}
+
+class _TitleFlow extends FlowDelegate {
+  _TitleFlow(this.phase, this.distance, this.direction) : super(repaint: phase);
+
+  final Animation<double> phase;
+  final double distance;
+  final TextDirection direction;
+
+  @override
+  BoxConstraints getConstraintsForChild(int i, BoxConstraints constraints) =>
+      BoxConstraints(maxHeight: constraints.maxHeight);
+
+  @override
+  void paintChildren(FlowPaintingContext context) {
+    final child = context.getChildSize(0)!;
+    final offset = phase.value * distance;
+    final x = direction == .ltr
+        ? -offset
+        : context.size.width - child.width + offset;
+    context.paintChild(
+      0,
+      transform: Matrix4.translationValues(
+        x,
+        (context.size.height - child.height) / 2,
+        0,
+      ),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_TitleFlow oldDelegate) =>
+      oldDelegate.phase != phase ||
+      oldDelegate.distance != distance ||
+      oldDelegate.direction != direction;
 }
