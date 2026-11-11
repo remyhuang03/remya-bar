@@ -42,6 +42,7 @@ class BarPill extends StatefulWidget {
     this.padding = EdgeInsets.zero,
     this.expandedPadding,
     this.onTap,
+    this.onSecondaryTap,
     this.toggled,
     this.semanticsLabel,
     this.semanticsHint,
@@ -56,6 +57,7 @@ class BarPill extends StatefulWidget {
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry? expandedPadding;
   final VoidCallback? onTap;
+  final VoidCallback? onSecondaryTap;
   final bool? toggled;
   final String? semanticsLabel;
   final String? semanticsHint;
@@ -162,6 +164,7 @@ class _BarPillState extends State<BarPill> {
                 type: .transparency,
                 child: InkWell(
                   onTap: onTap,
+                  onSecondaryTap: widget.onSecondaryTap,
                   onFocusChange: (value) => setState(() => _focused = value),
                   onHighlightChanged: (value) =>
                       setState(() => _pressed = value),

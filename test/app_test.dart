@@ -311,7 +311,8 @@ void main() {
         expect(tester.takeException(), isNull, reason: '$width at $scale');
         expect(find.byType(BarClock), findsOneWidget);
         if (scale == 1 && [1440.0, 1600.0, 2304.0].contains(width)) {
-          expect(find.byType(BarMedia), findsOneWidget);
+          // Media is hidden by default.
+          expect(find.byType(BarMedia), findsNothing);
           expect(find.byType(BarResources), findsOneWidget);
           expect(
             tester.widget<BarBattery>(find.byType(BarBattery)).isPowerSaver,
@@ -324,7 +325,6 @@ void main() {
           Rect? previous;
           for (final type in [
             BarResources,
-            BarMedia,
             BarWorkspaces,
             BarClock,
             BarBattery,

@@ -7,6 +7,7 @@ import 'package:remya_settings_client/remya_settings_client.dart';
 
 import 'app.dart';
 import 'features/account/account_profile_controller.dart';
+import 'features/ai_usage/ai_usage_backend.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/notifications/notification_backend.dart';
 import 'features/settings/bar_theme_controller.dart';
@@ -16,8 +17,13 @@ import 'features/system/system_backend.dart';
 
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Unknown providers fall back to initials if the manifest cannot load.
+  await loadAiIdentity().catchError(
+    (Object error) => debugPrint('AI provider identity unavailable: $error'),
+  );
   if (arguments.contains('--remya-popup')) {
     runWidget(const BarPopupHost());
+    startAiUsageWorker();
     return;
   }
   final root = kDebugMode
@@ -60,6 +66,7 @@ Future<void> main(List<String> arguments) async {
       preferences: preferences,
       hyprland: hyprland,
       system: system,
+      aiUsage: AiUsageBackend()..start(),
       account: AccountProfileController()..start(),
       notifications: NotificationBackend()..start(),
       onOpenSettingsPage: (page) =>

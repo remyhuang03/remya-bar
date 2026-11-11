@@ -48,6 +48,10 @@ class _BarHoverCardState extends State<BarHoverCard> {
     if ((!update && !activated && !_hovered) || box == null || !box.hasSize) {
       return;
     }
+    final view = View.of(context);
+    final viewport = Offset.zero & (view.physicalSize / view.devicePixelRatio);
+    final anchor = (box.localToGlobal(.zero) & box.size).intersect(viewport);
+    if (anchor.isEmpty) return;
     final data = {
       ...widget.data,
       if (widget.seedColor case final seed?)
@@ -70,7 +74,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
     _send(
       request(
         kind: widget.kind,
-        anchor: box.localToGlobal(.zero) & box.size,
+        anchor: anchor,
         size: Size(
           widget.size.width + BarCardSurface.shadowInsets.horizontal,
           widget.size.height + BarCardSurface.shadowInsets.vertical,

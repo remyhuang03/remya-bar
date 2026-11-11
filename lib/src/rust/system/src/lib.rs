@@ -1,6 +1,7 @@
 pub mod api;
 mod frb_generated;
 
+mod codexbar;
 mod media;
 mod notifications;
 mod tray;

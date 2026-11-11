@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../ai_usage/ai_usage_card.dart';
+import '../ai_usage/ai_usage_data.dart';
 import '../battery/battery_card.dart';
 import '../clock/datetime_card.dart';
 import '../media/media_preview.dart';
@@ -35,12 +37,12 @@ class BarDetailCard extends StatelessWidget {
           onAction: onAction,
           styleVariant: styleVariant,
           seedColor: seedColor,
-          pill: _pill(data['pill']),
+          pill: cardPill(data['pill']),
           emergence: emergence,
         )
       : BarCardSurface(
           seedColor: seedColor,
-          pill: _pill(data['pill']),
+          pill: cardPill(data['pill']),
           emergence: emergence,
           styleVariant: styleVariant,
           child: switch (kind) {
@@ -48,6 +50,10 @@ class BarDetailCard extends StatelessWidget {
               data: data,
               onOpenMonitor: () =>
                   onAction(const {'action': 'resources.monitor'}),
+            ),
+            aiUsageKind => AiUsageCard(
+              data: data,
+              onRefresh: () => onAction(const {'action': 'ai-usage.refresh'}),
             ),
             'battery' => BatteryCard(data: data, onAction: onAction),
             'notifications' => NotificationCenterCard(
@@ -63,7 +69,8 @@ class BarDetailCard extends StatelessWidget {
         );
 }
 
-Rect? _pill(Object? value) =>
+/// The pill rect a card popup is anchored under, from its `pill` payload.
+Rect? cardPill(Object? value) =>
     value is List &&
         value.length == 2 &&
         value[0] is int &&

@@ -30,6 +30,7 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 - **Media and System Status**. The media player provides playback controls alongside resource gauges for CPU, memory, and network by default, with GPU monitoring optional. Hovering reveals detailed metric graphs and hardware history.
 - **Quick Settings**. A slide-out panel houses configurable quick settings toggles, hardware sliders, session actions, and an on-screen keyboard. Users can reorder tiles and hide unused options to customize the layout.
 - **Tray and Notifications**. The system tray supports pinned or folded applications alongside an integrated notification center. Do Not Disturb filters popups and sounds while retaining notification history.
+- **AI Quota**. Colored provider rings show the remaining 5-hour and weekly quota of up to three AI subscriptions pinned in Remya Settings > AI, with a usage card on hover. Requires the optional `codexbar-cli` package with providers signed in.
 
 ---
 
@@ -46,6 +47,7 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
   - NetworkManager and BlueZ (for network & Bluetooth toggles)
   - NVIDIA Management Library (`libnvidia-ml.so.1`, provided by `nvidia-utils` on Arch) for optional NVIDIA GPU metrics. Without NVML, the resource monitor hides NVIDIA GPUs.
   - Remya Settings (`remya_settings`, provides theme & system D-Bus services)
+  - Optional: `codexbar-cli` (provides the `codexbar` executable) for AI Quota
 
 ### Installation
 

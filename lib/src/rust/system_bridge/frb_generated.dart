@@ -73,7 +73,7 @@ class SystemRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1692616024;
+  int get rustContentHash => 446766373;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -85,6 +85,19 @@ class SystemRustLib
 }
 
 abstract class SystemRustLibApi extends BaseApi {
+  Future<String?> crateApiCodexbarJson({
+    required String kind,
+    required bool refresh,
+  });
+
+  Future<void> crateApiCodexbarNotify({
+    required String provider,
+    required String window,
+    required int remaining,
+  });
+
+  Future<int?> crateApiCodexbarServerPort({required String token});
+
   Future<SystemSnapshot> crateApiHardwareSnapshot();
 
   Future<void> crateApiMediaAction({
@@ -160,6 +173,106 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   });
 
   @override
+  Future<String?> crateApiCodexbarJson({
+    required String kind,
+    required bool refresh,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(kind, serializer);
+          sse_encode_bool(refresh, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 1,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_String,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiCodexbarJsonConstMeta,
+        argValues: [kind, refresh],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiCodexbarJsonConstMeta => const TaskConstMeta(
+    debugName: "codexbar_json",
+    argNames: ["kind", "refresh"],
+  );
+
+  @override
+  Future<void> crateApiCodexbarNotify({
+    required String provider,
+    required String window,
+    required int remaining,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(provider, serializer);
+          sse_encode_String(window, serializer);
+          sse_encode_i_32(remaining, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 2,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiCodexbarNotifyConstMeta,
+        argValues: [provider, window, remaining],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiCodexbarNotifyConstMeta => const TaskConstMeta(
+    debugName: "codexbar_notify",
+    argNames: ["provider", "window", "remaining"],
+  );
+
+  @override
+  Future<int?> crateApiCodexbarServerPort({required String token}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(token, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 3,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_i_32,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiCodexbarServerPortConstMeta,
+        argValues: [token],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiCodexbarServerPortConstMeta => const TaskConstMeta(
+    debugName: "codexbar_server_port",
+    argNames: ["token"],
+  );
+
+  @override
   Future<SystemSnapshot> crateApiHardwareSnapshot() {
     return handler.executeNormal(
       NormalTask(
@@ -168,7 +281,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 1,
+            funcId: 4,
             port: port_,
           );
         },
@@ -200,7 +313,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 2,
+            funcId: 5,
             port: port_,
           );
         },
@@ -229,7 +342,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 3,
+            funcId: 6,
             port: port_,
           );
         },
@@ -263,7 +376,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 7,
             port: port_,
           );
         },
@@ -293,7 +406,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 8,
             port: port_,
           );
         },
@@ -325,7 +438,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 9,
             port: port_,
           );
         },
@@ -355,7 +468,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 10,
             port: port_,
           );
         },
@@ -391,7 +504,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 11,
             port: port_,
           );
         },
@@ -426,7 +539,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 12,
             port: port_,
           );
         },
@@ -457,7 +570,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 13,
             port: port_,
           );
         },
@@ -486,7 +599,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 14,
             port: port_,
           );
         },
@@ -514,7 +627,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 15,
             port: port_,
           );
         },
@@ -544,7 +657,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 16,
             port: port_,
           );
         },
@@ -577,7 +690,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 14,
+              funcId: 17,
               port: port_,
             );
           },
@@ -609,7 +722,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 15,
+              funcId: 18,
               port: port_,
             );
           },
@@ -648,7 +761,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 19,
             port: port_,
           );
         },
@@ -677,7 +790,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 20,
             port: port_,
           );
         },
@@ -709,7 +822,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 21,
             port: port_,
           );
         },
@@ -743,7 +856,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 22,
             port: port_,
           );
         },

@@ -922,6 +922,7 @@ version = "0.1.0-dev.20261109.0"
 dependencies = [
  "chrono",
  "flutter_rust_bridge",
+ "libc",
  "libloading",
  "rusqlite",
  "serde",
