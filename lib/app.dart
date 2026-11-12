@@ -18,6 +18,8 @@ import 'features/media/bar_media.dart';
 import 'features/notifications/bar_notifications.dart';
 import 'features/notifications/notification_backend.dart';
 import 'features/notifications/notification_view.dart';
+import 'features/osd/osd_controller.dart';
+import 'features/osd/osd_slider.dart';
 import 'features/system/system_backend.dart';
 import 'features/clock/bar_clock.dart';
 import 'features/hyprland/hyprland_backend.dart';
@@ -43,6 +45,7 @@ class RemyaBarApp extends StatefulWidget {
     this.account,
     this.aiUsage,
     this.notifications,
+    this.osd,
     this.onOpenSettingsPage,
     this.showTray = false,
     this.onOpenSettings = openRemyaSettings,
@@ -55,6 +58,7 @@ class RemyaBarApp extends StatefulWidget {
   final AccountProfileController? account;
   final AiUsageBackend? aiUsage;
   final NotificationBackend? notifications;
+  final OsdController? osd;
   final Future<void> Function(String page)? onOpenSettingsPage;
   final bool showTray;
   final Future<void> Function() onOpenSettings;
@@ -219,6 +223,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 
   void _updatePopupThemes() {
     _updateSidebar();
+    if (_showingOsd) unawaited(_syncOsd());
     unawaited(
       BarPopup.update(
         kind: keyboardKind,
@@ -246,6 +251,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     }
     if (widget.hyprland case final hyprland?) {
       hyprland.addListener(_scheduleFullscreenCheck);
+      hyprland.addListener(_syncOsdOutput);
       _fullscreenReconcile = Timer.periodic(
         const Duration(seconds: 2),
         (_) => _checkFullscreen(),
@@ -254,12 +260,27 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     }
     widget.account?.addListener(_updateSidebar);
     widget.notifications?.addListener(_syncToasts);
+    widget.osd?.addListener(_syncOsd);
     BarPopup.openCard.addListener(_syncToasts);
     widget.preferences.addListener(_updatePopupThemes);
     _window.setMethodCallHandler((call) async {
       if (call.method == 'outputChanged') {
         final geometry = Map<String, int>.from(call.arguments as Map);
         widget.hyprland?.updateOutput(x: geometry['x']!, y: geometry['y']!);
+        return;
+      }
+      if (call.method == 'osdShortcut') {
+        final action = call.arguments;
+        final osd = widget.osd;
+        if (action is! String || osd == null) return;
+        final hyprland = widget.hyprland;
+        if (hyprland != null) {
+          final active = await hyprland.focusedOutput();
+          final output = hyprland.output?.name;
+          if (!mounted || output == null || active != output) return;
+          osd.updateOutput(output);
+        }
+        await osd.handleShortcut(action);
         return;
       }
       if (call.method != 'toggleSidebar') throw MissingPluginException();
@@ -280,6 +301,65 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   bool _showingToasts = false;
   bool _syncingToasts = false;
   bool _toastsDirty = false;
+  bool _showingOsd = false;
+  bool _syncingOsd = false;
+  bool _osdDirty = false;
+
+  void _syncOsdOutput() {
+    widget.osd?.updateOutput(widget.hyprland?.output?.name);
+  }
+
+  Future<void> _syncOsd() async {
+    final osd = widget.osd;
+    if (osd == null || !mounted) return;
+    osd.updateOutput(widget.hyprland?.output?.name);
+    if (_syncingOsd) {
+      _osdDirty = true;
+      return;
+    }
+    _syncingOsd = true;
+    try {
+      final current = osd.state;
+      var visible = current != null;
+      if (current != null &&
+          current.type != .brightness &&
+          widget.hyprland != null) {
+        final output = widget.hyprland!.output?.name;
+        if (output != null) {
+          visible = await widget.hyprland!.focusedOutput() == output;
+        } else {
+          visible = false;
+        }
+      }
+      if (!visible) {
+        if (_showingOsd) {
+          _showingOsd = false;
+          await BarPopup.hide(kind: osdKind);
+        }
+        return;
+      }
+      if (!mounted) return;
+      final request = _showingOsd ? BarPopup.update : BarPopup.show;
+      _showingOsd = true;
+      await request(
+        kind: osdKind,
+        anchor: _popupAnchor,
+        size: osdSize,
+        data: current!.toData(
+          scale: MediaQueryData.fromView(View.of(context)).textScaler.scale(1),
+        ),
+        theme: widget.preferences.theme,
+      );
+    } catch (error) {
+      debugPrint('OSD popup: $error');
+    } finally {
+      _syncingOsd = false;
+      if (_osdDirty) {
+        _osdDirty = false;
+        unawaited(_syncOsd());
+      }
+    }
+  }
 
   /// One output, the focused one when the stack starts, hosts the popups until
   /// they end; it hides them while its notification card is open.
@@ -534,11 +614,14 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   @override
   void dispose() {
     widget.notifications?.removeListener(_syncToasts);
+    widget.osd?.removeListener(_syncOsd);
     BarPopup.openCard.removeListener(_syncToasts);
     widget.notifications?.dispose();
+    widget.osd?.dispose();
     _fullscreenCheck?.cancel();
     _fullscreenReconcile?.cancel();
     widget.hyprland?.removeListener(_scheduleFullscreenCheck);
+    widget.hyprland?.removeListener(_syncOsdOutput);
     _pillRefresh?.cancel();
     _sidebar?.dispose();
     unawaited(_keyboardDevice.close());

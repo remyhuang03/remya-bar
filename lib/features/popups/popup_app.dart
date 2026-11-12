@@ -10,6 +10,7 @@ import '../../bar_theme.dart';
 import '../keyboard/keyboard_panel.dart';
 import '../ai_usage/ai_usage_data.dart';
 import '../notifications/notification_view.dart';
+import '../osd/osd_slider.dart';
 import '../tray/tray_menu_popup.dart';
 import '../workspaces/bar_workspaces.dart';
 import '../workspaces/workspace_overview.dart';
@@ -187,6 +188,7 @@ class _BarPopupAppState extends State<BarPopupApp>
             'notifications',
             aiUsageKind,
             notificationToastsKind,
+            osdKind,
             workspaceOverviewKind,
           }.contains(arguments['kind'])) {
         throw PlatformException(
@@ -392,6 +394,10 @@ class _BarPopupAppState extends State<BarPopupApp>
           notificationToastsKind => NotificationToasts(
             data: details,
             onAction: _action,
+          ),
+          osdKind => Material(
+            type: .transparency,
+            child: OsdCapsuleSlider.fromData(details),
           ),
           'tray-menu' => TrayMenuPopup(
             key: ValueKey(_data['token']),

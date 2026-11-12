@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -55,12 +56,32 @@ class HyprlandBackend extends ChangeNotifier {
   bool _pendingRefresh = false;
   bool _disposed = false;
   HyprlandSnapshot? _snapshot;
+  String? _focusedOutput;
+  Future<String?>? _focusRequest;
+  int _focusRevision = 0;
   String? error;
   HyprlandUpdate? latest;
   bool connected = false;
   bool superHeld = false;
 
   List<HyprlandMonitor> get monitors => _snapshot?.monitors ?? [];
+
+  Future<String?> focusedOutput() async {
+    if (_focusedOutput case final name?) return name;
+    return _focusRequest ??= _readFocusedOutput().whenComplete(
+      () => _focusRequest = null,
+    );
+  }
+
+  Future<String?> _readFocusedOutput() async {
+    final revision = _focusRevision;
+    final workspace = jsonDecode(await request('j/activeworkspace'));
+    if (revision == _focusRevision && workspace is Map) {
+      final name = workspace['monitor'];
+      if (name is String) _focusedOutput = name;
+    }
+    return _focusedOutput;
+  }
 
   HyprlandMonitor? get output {
     final matches = (_snapshot?.monitors ?? <HyprlandMonitor>[]).where(
@@ -122,6 +143,17 @@ class HyprlandBackend extends ChangeNotifier {
           return;
         }
         latest = update;
+        if (update.kind == 'event' && update.name == 'focusedmon') {
+          _focusRevision++;
+          _focusedOutput = update.data.split(',').firstOrNull;
+        } else if (const {
+          'connected',
+          'disconnected',
+          'resync',
+        }.contains(update.kind)) {
+          _focusRevision++;
+          _focusedOutput = null;
+        }
         if (update.kind == 'connected') connected = true;
         if (update.kind == 'disconnected') connected = false;
         if (update.kind != 'event') {
@@ -142,6 +174,8 @@ class HyprlandBackend extends ChangeNotifier {
         }
       },
       onError: (Object error, StackTrace stack) {
+        _focusRevision++;
+        _focusedOutput = null;
         connected = false;
         this.error = 'Hyprland unavailable';
         debugPrint('Hyprland IPC: $error');

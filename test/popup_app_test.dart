@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:remya_bar/features/osd/osd_slider.dart';
 import 'package:remya_bar/features/popups/popup_app.dart';
 import 'package:remya_bar/features/popups/bar_card_surface.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
@@ -62,6 +63,25 @@ Future<List<MethodCall>> _popup(WidgetTester tester, Size size) async {
 }
 
 void main() {
+  testWidgets('OSD popup text has no fallback underline', (tester) async {
+    await _popup(tester, osdSize);
+    for (final (value, tag) in [
+      (75, 'Software brightness'),
+      (100, 'Dimming off'),
+    ]) {
+      await _content(tester, osdKind, {'type': 'gamma', 'value': value});
+      for (final label in ['$value%', tag]) {
+        final text = tester.widget<RichText>(
+          find.descendant(
+            of: find.text(label),
+            matching: find.byType(RichText),
+          ),
+        );
+        expect(text.text.style?.decoration, anyOf(isNull, TextDecoration.none));
+      }
+    }
+  });
+
   double progress(WidgetTester tester) => tester
       .widget<BarCardSurface>(find.byType(BarCardSurface))
       .emergence

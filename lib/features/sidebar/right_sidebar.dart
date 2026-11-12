@@ -1,15 +1,19 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show listEquals;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:remya_settings_client/remya_settings_client.dart'
+    show BarOsdPreferences;
 
 import '../../widgets/bar_pill.dart';
 import '../../widgets/bar_tooltip.dart';
 
+import '../osd/osd_slider.dart';
 import '../popups/bar_popup_button.dart';
 import '../popups/popup_measure.dart';
 
@@ -561,19 +565,7 @@ class _RightSidebarState extends State<RightSidebar> {
         child: Column(
           spacing: 8,
           children: [
-            _SidebarSlider(
-              key: ValueKey(brightness['output']),
-              icon: Icons.brightness_6_rounded,
-              label: 'Brightness',
-              percent: brightness['percent'] as num?,
-              onChange: edit || brightness['percent'] == null
-                  ? null
-                  : (percent) => _send(
-                      'sidebar.brightness',
-                      target: brightness['output'],
-                      value: percent,
-                    ),
-            ),
+            _brightnessSlider(brightness, edit),
             _soundSlider(
               'output',
               _output,
@@ -641,6 +633,48 @@ class _RightSidebarState extends State<RightSidebar> {
     ];
   }
 
+  BarOsdPreferences get _osdPreferences {
+    try {
+      return BarOsdPreferences.fromJson(widget.data['osd']);
+    } on FormatException {
+      return const BarOsdPreferences();
+    }
+  }
+
+  Widget _brightnessSlider(Map brightness, bool edit) {
+    final hardware = brightness['percent'] as num?;
+    final gamma = brightness['gamma'] as num?;
+    final minimum = _osdPreferences.gammaMin;
+    final offset = hardware == null ? 0 : 99;
+    final position = gamma != null && (hardware == null || gamma < 100)
+        ? gamma - offset
+        : hardware?.clamp(1, 100);
+    bool software(double value) =>
+        gamma != null && (hardware == null || value < 1);
+    return _SidebarSlider(
+      key: ValueKey((brightness['output'], hardware != null)),
+      icon: Icons.brightness_6_rounded,
+      label: 'Brightness',
+      percent: position,
+      min: gamma == null ? 1 : (minimum - offset).toDouble(),
+      // Software dimming sits below the hardware floor, or below 100% alone.
+      threshold: gamma == null ? null : 100.0 - offset,
+      zone: .software,
+      // The gamma fill color marks software dimming; no extra wording.
+      valueLabel: (value) =>
+          '${(software(value) ? value + offset : value).round()}%',
+      onChange: edit || position == null || brightness['output'] == null
+          ? null
+          : (value) => _send(
+              'sidebar.brightness',
+              target: brightness['output'],
+              value: software(value)
+                  ? {'gamma': (value + offset).round()}
+                  : value,
+            ),
+    );
+  }
+
   Widget _soundSlider(
     String direction,
     Map? device,
@@ -649,17 +683,25 @@ class _RightSidebarState extends State<RightSidebar> {
     String label,
   ) {
     final preferences = _map(device?['preferences']);
-    final muted = preferences['muted'] == true;
     final values = _rowsOf<int>(preferences['channels']);
     final percent = values.isEmpty
         ? null
         : values.reduce((a, b) => a > b ? a : b) * 100 / 65536;
+    // Zero volume and mute are one state, as in the OSD.
+    final muted = preferences['muted'] == true || percent?.round() == 0;
+    final output = direction == 'output';
+    final maximum = output
+        ? math.max(_osdPreferences.volumeMax, percent?.ceil() ?? 0)
+        : 100;
     final enabled = _draft == null && device != null;
     return _SidebarSlider(
       key: ValueKey((direction, device?['name'])),
       icon: muted ? mutedIcon : icon,
       label: label,
       percent: percent,
+      max: maximum.toDouble(),
+      threshold: maximum > 100 ? 100 : null,
+      zone: .boost,
       muted: muted,
       onChange: enabled && percent != null
           ? (value) => _send(
@@ -675,9 +717,7 @@ class _RightSidebarState extends State<RightSidebar> {
               value: !muted,
             )
           : null,
-      onSecondary: direction == 'output' && _draft == null
-          ? () => _view('audio')
-          : null,
+      onSecondary: output && _draft == null ? () => _view('audio') : null,
     );
   }
 

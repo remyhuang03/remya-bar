@@ -447,12 +447,20 @@ class _PowerButton extends StatelessWidget {
   }
 }
 
+/// What lies past [_SidebarSlider.threshold], matching the OSD capsule.
+enum _SliderZone { none, boost, software }
+
 class _SidebarSlider extends StatefulWidget {
   const _SidebarSlider({
     super.key,
     required this.icon,
     required this.label,
     this.percent,
+    this.min = 0,
+    this.max = 100,
+    this.threshold,
+    this.zone = .none,
+    this.valueLabel,
     this.muted = false,
     this.onChange,
     this.onIcon,
@@ -462,6 +470,14 @@ class _SidebarSlider extends StatefulWidget {
   final IconData icon;
   final String label;
   final num? percent;
+  final double min;
+  final double max;
+
+  /// Boundary marked like the OSD 100% marker: Boost starts above it and
+  /// software dimming lies below it.
+  final double? threshold;
+  final _SliderZone zone;
+  final String Function(double)? valueLabel;
   final bool muted;
   final ValueChanged<double>? onChange;
   final VoidCallback? onIcon;
@@ -533,17 +549,47 @@ class _SidebarSliderState extends State<_SidebarSlider> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final percent = (_draft ?? _pending ?? widget.percent?.toDouble() ?? 0)
-        .clamp(0.0, 100.0);
+    final min = widget.min;
+    final max = widget.max;
+    final percent = (_draft ?? _pending ?? widget.percent?.toDouble() ?? min)
+        .clamp(min, max);
+    final valueLabel =
+        widget.valueLabel?.call(percent) ?? '${percent.round()}%';
     final muted = widget.muted && _draft == null && _pending == null;
     final label = muted
         ? 'Muted'
         : widget.percent == null
         ? '—'
-        : '${percent.round()}%';
+        : valueLabel;
     final onChange = widget.onChange;
-    final active = muted ? colors.onSurface : colors.primary;
-    final inactive = colors.secondaryContainer;
+    final threshold = widget.threshold;
+    final software =
+        widget.zone == .software && threshold != null && percent < threshold;
+    final boost = OsdAccents.boost(colors);
+    final gamma = OsdAccents.gamma(colors);
+    final active = muted
+        ? colors.onSurface.withValues(alpha: .12)
+        : software
+        ? gamma.color
+        : colors.primary;
+    final onActive = muted
+        ? colors.onSurface
+        : software
+        ? gamma.onColor
+        : colors.onPrimary;
+    final inactive = muted
+        ? colors.surfaceContainerHighest
+        : colors.secondaryContainer;
+    final boosting =
+        !muted &&
+        widget.zone == .boost &&
+        threshold != null &&
+        percent > threshold;
+    final thumb = muted
+        ? colors.outline
+        : boosting
+        ? boost.color
+        : active;
 
     return Listener(
       onPointerSignal: (event) {
@@ -554,7 +600,7 @@ class _SidebarSliderState extends State<_SidebarSlider> {
         }
         GestureBinding.instance.pointerSignalResolver.register(event, (_) {
           onChange(
-            (percent + (event.scrollDelta.dy < 0 ? 5 : -5)).clamp(0, 100),
+            (percent + (event.scrollDelta.dy < 0 ? 5 : -5)).clamp(min, max),
           );
         });
       },
@@ -570,10 +616,8 @@ class _SidebarSliderState extends State<_SidebarSlider> {
                 1.0,
                 double.infinity,
               );
-              final value = muted
-                  ? (6000 / trackWidth).clamp(0.0, 100.0)
-                  : percent;
-              final handle = inset + trackWidth * value / 100;
+              final fraction = (percent - min) / (max - min);
+              final handle = inset + trackWidth * fraction;
               final readoutStyle = Theme.of(context).textTheme.bodySmall
                   ?.copyWith(fontSize: 12);
               final readoutPainter = TextPainter(
@@ -584,15 +628,18 @@ class _SidebarSliderState extends State<_SidebarSlider> {
               final readoutWidth = readoutPainter.width;
               readoutPainter.dispose();
               final inactiveSpace = constraints.maxWidth - handle;
+              // On the active track the readout ends before the Boost cut so
+              // it stays on one fill color.
+              final readoutEnd = boosting
+                  ? inset + trackWidth * (threshold - min) / (max - min) - 2
+                  : handle;
               final onActiveTrack =
-                  inactiveSpace < readoutWidth + 22 && value > 50;
+                  inactiveSpace < readoutWidth + 22 && fraction > .5;
               final iconColor = handle < 38 || widget.percent == null
                   ? colors.onSecondaryContainer
-                  : muted
-                  ? colors.surface
                   : onChange == null
                   ? colors.onSurface
-                  : colors.onPrimary;
+                  : onActive;
               return Stack(
                 children: [
                   Positioned.fill(
@@ -601,7 +648,18 @@ class _SidebarSliderState extends State<_SidebarSlider> {
                       child: SliderTheme(
                         data: SliderTheme.of(context).copyWith(
                           padding: const .symmetric(horizontal: inset),
-                          trackShape: const _SidebarTrackShape(),
+                          trackShape: _SidebarTrackShape(
+                            threshold:
+                                threshold != null &&
+                                    threshold > min &&
+                                    threshold < max
+                                ? (threshold - min) / (max - min)
+                                : null,
+                            boost: widget.zone == .boost && !muted
+                                ? boost.color
+                                : null,
+                            marker: muted ? colors.outline : colors.primary,
+                          ),
                           thumbShape: const HandleThumbShape(),
                           trackHeight: 40,
                           trackGap: _draft == null ? 6 : 5,
@@ -610,7 +668,7 @@ class _SidebarSliderState extends State<_SidebarSlider> {
                           ),
                           activeTrackColor: active,
                           inactiveTrackColor: inactive,
-                          thumbColor: active,
+                          thumbColor: thumb,
                           disabledActiveTrackColor:
                               colors.surfaceContainerHighest,
                           disabledInactiveTrackColor: inactive,
@@ -625,14 +683,15 @@ class _SidebarSliderState extends State<_SidebarSlider> {
                           ),
                         ),
                         child: Slider(
-                          value: value,
-                          max: 100,
-                          label: '${percent.round()}',
+                          value: percent,
+                          min: min,
+                          max: max,
+                          label: valueLabel,
                           overlayColor: .resolveWith(
                             (states) =>
                                 states.contains(WidgetState.focused) &&
                                     !states.contains(WidgetState.dragged)
-                                ? active.withValues(alpha: .12)
+                                ? colors.primary.withValues(alpha: .12)
                                 : Colors.transparent,
                           ),
                           semanticFormatterCallback: (_) => label,
@@ -654,7 +713,9 @@ class _SidebarSliderState extends State<_SidebarSlider> {
                     ),
                   ),
                   Positioned(
-                    right: onActiveTrack ? inactiveSpace + 12 : 14,
+                    right: onActiveTrack
+                        ? constraints.maxWidth - readoutEnd + 12
+                        : 14,
                     top: 0,
                     bottom: 0,
                     child: IgnorePointer(
@@ -666,7 +727,7 @@ class _SidebarSliderState extends State<_SidebarSlider> {
                               color: onActiveTrack
                                   ? onChange == null
                                         ? colors.onSurface
-                                        : colors.onPrimary
+                                        : onActive
                                   : colors.onSecondaryContainer,
                             ),
                           ),
@@ -707,7 +768,16 @@ class _SidebarSliderState extends State<_SidebarSlider> {
 }
 
 class _SidebarTrackShape extends SliderTrackShape with BaseSliderTrackShape {
-  const _SidebarTrackShape();
+  const _SidebarTrackShape({this.threshold, this.boost, this.marker});
+
+  /// Track fraction of the OSD threshold (100% volume, hardware floor).
+  final double? threshold;
+
+  /// Splits the active track at [threshold] with this color past it.
+  final Color? boost;
+
+  /// Dot drawn at [threshold] while it lies on the inactive track.
+  final Color? marker;
 
   @override
   void paint(
@@ -738,42 +808,62 @@ class _SidebarTrackShape extends SliderTrackShape with BaseSliderTrackShape {
       sliderTheme.inactiveTrackColor,
       enableAnimation.value,
     )!;
-    final (leftColor, rightColor) = textDirection == .ltr
-        ? (active, inactive)
-        : (inactive, active);
-    final leftEdge = thumbCenter.dx - gap;
-    final rightEdge = thumbCenter.dx + gap;
+    final ltr = textDirection == .ltr;
+    final direction = ltr ? 1.0 : -1.0;
+    final start = ltr ? track.left : track.right;
+    final end = ltr ? track.right : track.left;
+    final thumb = thumbCenter.dx;
     const outer = Radius.circular(16);
     const inner = Radius.circular(4);
     final canvas = context.canvas;
-    if (leftEdge > track.left) {
+    // Ends of the track keep the outer radius; cuts get the inner one.
+    void segment(double from, double to, Color color) {
+      final left = math.min(from, to);
+      final right = math.max(from, to);
+      if (right <= left) return;
+      final leftRadius = left <= track.left + .5 ? outer : inner;
+      final rightRadius = right >= track.right - .5 ? outer : inner;
       canvas.drawRRect(
         RRect.fromLTRBAndCorners(
-          track.left,
+          left,
           track.top,
-          leftEdge,
+          right,
           track.bottom,
-          topLeft: outer,
-          bottomLeft: outer,
-          topRight: inner,
-          bottomRight: inner,
+          topLeft: leftRadius,
+          bottomLeft: leftRadius,
+          topRight: rightRadius,
+          bottomRight: rightRadius,
         ),
-        Paint()..color = leftColor,
+        Paint()..color = color,
       );
     }
-    if (rightEdge < track.right) {
-      canvas.drawRRect(
-        RRect.fromLTRBAndCorners(
-          rightEdge,
-          track.top,
-          track.right,
-          track.bottom,
-          topLeft: inner,
-          bottomLeft: inner,
-          topRight: outer,
-          bottomRight: outer,
-        ),
-        Paint()..color = rightColor,
+
+    bool before(double a, double b) => (b - a) * direction > 0;
+    final activeEnd = thumb - gap * direction;
+    final split = threshold == null ? null : start + (end - start) * threshold!;
+    final boost = this.boost;
+    if (split != null && boost != null && before(split, thumb)) {
+      // Same 4 px cut the OSD uses to mark 100%.
+      if (before(start, split - 2 * direction)) {
+        segment(start, split - 2 * direction, active);
+      }
+      if (before(split + 2 * direction, activeEnd)) {
+        segment(split + 2 * direction, activeEnd, boost);
+      }
+    } else if (before(start, activeEnd)) {
+      segment(start, activeEnd, active);
+    }
+    if (before(thumb + gap * direction, end)) {
+      segment(thumb + gap * direction, end, inactive);
+    }
+    final marker = this.marker;
+    if (split != null &&
+        marker != null &&
+        before(thumb + (gap + 2) * direction, split)) {
+      canvas.drawCircle(
+        Offset(split, track.center.dy),
+        2,
+        Paint()..color = marker,
       );
     }
   }
