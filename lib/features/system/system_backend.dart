@@ -399,11 +399,14 @@ class SystemBackend extends ChangeNotifier {
       if (channels is List &&
           channels.isNotEmpty &&
           channels.every((value) => value is int && value >= 0)) {
+        final percent = channels.cast<int>().reduce(math.max) * 100 / 65536;
         output = {
           'name': name,
           'description': device?['description'],
-          'percent': channels.cast<int>().reduce(math.max) * 100 / 65536,
-          'muted': (preferences as Map)['muted'] == true,
+          'percent': percent,
+          // Zero volume and mute are one state.
+          'muted':
+              (preferences as Map)['muted'] == true || percent.round() == 0,
         };
       }
     }

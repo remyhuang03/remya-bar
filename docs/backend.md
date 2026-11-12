@@ -334,7 +334,15 @@ The 420-logical-pixel panel opens 6 pixels from the output’s right edge and
 
 The sidebar reads live Settings state while visible. Display brightness targets
 the owning output. Sound controls act on the displayed PipeWire input/output
-device. Output volume spans 0–150%, with Boost above 100%. The brightness slider
+device. Output volume spans 0% to the Settings `remya-bar.volume-max` ceiling
+(100–150%, default 150%; a higher level set elsewhere extends the track), with
+Boost above 100%. The sliders share the OSD visual rules: a dot marks the 100%
+volume threshold or the hardware brightness floor while it lies on the inactive
+track, Boost is a separate orange segment past a 4-pixel cut, software dimming
+uses the gamma fill, and a muted device keeps its level with a gray fill.
+Zero volume and mute are one state everywhere: 0% is shown as Muted, dragging
+to 0% also mutes, any audible level unmutes, and unmuting a silent device
+restores one volume step. The brightness slider
 uses hardware brightness down to 1%, then software dimming down to the configured
 gamma floor. Raising it clears software dimming before raising hardware brightness.
 Sliders apply live at 60 ms intervals and send the final value on release,
@@ -398,10 +406,12 @@ needs a missing baseline. Hardware brightness feedback appears on the affected
 output; volume and gamma feedback appear on the focused output. Shortcut input
 uses session D-Bus signals on `top.remya.bar.Shortcuts` at
 `/top/remya/bar`: `VolumeUp`, `VolumeDown`, `VolumeMute`, `BrightnessUp`, and
-`BrightnessDown`. Step sizes and minimum gamma are read from Settings via
-`BarOsdClient` (`remya-bar.osd`: `remya-bar.volume-step`,
-`remya-bar.brightness-step`, `remya-bar.gamma-min`) and updated on `Changed`
-signals. Brightness shortcuts adjust hardware backlight/DDC brightness between
+`BrightnessDown`. Step sizes, maximum volume, and minimum gamma are read from
+Settings via `BarOsdClient` (`remya-bar.osd`: `remya-bar.volume-step`,
+`remya-bar.volume-max`, `remya-bar.brightness-step`, `remya-bar.gamma-min`) and
+updated on `Changed` signals. `VolumeUp` stops at `volume-max` but never lowers
+a higher level set elsewhere. `VolumeDown` reaching 0% also mutes; `VolumeMute`
+or `VolumeUp` from 0% unmutes at one volume step. Brightness shortcuts adjust hardware backlight/DDC brightness between
 `1%` and `100%` and automatically transition into and out of `hyprsunset`
 gamma dimming (`display-gamma`) down to `gamma-min` when hardware brightness
 reaches its `1%` floor or is unavailable on the focused output. The popup shows

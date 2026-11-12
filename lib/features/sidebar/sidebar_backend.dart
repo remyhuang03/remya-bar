@@ -48,9 +48,8 @@ class SidebarBackend extends ChangeNotifier {
           notifyListeners();
           return;
         }
-        if (change.topic == barGammaMinSettingId) {
-          _data['gammaMin'] = change.value['value'];
-          notifyListeners();
+        if (barOsdSettingIds.contains(change.topic)) {
+          unawaited(_readOsdPreferences());
           return;
         }
         if (const {
@@ -78,7 +77,7 @@ class SidebarBackend extends ChangeNotifier {
       onError: (Object error) => debugPrint('Sidebar Settings changes: $error'),
     );
     _poll ??= Timer.periodic(const Duration(seconds: 4), (_) => _refresh());
-    if (wasClosed) unawaited(_readGammaMin());
+    if (wasClosed) unawaited(_readOsdPreferences());
     unawaited(_refresh());
   }
 
@@ -145,14 +144,17 @@ class SidebarBackend extends ChangeNotifier {
     }
   }
 
-  Future<void> _readGammaMin() async {
+  BarOsdPreferences _osd = const BarOsdPreferences();
+
+  Future<void> _readOsdPreferences() async {
     try {
       final preferences = await _settings.readBarOsdPreferences();
       if (_disposed || _poll == null) return;
-      _data['gammaMin'] = preferences.gammaMin;
+      _osd = preferences;
+      _data['osd'] = preferences.toJson();
       notifyListeners();
     } catch (error) {
-      debugPrint('Sidebar software brightness preference: $error');
+      debugPrint('Sidebar OSD preferences: $error');
     }
   }
 
@@ -271,9 +273,7 @@ class SidebarBackend extends ChangeNotifier {
         }
         final sound = copy(_data['sound']);
         final system = copy(sound['system']);
-        final direction = action.startsWith('sidebar.output-')
-            ? 'output'
-            : 'input';
+        final direction = _direction(action);
         system['devices'] = [
           for (final device in (system['devices'] as List? ?? const []))
             if (device is Map &&
@@ -337,23 +337,93 @@ class SidebarBackend extends ChangeNotifier {
     }
   }
 
+  /// Predicts [_setVolume] and [_setMuted] for one device.
   Map _soundPreferences(Map device, Object? value) {
     final previous = device['preferences'];
     final preferences = previous is Map ? {...previous} : {};
-    if (value is num) {
-      final channels = (preferences['channels'] as List? ?? const [])
-          .whereType<int>()
-          .toList();
-      final max = channels.fold(0, (a, b) => a > b ? a : b);
-      final wanted = (value * 65536 / 100).round();
+    final channels = (preferences['channels'] as List? ?? const [])
+        .whereType<int>()
+        .toList();
+    final max = channels.fold(0, (a, b) => a > b ? a : b);
+    void level(num percent) {
+      final wanted = (percent * 65536 / 100).round();
       preferences['channels'] = [
         for (final channel in channels)
           max == 0 ? wanted : (channel * wanted / max).round(),
       ];
+      preferences['muted'] = percent.round() == 0;
+    }
+
+    if (value is num) {
+      level(value);
+    } else if (value == false && (max * 100 / 65536).round() == 0) {
+      level(_osd.volumeStep);
     } else {
       preferences['muted'] = value;
     }
     return preferences;
+  }
+
+  static String _direction(String action) =>
+      action.startsWith('sidebar.output-') ? 'output' : 'input';
+
+  /// Zero volume and mute are one state: reaching 0 mutes and any audible
+  /// level unmutes.
+  Future<Map<String, Object?>> _setVolume(
+    String direction,
+    String name,
+    num percent,
+  ) async {
+    final silent = percent.round() == 0;
+    var sound = await _settings.changeSound('sound.$direction-volume', {
+      'name': name,
+      'percent': silent ? 0 : percent,
+    });
+    if ((_soundDevice(sound, direction, name)?['muted'] == true) != silent) {
+      sound = await _settings.changeSound('sound.$direction-muted', {
+        'name': name,
+        'muted': silent,
+      });
+    }
+    return sound;
+  }
+
+  /// Unmuting a silent device restores one volume step.
+  Future<Map<String, Object?>> _setMuted(
+    String direction,
+    String name,
+    bool muted,
+  ) async {
+    if (!muted) {
+      // _data already holds the prediction, so check the confirmed level.
+      final current = await _settings.readSound();
+      final channels = _soundDevice(current, direction, name)?['channels'];
+      if (channels is List &&
+          channels.whereType<int>().every(
+            (value) => value * 100 / 65536 < .5,
+          )) {
+        return _setVolume(direction, name, _osd.volumeStep);
+      }
+    }
+    return _settings.changeSound('sound.$direction-muted', {
+      'name': name,
+      'muted': muted,
+    });
+  }
+
+  static Map? _soundDevice(Object? sound, String direction, String name) {
+    final system = sound is Map ? sound['system'] : null;
+    final devices = system is Map ? system['devices'] : null;
+    if (devices is! List) return null;
+    for (final device in devices) {
+      if (device is Map &&
+          device['name'] == name &&
+          device['direction'] == direction) {
+        final preferences = device['preferences'];
+        return preferences is Map ? preferences : null;
+      }
+    }
+    return null;
   }
 
   Future<void> _perform(Map args, String? output) async {
@@ -373,19 +443,11 @@ class SidebarBackend extends ChangeNotifier {
               value <= (action == 'sidebar.output-volume' ? 150 : 100) =>
         (
           'sound',
-          await _settings.changeSound(
-            'sound.${(action as String).substring(8)}',
-            {'name': target, 'percent': value},
-          ),
+          await _setVolume(_direction(action as String), target, value),
         ),
-      'sidebar.output-muted' ||
-      'sidebar.input-muted' when target is String && value is bool => (
-        'sound',
-        await _settings.changeSound(
-          'sound.${(action as String).substring(8)}',
-          {'name': target, 'muted': value},
-        ),
-      ),
+      'sidebar.output-muted' || 'sidebar.input-muted'
+          when target is String && value is bool =>
+        ('sound', await _setMuted(_direction(action as String), target, value)),
       'sidebar.output-device' when target is String => (
         'sound',
         await _settings.changeSound(soundOutputDeviceSettingId, {
@@ -492,10 +554,7 @@ class SidebarBackend extends ChangeNotifier {
   bool _validHardware(Object? value) =>
       value is num && value.isFinite && value >= 1 && value <= 100;
 
-  bool _validGamma(int value) =>
-      value >=
-          (_data['gammaMin'] as int? ?? const BarOsdPreferences().gammaMin) &&
-      value <= 100;
+  bool _validGamma(int value) => value >= _osd.gammaMin && value <= 100;
 
   Future<Map<String, Object?>> _brightnessResult(
     String output,

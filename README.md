@@ -31,7 +31,7 @@ Remy'a Bar blends refined desktop aesthetics with deep Linux system integration.
 - **Quick Settings**. A slide-out panel houses configurable quick settings toggles, hardware sliders, session actions, and an on-screen keyboard. Users can reorder tiles and hide unused options to customize the layout.
 - **Tray and Notifications**. The system tray supports pinned or folded applications alongside an integrated notification center. Do Not Disturb filters popups and sounds while retaining persistent notification history.
 - **AI Quota**. Colored provider rings show the remaining 5-hour and weekly quota of up to three AI subscriptions pinned in Remya Settings > AI, with a usage card on hover. Requires the optional `codexbar-cli` package with providers signed in.
-- **On-Screen Display (OSD)**. A non-interactive top-centered MD3E capsule slider (`top.remya.bar/osd`) displays live feedback for volume (`0%–150%` with a `100%` threshold marker and harmonized `Boost` segment/tag), mute (preserving pre-mute slider position), hardware brightness (`0%–100%`), and `hyprsunset` software gamma dimming (`Gamma` tag), with step sizes and minimum gamma configured in Remya Settings.
+- **On-Screen Display (OSD)**. A non-interactive top-centered MD3E capsule slider (`top.remya.bar/osd`) displays live feedback for volume (`0%` up to a configurable `100%–150%` maximum, with a `100%` threshold marker and harmonized `Boost` segment/tag), mute (preserving pre-mute slider position; `0%` and mute are the same state), hardware brightness (`0%–100%`), and `hyprsunset` software gamma dimming (`Gamma` tag), with step sizes, maximum volume, and minimum gamma configured in Remya Settings. The sidebar volume and brightness sliders use the same thresholds and colors.
 
 ---
 

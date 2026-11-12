@@ -20,16 +20,27 @@ enum OsdType {
   };
 }
 
-typedef _OsdAccentColors = ({Color color, Color onColor});
+/// Default output volume ceiling when no preference has been read.
+const osdVolumeMax = 150;
 
-_OsdAccentColors _harmonizedColors(int seed, ColorScheme scheme) {
-  final harmonized = Blend.harmonize(seed, scheme.primary.toARGB32());
-  final palette = TonalPalette.fromHct(Hct.fromInt(harmonized));
-  final dark = scheme.brightness == .dark;
-  return (
-    color: Color(palette.get(dark ? 80 : 40)),
-    onColor: Color(palette.get(dark ? 20 : 100)),
-  );
+typedef OsdAccent = ({Color color, Color onColor});
+
+/// Custom M3 accents shared by the OSD and the sidebar sliders: Boost marks
+/// volume above 100%, Gamma marks software dimming.
+abstract final class OsdAccents {
+  static OsdAccent boost(ColorScheme scheme) => _harmonized(0xFFB16415, scheme);
+
+  static OsdAccent gamma(ColorScheme scheme) => _harmonized(0xFF4677C2, scheme);
+
+  static OsdAccent _harmonized(int seed, ColorScheme scheme) {
+    final harmonized = Blend.harmonize(seed, scheme.primary.toARGB32());
+    final palette = TonalPalette.fromHct(Hct.fromInt(harmonized));
+    final dark = scheme.brightness == .dark;
+    return (
+      color: Color(palette.get(dark ? 80 : 40)),
+      onColor: Color(palette.get(dark ? 20 : 100)),
+    );
+  }
 }
 
 class OsdCapsuleSlider extends StatelessWidget {
@@ -39,6 +50,7 @@ class OsdCapsuleSlider extends StatelessWidget {
     required this.value,
     this.muted = false,
     this.preMuteValue,
+    this.max = osdVolumeMax,
   });
 
   factory OsdCapsuleSlider.fromData(Map<String, Object?> data) {
@@ -46,11 +58,13 @@ class OsdCapsuleSlider extends StatelessWidget {
     final rawValue = data['value'];
     final value = rawValue is num ? rawValue.round() : 0;
     final rawPreMute = data['preMuteValue'];
+    final rawMax = data['max'];
     return OsdCapsuleSlider(
       type: type,
       value: value,
       muted: type == .volume && data['muted'] == true,
       preMuteValue: rawPreMute is num ? rawPreMute.round() : null,
+      max: rawMax is num && rawMax >= 100 ? rawMax.round() : osdVolumeMax,
     );
   }
 
@@ -59,10 +73,11 @@ class OsdCapsuleSlider extends StatelessWidget {
   final bool muted;
   final int? preMuteValue;
 
+  /// Volume track end; values above 100 are Boost. Ignored for brightness.
+  final int max;
+
   static const _capsuleHeight = 48.0;
   static const _tagHeight = 28.0;
-  static const _boostSeed = 0xFFB16415;
-  static const _gammaSeed = 0xFF4677C2;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -73,8 +88,9 @@ class OsdCapsuleSlider extends StatelessWidget {
   Widget _capsule(BuildContext context, double width) {
     final scheme = Theme.of(context).colorScheme;
     final isVolume = type == .volume;
-    final isMuted = isVolume && muted;
-    final maxValue = isVolume ? 150 : 100;
+    // Zero volume and mute are the same state.
+    final isMuted = isVolume && (muted || value <= 0);
+    final maxValue = isVolume ? max : 100;
     final percent = value.clamp(0, maxValue);
     final level = isMuted
         ? (preMuteValue ?? percent).clamp(0, maxValue)
@@ -82,8 +98,8 @@ class OsdCapsuleSlider extends StatelessWidget {
     final isBoost = isVolume && !isMuted && level > 100;
     final isMax = !isMuted && level == maxValue;
     final dimming = type == .gamma && percent < 100;
-    final boost = _harmonizedColors(_boostSeed, scheme);
-    final gamma = _harmonizedColors(_gammaSeed, scheme);
+    final boost = OsdAccents.boost(scheme);
+    final gamma = OsdAccents.gamma(scheme);
 
     const left = 4.0;
     final right = 196 * width / osdSize.width;
@@ -199,6 +215,7 @@ class OsdCapsuleSlider extends StatelessWidget {
                     ),
                   ],
                   if (isVolume &&
+                      maxValue > 100 &&
                       (level < 100 || isMuted) &&
                       (thumb - threshold).abs() >= 4)
                     Positioned(

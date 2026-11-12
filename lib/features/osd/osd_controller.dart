@@ -13,18 +13,21 @@ class OsdState {
     required this.value,
     this.muted = false,
     this.preMuteValue,
+    this.max = osdVolumeMax,
   });
 
   final OsdType type;
   final int value;
   final bool muted;
   final int? preMuteValue;
+  final int max;
 
   Map<String, Object?> toData({double scale = 1.0}) => {
     'type': type.name,
     'value': value,
     'muted': muted,
     'preMuteValue': ?preMuteValue,
+    'max': max,
     'scale': scale,
   };
 
@@ -34,10 +37,11 @@ class OsdState {
       other.type == type &&
       other.value == value &&
       other.muted == muted &&
-      other.preMuteValue == preMuteValue;
+      other.preMuteValue == preMuteValue &&
+      other.max == max;
 
   @override
-  int get hashCode => Object.hash(type, value, muted, preMuteValue);
+  int get hashCode => Object.hash(type, value, muted, preMuteValue, max);
 }
 
 class OsdController extends ChangeNotifier {
@@ -345,12 +349,15 @@ class OsdController extends ChangeNotifier {
       OsdState(
         type: .volume,
         value: percent,
-        muted: _volumeMuted == true,
+        muted: _volumeMuted == true || percent == 0,
         preMuteValue: _preMuteVolume,
+        max: math.max(preferences.volumeMax, percent),
       ),
     );
   }
 
+  /// Zero volume and mute are one state: stepping down to 0 mutes, and
+  /// unmuting or stepping up from 0 restores at least one step.
   Future<void> _changeVolume(int? delta) async {
     final revision = _serviceRevision;
     if (_volumePercent == null) await _refreshSound();
@@ -358,25 +365,29 @@ class OsdController extends ChangeNotifier {
     if (_disposed || _serviceRevision != revision || current == null) return;
     _writingVolume = true;
     try {
-      final muted = _volumeMuted == true;
-      if (delta == null || (delta > 0 && muted)) {
-        final sound = await _settings.changeSound(soundOutputMutedSettingId, {
-          'muted': delta == null && !muted,
-        });
-        if (_disposed || _serviceRevision != revision) return;
+      final muted = _volumeMuted == true || current == 0;
+      // An externally raised level above the ceiling is kept, not cut.
+      final ceiling = math.max(preferences.volumeMax, current);
+      final target = switch (delta) {
+        null when muted && current == 0 => preferences.volumeStep,
+        null => current,
+        _ => (current + delta).clamp(0, ceiling),
+      };
+      final mute = delta == null ? !muted : target == 0 || (muted && delta < 0);
+      Future<bool> write(String id, Map<String, Object?> value) async {
+        final sound = await _settings.changeSound(id, value);
+        if (_disposed || _serviceRevision != revision) return false;
         _applySoundPayload(sound);
-        if (delta == null) {
-          _showVolume();
-          return;
-        }
+        return true;
       }
-      final target = (current + delta).clamp(0, 150);
-      if (target != current) {
-        final sound = await _settings.changeSound(soundOutputVolumeSettingId, {
-          'percent': target,
-        });
-        if (_disposed || _serviceRevision != revision) return;
-        _applySoundPayload(sound);
+
+      if (target != current &&
+          !await write(soundOutputVolumeSettingId, {'percent': target})) {
+        return;
+      }
+      if ((_volumeMuted == true) != mute &&
+          !await write(soundOutputMutedSettingId, {'muted': mute})) {
+        return;
       }
       _showVolume();
     } catch (error) {

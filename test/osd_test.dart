@@ -204,6 +204,53 @@ void main() {
       );
     });
 
+    test('volume shortcuts stop at the configured maximum volume', () async {
+      settings.osdPrefs = const BarOsdPreferences(
+        volumeStep: 10,
+        volumeMax: 110,
+      );
+      settings.changesController.add((
+        topic: barVolumeMaxSettingId,
+        value: <String, dynamic>{'value': 110},
+      ));
+      settings.emitSound(percent: 95, muted: false);
+      await Future<void>.delayed(Duration.zero);
+
+      await controller.handleShortcut('VolumeUp');
+      await controller.handleShortcut('VolumeUp');
+      expect(settings.volumePercent, 110);
+      expect(
+        controller.state,
+        const OsdState(type: .volume, value: 110, preMuteValue: 110, max: 110),
+      );
+    });
+
+    test('zero volume and mute are one state', () async {
+      settings.osdPrefs = const BarOsdPreferences(volumeStep: 10);
+      settings.changesController.add((
+        topic: barVolumeStepSettingId,
+        value: <String, dynamic>{'value': 10},
+      ));
+      settings.emitSound(percent: 10, muted: false);
+      await Future<void>.delayed(Duration.zero);
+
+      // Stepping down to 0 also mutes.
+      await controller.handleShortcut('VolumeDown');
+      expect((settings.volumePercent, settings.volumeMuted), (0, true));
+      expect(controller.state?.muted, isTrue);
+
+      // Unmuting from 0 restores one step instead of a silent unmuted state.
+      await controller.handleShortcut('VolumeMute');
+      expect((settings.volumePercent, settings.volumeMuted), (10, false));
+
+      // An external 0 without the mute flag is shown and toggled as muted.
+      settings.emitSound(percent: 0, muted: false);
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state?.muted, isTrue);
+      await controller.handleShortcut('VolumeUp');
+      expect((settings.volumePercent, settings.volumeMuted), (10, false));
+    });
+
     test('brightness shortcuts transition between hardware backlight and hyprsunset gamma', () async {
       settings.emitBrightness(percent: 6);
       await Future<void>.delayed(Duration.zero);

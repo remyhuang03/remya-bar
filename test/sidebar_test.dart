@@ -219,6 +219,42 @@ void main() {
       },
     );
 
+    test('zero volume mutes and unmuting silence restores one step', () async {
+      Map<String, dynamic> silent({required bool muted}) {
+        final sound = _sound(0);
+        for (final device in (sound['system'] as Map)['devices'] as List) {
+          (device as Map)['preferences']['muted'] = muted;
+        }
+        return sound;
+      }
+
+      Object? written(int index) => jsonDecode(settings.writes[index].value);
+
+      final zero = volume(0);
+      expect(_preferences(backend.data, 'output')['muted'], isTrue);
+      settings.writes[0].result.complete(silent(muted: false));
+      await _flush();
+      expect(settings.writes[1].id, 'sound.output-muted');
+      expect(written(1), {'name': 'speaker', 'muted': true});
+      settings.writes[1].result.complete(silent(muted: true));
+      await zero;
+
+      settings.snapshots['sound'] = silent(muted: true);
+      final unmute = backend.perform({
+        'action': 'sidebar.output-muted',
+        'target': 'speaker',
+        'value': false,
+      }, 'eDP-1');
+      await _flush();
+      expect(settings.writes[2].id, 'sound.output-volume');
+      expect(written(2), {'name': 'speaker', 'percent': 5});
+      settings.writes[2].result.complete(silent(muted: true));
+      await _flush();
+      expect(written(3), {'name': 'speaker', 'muted': false});
+      settings.writes[3].result.complete(_sound(5));
+      await unmute;
+    });
+
     final predictions =
         <
           ({
@@ -568,19 +604,36 @@ void main() {
       actions,
       overrides: {
         'brightness': {'output': 'eDP-1', 'percent': 1, 'gamma': 75},
-        'gammaMin': 15,
+        'osd': const BarOsdPreferences(gammaMin: 15).toJson(),
         'sound': _sound(130),
       },
     );
     final sliders = tester.widgetList<Slider>(find.byType(Slider)).toList();
     expect(sliders[0].min, -84);
-    expect(find.text('Software 75%'), findsOneWidget);
+    expect(find.text('75%'), findsOneWidget);
     sliders[0].onChanged!(-84);
     expect(actions.last['value'], {'gamma': 15});
     expect(sliders[1].max, 150);
-    expect(find.text('130% · Boost'), findsOneWidget);
+    expect(find.text('130%'), findsOneWidget);
     sliders[1].onChanged!(150);
     expect(actions.last['value'], 150);
+  });
+
+  testWidgets('volume slider honors the ceiling and shows zero as muted', (
+    tester,
+  ) async {
+    await showSidebar(
+      tester,
+      [],
+      overrides: {
+        'osd': const BarOsdPreferences(volumeMax: 120).toJson(),
+        'sound': _sound(0),
+      },
+    );
+    final sliders = tester.widgetList<Slider>(find.byType(Slider)).toList();
+    expect(sliders[1].max, 120);
+    // Speaker and microphone are both at 0.
+    expect(find.text('Muted'), findsNWidgets(2));
   });
 
   testWidgets(
@@ -724,7 +777,12 @@ class _Settings extends SettingsClient {
     'display-brightness:eDP-1': {'output': 'eDP-1', 'percent': 50},
     displayGammaSettingId: {'gamma': 100},
     barOsdSettingId: {
-      'value': {'volume_step': 5, 'brightness_step': 5, 'gamma_min': 15},
+      'value': {
+        'volume_step': 5,
+        'volume_max': 150,
+        'brightness_step': 5,
+        'gamma_min': 15,
+      },
     },
     barSidebarLayoutSettingId: {
       'value': ['internet', 'power'],
