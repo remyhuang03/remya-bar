@@ -334,7 +334,10 @@ The 420-logical-pixel panel opens 6 pixels from the output’s right edge and
 
 The sidebar reads live Settings state while visible. Display brightness targets
 the owning output. Sound controls act on the displayed PipeWire input/output
-device. Sliders apply live at 60 ms intervals and send the final value on release,
+device. Output volume spans 0–150%, with Boost above 100%. The brightness slider
+uses hardware brightness down to 1%, then software dimming down to the configured
+gamma floor. Raising it clears software dimming before raising hardware brightness.
+Sliders apply live at 60 ms intervals and send the final value on release,
 or adjust by five percentage points per wheel step. They hold the released value
 until readback catches up or 1.5 seconds pass. The output slider opens the output
 picker on secondary click.
@@ -376,6 +379,37 @@ hl.bind("SUPER + A", hl.dsp.exec_cmd(
 
 Replace any existing binding for that chord when adopting it. Bar listens only
 to the signal for its own Hyprland instance and opens on the focused output.
+
+## On-screen display (OSD)
+
+`lib/features/osd/osd_slider.dart` and `lib/features/osd/osd_controller.dart`
+implement the non-interactive `OSD / Capsule Slider` overlay (`260 × 48` px
+capsule with a `28` px top reservation for the floating `Boost`, `Software brightness`, and `Dimming off`
+range tags, total `260 × 76` px). Native GTK places `top.remya.bar/osd` on the
+`OVERLAY` layer anchored top-center (`8` px below the bar, or `8` px from the
+top edge while the bar is hidden in fullscreen) with zero exclusive space, no
+keyboard focus, and an empty input region so pointer events pass through. Opening
+or hiding the OSD does not close the sidebar, hover cards, or menus.
+
+The OSD responds to Settings change signals for sound, hardware brightness and
+gamma. Settings watches PulseAudio and kernel backlight events. Bar reads state
+at startup, after a service restart, when an output changes, or when a shortcut
+needs a missing baseline. Hardware brightness feedback appears on the affected
+output; volume and gamma feedback appear on the focused output. Shortcut input
+uses session D-Bus signals on `top.remya.bar.Shortcuts` at
+`/top/remya/bar`: `VolumeUp`, `VolumeDown`, `VolumeMute`, `BrightnessUp`, and
+`BrightnessDown`. Step sizes and minimum gamma are read from Settings via
+`BarOsdClient` (`remya-bar.osd`: `remya-bar.volume-step`,
+`remya-bar.brightness-step`, `remya-bar.gamma-min`) and updated on `Changed`
+signals. Brightness shortcuts adjust hardware backlight/DDC brightness between
+`1%` and `100%` and automatically transition into and out of `hyprsunset`
+gamma dimming (`display-gamma`) down to `gamma-min` when hardware brightness
+reaches its `1%` floor or is unavailable on the focused output. The popup shows
+confirmed values, with a fixed right-side readout and a single coordinate for
+the volume `100%` marker, handle, and boost split.
+Shortcut repeats merge consecutive steps between writes while preserving both
+sides of the hardware/software brightness boundary. Hyprland focus events keep
+the target output current during the repeat burst.
 
 ## On-screen keyboard
 

@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:remya_settings_client/remya_settings_client.dart'
+    show BarOsdPreferences;
 
 import '../../widgets/bar_pill.dart';
 import '../../widgets/bar_tooltip.dart';
@@ -561,19 +563,7 @@ class _RightSidebarState extends State<RightSidebar> {
         child: Column(
           spacing: 8,
           children: [
-            _SidebarSlider(
-              key: ValueKey(brightness['output']),
-              icon: Icons.brightness_6_rounded,
-              label: 'Brightness',
-              percent: brightness['percent'] as num?,
-              onChange: edit || brightness['percent'] == null
-                  ? null
-                  : (percent) => _send(
-                      'sidebar.brightness',
-                      target: brightness['output'],
-                      value: percent,
-                    ),
-            ),
+            _brightnessSlider(brightness, edit),
             _soundSlider(
               'output',
               _output,
@@ -641,6 +631,40 @@ class _RightSidebarState extends State<RightSidebar> {
     ];
   }
 
+  Widget _brightnessSlider(Map brightness, bool edit) {
+    final hardware = brightness['percent'] as num?;
+    final gamma = brightness['gamma'] as num?;
+    final minimum =
+        widget.data['gammaMin'] as int? ?? const BarOsdPreferences().gammaMin;
+    final offset = hardware == null ? 0 : 99;
+    final position = gamma != null && (hardware == null || gamma < 100)
+        ? gamma - offset
+        : hardware?.clamp(1, 100);
+    bool software(double value) =>
+        gamma != null && (hardware == null || value < 1);
+    return _SidebarSlider(
+      key: ValueKey((brightness['output'], hardware != null)),
+      icon: Icons.brightness_6_rounded,
+      label: 'Brightness',
+      percent: position,
+      min: gamma == null ? 1 : (minimum - offset).toDouble(),
+      valueLabel: (value) => software(value)
+          ? value + offset >= 99.5
+                ? 'Dimming off'
+                : 'Software ${(value + offset).round()}%'
+          : '${value.round()}%',
+      onChange: edit || position == null || brightness['output'] == null
+          ? null
+          : (value) => _send(
+              'sidebar.brightness',
+              target: brightness['output'],
+              value: software(value)
+                  ? {'gamma': (value + offset).round()}
+                  : value,
+            ),
+    );
+  }
+
   Widget _soundSlider(
     String direction,
     Map? device,
@@ -660,6 +684,10 @@ class _RightSidebarState extends State<RightSidebar> {
       icon: muted ? mutedIcon : icon,
       label: label,
       percent: percent,
+      max: direction == 'output' ? 150 : 100,
+      valueLabel: (value) => direction == 'output' && value.round() > 100
+          ? '${value.round()}% · Boost'
+          : '${value.round()}%',
       muted: muted,
       onChange: enabled && percent != null
           ? (value) => _send(

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
@@ -16,6 +15,7 @@ class SidebarBackend extends ChangeNotifier {
   Timer? _poll;
   StreamSubscription<SettingsChange>? _changes;
   String? _output;
+  Map<String, Object?>? _confirmedBrightness;
   int _generation = 0;
   bool _refreshing = false;
   bool _writing = false;
@@ -24,16 +24,19 @@ class SidebarBackend extends ChangeNotifier {
   Map<String, Object?> get data => Map.unmodifiable(_data);
 
   void open(String? output) {
+    final wasClosed = _poll == null;
     if (_output != output) {
       _output = output;
       _generation++;
       _data.remove('brightness');
+      _confirmedBrightness = null;
     }
     _changes ??= _settings.changes.listen(
       (change) {
         if (_poll == null) return;
         final key = switch (change.topic) {
           'theme' => 'theme',
+          'sound' when change.value.containsKey('available') => 'sound',
           keepAwakeSettingId => 'keep-awake',
           notificationDndSettingId => 'notification-dnd',
           _ => null,
@@ -45,6 +48,18 @@ class SidebarBackend extends ChangeNotifier {
           notifyListeners();
           return;
         }
+        if (change.topic == barGammaMinSettingId) {
+          _data['gammaMin'] = change.value['value'];
+          notifyListeners();
+          return;
+        }
+        if (const {
+              'display-brightness',
+              displayGammaSettingId,
+            }.contains(change.topic) &&
+            _applyBrightnessChange(change)) {
+          return;
+        }
         if (const {
           airplaneEnabledSettingId,
           airplaneWifiSettingId,
@@ -53,6 +68,8 @@ class SidebarBackend extends ChangeNotifier {
           'network',
           'bluetooth',
           'night-light',
+          'display-brightness',
+          displayGammaSettingId,
           barSidebarLayoutSettingId,
         }.contains(change.topic)) {
           unawaited(_refresh());
@@ -61,6 +78,7 @@ class SidebarBackend extends ChangeNotifier {
       onError: (Object error) => debugPrint('Sidebar Settings changes: $error'),
     );
     _poll ??= Timer.periodic(const Duration(seconds: 4), (_) => _refresh());
+    if (wasClosed) unawaited(_readGammaMin());
     unawaited(_refresh());
   }
 
@@ -93,6 +111,9 @@ class SidebarBackend extends ChangeNotifier {
       }
       if (!_disposed && _poll != null && generation == _generation) {
         _data[key] = value;
+        if (key == 'brightness') {
+          _confirmedBrightness = value as Map<String, Object?>?;
+        }
         notifyListeners();
       }
     }
@@ -124,11 +145,58 @@ class SidebarBackend extends ChangeNotifier {
     }
   }
 
-  Future<Map?> _brightness(String output) async {
-    final data = await _settings.call('Get', ['display-brightness']);
-    return (data['outputs'] as List?)?.whereType<Map>().firstWhereOrNull(
-      (item) => item['output'] == output,
-    );
+  Future<void> _readGammaMin() async {
+    try {
+      final preferences = await _settings.readBarOsdPreferences();
+      if (_disposed || _poll == null) return;
+      _data['gammaMin'] = preferences.gammaMin;
+      notifyListeners();
+    } catch (error) {
+      debugPrint('Sidebar software brightness preference: $error');
+    }
+  }
+
+  Future<int?> _readGamma() async {
+    try {
+      return await _settings.readDisplayGamma();
+    } catch (error) {
+      debugPrint('Sidebar software brightness: $error');
+      return null;
+    }
+  }
+
+  Future<Map<String, Object?>> _brightness(String output) async {
+    final gamma = _readGamma();
+    final hardware = await _settings.call('Get', [
+      'display-brightness:$output',
+    ]);
+    return {...hardware, 'output': output, 'gamma': await gamma};
+  }
+
+  bool _applyBrightnessChange(SettingsChange change) {
+    final confirmed = _confirmedBrightness;
+    if (confirmed == null || _output == null) return false;
+    final value = change.value;
+    final outputs = value['outputs'];
+    final update = switch (change.topic) {
+      displayGammaSettingId => {'gamma': value['gamma']},
+      _ when value['output'] == _output => value,
+      _ when outputs is List =>
+        outputs
+            .whereType<Map>()
+            .where((item) => item['output'] == _output)
+            .firstOrNull,
+      _ => null,
+    };
+    if (update != null) {
+      _generation++;
+      final state = {...confirmed, ...Map<String, Object?>.from(update)};
+      state.remove('outputs');
+      _confirmedBrightness = state;
+      _data['brightness'] = state;
+      notifyListeners();
+    }
+    return true;
   }
 
   Future<void> perform(Map args, String? output) {
@@ -195,8 +263,9 @@ class SidebarBackend extends ChangeNotifier {
               'sidebar.input-muted'
           when target is String:
         final volume = (action as String).endsWith('-volume');
+        final maximum = action == 'sidebar.output-volume' ? 150 : 100;
         if (volume
-            ? value is! num || !value.isFinite || value < 0 || value > 100
+            ? value is! num || !value.isFinite || value < 0 || value > maximum
             : value is! bool) {
           return;
         }
@@ -215,14 +284,20 @@ class SidebarBackend extends ChangeNotifier {
               device,
         ];
         _data['sound'] = {...sound, 'system': system};
-      case 'sidebar.brightness'
-          when output != null &&
-              output == target &&
-              value is num &&
-              value.isFinite &&
-              value >= 0 &&
-              value <= 100:
-        patch('brightness', {'percent': value, 'output': output});
+      case 'sidebar.brightness' when output != null && output == target:
+        final confirmed = _confirmedBrightness;
+        if (confirmed?['output'] != output) return;
+        if (value case {'gamma': final int gamma} when _validGamma(gamma)) {
+          patch('brightness', {
+            'gamma': gamma,
+            if (confirmed?['percent'] is num) 'percent': 1,
+          });
+        } else if (_validHardware(value)) {
+          patch('brightness', {
+            'percent': value,
+            if (confirmed?['gamma'] is num) 'gamma': 100,
+          });
+        }
       case 'sidebar.wifi' when value is bool:
         patch('network', {'wifi_enabled': value});
       case 'sidebar.bluetooth'
@@ -286,20 +361,16 @@ class SidebarBackend extends ChangeNotifier {
     final value = args['value'];
     final target = args['target'];
     final (String key, Object? result) = switch (action) {
-      'sidebar.brightness'
-          when output != null &&
-              output == target &&
-              value is num &&
-              value.isFinite &&
-              value >= 0 &&
-              value <= 100 =>
-        ('brightness', await _brightnessResult(output, value.round())),
+      'sidebar.brightness' when output != null && output == target => (
+        'brightness',
+        await _brightnessResult(output, value),
+      ),
       'sidebar.output-volume' || 'sidebar.input-volume'
           when target is String &&
               value is num &&
               value.isFinite &&
               value >= 0 &&
-              value <= 100 =>
+              value <= (action == 'sidebar.output-volume' ? 150 : 100) =>
         (
           'sound',
           await _settings.changeSound(
@@ -407,7 +478,9 @@ class SidebarBackend extends ChangeNotifier {
         (state['error'] as String).isNotEmpty) {
       throw StateError(state['error'] as String);
     }
-    if (!_disposed && key.isNotEmpty) {
+    if (!_disposed &&
+        key.isNotEmpty &&
+        (key != 'brightness' || _output == output)) {
       _data[key] = state;
       for (final write in _queue) {
         _predict(write.args, write.output);
@@ -416,16 +489,58 @@ class SidebarBackend extends ChangeNotifier {
     }
   }
 
-  Future<Map?> _brightnessResult(String output, int percent) async {
-    await _settings.call('Set', [
-      'display.5d419889',
-      jsonEncode({'output': output, 'value': '$percent'}),
-    ]);
-    // A newer queued drag value reads back the final state; skip this one.
-    if (_queue.any((write) => write.args['action'] == 'sidebar.brightness')) {
-      return _data['brightness'] as Map?;
+  bool _validHardware(Object? value) =>
+      value is num && value.isFinite && value >= 1 && value <= 100;
+
+  bool _validGamma(int value) =>
+      value >=
+          (_data['gammaMin'] as int? ?? const BarOsdPreferences().gammaMin) &&
+      value <= 100;
+
+  Future<Map<String, Object?>> _brightnessResult(
+    String output,
+    Object? value,
+  ) async {
+    var state = _confirmedBrightness;
+    if (state == null || state['output'] != output) {
+      state = await _brightness(output);
     }
-    return _brightness(output);
+    final result = Map<String, Object?>.of(state);
+    Future<void> hardware(int percent) async {
+      if (result['percent'] == percent) return;
+      final actual = await _settings.setOutputBrightness(output, percent);
+      if (actual == null) {
+        throw StateError('Missing hardware brightness readback');
+      }
+      result['percent'] = actual;
+    }
+
+    Future<void> software(int gamma) async {
+      if (result['gamma'] != gamma) {
+        result['gamma'] = await _settings.setDisplayGamma(gamma);
+      }
+    }
+
+    try {
+      if (value case {'gamma': final int gamma}
+          when _validGamma(gamma) && result['gamma'] is num) {
+        if (result['percent'] is num) await hardware(1);
+        await software(gamma);
+      } else if (_validHardware(value) && result['percent'] is num) {
+        if (result['gamma'] is num && result['gamma'] != 100) {
+          await software(100);
+        }
+        await hardware((value as num).round());
+      } else {
+        throw const FormatException('Invalid sidebar brightness');
+      }
+      return result;
+    } finally {
+      if (_output == output) {
+        _confirmedBrightness = result;
+        _data['brightness'] = result;
+      }
+    }
   }
 
   @override
@@ -443,13 +558,4 @@ class _SidebarWrite {
   Map args;
   String? output;
   final result = Completer<void>();
-}
-
-extension<T> on Iterable<T> {
-  T? firstWhereOrNull(bool Function(T) test) {
-    for (final item in this) {
-      if (test(item)) return item;
-    }
-    return null;
-  }
 }

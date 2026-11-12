@@ -77,7 +77,12 @@ class SystemBackend extends ChangeNotifier {
         case 'power':
           unawaited(_refreshPower());
         case 'sound':
-          unawaited(_refreshSound(force: true));
+          if (change.value.containsKey('available') && !_writingSound) {
+            _soundRevision++;
+            _applySound(change.value);
+          } else {
+            unawaited(_refreshSound(force: true));
+          }
       }
     }, onError: (Object error) => debugPrint('Settings changes: $error'));
     _subscribeMedia();

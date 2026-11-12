@@ -88,18 +88,58 @@ void main() {
         final second = send(50);
         final latest = send(80);
         expect(settings.writes, hasLength(1));
-        settings.writes[0].result.complete(_sound(30));
+        settings.writes[0].result.complete(
+          action == 'brightness' ? {'percent': 30} : _sound(30),
+        );
         await first;
         expect(settings.writes, hasLength(2));
-        final request = jsonDecode(settings.writes[1].value) as Map;
+        final request = settings.writes[1].value;
         expect(
-          request[action == 'brightness' ? 'value' : 'percent'],
+          action == 'brightness' ? request : jsonDecode(request)['percent'],
           action == 'brightness' ? '80' : 80,
         );
-        settings.writes[1].result.complete(_sound(80));
+        settings.writes[1].result.complete(
+          action == 'brightness' ? {'percent': 80} : _sound(80),
+        );
         await Future.wait([second, latest]);
       });
     }
+
+    test('output boost and both directions of the brightness crossover reach Settings', () async {
+      backend.close();
+      final boosted = volume(130);
+      expect(_percent(backend.data), closeTo(130, .002));
+      expect(jsonDecode(settings.writes.single.value)['percent'], 130);
+      settings.writes.single.result.complete(_sound(130));
+      await boosted;
+
+      Future<void> brightness(Object value) => backend.perform({
+        'action': 'sidebar.brightness',
+        'target': 'eDP-1',
+        'value': value,
+      }, 'eDP-1');
+      final dim = brightness({'gamma': 75});
+      expect(settings.writes.last.id, 'display-brightness:eDP-1');
+      expect(settings.writes.last.value, '1');
+      settings.writes.last.result.complete({'percent': 1});
+      await _flush();
+      expect(settings.writes.last.id, displayGammaSettingId);
+      expect(settings.writes.last.value, '75');
+      settings.writes.last.result.complete({'gamma': 75});
+      await dim;
+      expect((backend.data['brightness'] as Map)['gamma'], 75);
+
+      final brighter = brightness(40);
+      expect(settings.writes.last.id, displayGammaSettingId);
+      expect(settings.writes.last.value, '100');
+      settings.writes.last.result.complete({'gamma': 100});
+      await _flush();
+      expect(settings.writes.last.id, 'display-brightness:eDP-1');
+      expect(settings.writes.last.value, '40');
+      settings.writes.last.result.complete({'percent': 40});
+      await brighter;
+      expect((backend.data['brightness'] as Map)['percent'], 40);
+    });
 
     test('volume coalescing keeps different device targets separate', () async {
       backend.close();
@@ -299,18 +339,14 @@ void main() {
             isFalse,
           );
           final result = <String, dynamic>{'authoritative': true};
-          if (prediction.key == 'brightness') {
-            settings.snapshots['display-brightness'] = {
-              'outputs': [
-                {'output': 'eDP-1', ...result},
-              ],
-            };
-          }
+          if (prediction.key == 'brightness') result['percent'] = 64;
           settings.writes.single.result.complete(result);
           await write;
           expect(
-            (backend.data[prediction.key] as Map)['authoritative'],
-            isTrue,
+            prediction.key == 'brightness'
+                ? (backend.data['brightness'] as Map)['percent']
+                : (backend.data[prediction.key] as Map)['authoritative'],
+            prediction.key == 'brightness' ? 64 : true,
           );
         },
       );
@@ -523,6 +559,30 @@ void main() {
     },
   );
 
+  testWidgets('sidebar exposes boost and software brightness ranges', (
+    tester,
+  ) async {
+    final actions = <Map<String, Object?>>[];
+    await showSidebar(
+      tester,
+      actions,
+      overrides: {
+        'brightness': {'output': 'eDP-1', 'percent': 1, 'gamma': 75},
+        'gammaMin': 15,
+        'sound': _sound(130),
+      },
+    );
+    final sliders = tester.widgetList<Slider>(find.byType(Slider)).toList();
+    expect(sliders[0].min, -84);
+    expect(find.text('Software 75%'), findsOneWidget);
+    sliders[0].onChanged!(-84);
+    expect(actions.last['value'], {'gamma': 15});
+    expect(sliders[1].max, 150);
+    expect(find.text('130% · Boost'), findsOneWidget);
+    sliders[1].onChanged!(150);
+    expect(actions.last['value'], 150);
+  });
+
   testWidgets(
     'quick controls stay enabled while actions overlap and show errors',
     (tester) async {
@@ -661,10 +721,10 @@ class _Settings extends SettingsClient {
     'power': {
       'system': {'profile': 'balanced'},
     },
-    'display-brightness': {
-      'outputs': [
-        {'output': 'eDP-1', 'percent': 50},
-      ],
+    'display-brightness:eDP-1': {'output': 'eDP-1', 'percent': 50},
+    displayGammaSettingId: {'gamma': 100},
+    barOsdSettingId: {
+      'value': {'volume_step': 5, 'brightness_step': 5, 'gamma_min': 15},
     },
     barSidebarLayoutSettingId: {
       'value': ['internet', 'power'],

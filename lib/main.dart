@@ -10,6 +10,7 @@ import 'features/account/account_profile_controller.dart';
 import 'features/ai_usage/ai_usage_backend.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/notifications/notification_backend.dart';
+import 'features/osd/osd_controller.dart';
 import 'features/settings/bar_theme_controller.dart';
 import 'features/popups/popup_app.dart';
 import 'features/popups/bar_popup.dart';
@@ -69,6 +70,7 @@ Future<void> main(List<String> arguments) async {
       aiUsage: AiUsageBackend()..start(),
       account: AccountProfileController()..start(),
       notifications: NotificationBackend()..start(),
+      osd: OsdController()..start(output: hyprland.output?.name),
       onOpenSettingsPage: (page) =>
           openRemyaSettings(debugExecutable: debugSettings, page: page),
       showTray: true,

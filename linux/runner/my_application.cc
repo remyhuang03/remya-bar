@@ -201,28 +201,51 @@ static void my_application_startup(GApplication* application) {
   self->shortcut_bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, nullptr);
   if (self->shortcut_bus != nullptr) {
     self->shortcut_subscription = g_dbus_connection_signal_subscribe(
-        self->shortcut_bus, nullptr, "top.remya.bar.Shortcuts", "ToggleSidebar",
+        self->shortcut_bus, nullptr, "top.remya.bar.Shortcuts", nullptr,
         "/top/remya/bar", nullptr, G_DBUS_SIGNAL_FLAGS_NONE,
-        +[](GDBusConnection*, const gchar*, const gchar*, const gchar*, const gchar*,
-            GVariant* parameters, gpointer data) {
-          const gchar* signature;
-          if (!g_variant_is_of_type(parameters, G_VARIANT_TYPE("(s)"))) return;
-          g_variant_get(parameters, "(&s)", &signature);
-          if (g_strcmp0(signature, g_getenv("HYPRLAND_INSTANCE_SIGNATURE")) != 0) return;
+        +[](GDBusConnection*, const gchar*, const gchar*, const gchar*,
+            const gchar* signal_name, GVariant* parameters, gpointer data) {
+          if (g_variant_is_of_type(parameters, G_VARIANT_TYPE("(s)"))) {
+            const gchar* signature;
+            g_variant_get(parameters, "(&s)", &signature);
+            if (signature[0] != '\0' &&
+                g_strcmp0(signature, g_getenv("HYPRLAND_INSTANCE_SIGNATURE")) != 0) {
+              return;
+            }
+          } else if (!g_variant_is_of_type(parameters, G_VARIANT_TYPE("()"))) {
+            return;
+          }
           auto* self = MY_APPLICATION(data);
           GHashTableIter iterator;
           gpointer value;
-          g_hash_table_iter_init(&iterator, self->bar_windows);
-          bool closed = false;
-          while (g_hash_table_iter_next(&iterator, nullptr, &value)) {
-            closed |= close_bar_sidebar(FL_VIEW(gtk_bin_get_child(GTK_BIN(value))));
+          if (g_strcmp0(signal_name, "ToggleSidebar") == 0) {
+            if (!g_variant_is_of_type(parameters, G_VARIANT_TYPE("(s)"))) return;
+            g_hash_table_iter_init(&iterator, self->bar_windows);
+            bool closed = false;
+            while (g_hash_table_iter_next(&iterator, nullptr, &value)) {
+              closed |= close_bar_sidebar(FL_VIEW(gtk_bin_get_child(GTK_BIN(value))));
+            }
+            if (closed) return;
+            g_hash_table_iter_init(&iterator, self->bar_windows);
+            while (g_hash_table_iter_next(&iterator, nullptr, &value)) {
+              auto* view = gtk_bin_get_child(GTK_BIN(value));
+              auto* channel = FL_METHOD_CHANNEL(g_object_get_data(G_OBJECT(view), "window-channel"));
+              fl_method_channel_invoke_method(channel, "toggleSidebar", nullptr, nullptr, nullptr, nullptr);
+            }
+            return;
           }
-          if (closed) return;
-          g_hash_table_iter_init(&iterator, self->bar_windows);
-          while (g_hash_table_iter_next(&iterator, nullptr, &value)) {
-            auto* view = gtk_bin_get_child(GTK_BIN(value));
-            auto* channel = FL_METHOD_CHANNEL(g_object_get_data(G_OBJECT(view), "window-channel"));
-            fl_method_channel_invoke_method(channel, "toggleSidebar", nullptr, nullptr, nullptr, nullptr);
+          if (g_strcmp0(signal_name, "VolumeUp") == 0 ||
+              g_strcmp0(signal_name, "VolumeDown") == 0 ||
+              g_strcmp0(signal_name, "VolumeMute") == 0 ||
+              g_strcmp0(signal_name, "BrightnessUp") == 0 ||
+              g_strcmp0(signal_name, "BrightnessDown") == 0) {
+            g_hash_table_iter_init(&iterator, self->bar_windows);
+            while (g_hash_table_iter_next(&iterator, nullptr, &value)) {
+              auto* view = gtk_bin_get_child(GTK_BIN(value));
+              auto* channel = FL_METHOD_CHANNEL(g_object_get_data(G_OBJECT(view), "window-channel"));
+              g_autoptr(FlValue) action = fl_value_new_string(signal_name);
+              fl_method_channel_invoke_method(channel, "osdShortcut", action, nullptr, nullptr, nullptr);
+            }
           }
         }, self, nullptr);
   }

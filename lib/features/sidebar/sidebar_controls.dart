@@ -453,6 +453,9 @@ class _SidebarSlider extends StatefulWidget {
     required this.icon,
     required this.label,
     this.percent,
+    this.min = 0,
+    this.max = 100,
+    this.valueLabel,
     this.muted = false,
     this.onChange,
     this.onIcon,
@@ -462,6 +465,9 @@ class _SidebarSlider extends StatefulWidget {
   final IconData icon;
   final String label;
   final num? percent;
+  final double min;
+  final double max;
+  final String Function(double)? valueLabel;
   final bool muted;
   final ValueChanged<double>? onChange;
   final VoidCallback? onIcon;
@@ -533,14 +539,18 @@ class _SidebarSliderState extends State<_SidebarSlider> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final percent = (_draft ?? _pending ?? widget.percent?.toDouble() ?? 0)
-        .clamp(0.0, 100.0);
+    final min = widget.min;
+    final max = widget.max;
+    final percent = (_draft ?? _pending ?? widget.percent?.toDouble() ?? min)
+        .clamp(min, max);
+    final valueLabel =
+        widget.valueLabel?.call(percent) ?? '${percent.round()}%';
     final muted = widget.muted && _draft == null && _pending == null;
     final label = muted
         ? 'Muted'
         : widget.percent == null
         ? '—'
-        : '${percent.round()}%';
+        : valueLabel;
     final onChange = widget.onChange;
     final active = muted ? colors.onSurface : colors.primary;
     final inactive = colors.secondaryContainer;
@@ -554,7 +564,7 @@ class _SidebarSliderState extends State<_SidebarSlider> {
         }
         GestureBinding.instance.pointerSignalResolver.register(event, (_) {
           onChange(
-            (percent + (event.scrollDelta.dy < 0 ? 5 : -5)).clamp(0, 100),
+            (percent + (event.scrollDelta.dy < 0 ? 5 : -5)).clamp(min, max),
           );
         });
       },
@@ -571,9 +581,10 @@ class _SidebarSliderState extends State<_SidebarSlider> {
                 double.infinity,
               );
               final value = muted
-                  ? (6000 / trackWidth).clamp(0.0, 100.0)
+                  ? min + (max - min) * (60 / trackWidth).clamp(0.0, 1.0)
                   : percent;
-              final handle = inset + trackWidth * value / 100;
+              final fraction = (value - min) / (max - min);
+              final handle = inset + trackWidth * fraction;
               final readoutStyle = Theme.of(context).textTheme.bodySmall
                   ?.copyWith(fontSize: 12);
               final readoutPainter = TextPainter(
@@ -585,7 +596,7 @@ class _SidebarSliderState extends State<_SidebarSlider> {
               readoutPainter.dispose();
               final inactiveSpace = constraints.maxWidth - handle;
               final onActiveTrack =
-                  inactiveSpace < readoutWidth + 22 && value > 50;
+                  inactiveSpace < readoutWidth + 22 && fraction > .5;
               final iconColor = handle < 38 || widget.percent == null
                   ? colors.onSecondaryContainer
                   : muted
@@ -626,8 +637,9 @@ class _SidebarSliderState extends State<_SidebarSlider> {
                         ),
                         child: Slider(
                           value: value,
-                          max: 100,
-                          label: '${percent.round()}',
+                          min: min,
+                          max: max,
+                          label: valueLabel,
                           overlayColor: .resolveWith(
                             (states) =>
                                 states.contains(WidgetState.focused) &&
