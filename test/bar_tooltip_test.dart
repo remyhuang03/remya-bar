@@ -5,7 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/widgets/bar_tooltip.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 void main() {
   testWidgets('hover opens a Flutter popup and closes it on exit or disposal', (

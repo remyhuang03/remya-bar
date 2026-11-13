@@ -5,7 +5,9 @@ class DatetimeCard extends StatelessWidget {
   const DatetimeCard({super.key, required this.data, required this.onSettings});
 
   final Map<String, Object?> data;
-  final VoidCallback onSettings;
+
+  /// Null hides the button, e.g. while Remya Settings is not installed.
+  final VoidCallback? onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -28,11 +30,12 @@ class DatetimeCard extends StatelessWidget {
               'Datetime',
               style: _type(context, 24, colors.primaryFixed, .w700),
             ),
-            IconButton.filledTonal(
-              tooltip: 'Date and time settings',
-              onPressed: onSettings,
-              icon: const Icon(Icons.settings_outlined),
-            ),
+            if (onSettings != null)
+              IconButton.filledTonal(
+                tooltip: 'Date and time settings',
+                onPressed: onSettings,
+                icon: const Icon(Icons.settings_outlined),
+              ),
           ],
         ),
         if (valid)

@@ -4,9 +4,10 @@ import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/services.dart';
 import 'package:flutter/physics.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 import '../../bar_theme.dart';
+import '../settings/bar_settings_entry.dart';
 import '../keyboard/keyboard_panel.dart';
 import '../ai_usage/ai_usage_data.dart';
 import '../notifications/notification_view.dart';
@@ -30,6 +31,8 @@ class BarPopupHost extends StatefulWidget {
 class _BarPopupHostState extends State<BarPopupHost>
     with WidgetsBindingObserver {
   late List<FlutterView> _views;
+  final _settingsPages = <int, String>{};
+  var _settingsRequest = 0;
 
   List<FlutterView> _popupViews() {
     final dispatcher = WidgetsBinding.instance.platformDispatcher;
@@ -43,11 +46,31 @@ class _BarPopupHostState extends State<BarPopupHost>
   void initState() {
     super.initState();
     _views = _popupViews();
+    barSettingsChannel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'open':
+          final args = call.arguments;
+          if (args is! Map ||
+              args['viewId'] is! int ||
+              args['page'] is! String) {
+            throw const FormatException('Invalid settings view');
+          }
+          setState(() {
+            _settingsPages[args['viewId'] as int] = args['page'] as String;
+            _settingsRequest++;
+            _views = _popupViews();
+          });
+        case 'closed':
+          setState(() => _settingsPages.remove(call.arguments));
+      }
+    });
+    barSettingsChannel.invokeMethod<void>('ready');
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    barSettingsChannel.setMethodCallHandler(null);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -65,7 +88,12 @@ class _BarPopupHostState extends State<BarPopupHost>
         View(
           key: ValueKey(view.viewId),
           view: view,
-          child: BarPopupApp(channel: BarPopup.viewChannel(view.viewId)),
+          child: _settingsPages.containsKey(view.viewId)
+              ? BarSettingsEntry(
+                  page: _settingsPages[view.viewId]!,
+                  request: _settingsRequest,
+                )
+              : BarPopupApp(channel: BarPopup.viewChannel(view.viewId)),
         ),
     ],
   );

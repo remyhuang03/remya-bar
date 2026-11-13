@@ -45,6 +45,11 @@ class _SidebarDetailState extends State<_SidebarDetail> {
   void _expand(String id) =>
       setState(() => _expanded = _expanded == id ? null : id);
 
+  /// Opens a Remya Settings page; null while Settings is not installed.
+  VoidCallback? _settings(String page) => remyaSettingsInstalled()
+      ? () => widget.send('sidebar.settings', target: page)
+      : null;
+
   Widget _button(
     String label,
     VoidCallback? action, {
@@ -175,10 +180,8 @@ class _SidebarDetailState extends State<_SidebarDetail> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            _button(
-              'Network settings',
-              () => widget.send('sidebar.settings', target: 'wifi'),
-            ),
+            if (_settings('wifi') case final open?)
+              _button('Network settings', open),
             _button(
               'Hidden network…',
               canConnect && connecting == null
@@ -242,7 +245,7 @@ class _SidebarDetailState extends State<_SidebarDetail> {
               : widget.busy || connecting != null
               ? null
               : !supported
-              ? () => widget.send('sidebar.settings', target: 'wifi')
+              ? _settings('wifi')
               : secured && uuid == null
               ? () => _wifiCredentials(ssid: ssid)
               : () => widget.send(
@@ -487,10 +490,8 @@ class _SidebarDetailState extends State<_SidebarDetail> {
         Wrap(
           spacing: 8,
           children: [
-            _button(
-              'Bluetooth settings',
-              () => widget.send('sidebar.settings', target: 'bluetooth'),
-            ),
+            if (_settings('bluetooth') case final open?)
+              _button('Bluetooth settings', open),
             _button(
               scanning ? 'Stop scan' : 'Scan',
               enabled && !pairing
@@ -538,13 +539,8 @@ class _SidebarDetailState extends State<_SidebarDetail> {
           ),
       ],
       bottom: [
-        Align(
-          alignment: .centerLeft,
-          child: _button(
-            'Sound settings',
-            () => widget.send('sidebar.settings', target: 'sound-volume'),
-          ),
-        ),
+        if (_settings('sound-volume') case final open?)
+          Align(alignment: .centerLeft, child: _button('Sound settings', open)),
       ],
     );
   }
@@ -578,13 +574,8 @@ class _SidebarDetailState extends State<_SidebarDetail> {
           ),
       ],
       bottom: [
-        Align(
-          alignment: .centerLeft,
-          child: _button(
-            'Power settings',
-            () => widget.send('sidebar.settings', target: 'power'),
-          ),
-        ),
+        if (_settings('power') case final open?)
+          Align(alignment: .centerLeft, child: _button('Power settings', open)),
       ],
     );
   }

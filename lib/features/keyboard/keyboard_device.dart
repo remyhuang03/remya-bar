@@ -2,13 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+
+import '../settings/bar_preferences.dart';
 
 import '../hyprland/hyprland_backend.dart';
 
 /// Hyprland marks the virtual device as main as soon as it sends a key.
 class KeyboardDevice {
   final _settings = SettingsClient();
+  late final _preferences = BarPreferences(client: _settings);
   String? _physical;
   bool _preview = true;
 
@@ -16,7 +19,7 @@ class KeyboardDevice {
 
   Future<bool> _readPreview() async {
     try {
-      _preview = await _settings.readBarKeyboardPreview().timeout(
+      _preview = await _preferences.readKeyboardPreview().timeout(
         const Duration(milliseconds: 500),
       );
     } catch (error) {

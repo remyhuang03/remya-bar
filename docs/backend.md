@@ -1,45 +1,84 @@
-# Backend and Settings dependency
+# Backend and Remya Core contract
 
-Remya Bar (`top.remya.bar`, executable `remya_bar`) is independently built and
-installed. It depends on Remya Settings (`top.remya.settings`, executable
-`remya_settings`) for configuration, shared Material theme policy, and future
-settings operations. Install Settings first; the Bar installer checks its desktop
-entry in XDG_DATA_HOME/XDG_DATA_DIRS.
+Remya Bar (`top.remya.bar`, executable `remya_bar`) depends on Remya Core,
+not the Settings GUI. The installer requires the XDG activation file
+`dbus-1/services/top.remya.Core1.service` and orders `top.remya.bar.service`
+after `top.remya.core.service`. The session D-Bus name, object path and interface
+are `top.remya.Core1`, `/top/remya/Core1`, and `top.remya.Core1`; Core provides
+`remyad` and CLI `remya`.
 
-## Public Settings boundary
+## Public integration boundary
 
-Use `remya_settings_client`, owned by the Settings repository, for all Settings
-interactions. The development source dependency is
-`../remya-settings/packages/remya_settings_client`. Installed bundles contain
-compiled code and do not require sibling source repositories.
+Development uses path dependencies `../remya-core/packages/remya_client` (pure
+Dart system/shared APIs, `AppPreferences`, opener) and
+`../remya-core/packages/remya_ui` (theme, theme controller, AI identity icons).
+Compiled bundles do not require sibling repositories. System sound, networking,
+Bluetooth, power, night light, brightness/gamma, account and AI provider usage
+remain Core operations. Brightness/gamma currently have no typed Dart helpers;
+Bar uses the documented Get/Set operations via `SettingsClient.call`.
+System pages open through `openRemyaSettings`; debug may launch the sibling
+Settings debug bundle using that public opener.
 
-The package contains the versioned contract, D-Bus client, settings opener,
-MD3E theme, and observable theme controller. Release bars request the effective
-theme through `top.remya.settings.Service1`, use `Changed` signals, and refresh
-every two seconds to recover from service restarts. Settings starts in the
-background on demand; the sidebar Settings action calls `Open("remya-bar")`. In debug,
-the public opener launches the sibling repository's
-`build/linux/x64/debug/bundle/remya_settings` directly, so an installed D-Bus
-activation file is unnecessary. Build that Settings debug bundle first. Failed launches show
-a popup error banner and remain retryable. The bar never writes settings files
-or applies desktop appearance itself. Bar and popup typography use the system
-Inter font, while preserving the shared CJK fallback list. Inter is a runtime
-dependency (`inter-font` on Arch), checked by the installer; no font files are bundled.
+Bar owns `linux/packaging/remya-bar.json`, installed as
+`$XDG_DATA_HOME/remya/apps/remya-bar.json`. It declares the `remya-bar`
+registration, `top.remya.bar` desktop id, `bar` config namespace, pages `layout`,
+`osd`, `notifications`, `ai-ring`, complete schemas and defaults. Storage keys are
+`layout`, `clock-seconds`, `keyboard-preview`, `folded-apps`, `sidebar-layout`,
+`osd`, `notifications`, `quiet-schedule`, `priority-notifications`, and `ai-ring`.
+Object field names in storage use kebab case. Bar's internal popup transport
+retains its existing field names.
 
-Both apps use the same seed color, DynamicSchemeVariant mapping, typography
-fallback, Material 3 mode, and expressive icon style. Invalid updates retain the
-last valid theme. Debug builds first read `<bar-repo>/config/config.local.toml`,
-then the sibling Settings repository's local config, then installed XDG config.
-The native runner supplies the absolute repository root independently of cwd.
-Release builds always use the Settings service.
+`BarPreferences` uses only `AppPreferences('remya-bar')` Get/Set/Replace.
+Core stores these values at `$XDG_CONFIG_HOME/remya/bar/settings.toml` and emits
+`Changed` with the full registered setting id, e.g. `remya-bar.osd`.
+Bar additionally checks pill uniqueness across groups, center bounds, UTF-8
+byte bounds for identifiers, and priority app id uniqueness. Errors retain the
+last valid value/revision; invalid values are never silently repaired. Tray
+edits read the current value and Replace with its revision. Sidebar edits use
+the revision of the displayed value and retain Core's conflict message:
+`Changed in another view. Reopen the editor.` No old interface or migration is used.
 
-See [the complete Settings API](../../remya-settings/docs/public-api.md) for both
-CLI and D-Bus operations, schemas, availability, errors, and compatibility rules;
-see [XDG installation and paths](../../remya-settings/docs/xdg-layout.md).
-Future components must extend the owning Settings feature and its common
-operation dispatcher, client contract, API documentation, and parity tests.
-Do not import Settings UI/controllers/backends into Bar or add component-specific
-private config parsing. No speculative plugins or future modules are included.
+System settings live in `remya/system/`; shared appearance lives in
+`remya/shared/theme.toml`. Only absolute XDG roots are accepted, with absolute
+HOME fallbacks. Release uses `SettingsThemeController.service` from `remya_ui`.
+Debug theme resolution is `<bar>/config/config.local.toml`, then
+`<core>/config/shared/theme.toml`, then installed shared theme. The runner
+supplies an absolute repository root independently of cwd. Invalid themes retain
+the last valid theme. Bar and popup typography use system Inter with shared CJK
+fallbacks; the installer checks Inter (`inter-font` on Arch).
+
+## Settings window entry
+
+`remya_bar --settings [page]` forwards to the resident GApplication. The primary
+creates a normal GTK toplevel titled `Remya Bar Settings` with app id
+`top.remya.bar`, using `fl_view_new_for_engine` on the existing warm popup engine.
+`top.remya.bar/settings` carries `open({viewId, page})`, `closed(viewId)` and the
+Dart `ready` handshake; bar engines request `open(page)`. Repeated opens reuse
+the window and deliver the new page. Closing destroys the view, keeping the
+engine available. The desktop action Exec is the installed command plus
+`--settings`, so Core `OpenApp('remya-bar', page)` reaches this entry.
+
+`BarSettingsEntry` shows the registered pages (`layout`, `osd`,
+`notifications`, `ai-ring`) in a navigation rail. Each `open` delivers a request
+serial, so reopening any page navigates even while the window stays open; an
+empty or unknown page keeps the current one. The window runs its own
+`BarSettingsController` and Remya theme controller on the popup engine (debug
+reads the repository root through `top.remya.paths`, also registered there).
+The controller subscribes to Core `Changed` and service owner changes before
+reading, rereads a key on its `Changed`, and reads tracked providers from
+`ai.providers`. Every edit is a `Replace` with the revision of the displayed
+value. Read errors (for example `Unavailable`) and write errors are shown with
+text, an icon and a Reload action while the last valid values stay visible; a
+conflict stays shown until the user reloads that preference or saves it again.
+Controls of a preference being saved are disabled; schedule times and repeat are
+hidden while the quiet schedule is off, and options of hidden pills are omitted.
+The sidebar and keyboard Settings buttons open this window. Buttons that open
+Remya Settings pages are hidden unless `applications/top.remya.settings.desktop`
+exists in an absolute XDG data root (rechecked at most every five seconds).
+
+See Core's [public API](../../remya-core/docs/public-api.md),
+[XDG layout](../../remya-core/docs/xdg-layout.md), and
+[app preferences](../../remya-core/docs/app-preferences.md).
 
 ## Hyprland IPC
 
@@ -97,7 +136,7 @@ icon channel. Body markup keeps only `<b> <i> <u> <a href>` (http, https and
 mailto links), turns `<br>` into a line break and falls back to the raw text
 when malformed. The non-standard `value` hint is shown as progress.
 
-`expire_timeout` -1 uses the Settings popup duration, 0 never expires, and
+`expire_timeout` -1 uses the Bar popup duration, 0 never expires, and
 Critical never expires. Expiry hides the popup and keeps the notification in
 history; `transient` notifications leave with their popup (reason 1).
 `notificationsHover` pauses all popup timers. `CloseNotification` emits reason
@@ -114,8 +153,8 @@ entries show their saved content in the center without replaying popups, sounds,
 or action buttons tied to the previous daemon instance. Use an isolated
 `XDG_STATE_HOME` when testing with a separate session bus.
 
-Settings owns the preferences (`Get("notifications")`, see the Settings
-[notifications API](../../remya-settings/docs/public-api.md#notifications)).
+Bar owns notification preferences in `remya-bar.notifications`,
+`remya-bar.quiet-schedule` and `remya-bar.priority-notifications`.
 Every output engine reads them, follows `Changed` for the notification IDs and
 passes them to `notificationsConfigure`; read errors keep the last valid
 values. Each engine reports its output's Hyprland full screen state with
@@ -145,10 +184,11 @@ panel is open, since the panel lists the same notifications in that corner.
 
 ## Validation
 
-Run the checks in AGENTS.md and `python ../remya-settings/test/interface_smoke.py`
-after building both release bundles. The integration test uses temporary XDG
-roots and an isolated session bus, verifies real bar theme changes on every
-connected output, and stops its own bars and settings service. Keep debug and
+Run the checks in AGENTS.md. Validate registration schemas/defaults with
+`uv run --no-cache --with jsonschema python test/bar_registration_test.py`
+and temporary-XDG installation with `python test/install_test.py`. Native
+lifecycle and window smoke checks should use an isolated session bus and
+temporary XDG state/data roots to preserve the installed desktop. Keep debug and
 release builds/tests sequential within a repository because Flutter shares its
 native ephemeral engine files across build modes.
 
@@ -160,7 +200,7 @@ recreates the surfaces and raster contexts with the new output scales.
 Re-exec happens before destroying the disconnected output's Flutter engine
 because its destructor terminates the EGL display still shared by other bars
 and popups. The new process reads the current outputs, restores notification
-history and reloads preferences from Settings. Run `python test/bar_resume_smoke.py` with
+history and reloads preferences from Core. Run `python test/bar_resume_smoke.py` with
 `python-dbus` on Hyprland to exercise the wake path without suspending the host.
 
 `fvm dart run test/hyprland_ipc_smoke.dart` verifies both real IPC endpoints
@@ -174,12 +214,12 @@ this is separate from successful transport/readback.
 Use `BarTooltip` instead of Flutter `Tooltip` or `IconButton.tooltip` inside the
 bar: a Flutter overlay cannot leave its 40-pixel native surface. Tooltip text,
 background, border, wrapping, typography, and text scaling are rendered by Flutter.
-The tooltip uses the owning Settings palette's `surfaceContainerHigh` and
+The tooltip uses the owning Core palette's `surfaceContainerHigh` and
 `onSurface`, with an outline and rounded corners. GTK never draws its content.
 
 `BarPopup.show` is the shared transport for floating components. Its request has
 a component `kind`, view-local anchor rectangle, logical size, component `data`,
-and the versioned Settings theme. `BarPopupApp` dispatches each kind to its Flutter
+and the versioned Core theme. `BarPopupApp` dispatches each kind to its Flutter
 renderer. GTK owns placement, visibility, focus policy and lifetime only.
 
 Detail cards share one per-output popup slot. AI Usage opens on hover or click. Its Flutter view uses an OVERLAY layer surface anchored top/left,
@@ -197,7 +237,7 @@ and 200 ms retraction change only the painted/clipped shape; `resize.height`
 always measures full content including the 12 px neck and shadow insets. Missing
 pill geometry falls back to a rounded card. The media pill sends its artwork
 palette's primary as `cardSeed`; pill and card regenerate the same surface palette
-using that seed, brightness and Settings style variant.
+using that seed, brightness and Core style variant.
 
 The popup announces `ready` before receiving `content`. Native sets `opening: true`
 only when a card maps or switches kind; showing the same visible card replaces its
@@ -220,8 +260,8 @@ The process starts one shared popup engine with a realized, unmapped implicit
 GTK view. The popup entry path (`--remya-popup`) runs a Flutter `ViewCollection`
 of the explicit popup views. Each open popup has its own view and method channel
 named by its view ID. Native forwards actions to the owning bar view, which also
-supplies the effective Settings theme. The popup engine runs no bar Rust event
-subscription or Settings controller.
+supplies the effective Core theme. The popup engine runs no bar Rust event
+subscription or Core controller.
 
 Each popup has zero exclusive space. The bar stays 40 pixels tall. Tooltip hover
 waits 500 ms and closes on pointer exit or widget disposal. Closing a popup or
@@ -234,8 +274,8 @@ scale.
 `lib/features/clock/bar_clock.dart` displays the local system date and time in
 its configured pill group on wide outputs, and centered on narrow outputs. It reads the real wall clock on every tick,
 aligns updates to second boundaries, and cancels its timer when an output view
-is removed. Only the clock widget rebuilds. It does not call Settings or spawn
-processes for each tick; time and time zone writes remain owned by Settings.
+is removed. Only the clock widget rebuilds. It does not call Core or spawn
+processes for each tick; time and time zone writes remain owned by Core.
 The initial date/time format is deliberately fixed, with no formatting preference.
 Very narrow transitional surfaces omit the clock so the sidebar button remains usable.
 
@@ -246,7 +286,7 @@ The main bar reads system batteries from Linux sysfs through the Rust bridge.
 Peripheral batteries are excluded. The first system battery is shown when its
 charge is available, and only the kernel status `Charging` shows a bolt. Charge at
 or below 20% takes color precedence over energy saver. The saver color follows the
-live `system.profile` from Settings' public `Get power` operation.
+live `system.profile` from Core's public `Get power` operation.
 
 ## Media control
 
@@ -256,10 +296,10 @@ Signals coalesce for 25 ms; position refreshes once per second only while playin
 Failed connections reconnect with bounded backoff; unchanged snapshots are suppressed.
 Play/pause updates optimistically for up to two seconds and rolls back on failure.
 The pill uses the selected player's position and duration. Both the pill and hover card derive their palette from the selected cover and fall
-back to the Settings palette when artwork is unavailable.
+back to the Core palette when artwork is unavailable.
 The hover card sends transport and seek commands to that player. Rust checks
 capabilities and validates the unique owner and track ID before seeking.
-The output slider reads the default device via Settings' public Sound API
+The output slider reads the default device via Core's public Sound API
 and writes the named device through `sound.output-volume`. Volume updates immediately
 and coalesces pending writes to the latest value, with authoritative final readback.
 The volume slider sends throttled updates while dragging; both sliders hold their
@@ -276,19 +316,19 @@ time page through the public Settings opener.
 ## Clock and battery
 
 The clock capsule shows local time and the date. Bar reads
-`remya-bar.clock-seconds` from the public Settings service and follows its
+`remya-bar.clock-seconds` from the public Core service and follows its
 change notifications, with a default of showing seconds.
 
 Bar reads the clock, layout, power, and Wi-Fi/Bluetooth quick status once at
-startup and then only on Settings `Changed` signals; a signal that arrives
+startup and then only on Core `Changed` signals; a signal that arrives
 during a read reruns it. Only the account profile keeps a one-minute fallback,
-because avatar or name edits made outside Settings emit no signal.
+because avatar or name edits made outside Core emit no signal.
 
 The battery card reads charge, estimated time, draw, health and cycle count
 from the system battery when those fields are available. It reads and changes
-the power profile and automatic Energy Saver through the public Settings Power
-API. Settings owns the threshold and restores the last nonzero threshold when
-automatic Energy Saver is enabled. Settings continues to validate and apply
+the power profile and automatic Energy Saver through the public Core Power
+API. Core owns the threshold and restores the last nonzero threshold when
+automatic Energy Saver is enabled. Core continues to validate and apply
 power writes, and the card displays the returned state.
 
 ## Application tray
@@ -310,12 +350,10 @@ a time with `AboutToShow` and `GetLayout` and revalidates enabled leaf actions
 before sending `Event`. If an app has no usable DBusMenu, the local menu offers
 its native `ContextMenu` action. Legacy XEmbed items are outside this implementation.
 
-Items start pinned. Settings owns the folded IDs through
-[`remya-bar.folded-apps`](../../remya-settings/docs/public-api.md#remya-bar-folded-applications).
+Items start pinned. Bar owns folded IDs through `remya-bar.folded-apps`.
 Bar identifies apps by SNI ID with the executable name when available, since
 different Chromium-based apps can export the same ID. All outputs read the
-same Settings preference and reconcile on change. Appearance → Remya Bar
-in Settings lists folded IDs and can pin them again, even while the app is closed.
+same Bar preference through Core and reconcile on change.
 
 ## System Resources
 
@@ -340,9 +378,9 @@ Its monitor button opens a supported desktop system monitor.
 The 420-logical-pixel panel opens 6 pixels from the output’s right edge and
 8 pixels below the bar. The panel sizes to its content and scrolls when needed.
 
-The sidebar reads live Settings state while visible. Display brightness targets
+The sidebar reads live Core state while visible. Display brightness targets
 the owning output. Sound controls act on the displayed PipeWire input/output
-device. Output volume spans 0% to the Settings `remya-bar.volume-max` ceiling
+device. Output volume spans 0% to the Bar `remya-bar.osd` `volume-max` ceiling
 (100–150%, default 150%; a higher level set elsewhere extends the track), with
 Boost above 100%. The sliders share the OSD visual rules: a dot marks the 100%
 volume threshold or the hardware brightness floor while it lies on the inactive
@@ -360,28 +398,27 @@ picker on secondary click.
 
 Sidebar writes run in FIFO order; queued volume and brightness writes coalesce
 per action and target to the latest value. Predictable controls update immediately
-and reconcile with Settings results; refresh reads wait until the queue drains.
+and reconcile with Core results; refresh reads wait until the queue drains.
 Layout editing, session actions, Wi-Fi connection/forget flows, Bluetooth
 pairing/forget flows, and the airplane and keyboard toggles use the busy guard.
 
 Wi-Fi scan, connection, disconnect, forget, and hidden-network activation use
-Settings' NetworkManager API. BlueZ state, scan, connect, disconnect, forget,
+Core's NetworkManager API. BlueZ state, scan, connect, disconnect, forget,
 and pairing prompts use the Bluetooth API. Night Light toggles the current
-hyprsunset state and follows the schedule already configured in Settings.
+hyprsunset state and follows the schedule already configured in Core.
 Power Saver toggles between power-saver and balanced when both profiles exist,
 and the Power detail lists every available profile. Keep awake shares the
-Settings service's session-only hypridle inhibitor. On startup the bar asks
-Settings to ensure hypridle is running. Settings reuses an existing daemon or
-starts the packaged user service. Dark mode uses the Settings
+Core service's session-only hypridle inhibitor. On startup the bar asks
+Core to ensure hypridle is running. Core reuses an existing daemon or
+starts the packaged user service. Dark mode uses the Core
 Light/Dark preference and applies it through the same appearance backend.
-Mic mute controls the current default PipeWire input through Settings Sound.
-The compact and large Do Not Disturb controls use the same manual Settings
+Mic mute controls the current default PipeWire input through Core Sound.
+The compact and large Do Not Disturb controls use the same manual Bar
 preference. Airplane mode reads live radio state via `readAirplane` and writes
-via `setAirplaneEnabled`. Settings owns radio readback, partial-failure
-handling, and migration of the former VPN tile in saved sidebar layouts.
+via `setAirplaneEnabled`. Core owns radio readback and partial-failure handling.
+Bar validates sidebar tile IDs without retired-tile or VPN migration.
 
-The editor sends the old and new visible tile order to Settings for an atomic
-update. Hidden IDs are inferred from the full tile list. The Power menu asks
+The editor uses the visible tile order and Core revision for an atomic Replace. Hidden IDs are inferred from the full tile list. The Power menu asks
 logind to lock, suspend, or terminate the current graphical session, reboot, or
 power off. Suspend, log out, restart and shut down require a second click within
 three seconds. Screenshot, screen record, and color picker tiles launch
@@ -410,16 +447,16 @@ top edge while the bar is hidden in fullscreen) with zero exclusive space, no
 keyboard focus, and an empty input region so pointer events pass through. Opening
 or hiding the OSD does not close the sidebar, hover cards, or menus.
 
-The OSD responds to Settings change signals for sound, hardware brightness and
-gamma. Settings watches PulseAudio and kernel backlight events. Bar reads state
+The OSD responds to Core change signals for sound, hardware brightness and
+gamma. Core watches PulseAudio and kernel backlight events. Bar reads state
 at startup, after a service restart, when an output changes, or when a shortcut
 needs a missing baseline. Hardware brightness feedback appears on the affected
 output; volume and gamma feedback appear on the focused output. Shortcut input
 uses session D-Bus signals on `top.remya.bar.Shortcuts` at
 `/top/remya/bar`: `VolumeUp`, `VolumeDown`, `VolumeMute`, `BrightnessUp`, and
 `BrightnessDown`. Step sizes, maximum volume, and minimum gamma are read from
-Settings via `BarOsdClient` (`remya-bar.osd`: `remya-bar.volume-step`,
-`remya-bar.volume-max`, `remya-bar.brightness-step`, `remya-bar.gamma-min`) and
+BarPreferences (`remya-bar.osd`: `volume-step`, `volume-max`,
+`brightness-step`, `gamma-min`) and
 updated on `Changed` signals. `VolumeUp` stops at `volume-max` but never lowers
 a higher level set elsewhere. `VolumeDown` reaching 0% also mutes; `VolumeMute`
 or `VolumeUp` from 0% unmutes at one volume step. Brightness shortcuts adjust hardware backlight/DDC brightness between
@@ -442,7 +479,7 @@ keyboard is visible. The floating position is written atomically to
 `$XDG_STATE_HOME/remya/bar/keyboard.ini` (default `~/.local/state`).
 Hyprland supplies the current layout group and physical Caps Lock state. The
 runner compiles the XKB keymap and sends evdev key events with
-`zwp_virtual_keyboard_v1`. Settings owns the touch key preview preference.
+`zwp_virtual_keyboard_v1`. Bar owns the touch key preview preference through Core app preferences.
 
 ## Fullscreen output visibility
 
@@ -454,13 +491,13 @@ releases the bar's exclusive zone while hidden. Leaving fullscreen restores the
 refresh, with periodic reconciliation for missed events.
 
 On outputs at least 700 logical pixels wide (after text scaling), pills follow
-Settings' `remya-bar.layout` (read through `BarLayoutClient`, refreshed on
+Bar's `remya-bar.layout` (read through `BarPreferences`, refreshed on
 `Changed`, with the last valid layout kept on errors). Groups are spaced evenly
 across the bar with 24-pixel side padding, and pills inside a group are 8 pixels
-apart. The default layout has four groups: notifications, window, resources and
-media in the first group, workspaces and clock in the centered group, the tray
-in the third group, and battery and Quick Settings in the last group. Groups
-keep their natural widths. When they fit, Settings can center one group, and the
+apart. The default layout has four groups: notifications, window and resources
+in the first group, workspaces and clock in the centered group, the tray
+in the third group, and AI usage, battery and Quick Settings in the last group. Groups
+keep their natural widths. When they fit, the layout can center one group, and the
 groups before and after it are then spaced evenly within their own side, as long
 as both sides fit. Otherwise groups sit 16 pixels apart and the bar scrolls
 horizontally; the mouse wheel scrolls it unless a pill such as the workspaces
@@ -474,7 +511,7 @@ The media title uses an ellipsis by default. The experimental media marquee
 option scrolls long titles at 20 Hz and leaves the media controls available
 in both modes.
 Narrower outputs show the centered clock and the quick settings toggle.
-The toggle shows live Wi-Fi, Bluetooth and volume state from Settings and
+The toggle shows live Wi-Fi, Bluetooth and volume state from Core and
 omits icons whose state is unknown.
 Capsules with missing data are omitted before their width is assigned.
 
@@ -524,14 +561,14 @@ The optional `codexbar-cli` dependency supplies the `codexbar` executable. A
 worker in the warm popup engine coalesces requests from all outputs into one
 sample every five minutes. Rust starts and supervises the CLI child, binds its
 HTTP server to a reserved port on `127.0.0.1` and ties the child to the bar
-process. Reads `Get("ai.bar")` from Settings (`pinned`, `lowPercent`, `showUsed`, and
-`ringOrder` without a provider probe) and re-polls when Settings signals `Changed` for
-`ai.providers` or `ai.bar`. Tracked providers are CodexBar's enabled set from
-`codexbar config providers`, which Settings > AI writes. The pill shows
+process. Reads `remya-bar.ai-ring` via BarPreferences (`pinned`, `low-percent`,
+`show-used`, `ring-order` without a provider probe) and re-polls when Core signals
+`Changed` for `ai.providers` or `remya-bar.ai-ring`. Tracked providers are CodexBar's enabled set from
+`codexbar config providers`, which Settings > AI writes through Core. The pill shows
 `pinned` in order (at most three, each only while it has data) or, without
 pins, the first three tracked providers with data; the card shows every tracked
-provider. `lowPercent` sets the low-quota threshold. While Settings is
-unreachable the worker keeps its last Settings value; before the first one it
+provider. `lowPercent` sets the low-quota threshold. While Core is
+unreachable the worker keeps its last Core value; before the first one it
 uses a 20% threshold. Usage is always probed for all providers and filtered locally.
 Bar views apply presentation preferences independently of the quota probe. A
 single quota window uses the outer ring. With two windows, the selected ring
@@ -550,8 +587,8 @@ The pill and card show providers with at least one valid quota percentage.
 Errors and samples older than ten minutes hide the affected provider until a
 valid sample returns. Missing reset, pace, and spend fields stay unknown.
 The card shows positive credit balances and banked resets reported by CodexBar.
-Provider logos, brand colors and the Lobe Icons notice come from the Settings
-client package (`loadAiIdentity()`, called at startup in the bar and popup
+Provider logos, brand colors and the Lobe Icons notice come from the Core
+UI package (`loadAiIdentity()`, called at startup in the bar and popup
 engines). Rings, meters and spend series use `aiProviderAccent`; low quotas use
 the error colors. Logos are drawn without a color filter so color logos keep
 their colors; monochrome ones follow `currentColor`. Providers without a known

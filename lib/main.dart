@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 import 'app.dart';
 import 'features/account/account_profile_controller.dart';
@@ -28,18 +29,8 @@ Future<void> main(List<String> arguments) async {
     startAiUsageWorker();
     return;
   }
-  final root = kDebugMode
-      ? await const MethodChannel('top.remya.paths')
-            .invokeMethod<String>('repositoryDirectory')
-      : null;
-  final preferences = kDebugMode
-      ? SettingsThemeController(
-          () => resolveBarTheme(
-            isDebug: kDebugMode,
-            repositoryDirectory: root == null ? null : Directory(root).absolute,
-          ),
-        )
-      : SettingsThemeController.service();
+  final root = await barRepositoryRoot();
+  final preferences = barThemeController(root);
   await preferences.start();
   await HyprlandBackend.initialize();
   await SystemBackend.initialize();

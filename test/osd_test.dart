@@ -6,7 +6,9 @@ import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/bar_theme.dart';
 import 'package:remya_bar/features/osd/osd_controller.dart';
 import 'package:remya_bar/features/osd/osd_slider.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_bar/features/settings/bar_preferences.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 void main() {
   group('OsdCapsuleSlider', () {
@@ -179,7 +181,7 @@ void main() {
         gammaMin: 15,
       );
       settings.changesController.add((
-        topic: barVolumeStepSettingId,
+        topic: barOsdSettingId,
         value: <String, dynamic>{'value': 10},
       ));
       await Future<void>.delayed(Duration.zero);
@@ -210,7 +212,7 @@ void main() {
         volumeMax: 110,
       );
       settings.changesController.add((
-        topic: barVolumeMaxSettingId,
+        topic: barOsdSettingId,
         value: <String, dynamic>{'value': 110},
       ));
       settings.emitSound(percent: 95, muted: false);
@@ -228,7 +230,7 @@ void main() {
     test('zero volume and mute are one state', () async {
       settings.osdPrefs = const BarOsdPreferences(volumeStep: 10);
       settings.changesController.add((
-        topic: barVolumeStepSettingId,
+        topic: barOsdSettingId,
         value: <String, dynamic>{'value': 10},
       ));
       settings.emitSound(percent: 10, muted: false);
@@ -408,7 +410,15 @@ class _FakeSettingsClient extends SettingsClient {
         return pendingBrightness!.future;
       }
       return switch (key) {
-        barOsdSettingId => {'value': osdPrefs.toJson()},
+        barOsdSettingId => {
+          'value': {
+            'volume-step': osdPrefs.volumeStep,
+            'volume-max': osdPrefs.volumeMax,
+            'brightness-step': osdPrefs.brightnessStep,
+            'gamma-min': osdPrefs.gammaMin,
+          },
+          'revision': 'a' * 64,
+        },
         'sound' => _soundPayload(),
         'display-brightness:eDP-1' => {
           'output': 'eDP-1',

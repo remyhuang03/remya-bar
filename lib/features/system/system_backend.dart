@@ -4,7 +4,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_bar/features/settings/bar_preferences.dart';
 
 import '../../src/rust/system_bridge/api.dart' as api;
 import '../../src/rust/system_bridge/frb_generated.dart';
@@ -16,6 +17,7 @@ class SystemBackend extends ChangeNotifier {
     : _settings = settings ?? SettingsClient();
 
   final SettingsClient _settings;
+  late final _preferences = BarPreferences(client: _settings);
   Timer? _timer;
   bool _disposed = false;
   bool _refreshing = false;
@@ -123,7 +125,7 @@ class SystemBackend extends ChangeNotifier {
     }
     _refreshingClock = true;
     try {
-      final next = await _settings.readBarClockSeconds();
+      final next = await _preferences.readClockSeconds();
       if (_disposed || next == showClockSeconds) return;
       showClockSeconds = next;
       notifyListeners();
@@ -146,7 +148,7 @@ class SystemBackend extends ChangeNotifier {
     }
     _refreshingLayout = true;
     try {
-      final next = await _settings.readBarLayout();
+      final next = await _preferences.readLayout();
       if (_disposed || next == layout) return;
       layout = next;
       notifyListeners();

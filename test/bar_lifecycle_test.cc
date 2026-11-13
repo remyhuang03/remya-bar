@@ -83,6 +83,33 @@ static bool check_popup_views(MyApplication* app, FlView* owner) {
   return true;
 }
 
+static void check_settings_window(MyApplication* self) {
+  auto* implicit = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->popup_engine_window)));
+  auto* engine = fl_view_get_engine(implicit);
+  open_settings(self, "layout");
+  auto* first = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->settings_window)));
+  const auto first_id = fl_view_get_id(first);
+  g_assert_true(fl_view_get_engine(first) == engine);
+  g_assert_false(gtk_layer_is_layer_window(GTK_WINDOW(self->settings_window)));
+  g_assert_cmpstr(gtk_window_get_title(GTK_WINDOW(self->settings_window)), ==, "Remya Bar Settings");
+  open_settings(self, "notifications");
+  g_assert_true(first == FL_VIEW(gtk_bin_get_child(GTK_BIN(self->settings_window))));
+  g_assert_cmpstr(self->settings_page, ==, "notifications");
+  gtk_widget_destroy(self->settings_window);
+  g_assert_null(self->settings_window);
+  g_assert_true(gtk_widget_get_realized(self->popup_engine_window));
+  open_settings(self, "ai-ring");
+  auto* reopened = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->settings_window)));
+  g_assert_cmpint(fl_view_get_id(reopened), >, first_id);
+  g_assert_true(fl_view_get_engine(reopened) == engine);
+  gtk_widget_destroy(self->settings_window);
+  g_assert_null(self->settings_window);
+  g_assert_true(valid_settings_page("quiet-schedule"));
+  g_assert_false(valid_settings_page("../invalid"));
+  g_assert_false(valid_settings_page("layout\n"));
+  g_print("PASS: normal settings window, page reuse, close/reopen with warm engine\n");
+}
+
 static gboolean check_monitor_lifecycle(gpointer data) {
   auto* self = MY_APPLICATION(data);
   GdkDisplay* display = gdk_display_get_default();
@@ -97,6 +124,7 @@ static gboolean check_monitor_lifecycle(gpointer data) {
     if (!check_popup_views(self, FL_VIEW(gtk_bin_get_child(window)))) {
       return G_SOURCE_CONTINUE;
     }
+    check_settings_window(self);
     // Emit client-side GDK events without changing the desktop's outputs.
     for (int index = 0; index < count; index++) {
       GdkMonitor* monitor = gdk_display_get_monitor(display, index);

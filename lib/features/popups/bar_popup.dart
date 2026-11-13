@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 /// The owning view supplies the same Settings theme to its popup Flutter view.
 class BarPopupScope extends InheritedWidget {

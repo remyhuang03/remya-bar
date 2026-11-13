@@ -5,7 +5,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_bar/features/settings/bar_preferences.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 import '../../src/rust/system_bridge/api.dart' as api;
 import '../../widgets/bar_tooltip.dart';
@@ -25,6 +27,7 @@ class BarTray extends StatefulWidget {
 
 class BarTrayState extends State<BarTray> {
   final _settings = SettingsClient();
+  late final _preferences = BarPreferences(client: _settings);
   late final StreamSubscription<SettingsChange> _changes;
   late final Timer _timer;
   var _items = <api.TrayItem>[];
@@ -60,7 +63,7 @@ class BarTrayState extends State<BarTray> {
     if (_writing || !mounted) return;
     final revision = ++_preferencesRevision;
     try {
-      final folded = await _settings.readBarFoldedApps();
+      final folded = await _preferences.readFoldedApps();
       if (!mounted || revision != _preferencesRevision) return;
       _applyFolded(folded);
     } catch (error) {
@@ -269,7 +272,7 @@ class BarTrayState extends State<BarTray> {
         _writing = true;
         ++_preferencesRevision;
         try {
-          final folded = await _settings.setBarAppFolded(
+          final folded = await _preferences.setAppFolded(
             item.appId,
             !_isFolded(item),
           );

@@ -12,6 +12,10 @@ struct _MyApplication {
   char** dart_entrypoint_arguments;
   GHashTable* bar_windows;
   GtkWidget* popup_engine_window;
+  GtkWidget* settings_window;
+  FlMethodChannel* settings_channel;
+  gchar* settings_page;
+  bool settings_ready;
   GDBusConnection* shortcut_bus;
   guint shortcut_subscription;
   guint output_restart;
@@ -47,6 +51,95 @@ static void set_bar_fullscreen(GtkWindow* window, bool fullscreen) {
 
 static void schedule_output_restart(MyApplication* self);
 
+static void send_settings_page(MyApplication* self) {
+  if (!self->settings_ready || self->settings_window == nullptr) return;
+  auto* view = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->settings_window)));
+  g_autoptr(FlValue) args = fl_value_new_map();
+  fl_value_set_string_take(args, "viewId", fl_value_new_int(fl_view_get_id(view)));
+  fl_value_set_string_take(args, "page", fl_value_new_string(self->settings_page));
+  fl_method_channel_invoke_method(self->settings_channel, "open", args,
+                                 nullptr, nullptr, nullptr);
+}
+
+static bool valid_settings_page(const char* page) {
+  return page != nullptr && (page[0] == '\0' ||
+      g_regex_match_simple("^[a-z0-9]+(-[a-z0-9]+)*$", page,
+                           G_REGEX_DOLLAR_ENDONLY, G_REGEX_MATCH_DEFAULT));
+}
+
+static void open_settings(MyApplication* self, const char* page) {
+  g_free(self->settings_page);
+  self->settings_page = g_strdup(page);
+  if (self->settings_window == nullptr) {
+    auto* window = gtk_application_window_new(GTK_APPLICATION(self));
+    self->settings_window = window;
+    gtk_window_set_title(GTK_WINDOW(window), "Remya Bar Settings");
+    gtk_window_set_default_size(GTK_WINDOW(window), 900, 640);
+    auto* implicit = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->popup_engine_window)));
+    auto* view = fl_view_new_for_engine(fl_view_get_engine(implicit));
+    gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
+    g_signal_connect(window, "destroy", G_CALLBACK(+[](GtkWidget* window, gpointer data) {
+      auto* self = MY_APPLICATION(data);
+      auto* view = FL_VIEW(gtk_bin_get_child(GTK_BIN(window)));
+      g_autoptr(FlValue) id = fl_value_new_int(fl_view_get_id(view));
+      fl_method_channel_invoke_method(self->settings_channel, "closed", id,
+                                     nullptr, nullptr, nullptr);
+      self->settings_window = nullptr;
+    }), self);
+    gtk_widget_show_all(window);
+  }
+  send_settings_page(self);
+  gtk_window_present(GTK_WINDOW(self->settings_window));
+}
+
+static FlMethodChannel* settings_channel(MyApplication* self, FlEngine* engine) {
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  auto* channel = fl_method_channel_new(fl_engine_get_binary_messenger(engine),
+      "top.remya.bar/settings", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(channel,
+      [](FlMethodChannel*, FlMethodCall* call, gpointer data) {
+        auto* self = MY_APPLICATION(data);
+        const char* method = fl_method_call_get_name(call);
+        if (g_strcmp0(method, "ready") == 0) {
+          self->settings_ready = true;
+          fl_method_call_respond_success(call, nullptr, nullptr);
+          send_settings_page(self);
+        } else if (g_strcmp0(method, "open") == 0) {
+          FlValue* args = fl_method_call_get_args(call);
+          const char* page = fl_value_get_type(args) == FL_VALUE_TYPE_STRING
+              ? fl_value_get_string(args) : nullptr;
+          if (!valid_settings_page(page)) {
+            fl_method_call_respond_error(call, "invalid-page", "Invalid settings page", nullptr, nullptr);
+            return;
+          }
+          open_settings(self, page);
+          fl_method_call_respond_success(call, nullptr, nullptr);
+        } else {
+          fl_method_call_respond_not_implemented(call, nullptr);
+        }
+      }, self, nullptr);
+  return channel;
+}
+
+// Debug theme resolution in bar and settings views needs the repository root.
+static FlMethodChannel* paths_channel(FlEngine* engine) {
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  auto* channel = fl_method_channel_new(fl_engine_get_binary_messenger(engine),
+      "top.remya.paths", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(
+      channel,
+      [](FlMethodChannel*, FlMethodCall* call, gpointer) {
+        if (g_strcmp0(fl_method_call_get_name(call), "repositoryDirectory") == 0) {
+          g_autoptr(FlValue) root = fl_value_new_string(REMYA_REPOSITORY_DIR);
+          fl_method_call_respond_success(call, root, nullptr);
+        } else {
+          fl_method_call_respond_not_implemented(call, nullptr);
+        }
+      },
+      nullptr, nullptr);
+  return channel;
+}
+
 static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   if (g_hash_table_contains(self->bar_windows, monitor)) return;
 
@@ -76,6 +169,8 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
       project, self->dart_entrypoint_arguments);
 
   FlView* view = fl_view_new(project);
+  g_object_set_data_full(G_OBJECT(view), "settings-channel",
+      settings_channel(self, fl_view_get_engine(view)), g_object_unref);
   const GdkRGBA transparent = {0, 0, 0, 0};
   fl_view_set_background_color(view, &transparent);
   auto* popup_view = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->popup_engine_window)));
@@ -121,21 +216,8 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
         if (g_hash_table_contains(self->bar_windows, monitor))
           schedule_output_restart(self);
       }), self, G_CONNECT_DEFAULT);
-  g_autoptr(FlStandardMethodCodec) paths_codec = fl_standard_method_codec_new();
-  g_autoptr(FlMethodChannel) paths_channel = fl_method_channel_new(
-      fl_engine_get_binary_messenger(fl_view_get_engine(view)), "top.remya.paths",
-      FL_METHOD_CODEC(paths_codec));
-  fl_method_channel_set_method_call_handler(
-      paths_channel,
-      [](FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
-        if (g_strcmp0(fl_method_call_get_name(call), "repositoryDirectory") == 0) {
-          g_autoptr(FlValue) root = fl_value_new_string(REMYA_REPOSITORY_DIR);
-          fl_method_call_respond_success(call, root, nullptr);
-        } else {
-          fl_method_call_respond_not_implemented(call, nullptr);
-        }
-      },
-      nullptr, nullptr);
+  g_object_set_data_full(G_OBJECT(view), "paths-channel",
+      paths_channel(fl_view_get_engine(view)), g_object_unref);
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
   gtk_widget_show_all(GTK_WIDGET(window));
@@ -178,6 +260,10 @@ static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
   if (self->popup_engine_window == nullptr) {
     self->popup_engine_window = create_bar_popup_engine();
+    auto* view = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->popup_engine_window)));
+    self->settings_channel = settings_channel(self, fl_view_get_engine(view));
+    g_object_set_data_full(G_OBJECT(self->popup_engine_window), "paths-channel",
+        paths_channel(fl_view_get_engine(view)), g_object_unref);
   }
   GdkDisplay* display = gdk_display_get_default();
   for (int index = 0; index < gdk_display_get_n_monitors(display); index++) {
@@ -185,34 +271,31 @@ static void my_application_activate(GApplication* application) {
   }
 }
 
-// Implements GApplication::local_command_line.
-static gboolean my_application_local_command_line(GApplication* application,
-                                                  gchar*** arguments,
-                                                  int* exit_status) {
-  MyApplication* self = MY_APPLICATION(application);
-  // Strip out the first argument as it is the binary name.
-  self->dart_entrypoint_arguments = g_strdupv(*arguments + 1);
-
-  g_autoptr(GError) error = nullptr;
-  if (!g_application_register(application, nullptr, &error)) {
-    g_warning("Failed to register: %s", error->message);
-    *exit_status = 1;
-    return TRUE;
+// GApplication forwards command lines from secondary processes to this instance.
+static int my_application_command_line(GApplication* application,
+                                       GApplicationCommandLine* command_line) {
+  auto* self = MY_APPLICATION(application);
+  int argc = 0;
+  g_auto(GStrv) arguments = g_application_command_line_get_arguments(command_line, &argc);
+  const bool settings = argc > 1 && g_strcmp0(arguments[1], "--settings") == 0;
+  const char* page = settings && argc == 3 ? arguments[2] : "";
+  if (settings && (argc > 3 || !valid_settings_page(page))) {
+    g_application_command_line_printerr(command_line, "Usage: remya_bar --settings [page]\n");
+    return 1;
   }
-
   if (!gtk_layer_is_supported()) {
-    g_printerr(
-        "Remy'a Bar requires a Wayland compositor with layer-shell support.\n");
-    *exit_status = 1;
-    return TRUE;
+    g_application_command_line_printerr(command_line,
+        "Remya Bar requires a Wayland compositor with layer-shell support.\n");
+    return 1;
   }
-
-  // Keep display event handling alive while all outputs are disconnected.
-  g_application_hold(application);
+  if (self->dart_entrypoint_arguments == nullptr) {
+    self->dart_entrypoint_arguments = g_strdupv(arguments + (settings ? argc : 1));
+    // Keep display event handling alive while all outputs are disconnected.
+    g_application_hold(application);
+  }
   g_application_activate(application);
-  *exit_status = 0;
-
-  return TRUE;
+  if (settings) open_settings(self, page);
+  return 0;
 }
 
 // Implements GApplication::startup.
@@ -286,6 +369,7 @@ static void my_application_shutdown(GApplication* application) {
     g_dbus_connection_signal_unsubscribe(self->shortcut_bus, self->shortcut_subscription);
     g_clear_object(&self->shortcut_bus);
   }
+  if (self->settings_window != nullptr) gtk_widget_destroy(self->settings_window);
   g_hash_table_foreach(
       self->bar_windows,
       [](gpointer key, gpointer value, gpointer data) {
@@ -301,6 +385,8 @@ static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   g_clear_pointer(&self->bar_windows, g_hash_table_unref);
+  g_clear_object(&self->settings_channel);
+  g_clear_pointer(&self->settings_page, g_free);
   if (self->popup_engine_window != nullptr) {
     gtk_widget_destroy(self->popup_engine_window);
     g_clear_object(&self->popup_engine_window);
@@ -310,8 +396,7 @@ static void my_application_dispose(GObject* object) {
 
 static void my_application_class_init(MyApplicationClass* klass) {
   G_APPLICATION_CLASS(klass)->activate = my_application_activate;
-  G_APPLICATION_CLASS(klass)->local_command_line =
-      my_application_local_command_line;
+  G_APPLICATION_CLASS(klass)->command_line = my_application_command_line;
   G_APPLICATION_CLASS(klass)->startup = my_application_startup;
   G_APPLICATION_CLASS(klass)->shutdown = my_application_shutdown;
   G_OBJECT_CLASS(klass)->dispose = my_application_dispose;
@@ -331,7 +416,7 @@ MyApplication* my_application_new(RestartBar restart_bar, gpointer restart_data)
 
   auto* self = MY_APPLICATION(g_object_new(my_application_get_type(),
                                            "application-id", APPLICATION_ID, "flags",
-                                           G_APPLICATION_NON_UNIQUE, nullptr));
+                                           G_APPLICATION_HANDLES_COMMAND_LINE, nullptr));
   self->restart_bar = restart_bar;
   self->restart_data = restart_data;
   return self;

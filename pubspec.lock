@@ -248,13 +248,20 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.1.0"
-  remya_settings_client:
+  remya_client:
     dependency: "direct main"
     description:
-      path: "../remya-settings/packages/remya_settings_client"
+      path: "../remya-core/packages/remya_client"
       relative: true
     source: path
-    version: "0.1.0-dev.20261111.0"
+    version: "0.1.0-dev.20261113.0"
+  remya_ui:
+    dependency: "direct main"
+    description:
+      path: "../remya-core/packages/remya_ui"
+      relative: true
+    source: path
+    version: "0.1.0-dev.20261113.0"
   sky_engine:
     dependency: transitive
     description: flutter

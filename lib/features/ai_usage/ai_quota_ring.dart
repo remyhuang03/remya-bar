@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/physics.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 import 'ai_usage_data.dart';
 

@@ -4,9 +4,12 @@ import 'dart:convert';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_bar/features/settings/bar_preferences.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 import 'bar_theme.dart';
+import 'features/settings/bar_settings_entry.dart';
 import 'features/account/account_profile_controller.dart';
 import 'features/ai_usage/ai_usage_backend.dart';
 import 'features/ai_usage/ai_usage_data.dart';
@@ -619,8 +622,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
           ? jsonDecode(await backend.request('j/cursorpos'))
           : _keyboardDevice.read(backend, select: args['value'] as int?);
     } else if (action == 'keyboard.settings') {
-      await (widget.onOpenSettingsPage ??
-          (page) => openRemyaSettings(page: page))('remya-bar');
+      await openBarSettings(page: 'layout');
     } else if (action == 'sidebar.settings') {
       final page = args['target'];
       if (page is! String ||
@@ -633,8 +635,12 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
           }.contains(page)) {
         throw const FormatException('Invalid Settings page');
       }
-      await (widget.onOpenSettingsPage ??
-          (page) => openRemyaSettings(page: page))(page);
+      if (page == 'remya-bar') {
+        await openBarSettings();
+      } else {
+        await (widget.onOpenSettingsPage ??
+            (page) => openRemyaSettings(page: page))(page);
+      }
       await BarPopup.hide(kind: 'sidebar');
     } else if (action is String && action.startsWith('sidebar.')) {
       final sidebar = _sidebar;

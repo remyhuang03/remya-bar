@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remya_bar/features/account/account_profile_controller.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
 
 class _Client extends SettingsClient {
   Map<String, dynamic> value = {

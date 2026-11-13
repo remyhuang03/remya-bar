@@ -4,12 +4,16 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:remya_bar/features/settings/remya_settings_installed.dart';
 import 'package:remya_bar/features/sidebar/right_sidebar.dart';
 import 'package:remya_bar/features/sidebar/sidebar_backend.dart';
 import 'package:remya_bar/src/rust/system_bridge/frb_generated.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_bar/features/settings/bar_display.dart';
+import 'package:remya_bar/features/settings/bar_preferences.dart';
 
 void main() {
+  debugRemyaSettingsInstalled = true;
   group('SidebarBackend', () {
     late _Settings settings;
     late SidebarBackend backend;
@@ -865,14 +869,16 @@ class _Settings extends SettingsClient {
     'display-brightness:eDP-1': {'output': 'eDP-1', 'percent': 50},
     displayGammaSettingId: {'gamma': 100},
     barOsdSettingId: {
+      'revision': 'a' * 64,
       'value': {
-        'volume_step': 5,
-        'volume_max': 150,
-        'brightness_step': 5,
-        'gamma_min': 15,
+        'volume-step': 5,
+        'volume-max': 150,
+        'brightness-step': 5,
+        'gamma-min': 15,
       },
     },
     barSidebarLayoutSettingId: {
+      'revision': 'a' * 64,
       'value': ['internet', 'power'],
     },
   };

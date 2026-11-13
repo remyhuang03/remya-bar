@@ -4,7 +4,7 @@ import 'package:remya_bar/features/battery/bar_battery.dart';
 import 'package:remya_bar/features/media/media_preview.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
 import 'package:remya_bar/features/system/system_backend.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 Widget _host(Widget child, {double scale = 1}) => BarPopupScope(
   theme: RemyaTheme(),

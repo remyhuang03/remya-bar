@@ -19,16 +19,16 @@
 - Implement backend logic and complex or performance-critical computation in Rust. The Hyprland feature uses `flutter_rust_bridge` 2.13.0; use the matching generator and `flutter_rust_bridge.yaml`. Keep the core crate empty.
 - Keep generated bridge code separate from handwritten code and regenerate it instead of editing it manually.
 
-## Settings Integration and XDG
-- Remya Bar depends on the separately installed Remya Settings application. Use its public `remya_settings_client` package and versioned session D-Bus interface; never import Settings UI, controllers, or system-writing backends.
-- Settings owns schemas, defaults, validation, persistence, and system writes. New available operations must work through both its CLI and D-Bus dispatcher and have API documentation and parity tests.
-- Keep bar components feature-first. Access Settings through the client contract instead of adding private file parsing or component-specific launch mechanisms.
-- Keep installed preferences under XDG_CONFIG_HOME/remya/settings and installation metadata/bundles under XDG_DATA_HOME; ignore relative XDG paths and use specified HOME fallbacks. Do not create unused cache/state directories.
-- Debug config priority is Bar repository config/config.local.toml, sibling Settings repository config/config.local.toml, then XDG config. Native runner paths must make repository lookup independent of launch cwd. Release clients use the Settings service. Debug Settings launch uses the sibling debug bundle through the public client opener and must not require installed activation files.
+## Core Integration and XDG
+- Remya Bar depends on separately installed Remya Core (`remyad`, CLI `remya`, session D-Bus `top.remya.Core1` at `/top/remya/Core1`, interface `top.remya.Core1`). Use the pure Dart `remya_client` and Flutter `remya_ui` packages from `../remya-core/packages/` during development. Never import Settings GUI or backend code.
+- Core owns system settings, shared theme, validation and atomic persistence. Bar owns its preference schemas/defaults in `linux/packaging/remya-bar.json` and uses `BarPreferences` over `AppPreferences('remya-bar')` exclusively. Never read or write app preference files directly. Recheck cross-field constraints in Dart and keep the last valid state on errors.
+- Install the registration at `$XDG_DATA_HOME/remya/apps/remya-bar.json`. Core persists its values at `$XDG_CONFIG_HOME/remya/bar/settings.toml`; system settings live in `remya/system/`, shared theme in `remya/shared/theme.toml`. Ignore relative XDG roots and use absolute HOME fallbacks. Do not create unused cache/state directories.
+- Use revision-checked `Replace` for tray read-modify-write and sidebar editors; surface Core conflicts without retrying or overwriting another view.
+- Debug theme priority is Bar `config/config.local.toml`, sibling Core `config/shared/theme.toml`, then installed `remya/shared/theme.toml`. The native runner supplies the absolute repository root independently of launch cwd. Release uses the service theme controller from `remya_ui`.
+- Use the public `openRemyaSettings` opener for system pages. Bar preference entry points use Bar's own `--settings [page]` window, forwarded through GApplication to the resident instance. Its desktop file provides `[Desktop Action settings]`. Settings views are ordinary GTK toplevels on the warm popup engine; closing one destroys only its view.
+- Read `docs/backend.md` and Core's linked public API, XDG and app-preferences documents before changing contracts; update documentation with contract changes. Do not add compatibility aliases, removed-interface fallbacks or automatic migration.
 - Preserve the last valid theme on invalid configuration/service errors. Keep the bar surface transparent outside its capsule shape without changing its exclusive zone or focus policy.
-- Read `docs/backend.md` and the linked Settings API/XDG documents before changing integration behavior. Update those documents with contract changes.
-
-- Render tooltips and other floating component content with Flutter through the shared `BarPopup`/`BarPopupApp` host. Native GTK owns only surface placement, visibility, focus policy, and lifetime; never draw popup text or UI with GTK. Use `BarTooltip` for hover hints and pass the owning Settings theme.
+- Render tooltips and floating content with Flutter through `BarPopup`/`BarPopupApp`. GTK owns surface placement, visibility, focus policy and lifetime only. Use `BarTooltip` for concise hints with the owning Remya theme.
 
 ## Toolchains & Dependencies
 - Always invoke Flutter and Dart as `fvm flutter ...` and `fvm dart ...`, never through global SDK commands.

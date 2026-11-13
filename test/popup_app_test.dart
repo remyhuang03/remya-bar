@@ -1,10 +1,12 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:remya_bar/features/settings/remya_settings_installed.dart';
 import 'package:remya_bar/features/osd/osd_slider.dart';
 import 'package:remya_bar/features/popups/popup_app.dart';
 import 'package:remya_bar/features/popups/bar_card_surface.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 const _channel = MethodChannel('top.remya.bar/popup');
 
@@ -63,6 +65,7 @@ Future<List<MethodCall>> _popup(WidgetTester tester, Size size) async {
 }
 
 void main() {
+  debugRemyaSettingsInstalled = true;
   testWidgets('OSD popup text has no fallback underline', (tester) async {
     await _popup(tester, osdSize);
     for (final (value, tag) in [
