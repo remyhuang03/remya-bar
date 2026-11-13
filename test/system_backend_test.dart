@@ -4,7 +4,8 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remya_bar/features/system/system_backend.dart';
 import 'package:remya_bar/src/rust/system_bridge/frb_generated.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_bar/features/settings/bar_preferences.dart';
 
 MediaPlayerSnapshot _player(String status) => .new(
   busName: 'org.mpris.MediaPlayer2.test',
@@ -74,10 +75,11 @@ class _Settings extends SettingsClient {
       return result.future;
     }
     if (method == 'Get' && arguments.single == barClockSecondsSettingId) {
-      return {'value': true};
+      return {'value': true, 'revision': 'a' * 64};
     }
     if (method == 'Get' && arguments.single == barLayoutSettingId) {
-      return layout?.future ?? {'value': BarLayout.defaults.toJson()};
+      return layout?.future ??
+          {'value': BarLayout.defaults.toJson(), 'revision': 'a' * 64};
     }
     return {};
   }
@@ -270,7 +272,10 @@ void main() {
     await _flush();
     final layout = settings.layout!;
     settings.layout = null;
-    layout.complete({'value': BarLayout.defaults.toJson()});
+    layout.complete({
+      'value': BarLayout.defaults.toJson(),
+      'revision': 'a' * 64,
+    });
     await _flush();
     await _flush();
     expect(settings.gets, [barLayoutSettingId, barLayoutSettingId]);

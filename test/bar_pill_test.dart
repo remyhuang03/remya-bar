@@ -5,7 +5,7 @@ import 'package:remya_bar/features/popups/bar_popup.dart';
 import 'package:remya_bar/features/popups/bar_card_surface.dart';
 import 'package:remya_bar/widgets/bar_hover_card.dart';
 import 'package:remya_bar/widgets/bar_pill.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 Widget _host(
   Widget child, {

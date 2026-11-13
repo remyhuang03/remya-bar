@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../settings/remya_settings_installed.dart';
+
 import '../../widgets/percent_text.dart';
 import '../../widgets/wave_progress.dart';
 
@@ -34,13 +36,14 @@ class BatteryCard extends StatelessWidget {
                 ),
               ),
             ),
-            IconButton.filledTonal(
-              tooltip: 'Power settings',
-              onPressed: data['pending'] == true
-                  ? null
-                  : () => onAction(const {'action': 'battery.settings'}),
-              icon: const Icon(Icons.settings_outlined),
-            ),
+            if (remyaSettingsInstalled())
+              IconButton.filledTonal(
+                tooltip: 'Power settings',
+                onPressed: data['pending'] == true
+                    ? null
+                    : () => onAction(const {'action': 'battery.settings'}),
+                icon: const Icon(Icons.settings_outlined),
+              ),
           ],
         ),
         if (data['error'] case final String error)

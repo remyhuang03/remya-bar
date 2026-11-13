@@ -35,6 +35,44 @@ def check_bars(process, before):
     assert all(c['pid'] != process.pid for c in hyprctl('clients'))
 
 
+def check_settings(binary, process, before):
+    for page in ('layout', 'notifications'):
+        forwarded = subprocess.run([str(binary), '--settings', page],
+                                   capture_output=True, text=True, timeout=10)
+        assert forwarded.returncode == 0, forwarded.stderr
+        deadline = time.monotonic() + 10
+        while True:
+            clients = [c for c in hyprctl('clients') if c['pid'] == process.pid]
+            if len(clients) == 1 and clients[0]['title'] == 'Remya Bar Settings':
+                break
+            assert time.monotonic() < deadline, clients
+            time.sleep(0.1)
+        assert clients[0]['class'] == 'top.remya.bar', clients
+        assert {m['name']: m['reserved'] for m in hyprctl('monitors')} == {
+            name: [value[0], value[1] + 40, value[2], value[3]]
+            for name, value in before.items()
+        }
+    address = clients[0]['address']
+    subprocess.run(['hyprctl', 'dispatch', f'hl.dsp.window.close({{window = "address:{address}"}})'],
+                   check=True, capture_output=True)
+    deadline = time.monotonic() + 10
+    while any(c['pid'] == process.pid for c in hyprctl('clients')):
+        assert time.monotonic() < deadline, 'Settings window did not close'
+        time.sleep(0.1)
+    assert process.poll() is None, 'Closing settings stopped Bar'
+    # Reopen via the optional-page form; the resident process must still own it.
+    result = subprocess.run([str(binary), '--settings'], timeout=10)
+    assert result.returncode == 0
+    deadline = time.monotonic() + 10
+    while not any(c['pid'] == process.pid for c in hyprctl('clients')):
+        assert time.monotonic() < deadline, 'Settings did not reopen'
+        time.sleep(0.1)
+    invalid = subprocess.run([str(binary), '--settings', '../invalid'],
+                             capture_output=True, timeout=10)
+    assert invalid.returncode == 1
+    print('PASS: forwarded settings command lines, one normal toplevel, close/reopen and invalid page')
+
+
 def main():
     root = Path(__file__).resolve().parents[1]
     binary = root / 'build/linux/x64/debug/bundle/remya_bar'
@@ -57,6 +95,7 @@ def main():
                     time.sleep(0.2)
             print(f'PASS: one 40-pixel top bar on each of {len(before)} outputs; '
                   'reserved space, no keyboard focus, no normal windows.')
+            check_settings(binary, process, before)
         finally:
             if process.poll() is None:
                 process.terminate()

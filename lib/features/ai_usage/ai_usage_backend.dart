@@ -6,7 +6,8 @@ import 'dart:math';
 import 'dart:ui' show IsolateNameServer;
 
 import 'package:flutter/foundation.dart';
-import 'package:remya_settings_client/settings_contract.dart';
+import 'package:remya_client/settings_contract.dart';
+import 'package:remya_bar/features/settings/bar_preferences.dart';
 
 import '../../src/rust/system_bridge/api.dart' as rust;
 import '../system/system_backend.dart';
@@ -19,6 +20,7 @@ const _workerName = 'top.remya.bar/ai-usage';
 class AiUsageBackend extends ChangeNotifier {
   Map<String, Object?> data = const {};
   final _settings = SettingsClient();
+  late final _preferences = BarPreferences(client: _settings);
   Map<String, Object?> _sample = const {};
   Map<String, dynamic>? _bar;
   Future<void>? _readingBar;
@@ -39,7 +41,7 @@ class AiUsageBackend extends ChangeNotifier {
       unawaited(_readBar());
     });
     _changes = _settings.changes.listen((change) {
-      if (change.topic == aiBarSettingId) {
+      if (change.topic == aiRingSettingId) {
         unawaited(_readBar());
       } else if (change.topic == aiProvidersSettingId) {
         unawaited(_read());
@@ -58,12 +60,12 @@ class AiUsageBackend extends ChangeNotifier {
     while (_barDirty && !_disposed) {
       _barDirty = false;
       try {
-        final next = await _settings.readAiBar();
+        final next = await _preferences.readAiRing();
         if (_disposed) return;
         _bar = next;
         _publish();
       } catch (_) {
-        // Keep the last valid preferences while Settings reconnects.
+        // Keep the last valid preferences while Core reconnects.
       }
     }
   }
@@ -143,7 +145,7 @@ void startAiUsageWorker() {
 class _AiUsageWorker {
   _AiUsageWorker() {
     _settings.changes.listen((change) {
-      if (change.topic == aiBarSettingId) {
+      if (change.topic == aiRingSettingId) {
         unawaited(_readBar().then((bar) => _notifyAlerts(aiLowPercent(bar))));
       } else if (change.topic == aiProvidersSettingId) {
         _nextPoll = null;
@@ -152,14 +154,15 @@ class _AiUsageWorker {
   }
 
   final _settings = SettingsClient();
+  late final _preferences = BarPreferences(client: _settings);
   Map<String, dynamic>? _bar;
 
-  /// Bar preferences from Settings; the last value is kept while Settings
+  /// Bar preferences from Core; the last value is kept while Core
   /// reconnects. Tracking itself is CodexBar's enabled set, which Settings
-  /// writes, so polling never makes Settings probe every provider.
+  /// writes, so polling never makes Core probe every provider.
   Future<Map<String, dynamic>?> _readBar() async {
     try {
-      _bar = await _settings.readAiBar();
+      _bar = await _preferences.readAiRing();
     } catch (_) {}
     return _bar;
   }

@@ -40,7 +40,7 @@ def user_unit(executable):
     return (
         "[Unit]\nDescription=Remy'a Bar\n"
         "PartOf=graphical-session.target\nAfter=graphical-session.target\n"
-        "Wants=top.remya.settings.service\nAfter=top.remya.settings.service\n\n"
+        "Wants=top.remya.core.service\nAfter=top.remya.core.service\n\n"
         f"[Service]\nExecStart={unit_quote(executable)}\n"
         "Restart=on-failure\nRestartSec=2\n\n"
         "[Install]\nWantedBy=graphical-session.target\n")
@@ -66,6 +66,9 @@ def install(root, environment):
     if not (source / APP_ID).is_file():
         raise RuntimeError("Run fvm flutter build linux --release first")
     destination = data / "remya" / APP_ID
+    roots = [data] + [Path(value) for value in (environment.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":") if value.startswith("/")]
+    if not any((directory / "dbus-1/services/top.remya.Core1.service").is_file() for directory in roots):
+        raise RuntimeError("Install Remya Core first; Remya Bar requires top.remya.Core1 D-Bus activation")
     # The autostart unit is restarted with the new bundle; other instances block the update.
     has_systemd = shutil.which("systemctl") is not None
     was_active = has_systemd and systemctl("is-active", "--quiet", UNIT, check=False).returncode == 0
@@ -80,9 +83,6 @@ def install(root, environment):
             continue
         if executable.is_relative_to(destination):
             raise RuntimeError(f"Stop {APP_ID} before updating its installed bundle")
-    roots = [data] + [Path(value) for value in (environment.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":") if value.startswith("/")]
-    if not any((directory / "applications/top.remya.settings.desktop").is_file() for directory in roots):
-        raise RuntimeError("Install Remya Settings first; Remya Bar requires it")
     home = environment.get("HOME", "")
     if not home.startswith("/"):
         raise ValueError("An absolute HOME is required for ~/.local/bin")
@@ -109,6 +109,9 @@ def install(root, environment):
     # env lets Gio validate the launcher before expanding literal %% in path arguments.
     entry = entry.replace(f"Exec={APP_ID}", f"Exec=/usr/bin/env {desktop_quote(destination / APP_ID)}")
     (applications / f"{PACKAGE}.desktop").write_text(entry)
+    registrations = data / "remya/apps"
+    registrations.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(root / "linux/packaging/remya-bar.json", registrations / "remya-bar.json")
     icons = data / "icons/hicolor/scalable/apps"
     icons.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(root / "assets/icons/app_icon.svg", icons / f"{PACKAGE}.svg")

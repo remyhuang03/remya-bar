@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
 
 /// Settings owns identity and avatar paths; the bar only observes its public API.
 class AccountProfileController extends ChangeNotifier {

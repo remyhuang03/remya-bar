@@ -4,29 +4,31 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_bar/features/settings/bar_preferences.dart';
 
 import '../../src/rust/system_bridge/api.dart' as api;
 
 const _icons = MethodChannel('top.remya.bar/icons');
 
 /// Mirrors the process-wide Rust notification server for one output and
-/// applies the Settings Do not disturb and popup duration preferences.
+/// applies the Bar Do not disturb and popup duration preferences.
 class NotificationBackend extends ChangeNotifier {
   NotificationBackend({SettingsClient? settings})
     : _settings = settings ?? SettingsClient();
 
   final SettingsClient _settings;
+  late final _preferences = BarPreferences(client: _settings);
   StreamSubscription<api.NotificationCenter>? _subscription;
   StreamSubscription<SettingsChange>? _changes;
   Timer? _retry;
   bool _disposed = false;
   api.NotificationCenter? center;
 
-  /// Saved Settings preferences; null until Settings answers.
+  /// Saved Bar preferences; null until Core answers.
   NotificationPreferences? preferences;
 
-  /// The manual Do Not Disturb switch; null until Settings answers.
+  /// The manual Do Not Disturb switch; null until Core answers.
   bool? get doNotDisturb => preferences?.doNotDisturb;
 
   /// Why Do Not Disturb is in effect: null, manual, schedule or fullscreen.
@@ -77,7 +79,7 @@ class NotificationBackend extends ChangeNotifier {
   // Errors keep the last valid preferences, like the theme.
   Future<void> _readPreferences() async {
     try {
-      final next = await _settings.readNotificationPreferences();
+      final next = await _preferences.readNotifications();
       if (_disposed) return;
       preferences = next;
       notifyListeners();
@@ -117,10 +119,7 @@ class NotificationBackend extends ChangeNotifier {
   }
 
   Future<void> setDoNotDisturb(bool enabled) async {
-    await _settings.setNotificationPreference(
-      notificationDndSettingId,
-      enabled,
-    );
+    await _preferences.setDoNotDisturb(enabled);
     await _readPreferences();
   }
 

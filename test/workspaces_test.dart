@@ -9,7 +9,8 @@ import 'package:remya_bar/features/hyprland/hyprland_backend.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
 import 'package:remya_bar/features/window/bar_active_window.dart';
 import 'package:remya_bar/features/workspaces/bar_workspaces.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 const _window = HyprlandWindow(
   address: '0xa',

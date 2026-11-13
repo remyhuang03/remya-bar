@@ -13,7 +13,7 @@ import 'package:remya_bar/features/ai_usage/ai_usage_data.dart';
 import 'package:remya_bar/features/ai_usage/bar_ai_quota.dart';
 import 'package:remya_bar/features/popups/bar_detail_card.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 const _codex = {'id': 'codex', 'name': 'Codex'};
 
@@ -83,7 +83,7 @@ void main() {
     );
   });
 
-  test('reads the Settings threshold', () {
+  test('uses the Bar threshold', () {
     final ai = {
       'bar': {'pinned': [], 'lowPercent': 35},
     };

@@ -7,3 +7,8 @@ Icon=top.remya.bar
 Terminal=false
 Categories=System;
 StartupWMClass=top.remya.bar
+Actions=settings;
+
+[Desktop Action settings]
+Name=Settings
+Exec=remya_bar --settings

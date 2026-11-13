@@ -16,7 +16,8 @@ import 'package:remya_bar/features/system/system_backend.dart';
 import 'package:remya_bar/features/window/bar_active_window.dart';
 import 'package:remya_bar/features/workspaces/bar_workspaces.dart';
 import 'package:remya_bar/widgets/percent_text.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_bar/features/settings/bar_preferences.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 Future<void> _openSettings(WidgetTester tester) async {
   const codec = StandardMethodCodec();

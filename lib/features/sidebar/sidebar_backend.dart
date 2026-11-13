@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+
+import '../settings/bar_display.dart';
+import '../settings/bar_preferences.dart';
 
 import '../../src/rust/system_bridge/api.dart' as system;
 
@@ -10,6 +13,8 @@ class SidebarBackend extends ChangeNotifier {
     : _settings = settings ?? SettingsClient();
 
   final SettingsClient _settings;
+  late final _display = BarDisplay(_settings);
+  late final _preferences = BarPreferences(client: _settings);
   final _queue = <_SidebarWrite>[];
   final _data = <String, Object?>{};
   Timer? _poll;
@@ -38,7 +43,6 @@ class SidebarBackend extends ChangeNotifier {
           'theme' => 'theme',
           'sound' when change.value.containsKey('available') => 'sound',
           keepAwakeSettingId => 'keep-awake',
-          notificationDndSettingId => 'notification-dnd',
           _ => null,
         };
         if (_writing || _queue.isNotEmpty) return;
@@ -46,6 +50,10 @@ class SidebarBackend extends ChangeNotifier {
           _generation++;
           _data[key] = change.value;
           notifyListeners();
+          return;
+        }
+        if (change.topic == barNotificationsSettingId) {
+          unawaited(_refresh());
           return;
         }
         if (barOsdSettingIds.contains(change.topic)) {
@@ -106,7 +114,7 @@ class SidebarBackend extends ChangeNotifier {
         value = await request;
       } catch (error) {
         debugPrint('Sidebar $key: $error');
-        if (key == 'layout') return;
+        if (key == 'layout' || key == 'notification-dnd') return;
       }
       if (!_disposed && _poll != null && generation == _generation) {
         _data[key] = value;
@@ -130,9 +138,9 @@ class SidebarBackend extends ChangeNotifier {
         read('keep-awake', _settings.readKeepAwake()),
         read(
           'notification-dnd',
-          _settings.call('Get', [notificationDndSettingId]),
+          _preferences.readDoNotDisturb().then((value) => {'value': value}),
         ),
-        read('layout', _settings.readSidebarLayout()),
+        read('layout', _preferences.readSidebarLayout()),
         if (output != null)
           read('brightness', _brightness(output))
         else
@@ -148,7 +156,7 @@ class SidebarBackend extends ChangeNotifier {
 
   Future<void> _readOsdPreferences() async {
     try {
-      final preferences = await _settings.readBarOsdPreferences();
+      final preferences = await _preferences.readOsd();
       if (_disposed || _poll == null) return;
       _osd = preferences;
       _data['osd'] = preferences.toJson();
@@ -160,7 +168,7 @@ class SidebarBackend extends ChangeNotifier {
 
   Future<int?> _readGamma() async {
     try {
-      return await _settings.readDisplayGamma();
+      return await _display.readGamma();
     } catch (error) {
       debugPrint('Sidebar software brightness: $error');
       return null;
@@ -506,7 +514,7 @@ class SidebarBackend extends ChangeNotifier {
       ),
       'sidebar.dnd' when value is bool => (
         'notification-dnd',
-        await _settings.call('Set', [notificationDndSettingId, '$value']),
+        await _preferences.setDoNotDisturb(value),
       ),
       'sidebar.dark' when value is bool => (
         'theme',
@@ -521,10 +529,7 @@ class SidebarBackend extends ChangeNotifier {
       ),
       'sidebar.layout' when value is List && target is List => (
         'layout',
-        await _settings.setSidebarLayout(
-          List<String>.from(target),
-          List<String>.from(value),
-        ),
+        await _replaceSidebarLayout(target, value),
       ),
       'sidebar.session' when value is String => (
         '',
@@ -551,6 +556,20 @@ class SidebarBackend extends ChangeNotifier {
     }
   }
 
+  Future<Object> _replaceSidebarLayout(List expected, List tiles) {
+    if (!listEquals(
+      expected,
+      _preferences.lastValid('sidebar-layout') as List?,
+    )) {
+      throw StateError('Changed in another view. Reopen the editor.');
+    }
+    return _preferences.replace(
+      'sidebar-layout',
+      tiles,
+      _preferences.revision('sidebar-layout'),
+    );
+  }
+
   bool _validHardware(Object? value) =>
       value is num && value.isFinite && value >= 1 && value <= 100;
 
@@ -567,7 +586,7 @@ class SidebarBackend extends ChangeNotifier {
     final result = Map<String, Object?>.of(state);
     Future<void> hardware(int percent) async {
       if (result['percent'] == percent) return;
-      final actual = await _settings.setOutputBrightness(output, percent);
+      final actual = await _display.setBrightness(output, percent);
       if (actual == null) {
         throw StateError('Missing hardware brightness readback');
       }
@@ -576,7 +595,7 @@ class SidebarBackend extends ChangeNotifier {
 
     Future<void> software(int gamma) async {
       if (result['gamma'] != gamma) {
-        result['gamma'] = await _settings.setDisplayGamma(gamma);
+        result['gamma'] = await _display.setGamma(gamma);
       }
     }
 

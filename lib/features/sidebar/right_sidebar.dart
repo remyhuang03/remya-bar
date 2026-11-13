@@ -7,8 +7,8 @@ import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:remya_settings_client/remya_settings_client.dart'
-    show BarOsdPreferences;
+
+import '../settings/bar_preference_models.dart' show BarOsdPreferences;
 
 import '../../widgets/bar_pill.dart';
 import '../../widgets/bar_tooltip.dart';
@@ -17,6 +17,7 @@ import '../../widgets/percent_text.dart';
 import '../osd/osd_slider.dart';
 import '../popups/bar_popup_button.dart';
 import '../popups/popup_measure.dart';
+import '../settings/remya_settings_installed.dart';
 
 part 'sidebar_controls.dart';
 part 'sidebar_detail.dart';

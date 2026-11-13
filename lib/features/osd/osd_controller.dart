@@ -3,7 +3,11 @@ import 'dart:math' as math;
 
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
-import 'package:remya_settings_client/remya_settings_client.dart';
+import 'package:remya_client/remya_client.dart';
+
+import 'package:remya_bar/features/settings/bar_preferences.dart';
+
+import '../settings/bar_display.dart' show displayGammaSettingId;
 
 import 'osd_slider.dart';
 
@@ -52,6 +56,7 @@ class OsdController extends ChangeNotifier {
        _ownsSettings = settings == null;
 
   final SettingsClient _settings;
+  late final _preferences = BarPreferences(client: _settings);
   final bool _ownsSettings;
   final Duration timeout;
 
@@ -159,7 +164,7 @@ class OsdController extends ChangeNotifier {
   Future<void> _refreshPreferences() async {
     final revision = _serviceRevision;
     try {
-      final next = await _settings.readBarOsdPreferences();
+      final next = await _preferences.readOsd();
       if (_disposed || _serviceRevision != revision) return;
       preferences = next;
     } catch (error) {

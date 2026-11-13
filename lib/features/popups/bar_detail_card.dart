@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../settings/remya_settings_installed.dart';
+
 import '../ai_usage/ai_usage_card.dart';
 import '../ai_usage/ai_usage_data.dart';
 import '../battery/battery_card.dart';
@@ -62,7 +64,9 @@ class BarDetailCard extends StatelessWidget {
             ),
             'datetime' => DatetimeCard(
               data: data,
-              onSettings: () => onAction(const {'action': 'datetime.settings'}),
+              onSettings: remyaSettingsInstalled()
+                  ? () => onAction(const {'action': 'datetime.settings'})
+                  : null,
             ),
             _ => const Text('Unavailable'),
           },
