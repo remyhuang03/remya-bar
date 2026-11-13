@@ -111,7 +111,7 @@ def install(root, environment):
     (applications / f"{PACKAGE}.desktop").write_text(entry)
     icons = data / "icons/hicolor/scalable/apps"
     icons.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(root / "assets/icons/bar.svg", icons / f"{PACKAGE}.svg")
+    shutil.copyfile(root / "assets/icons/app_icon.svg", icons / f"{PACKAGE}.svg")
     if shutil.which("gtk-update-icon-cache"):
         subprocess.run(["gtk-update-icon-cache", "-f", "-t", str(data / "icons/hicolor")], check=True)
     command.parent.mkdir(parents=True, exist_ok=True)

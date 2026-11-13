@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="176" height="114" viewBox="0 0 176 114">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="13.648" y1="1.386" x2="90.617" y2="127.72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38dbc2"/>
+      <stop offset="0.65" stop-color="#0ab09e"/>
+      <stop offset="1" stop-color="#0ab09e"/>
+    </linearGradient>
+    <mask id="mask-1" maskUnits="userSpaceOnUse" color-interpolation="sRGB" x="-8" y="-2" width="192" height="148">
+    <path d="M44 0 L132 0 C156.301 0 176 19.699 176 44 L176 44 C176 68.301 156.301 88 132 88 L44 88 C19.699 88 0 68.301 0 44 L0 44 C0 19.699 19.699 0 44 0 Z" fill="#ffffff"/>
+    </mask>
+    <clipPath id="clip-path-1">
+      <path d="M12 32 L164 32 L164 126 L12 126 Z"/>
+    </clipPath>
+    <filter id="filter-1" filterUnits="userSpaceOnUse" x="4" y="24" width="168" height="110" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="6"/></filter>
+    <linearGradient id="linear-gradient-2" x1="88" y1="44" x2="88" y2="114" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#99e0ff" stop-opacity="0"/>
+      <stop offset="0.6286" stop-color="#99e0ff"/>
+      <stop offset="1" stop-color="#99e0ff"/>
+    </linearGradient>
+  </defs>
+  <title>bar (Copy).svg</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <path d="M52 44 L124 44 C139.464 44 152 56.536 152 72 L152 86 C152 101.464 139.464 114 124 114 L52 114 C36.536 114 24 101.464 24 86 L24 72 C24 56.536 36.536 44 52 44 Z" fill="#a8ede0"/>
+    <path d="M44 0 L132 0 C156.301 0 176 19.699 176 44 L176 44 C176 68.301 156.301 88 132 88 L44 88 C19.699 88 0 68.301 0 44 L0 44 C0 19.699 19.699 0 44 0 Z" fill="url(#linear-gradient-1)"/>
+    <g mask="url(#mask-1)">
+      <g>
+        <g clip-path="url(#clip-path-1)">
+          <g filter="url(#filter-1)">
+            <path d="M52 44 L124 44 C139.464 44 152 56.536 152 72 L152 86 C152 101.464 139.464 114 124 114 L52 114 C36.536 114 24 101.464 24 86 L24 72 C24 56.536 36.536 44 52 44 Z" fill="url(#linear-gradient-2)"/>
+          </g>
+        </g>
+      </g>
+    </g>
+    <path d="M31 35 L49 35 C53.971 35 58 39.029 58 44 L58 44 C58 48.971 53.971 53 49 53 L31 53 C26.029 53 22 48.971 22 44 L22 44 C22 39.029 26.029 35 31 35 Z" fill="#ffffff"/>
+    <path d="M75 35 L75 35 C79.971 35 84 39.029 84 44 L84 44 C84 48.971 79.971 53 75 53 L75 53 C70.029 53 66 48.971 66 44 L66 44 C66 39.029 70.029 35 75 35 Z" fill="#ffffff"/>
+    <path d="M101 35 L101 35 C105.971 35 110 39.029 110 44 L110 44 C110 48.971 105.971 53 101 53 L101 53 C96.029 53 92 48.971 92 44 L92 44 C92 39.029 96.029 35 101 35 Z" fill="#ffffff"/>
+    <path d="M128 38 L148 38 C151.314 38 154 40.686 154 44 L154 44 C154 47.314 151.314 50 148 50 L128 50 C124.686 50 122 47.314 122 44 L122 44 C122 40.686 124.686 38 128 38 Z" fill="#ffffff"/>
+  </g>
+</svg>
