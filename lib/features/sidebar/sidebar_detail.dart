@@ -22,7 +22,6 @@ class _SidebarDetail extends StatefulWidget {
     required this.busy,
     required this.send,
     required this.pad,
-    required this.onHeight,
     this.error,
   });
 
@@ -34,7 +33,6 @@ class _SidebarDetail extends StatefulWidget {
   final Future<bool> Function(String action, {Object? value, Object? target})
   send;
   final double pad;
-  final ValueChanged<double> onHeight;
   final Widget? error;
 
   @override
@@ -43,21 +41,9 @@ class _SidebarDetail extends StatefulWidget {
 
 class _SidebarDetailState extends State<_SidebarDetail> {
   String? _expanded;
-  double? _topHeight;
-  double? _itemsHeight;
-  double? _bottomHeight;
 
   void _expand(String id) =>
       setState(() => _expanded = _expanded == id ? null : id);
-
-  void _reportHeight({required bool hasItems, required bool hasBottom}) {
-    final top = _topHeight;
-    final items = hasItems ? _itemsHeight : 0.0;
-    final bottom = hasBottom ? _bottomHeight : 0.0;
-    if (top == null || items == null || bottom == null) return;
-    final gaps = (hasItems ? 12.0 : 0.0) + (hasBottom ? 12.0 : 0.0);
-    widget.onHeight(top + items + bottom + gaps);
-  }
 
   Widget _button(
     String label,
@@ -77,65 +63,36 @@ class _SidebarDetailState extends State<_SidebarDetail> {
       'power' => _power(),
       _ => const _DetailSections(top: []),
     };
-    final top = [if (widget.error != null) widget.error!, ...sections.top];
-    final hasItems = sections.items.isNotEmpty;
-    final hasBottom = sections.bottom.isNotEmpty;
-    if (!hasItems) _itemsHeight = 0;
-    if (!hasBottom) _bottomHeight = 0;
     return Column(
-      mainAxisSize: .min,
       crossAxisAlignment: .stretch,
       spacing: 12,
       children: [
         Padding(
           padding: .symmetric(horizontal: widget.pad),
-          child: PopupMeasure(
-            onHeight: (height) {
-              _topHeight = height;
-              _reportHeight(hasItems: hasItems, hasBottom: hasBottom);
-            },
+          child: Column(
+            crossAxisAlignment: .stretch,
+            spacing: 8,
+            children: sections.top,
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            primary: false,
+            padding: .symmetric(horizontal: widget.pad),
             child: Column(
-              mainAxisSize: .min,
               crossAxisAlignment: .stretch,
               spacing: 8,
-              children: top,
+              children: [?widget.error, ...sections.items],
             ),
           ),
         ),
-        if (hasItems)
-          Flexible(
-            fit: .loose,
-            child: SingleChildScrollView(
-              primary: false,
-              padding: .symmetric(horizontal: widget.pad),
-              child: PopupMeasure(
-                onHeight: (height) {
-                  _itemsHeight = height;
-                  _reportHeight(hasItems: true, hasBottom: hasBottom);
-                },
-                child: Column(
-                  mainAxisSize: .min,
-                  crossAxisAlignment: .stretch,
-                  spacing: 8,
-                  children: sections.items,
-                ),
-              ),
-            ),
-          ),
-        if (hasBottom)
+        if (sections.bottom.isNotEmpty)
           Padding(
             padding: .symmetric(horizontal: widget.pad),
-            child: PopupMeasure(
-              onHeight: (height) {
-                _bottomHeight = height;
-                _reportHeight(hasItems: hasItems, hasBottom: true);
-              },
-              child: Column(
-                mainAxisSize: .min,
-                crossAxisAlignment: .stretch,
-                spacing: 8,
-                children: sections.bottom,
-              ),
+            child: Column(
+              crossAxisAlignment: .stretch,
+              spacing: 8,
+              children: sections.bottom,
             ),
           ),
       ],
@@ -184,6 +141,8 @@ class _SidebarDetailState extends State<_SidebarDetail> {
             ),
           ],
         ),
+      ],
+      items: [
         if (network['available'] != true || device == null)
           const Text('Wi-Fi unavailable')
         else if (!enabled)
@@ -208,8 +167,6 @@ class _SidebarDetailState extends State<_SidebarDetail> {
               ),
             ),
         ],
-      ],
-      items: [
         if (enabled)
           for (final point in accessPoints) _wifiRow(point, device, connecting),
       ],
@@ -447,6 +404,8 @@ class _SidebarDetailState extends State<_SidebarDetail> {
                 ),
             ],
           ),
+      ],
+      items: [
         if (bluetooth['error'] case final String error) Text(error),
         if (prompt.isNotEmpty)
           _PairPrompt(
@@ -468,8 +427,6 @@ class _SidebarDetailState extends State<_SidebarDetail> {
               exclusive: true,
             ),
           ),
-      ],
-      items: [
         for (final device in devices) ...[
           _DetailRow(
             icon: Icons.bluetooth_rounded,

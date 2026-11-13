@@ -43,45 +43,47 @@ class _BarNotificationsState extends State<BarNotifications> {
     final error = widget.backend.error;
     final dnd = widget.backend.quietReason != null;
     final count = history.length;
-    return BarTooltip(
-      message: 'Notifications',
-      child: BarPill(
-        pillKey: _pill,
-        padding: const .symmetric(horizontal: 12),
-        toggled: widget.open,
-        onTap: _toggle,
-        semanticsLabel: error != null
-            ? 'Notifications unavailable'
-            : '$count notifications${dnd ? ', do not disturb' : ''}',
-        builder: (context, state) {
-          final colors = Theme.of(context).colorScheme;
-          return Row(
-            mainAxisSize: .min,
-            spacing: count > 0 ? 4 : 0,
-            children: [
-              Icon(
-                error != null
-                    ? Icons.notifications_off_rounded
-                    : dnd
-                    ? Icons.notifications_paused_rounded
-                    : Icons.notifications_rounded,
-                size: 18,
-                color: state.pressed
-                    ? state.foreground
-                    : colors.onSurfaceVariant,
-              ),
-              if (error == null && count > 0)
-                Text(
-                  count > 99 ? '99+' : '$count',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontSize: 14,
-                    height: 1.25,
-                    color: state.pressed ? state.foreground : colors.primary,
-                  ),
+    return Semantics(
+      toggled: widget.open,
+      child: BarTooltip(
+        message: 'Notifications',
+        child: BarPill(
+          pillKey: _pill,
+          padding: const .symmetric(horizontal: 12),
+          onTap: _toggle,
+          semanticsLabel: error != null
+              ? 'Notifications unavailable'
+              : '$count notifications${dnd ? ', do not disturb' : ''}',
+          builder: (context, state) {
+            final colors = Theme.of(context).colorScheme;
+            return Row(
+              mainAxisSize: .min,
+              spacing: count > 0 ? 4 : 0,
+              children: [
+                Icon(
+                  error != null
+                      ? Icons.notifications_off_rounded
+                      : dnd
+                      ? Icons.notifications_paused_rounded
+                      : Icons.notifications_rounded,
+                  size: 18,
+                  color: state.pressed
+                      ? state.foreground
+                      : colors.onSurfaceVariant,
                 ),
-            ],
-          );
-        },
+                if (error == null && count > 0)
+                  Text(
+                    count > 99 ? '99+' : '$count',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontSize: 14,
+                      height: 1.25,
+                      color: state.pressed ? state.foreground : colors.primary,
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

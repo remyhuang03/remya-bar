@@ -71,7 +71,14 @@ class _Segment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final windows = provider.pillWindows;
+    final ring = AiQuotaRing(
+      provider,
+      showUsed: showUsed,
+      ringOrder: ringOrder,
+      index: index,
+    );
+    final (:outer, :inner) = ring.resolveWindows();
+    final windows = [?outer, ?inner];
     final tightest = provider.tightest;
     final values = state.expanded ? windows : [?tightest];
     final reset = state.expanded || tightest?.low == true
@@ -105,12 +112,7 @@ class _Segment extends StatelessWidget {
           mainAxisSize: .min,
           spacing: 6,
           children: [
-            AiQuotaRing(
-              provider,
-              showUsed: showUsed,
-              ringOrder: ringOrder,
-              index: index,
-            ),
+            ring,
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 114),
               child: Column(

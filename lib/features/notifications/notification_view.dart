@@ -34,7 +34,6 @@ class NotificationCenterCard extends StatefulWidget {
 class _NotificationCenterCardState extends State<NotificationCenterCard> {
   double? _topHeight;
   double? _bodyHeight;
-  double _lastPad = 0;
 
   void _reportHeight(double pad) {
     final top = _topHeight;
@@ -61,7 +60,6 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
     final panel = widget.onHeight != null;
 
     Widget content(double pad) {
-      _lastPad = pad;
       final headerAndDnd = Column(
         mainAxisSize: .min,
         crossAxisAlignment: .stretch,
@@ -70,7 +68,7 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
           Row(
             spacing: 10,
             children: [
-              Flexible(
+              Expanded(
                 child: Text(
                   'Notifications',
                   maxLines: 1,
@@ -89,7 +87,6 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
                   color: colors.primary,
                   foreground: colors.onPrimary,
                 ),
-              const Spacer(),
               if (items.isNotEmpty)
                 FilledButton.tonal(
                   onPressed: () =>
@@ -107,11 +104,6 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
                 'value': value,
               }),
             ),
-          if (error is String)
-            Text(
-              error,
-              style: theme.textTheme.bodyMedium?.copyWith(color: colors.error),
-            ),
         ],
       );
       final body = Column(
@@ -119,6 +111,11 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
         crossAxisAlignment: .stretch,
         spacing: 16,
         children: [
+          if (error is String)
+            Text(
+              error,
+              style: theme.textTheme.bodyMedium?.copyWith(color: colors.error),
+            ),
           if (error == null && items.isEmpty)
             Padding(
               padding: const .symmetric(vertical: 16),
@@ -167,7 +164,7 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
               child: PopupMeasure(
                 onHeight: (height) {
                   _topHeight = height;
-                  _reportHeight(_lastPad);
+                  _reportHeight(pad);
                 },
                 child: headerAndDnd,
               ),
@@ -180,7 +177,7 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
                 child: PopupMeasure(
                   onHeight: (height) {
                     _bodyHeight = height;
-                    _reportHeight(_lastPad);
+                    _reportHeight(pad);
                   },
                   child: body,
                 ),
@@ -274,6 +271,7 @@ class _DndTile extends StatelessWidget {
                 toggled: value,
                 excludeSemantics: true,
                 child: Switch(
+                  padding: .zero,
                   materialTapTargetSize: .shrinkWrap,
                   value: value,
                   onChanged: onChanged,

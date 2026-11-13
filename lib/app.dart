@@ -99,6 +99,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 
   double _notificationsScale = 1;
   int? _notificationsReservedHeight;
+  int _panelRequest = 0;
 
   bool _fullscreen = false;
   bool? _reportedFullscreen;
@@ -152,7 +153,12 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     double scale, {
     String? focusedOutput,
   }) async {
-    if (_fullscreen) return;
+    if (_fullscreen ||
+        (focusedOutput != null &&
+            widget.hyprland?.output?.name != focusedOutput)) {
+      return;
+    }
+    final request = ++_panelRequest;
     if (_sidebarOpen) {
       _sidebarOpen = false;
       _sidebar?.close();
@@ -165,7 +171,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     _sidebarOpen = true;
     try {
       final (monitor, focus) = await (_sidebarMonitor(), _focusedWindow()).wait;
-      if (!mounted || !_sidebarOpen) return;
+      if (!mounted || !_sidebarOpen || request != _panelRequest) return;
       if (focusedOutput != null && monitor?['name'] != focusedOutput) {
         _sidebarOpen = false;
         return;
@@ -188,10 +194,15 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         },
         theme: widget.preferences.theme,
       );
-      if (_sidebarOpen && mounted) _sidebar?.open(_sidebarOutput);
+      if (_sidebarOpen && mounted && request == _panelRequest) {
+        _sidebar?.open(_sidebarOutput);
+      }
     } catch (error) {
-      _sidebarOpen = false;
-      _sidebar?.close();
+      if (request == _panelRequest) {
+        _sidebarOpen = false;
+        _sidebar?.close();
+        unawaited(_syncToasts());
+      }
       debugPrint('Sidebar: $error');
     }
   }
@@ -243,6 +254,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 
   Future<void> _toggleNotifications(Rect anchor, double scale) async {
     if (_fullscreen) return;
+    final request = ++_panelRequest;
     if (_notificationsOpen) {
       _notificationsOpen = false;
       await BarPopup.hide(kind: 'notifications');
@@ -256,7 +268,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     unawaited(_syncToasts());
     try {
       final monitor = await _sidebarMonitor();
-      if (!mounted || !_notificationsOpen) return;
+      if (!mounted || !_notificationsOpen || request != _panelRequest) return;
       final reserved = monitor?['reserved'];
       _notificationsReservedHeight = switch (reserved) {
         [_, final int top, _, final int bottom] => top + bottom,
@@ -273,8 +285,10 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         theme: widget.preferences.theme,
       );
     } catch (error) {
-      _notificationsOpen = false;
-      unawaited(_syncToasts());
+      if (request == _panelRequest) {
+        _notificationsOpen = false;
+        unawaited(_syncToasts());
+      }
       debugPrint('Notifications: $error');
     }
   }
@@ -566,10 +580,10 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         'picker' => const ['--color-picker'],
         _ => throw const FormatException('Invalid capture target'),
       };
+      await widget.onLaunchScreenCapture(arguments);
       await BarPopup.hide(kind: 'sidebar');
       _sidebarOpen = false;
       _sidebar?.close();
-      await widget.onLaunchScreenCapture(arguments);
     } else if (action == 'sidebar.keyboard' && args['value'] is bool) {
       if (!_sidebarOpen) throw StateError('Sidebar is closed');
       if (args['value'] == false) {

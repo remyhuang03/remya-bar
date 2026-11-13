@@ -368,12 +368,12 @@ class _QuotaMeter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final reverse = !showUsed;
-    final fill = (showUsed ? window.used : window.left) / 100;
-    final expectedUsed = window.expectedUsed;
-    final pace = expectedUsed == null ? null : expectedUsed / 100;
+    final used = window.used / 100;
+    final pace = window.expectedUsedFraction;
     final height = compact ? 4.0 : 8.0;
-    final activeColor = window.low ? colors.error : accent;
+    final highlight = window.low ? colors.error : accent;
+    final usedColor = showUsed ? highlight : colors.secondaryContainer;
+    final remainingColor = showUsed ? colors.secondaryContainer : highlight;
     final outer = Radius.circular(height / 2);
     final inner = Radius.circular(height / 4);
     return ExcludeSemantics(
@@ -382,56 +382,57 @@ class _QuotaMeter extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
-            final active = width * fill;
-            final gap = fill == 0 || fill == 1
+            final usedWidth = width * used;
+            final gap = used == 0 || used == 1
                 ? 0.0
-                : 4.0.clamp(0.0, width - active);
+                : 4.0.clamp(0.0, width - usedWidth);
             return Stack(
               clipBehavior: .none,
               children: [
-                if (fill > 0)
+                if (used > 0)
                   Positioned(
-                    left: reverse ? null : 0,
-                    right: reverse ? 0 : null,
-                    width: active,
+                    left: 0,
+                    width: usedWidth,
                     top: 0,
                     bottom: 0,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: activeColor,
+                        color: usedColor,
                         borderRadius: .horizontal(
-                          left: reverse ? (fill == 1 ? outer : inner) : outer,
-                          right: reverse ? outer : (fill == 1 ? outer : inner),
+                          left: outer,
+                          right: used == 1 ? outer : inner,
                         ),
                       ),
                     ),
                   ),
-                if (fill < 1)
+                if (used < 1)
                   Positioned(
-                    left: reverse ? 0 : active + gap,
-                    right: reverse ? active + gap : 0,
+                    left: usedWidth + gap,
+                    right: 0,
                     top: 0,
                     bottom: 0,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: colors.secondaryContainer,
+                        color: remainingColor,
                         borderRadius: .horizontal(
-                          left: reverse ? outer : (fill == 0 ? outer : inner),
-                          right: reverse ? (fill == 0 ? outer : inner) : outer,
+                          left: used == 0 ? outer : inner,
+                          right: outer,
                         ),
                       ),
                     ),
                   ),
-                if (!compact && width - active - gap >= 6)
+                if (!compact && width - usedWidth - gap >= 6)
                   Positioned(
-                    left: reverse ? 2 : null,
-                    right: reverse ? null : 2,
+                    right: 2,
                     top: 2,
                     child: SvgPicture.asset(
                       'assets/icons/ai_usage/stop.svg',
                       width: 4,
                       height: 4,
-                      colorFilter: ColorFilter.mode(activeColor, .srcIn),
+                      colorFilter: ColorFilter.mode(
+                        showUsed ? highlight : colors.surfaceContainer,
+                        .srcIn,
+                      ),
                     ),
                   ),
                 if (pace != null && width >= 2)

@@ -18,6 +18,11 @@ const _workerName = 'top.remya.bar/ai-usage';
 /// to pick up a refresh initiated on another monitor.
 class AiUsageBackend extends ChangeNotifier {
   Map<String, Object?> data = const {};
+  final _settings = SettingsClient();
+  Map<String, Object?> _sample = const {};
+  Map<String, dynamic>? _bar;
+  Future<void>? _readingBar;
+  bool _barDirty = false;
   Timer? _timer;
   StreamSubscription<SettingsChange>? _changes;
   bool _disposed = false;
@@ -28,13 +33,51 @@ class AiUsageBackend extends ChangeNotifier {
 
   void start() {
     unawaited(_read());
-    _timer = Timer.periodic(const Duration(seconds: 15), (_) => _read());
-    _changes = SettingsClient().changes.listen((change) {
-      if (change.topic == aiBarSettingId ||
-          change.topic == aiProvidersSettingId) {
+    unawaited(_readBar());
+    _timer = Timer.periodic(const Duration(seconds: 15), (_) {
+      unawaited(_read());
+      unawaited(_readBar());
+    });
+    _changes = _settings.changes.listen((change) {
+      if (change.topic == aiBarSettingId) {
+        unawaited(_readBar());
+      } else if (change.topic == aiProvidersSettingId) {
         unawaited(_read());
       }
     }, onError: (Object _) {});
+  }
+
+  Future<void> _readBar() {
+    _barDirty = true;
+    return _readingBar ??= _readBarChanges().whenComplete(
+      () => _readingBar = null,
+    );
+  }
+
+  Future<void> _readBarChanges() async {
+    while (_barDirty && !_disposed) {
+      _barDirty = false;
+      try {
+        final next = await _settings.readAiBar();
+        if (_disposed) return;
+        _bar = next;
+        _publish();
+      } catch (_) {
+        // Keep the last valid preferences while Settings reconnects.
+      }
+    }
+  }
+
+  void _publish() {
+    final hadProviders = aiRows(data['providers']).isNotEmpty;
+    data = {
+      ..._sample,
+      'showUsed': _bar?['showUsed'] == true,
+      'ringOrder': _bar?['ringOrder'] == '5h-inner' ? '5h-inner' : '5h-outer',
+      'threshold': aiLowPercent(_bar),
+      'pinned': [...?(_bar?['pinned'] as List?)?.whereType<String>()],
+    };
+    if (visible || hadProviders) notifyListeners();
   }
 
   Future<void> refresh() async {
@@ -58,10 +101,9 @@ class AiUsageBackend extends ChangeNotifier {
       worker.send([reply.sendPort, force]);
       final value = await reply.first.timeout(const Duration(seconds: 90));
       if (!_disposed) {
-        final hadProviders = aiRows(data['providers']).isNotEmpty;
-        data = aiMap(value);
+        _sample = aiMap(value);
         tick++;
-        if (visible || hadProviders) notifyListeners();
+        _publish();
       }
     } on TimeoutException {
       // The next poll can reconnect after an engine restart.
@@ -75,6 +117,7 @@ class AiUsageBackend extends ChangeNotifier {
     _disposed = true;
     _timer?.cancel();
     unawaited(_changes?.cancel());
+    unawaited(_settings.close());
     super.dispose();
   }
 }
@@ -100,8 +143,9 @@ void startAiUsageWorker() {
 class _AiUsageWorker {
   _AiUsageWorker() {
     _settings.changes.listen((change) {
-      if (change.topic == aiProvidersSettingId ||
-          change.topic == aiBarSettingId) {
+      if (change.topic == aiBarSettingId) {
+        unawaited(_readBar().then((bar) => _notifyAlerts(aiLowPercent(bar))));
+      } else if (change.topic == aiProvidersSettingId) {
         _nextPoll = null;
       }
     }, onError: (Object _) {});
@@ -156,9 +200,8 @@ class _AiUsageWorker {
           authenticate: true,
         ),
       );
-      final (bar, configured) = await (_readBar(), _cli('providers')).wait;
+      final (_, configured) = await (_readBar(), _cli('providers')).wait;
       final automatic = configured == null;
-      final threshold = aiLowPercent(bar);
       final (usage, cost) = await (
         _endpoint(client, port, 'usage', refresh: true),
         _endpoint(client, port, 'cost', refresh: force),
@@ -169,7 +212,6 @@ class _AiUsageWorker {
         previous: aiRows(_sample['providers']),
         automatic: automatic,
       );
-      final now = DateTime.now();
       final updated =
           [
             for (final row in data)
@@ -181,24 +223,24 @@ class _AiUsageWorker {
           );
       _sample = {
         'providers': data,
-        'showUsed': bar?['showUsed'] is bool
-            ? bar!['showUsed'] == true
-            : aiMap(shell['host'])['usageBarsShowUsed'] == true,
-        'ringOrder': bar?['ringOrder'] == '5h-inner' ? '5h-inner' : '5h-outer',
-        'threshold': threshold,
-        'pinned': [...?(bar?['pinned'] as List?)?.whereType<String>()],
         'updatedAt': updated?.toIso8601String(),
         'cost': _costData(cost, data),
       };
-      for (final (name, window, left) in _alerts.update([
-        for (final row in data) AiQuotaProvider(row, now, threshold),
-      ])) {
-        unawaited(
-          rust.codexbarNotify(provider: name, window: window, remaining: left),
-        );
-      }
+      _notifyAlerts(aiLowPercent(_bar));
     } finally {
       client.close(force: true);
+    }
+  }
+
+  void _notifyAlerts(double threshold) {
+    final now = DateTime.now();
+    for (final (name, window, left) in _alerts.update([
+      for (final row in aiRows(_sample['providers']))
+        AiQuotaProvider(row, now, threshold),
+    ])) {
+      unawaited(
+        rust.codexbarNotify(provider: name, window: window, remaining: left),
+      );
     }
   }
 

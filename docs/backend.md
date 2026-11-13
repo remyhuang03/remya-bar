@@ -154,6 +154,9 @@ native ephemeral engine files across build modes.
 
 The Linux runner re-executes Bar with the same arguments after logind's
 `PrepareForSleep(false)` signal or when GDK removes an output with a bar.
+Output additions and changes to the GTK monitor scale also re-execute Bar,
+after a short debounce so the Wayland output announcements can settle. This
+recreates the surfaces and raster contexts with the new output scales.
 Re-exec happens before destroying the disconnected output's Flutter engine
 because its destructor terminates the EGL display still shared by other bars
 and popups. The new process reads the current outputs, restores notification
@@ -210,7 +213,9 @@ The owner receives `action` with
 when really hidden. `BarPopup.openCard` follows this per-engine state and ignores
 stale closes for another kind. Pills stay expanded and use the card's exact
 surface color while attached; hover-card updates are sent only for changed
-content (including the owning theme) while their kind is open. Reduced motion jumps to the animation endpoints.
+content (including the owning theme) while their kind is open. Open cards also follow the visible pill bounds on
+rendered frames, including during horizontal scrolling and pill animation.
+Reduced motion jumps to the animation endpoints.
 The process starts one shared popup engine with a realized, unmapped implicit
 GTK view. The popup entry path (`--remya-popup`) runs a Flutter `ViewCollection`
 of the explicit popup views. Each open popup has its own view and method channel
@@ -528,8 +533,15 @@ pins, the first three tracked providers with data; the card shows every tracked
 provider. `lowPercent` sets the low-quota threshold. While Settings is
 unreachable the worker keeps its last Settings value; before the first one it
 uses a 20% threshold. Usage is always probed for all providers and filtered locally.
-It uses the authenticated dashboard shell for the fill preference and reads
-usage and cost from the JSON routes.
+Bar views apply presentation preferences independently of the quota probe. A
+single quota window uses the outer ring. With two windows, the selected ring
+order also sets the expanded pill's readout order. Rings start at 12 o'clock
+and run clockwise. Card meters run from left to right. Both place used quota
+first and remaining quota second. The pace marker stays on the used-quota
+scale. The quota preference selects the highlighted segment and the
+percentage readout. The worker
+reads the provider catalog from the authenticated dashboard shell when needed
+and reads usage and cost from the JSON routes.
 CodexBar exposes its ordinary usage and cost routes to local loopback clients.
 If a route is unavailable, the worker falls back to the corresponding CLI
 command. The optional dependency is detected at runtime.

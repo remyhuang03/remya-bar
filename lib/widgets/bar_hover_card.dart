@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:collection/collection.dart';
+import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'package:material_ui/material_ui.dart';
 
 import '../features/popups/bar_card_surface.dart';
@@ -39,20 +40,23 @@ class _BarHoverCardState extends State<BarHoverCard> {
   bool _shown = false;
   Map<String, Object?>? _lastContent;
   Rect? _lastAnchor;
-  ScrollPosition? _scrollPosition;
 
   void _send(Future<void> request) {
     request.catchError((Object error) => debugPrint('Bar card: $error'));
   }
 
   void _show({bool update = false, bool activated = false}) {
+    if (update && BarPopup.openCard.value != widget.kind) return;
     final box = context.findRenderObject() as RenderBox?;
     if ((!update && !activated && !_hovered) || box == null || !box.hasSize) {
       return;
     }
     final view = View.of(context);
     final viewport = Offset.zero & (view.physicalSize / view.devicePixelRatio);
-    final anchor = (box.localToGlobal(.zero) & box.size).intersect(viewport);
+    var anchor = (box.localToGlobal(.zero) & box.size).intersect(viewport);
+    if (RenderAbstractViewport.maybeOf(box) case final RenderBox scroll) {
+      anchor = anchor.intersect(scroll.localToGlobal(.zero) & scroll.size);
+    }
     if (anchor.isEmpty) {
       if (update && _shown) {
         _shown = false;
@@ -77,11 +81,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
       content,
       _lastContent,
     );
-    if (update &&
-        (BarPopup.openCard.value != widget.kind ||
-            (!anchorChanged && !contentChanged))) {
-      return;
-    }
+    if (update && !anchorChanged && !contentChanged) return;
     _lastAnchor = anchor;
     _lastContent = content;
     final request = update ? BarPopup.update : BarPopup.show;
@@ -105,35 +105,30 @@ class _BarHoverCardState extends State<BarHoverCard> {
     _show(activated: true);
   }
 
-  void _refresh() {
-    if (!_shown) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _show(update: true);
-    });
+  // An anchor can move on a rendered frame without this widget rebuilding.
+  void _trackAnchor(Duration _) {
+    if (!mounted || BarPopup.openCard.value != widget.kind) return;
+    _show(update: true);
+    if (_shown) WidgetsBinding.instance.addPostFrameCallback(_trackAnchor);
   }
 
-  @override
-  void didUpdateWidget(BarHoverCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _refresh();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final scrollPosition = Scrollable.maybeOf(context)?.position;
-    if (scrollPosition != _scrollPosition) {
-      _scrollPosition?.removeListener(_refresh);
-      _scrollPosition = scrollPosition;
-      _scrollPosition?.addListener(_refresh);
+  void _onOpenCard() {
+    if (BarPopup.openCard.value == widget.kind) {
+      WidgetsBinding.instance.addPostFrameCallback(_trackAnchor);
+    } else {
+      _shown = false;
     }
-    _refresh();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    BarPopup.openCard.addListener(_onOpenCard);
   }
 
   @override
   void dispose() {
-    _scrollPosition?.removeListener(_refresh);
-    _scrollPosition = null;
+    BarPopup.openCard.removeListener(_onOpenCard);
     _timer?.cancel();
     if (_shown) _send(BarPopup.hide(kind: widget.kind));
     super.dispose();

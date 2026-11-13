@@ -785,7 +785,15 @@ void main() {
         },
       );
       await tester.tap(find.text('Internet'));
+      await tester.pump();
+      final header = find.text('Available networks');
+      final startX = tester.getTopLeft(header).dx;
+      await tester.pump(const Duration(milliseconds: 100));
+      final midX = tester.getTopLeft(header).dx;
       await tester.pumpAndSettle();
+      final endX = tester.getTopLeft(header).dx;
+      expect(startX, greaterThan(midX));
+      expect(midX, greaterThan(endX));
       final headerBottom = tester
           .getBottomLeft(find.text('Available networks'))
           .dy;

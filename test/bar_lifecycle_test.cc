@@ -4,6 +4,7 @@
 
 static guint released_engines = 0;
 static guint restart_requests = 0;
+static guint output_restart_requests = 0;
 static constexpr int kInitialTooltipHeight = 80;
 
 static void show_test_tooltip(BarPopup* popup, const char* message) {
@@ -102,6 +103,7 @@ static gboolean check_monitor_lifecycle(gpointer data) {
       g_signal_emit_by_name(display, "monitor-added", monitor);
     }
     g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, count);
+    g_assert_cmpuint(self->output_restart, ==, 0);
     for (int index = 0; index < count; index++) {
       GdkMonitor* monitor = gdk_display_get_monitor(display, index);
       auto* window = GTK_BIN(g_hash_table_lookup(self->bar_windows, monitor));
@@ -119,19 +121,23 @@ static gboolean check_monitor_lifecycle(gpointer data) {
     return G_SOURCE_CONTINUE;
   }
 
-  // Flutter can still be completing platform work after GTK destroys a view.
-  // Let the main loop process those callbacks while all outputs are absent.
-  g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, 0);
-  if (released_engines < count && g_get_monotonic_time() < release_deadline) {
+  if (released_engines < count) {
+    g_assert_cmpint(g_get_monotonic_time(), <, release_deadline);
     return G_SOURCE_CONTINUE;
   }
-  g_assert_cmpuint(released_engines, ==, count);
   g_assert_true(gtk_widget_get_realized(self->popup_engine_window));
   g_assert_false(gtk_widget_get_mapped(self->popup_engine_window));
-  for (int index = 0; index < count; index++) {
-    g_signal_emit_by_name(display, "monitor-added",
-                          gdk_display_get_monitor(display, index));
+  if (output_restart_requests == 0) {
+    if (self->output_restart == 0) {
+      g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, 0);
+      for (int index = 0; index < count; index++) {
+        g_signal_emit_by_name(display, "monitor-added",
+                              gdk_display_get_monitor(display, index));
+      }
+    }
+    return G_SOURCE_CONTINUE;
   }
+  g_assert_cmpuint(output_restart_requests, ==, 1);
   g_application_activate(G_APPLICATION(self));
   g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, count);
   g_assert_cmpuint(
@@ -211,6 +217,10 @@ int main(int argc, char** argv) {
   g_autoptr(MyApplication) app = nullptr;
   app = my_application_new(
       [](const char* reason, gpointer data) {
+        if (g_strcmp0(reason, "Display connected or scale changed") == 0) {
+          ++output_restart_requests;
+          return;
+        }
         auto* self = *static_cast<MyApplication**>(data);
         GdkMonitor* monitor =
             gdk_display_get_monitor(gdk_display_get_default(), restart_requests);

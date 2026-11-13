@@ -26,37 +26,18 @@ class AiQuotaRing extends StatelessWidget {
   /// Assigns up to two quota windows to the outer and inner rings per [ringOrder].
   ({AiQuotaWindow? outer, AiQuotaWindow? inner}) resolveWindows() {
     final windows = provider.pillWindows;
-    AiQuotaWindow? fiveHour;
-    AiQuotaWindow? weekly;
-    for (final window in windows) {
-      final minutes = aiNumber(window.data['minutes']);
-      if (minutes == 300) {
-        fiveHour ??= window;
-      } else if (minutes == 10080) {
-        weekly ??= window;
-      }
-    }
-    final remaining =
-        [
-          for (final window in windows)
-            if (window != fiveHour && window != weekly) window,
-        ]..sort(
-          (a, b) => (aiNumber(a.data['minutes']) ?? double.infinity).compareTo(
-            aiNumber(b.data['minutes']) ?? double.infinity,
-          ),
-        );
-    for (final window in remaining) {
-      if (fiveHour == null) {
-        fiveHour = window;
-      } else {
-        weekly ??= window;
-      }
-    }
-    final fiveHourInner = ringOrder == '5h-inner';
-    return (
-      outer: fiveHourInner ? weekly : fiveHour,
-      inner: fiveHourInner ? fiveHour : weekly,
-    );
+    if (windows.length < 2) return (outer: windows.firstOrNull, inner: null);
+    final [first, second] = windows;
+    final shortFirst = switch ((first.cadence, second.cadence)) {
+      ('5H', _) || (_, '1W') => true,
+      (_, '5H') || ('1W', _) => false,
+      _ =>
+        (aiNumber(first.data['minutes']) ?? double.infinity) <=
+            (aiNumber(second.data['minutes']) ?? double.infinity),
+    };
+    return shortFirst == (ringOrder != '5h-inner')
+        ? (outer: first, inner: second)
+        : (outer: second, inner: first);
   }
 
   @override
@@ -79,11 +60,10 @@ class AiQuotaRing extends StatelessWidget {
                   shape: .circle,
                   color: scheme.errorContainer,
                 ),
-              )
-            else ...[
-              _AnimatedArc(outer, 12.5, 3, accent, showUsed: showUsed),
+              ),
+            _AnimatedArc(outer, 12.5, 3, accent, showUsed: showUsed),
+            if (inner != null)
               _AnimatedArc(inner, 9, 2, accent, showUsed: showUsed),
-            ],
             Center(
               child: Opacity(
                 opacity: exhausted ? .38 : 1,
@@ -215,14 +195,16 @@ class _AnimatedArc extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final left = window?.left;
-    final expectedUsed = window?.expectedUsed;
+    final used = (window?.used ?? 0) / 100;
+    final track = window == null
+        ? scheme.outlineVariant
+        : scheme.onSurface.withValues(alpha: .16);
+    final highlight = window?.low == true ? scheme.error : accent;
+    final usedColor = showUsed && window != null ? highlight : track;
+    final remainingColor = !showUsed && window != null ? highlight : track;
     return TweenAnimationBuilder<double>(
       key: ValueKey((radius, window?.slot, window?.reset)),
-      tween: Tween(
-        begin: 0,
-        end: left == null ? 0 : (showUsed ? 100 - left : left) / 100,
-      ),
+      tween: Tween(begin: 0, end: used),
       duration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
           : const Duration(milliseconds: 360),
@@ -232,15 +214,11 @@ class _AnimatedArc extends StatelessWidget {
           radius,
           stroke,
           fill.clamp(0.0, 1.0),
-          // A neutral track keeps every accent readable on the pill.
-          left == null
-              ? scheme.outlineVariant
-              : scheme.onSurface.withValues(alpha: .16),
-          window?.low == true ? scheme.error : accent,
+          remainingColor,
+          usedColor,
           scheme.onSurface,
           scheme.surfaceContainerHighest,
-          expectedUsed == null ? null : expectedUsed / 100,
-          reverse: !showUsed,
+          window?.expectedUsedFraction,
         ),
       ),
     );
@@ -251,19 +229,17 @@ class _ArcPainter extends CustomPainter {
   const _ArcPainter(
     this.radius,
     this.stroke,
-    this.fill,
-    this.track,
-    this.active,
+    this.used,
+    this.remainingColor,
+    this.usedColor,
     this.tick,
     this.halo,
-    this.pace, {
-    required this.reverse,
-  });
+    this.pace,
+  );
 
-  final double radius, stroke, fill;
-  final Color track, active, tick, halo;
+  final double radius, stroke, used;
+  final Color remainingColor, usedColor, tick, halo;
   final double? pace;
-  final bool reverse;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -275,43 +251,20 @@ class _ArcPainter extends CustomPainter {
       ..style = .stroke
       ..strokeWidth = stroke
       ..strokeCap = .round;
-    final angle = fill * full;
+    final angle = used * full;
     final gap = (stroke + 1) / radius;
-    if (reverse) {
-      final usedAngle = full - angle;
-      if (fill < 1) {
-        final trim = fill == 0 ? 0.0 : gap;
-        canvas.drawArc(
-          bounds,
-          start + trim,
-          math.max(0, usedAngle - trim * 2),
-          false,
-          paint..color = track,
-        );
-      }
-      if (fill > 0) {
-        canvas.drawArc(
-          bounds,
-          start + usedAngle,
-          angle,
-          false,
-          paint..color = active,
-        );
-      }
-    } else {
-      if (fill < 1) {
-        final trim = fill == 0 ? 0.0 : gap;
-        canvas.drawArc(
-          bounds,
-          start + angle + trim,
-          math.max(0, full - angle - trim * 2),
-          false,
-          paint..color = track,
-        );
-      }
-      if (fill > 0) {
-        canvas.drawArc(bounds, start, angle, false, paint..color = active);
-      }
+    if (used < 1) {
+      final trim = used == 0 ? 0.0 : gap;
+      canvas.drawArc(
+        bounds,
+        start + angle + trim,
+        math.max(0, full - angle - trim * 2),
+        false,
+        paint..color = remainingColor,
+      );
+    }
+    if (used > 0) {
+      canvas.drawArc(bounds, start, angle, false, paint..color = usedColor);
     }
     if (pace case final fraction?) {
       final target = start + fraction * full;
@@ -341,16 +294,15 @@ class _ArcPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ArcPainter oldDelegate) =>
-      (radius, stroke, fill, track, active, tick, halo, pace, reverse) !=
+      (radius, stroke, used, remainingColor, usedColor, tick, halo, pace) !=
       (
         oldDelegate.radius,
         oldDelegate.stroke,
-        oldDelegate.fill,
-        oldDelegate.track,
-        oldDelegate.active,
+        oldDelegate.used,
+        oldDelegate.remainingColor,
+        oldDelegate.usedColor,
         oldDelegate.tick,
         oldDelegate.halo,
         oldDelegate.pace,
-        oldDelegate.reverse,
       );
 }

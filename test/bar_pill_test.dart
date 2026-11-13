@@ -211,10 +211,15 @@ void main() {
     expect(updates, hasLength(1));
     final args = updates.single.arguments as Map;
     final anchor = args['anchor'] as List;
-    expect(
-      (anchor[0] as num).toDouble(),
-      closeTo((showAnchor[0] as num).toDouble() - 40, 0.5),
-    );
+    expect(anchor[0], showAnchor[0] - 40);
+    controller.jumpTo(120);
+    await tester.pump();
+    final clipped = (calls.last.arguments as Map)['anchor'] as List;
+    expect(clipped[0], showAnchor[0] - 100);
+    expect(clipped[2], 60);
+    controller.jumpTo(180);
+    await tester.pump();
+    expect(calls.last.method, 'hide');
     BarPopup.openCard.value = null;
     await tester.pumpWidget(const SizedBox());
   });

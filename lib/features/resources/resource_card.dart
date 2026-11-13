@@ -264,7 +264,6 @@ class _ComputeTile extends StatelessWidget {
           value == null ? '' : '%',
           colors.reading,
           size: 32,
-          unitSize: 16,
         ),
         SizedBox(
           height: 36,

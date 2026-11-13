@@ -133,7 +133,10 @@ class AiQuotaWindow {
     return remaining / minutes * 100;
   }
 
-  double? get expectedUsed => expectedLeft == null ? null : 100 - expectedLeft!;
+  double? get expectedUsedFraction {
+    final expected = expectedLeft;
+    return expected == null ? null : (100 - expected) / 100;
+  }
 
   bool get runningOut => data['willLast'] == false;
 
@@ -196,11 +199,10 @@ class AiQuotaWindow {
             seconds < const Duration(days: 366).inSeconds) {
       return 'Empty in ~${aiDuration(Duration(seconds: seconds.round()))}';
     }
-    final expected = expectedLeft;
-    if (expected == null) return null;
-    final delta = (left - expected).round();
-    if (delta.abs() <= 2) return 'On pace';
-    return '${delta.abs()}% in ${delta > 0 ? 'reserve' : 'deficit'}';
+    if (pacePercent case (:final delta, :final reserve)) {
+      return '$delta% in ${reserve ? 'reserve' : 'deficit'}';
+    }
+    return expectedLeft == null ? null : 'On pace';
   }
 }
 

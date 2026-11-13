@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/gestures.dart' show kSecondaryMouseButton;
@@ -7,6 +8,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/features/ai_usage/ai_quota_ring.dart';
 import 'package:remya_bar/features/ai_usage/ai_usage_backend.dart';
+import 'package:remya_bar/features/ai_usage/ai_usage_card.dart';
 import 'package:remya_bar/features/ai_usage/ai_usage_data.dart';
 import 'package:remya_bar/features/ai_usage/bar_ai_quota.dart';
 import 'package:remya_bar/features/popups/bar_detail_card.dart';
@@ -41,17 +43,20 @@ Map<String, Object?> _usage(DateTime now, {num used = 86}) => {
   'resetCredits': {'available': 2},
 };
 
-Future<void> _pumpRings(WidgetTester tester, List<AiQuotaProvider> providers) =>
-    tester.pumpWidget(
-      MaterialApp(
-        home: Row(
-          children: [
-            for (final (index, provider) in providers.indexed)
-              AiQuotaRing(provider, showUsed: false, index: index),
-          ],
-        ),
-      ),
-    );
+Future<void> _pumpRings(
+  WidgetTester tester,
+  List<AiQuotaProvider> providers, {
+  bool showUsed = false,
+}) => tester.pumpWidget(
+  MaterialApp(
+    home: Row(
+      children: [
+        for (final (index, provider) in providers.indexed)
+          AiQuotaRing(provider, showUsed: showUsed, index: index),
+      ],
+    ),
+  ),
+);
 
 void main() {
   final now = DateTime.utc(2026, 11, 9, 9);
@@ -128,20 +133,82 @@ void main() {
     final rings = find.byType(AiQuotaRing);
     final accent = aiProviderAccent('claude', scheme);
     expect(accent, isNot(scheme.error));
-    // Each arc paints its track first, then the active sweep.
     final track = scheme.onSurface.withValues(alpha: .16);
     expect(
       rings.first,
       paints
-        ..arc(color: track)
-        ..arc(color: accent),
+        ..arc(color: accent)
+        ..arc(
+          color: track,
+          startAngle: -math.pi / 2,
+          sweepAngle: .3 * (2 * math.pi),
+        ),
     );
     expect(
       rings.last,
       paints
-        ..arc(color: track)
-        ..arc(color: scheme.error),
+        ..arc(color: scheme.error)
+        ..arc(color: track),
     );
+    await _pumpRings(tester, [provider('claude', 30)], showUsed: true);
+    await tester.pumpAndSettle();
+    expect(
+      rings.first,
+      paints
+        ..arc(color: track)
+        ..arc(
+          color: accent,
+          startAngle: -math.pi / 2,
+          sweepAngle: .3 * (2 * math.pi),
+        ),
+    );
+  });
+
+  testWidgets('card keeps used on the left and swaps the highlight', (
+    tester,
+  ) async {
+    final sampleTime = DateTime.now();
+    final provider = aiProviderData(_codex, _usage(sampleTime, used: 30))
+      ..remove('secondary')
+      ..remove('tertiary');
+    for (final showUsed in [false, true]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AiUsageCard(
+            data: {
+              'providers': [provider],
+              'showUsed': showUsed,
+            },
+            onRefresh: () {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(showUsed ? '30% used' : '70% left'), findsOneWidget);
+      final stop = find.byWidgetPredicate(
+        (widget) =>
+            widget is SvgPicture &&
+            widget.bytesLoader is SvgAssetLoader &&
+            (widget.bytesLoader as SvgAssetLoader).assetName.endsWith(
+              '/stop.svg',
+            ),
+      );
+      final meter = find.ancestor(of: stop, matching: find.byType(Stack)).first;
+      final rect = tester.getRect(meter);
+      final segments = tester.widget<Stack>(meter).children.cast<Positioned>();
+      final [used, remaining, _, pace] = segments;
+      final scheme = Theme.of(tester.element(meter)).colorScheme;
+      final accent = aiProviderAccent('codex', scheme);
+      Color? colorOf(Positioned segment) =>
+          ((segment.child as DecoratedBox).decoration as BoxDecoration).color;
+      expect(used.left, 0);
+      expect(used.width, closeTo(rect.width * .3, .01));
+      expect(remaining.left, closeTo(rect.width * .3 + 4, .01));
+      expect(remaining.right, 0);
+      expect(pace.left, closeTo(rect.width * .68 - 1, .01));
+      expect(colorOf(used), showUsed ? accent : scheme.secondaryContainer);
+      expect(colorOf(remaining), showUsed ? scheme.secondaryContainer : accent);
+    }
   });
 
   test(
@@ -416,6 +483,27 @@ void main() {
     },
   );
 
+  test('a single quota window always uses the outer ring', () {
+    for (final slot in quotaSlots) {
+      for (final ringOrder in ['5h-outer', '5h-inner']) {
+        final provider = AiQuotaProvider(
+          {
+            slot: {'used': 30, 'minutes': slot == 'primary' ? 300 : 10080},
+          },
+          now,
+          20,
+        );
+        final (:outer, :inner) = AiQuotaRing(
+          provider,
+          showUsed: false,
+          ringOrder: ringOrder,
+        ).resolveWindows();
+        expect(outer?.slot, slot);
+        expect(inner, isNull);
+      }
+    }
+  });
+
   testWidgets(
     'supports showUsed, 5h-inner ring order, AGY label, and % style',
     (tester) async {
@@ -458,7 +546,7 @@ void main() {
       expect(inner?.slot, 'primary');
       expect(inner?.percentValue(showUsed: true), 70);
       expect(inner?.used, 70);
-      expect(inner?.expectedUsed, 68);
+      expect(inner?.expectedUsedFraction, .68);
       BarPopup.openCard.value = null;
       await tester.pumpWidget(const SizedBox());
     },

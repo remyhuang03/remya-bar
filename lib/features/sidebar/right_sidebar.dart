@@ -241,6 +241,7 @@ class _RightSidebarState extends State<RightSidebar> {
       _error = null;
     });
     if (_scroll.hasClients) _scroll.jumpTo(0);
+    if (detail != null) widget.onHeight(sidebarSize.height);
     if (detail == 'internet' &&
         _network['wifi_enabled'] == true &&
         _network['adapter'] is String) {
@@ -322,7 +323,7 @@ class _RightSidebarState extends State<RightSidebar> {
               final pad = constraints.maxWidth < 340 ? 12.0 : 24.0;
               final headerHeight =
                   44.0 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 2);
-              return Padding(
+              final page = Padding(
                 padding: .symmetric(vertical: pad),
                 child: Column(
                   mainAxisSize: .min,
@@ -337,7 +338,7 @@ class _RightSidebarState extends State<RightSidebar> {
                       ),
                     ),
                     Flexible(
-                      fit: .loose,
+                      fit: _detail == null ? .loose : .tight,
                       child: _detail == null
                           ? SingleChildScrollView(
                               controller: _scroll,
@@ -370,13 +371,23 @@ class _RightSidebarState extends State<RightSidebar> {
                               error: _error == null
                                   ? null
                                   : _errorBanner(theme, _error!),
-                              onHeight: (height) => widget.onHeight(
-                                height + pad * 2 + 16 + headerHeight,
-                              ),
                             ),
                     ),
                   ],
                 ),
+              );
+              return TweenAnimationBuilder<double>(
+                key: ValueKey(_detail),
+                duration: MediaQuery.disableAnimationsOf(context)
+                    ? Duration.zero
+                    : const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+                tween: Tween(begin: _detail == null ? 0 : 1, end: 0),
+                builder: (_, offset, child) => FractionalTranslation(
+                  translation: Offset(offset, 0),
+                  child: child,
+                ),
+                child: page,
               );
             },
           ),

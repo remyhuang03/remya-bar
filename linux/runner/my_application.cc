@@ -14,6 +14,7 @@ struct _MyApplication {
   GtkWidget* popup_engine_window;
   GDBusConnection* shortcut_bus;
   guint shortcut_subscription;
+  guint output_restart;
   RestartBar restart_bar;
   gpointer restart_data;
 };
@@ -43,6 +44,8 @@ static void set_bar_fullscreen(GtkWindow* window, bool fullscreen) {
     gtk_widget_show(GTK_WIDGET(window));
   }
 }
+
+static void schedule_output_restart(MyApplication* self);
 
 static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   if (g_hash_table_contains(self->bar_windows, monitor)) return;
@@ -113,6 +116,11 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
         g_autoptr(FlValue) geometry = output_geometry(monitor);
         fl_method_channel_invoke_method(channel, "outputChanged", geometry, nullptr, nullptr, nullptr);
       }), window_channel, G_CONNECT_DEFAULT);
+  g_signal_connect_object(monitor, "notify::scale-factor",
+      G_CALLBACK(+[](GdkMonitor* monitor, GParamSpec*, MyApplication* self) {
+        if (g_hash_table_contains(self->bar_windows, monitor))
+          schedule_output_restart(self);
+      }), self, G_CONNECT_DEFAULT);
   g_autoptr(FlStandardMethodCodec) paths_codec = fl_standard_method_codec_new();
   g_autoptr(FlMethodChannel) paths_channel = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)), "top.remya.paths",
@@ -133,9 +141,23 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   gtk_widget_show_all(GTK_WIDGET(window));
 }
 
-static void monitor_added(GdkDisplay* display, GdkMonitor* monitor,
-                          MyApplication* self) {
-  create_bar_window(self, monitor);
+static void schedule_output_restart(MyApplication* self) {
+  if (self->output_restart != 0) g_source_remove(self->output_restart);
+  // Wait for Wayland's output announcements to settle before recreating the
+  // graphics contexts with the current output scales.
+  self->output_restart = g_timeout_add(250, +[](gpointer data) -> gboolean {
+    auto* self = MY_APPLICATION(data);
+    self->output_restart = 0;
+    self->restart_bar("Display connected or scale changed", self->restart_data);
+    // Keep hotplug usable if exec failed.
+    g_application_activate(G_APPLICATION(self));
+    return G_SOURCE_REMOVE;
+  }, self);
+}
+
+static void monitor_added(GdkDisplay*, GdkMonitor* monitor, MyApplication* self) {
+  if (!g_hash_table_contains(self->bar_windows, monitor))
+    schedule_output_restart(self);
 }
 
 static void monitor_removed(GdkDisplay* display, GdkMonitor* monitor,
@@ -259,6 +281,7 @@ static void my_application_startup(GApplication* application) {
 // Implements GApplication::shutdown.
 static void my_application_shutdown(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
+  g_clear_handle_id(&self->output_restart, g_source_remove);
   if (self->shortcut_bus != nullptr) {
     g_dbus_connection_signal_unsubscribe(self->shortcut_bus, self->shortcut_subscription);
     g_clear_object(&self->shortcut_bus);

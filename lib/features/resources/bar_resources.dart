@@ -96,7 +96,7 @@ class _Segment {
       : resourcePercentLabel(value);
 
   double valueWidth(BuildContext context) =>
-      _measure(context, network ? '444M' : '100%');
+      _measure(context, network: network);
 
   double width(BuildContext context) =>
       26 + (network ? 32 + 2 * valueWidth(context) : valueWidth(context));
@@ -141,9 +141,11 @@ TextStyle _valueStyle(BuildContext context) => Theme.of(context)
       letterSpacing: 0,
     );
 
-double _measure(BuildContext context, String text) {
+double _measure(BuildContext context, {required bool network}) {
   final painter = TextPainter(
-    text: TextSpan(text: text, style: _valueStyle(context)),
+    text: network
+        ? TextSpan(text: '444M', style: _valueStyle(context))
+        : PercentText.span(context, '100', style: _valueStyle(context)),
     textDirection: Directionality.of(context),
     textScaler: MediaQuery.textScalerOf(context),
   )..layout();
