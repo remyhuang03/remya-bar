@@ -146,4 +146,76 @@ void main() {
     expect(calls.where((call) => call.method == 'update'), hasLength(2));
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets('hover card updates popup anchor while scrolling horizontally', (
+    tester,
+  ) async {
+    final calls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      BarPopup.channel,
+      (call) async {
+        calls.add(call);
+        return null;
+      },
+    );
+    final controller = ScrollController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      BarPopupScope(
+        theme: const RemyaTheme(),
+        child: MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 300,
+              height: 40,
+              child: SingleChildScrollView(
+                controller: controller,
+                scrollDirection: .horizontal,
+                child: SizedBox(
+                  width: 600,
+                  height: 40,
+                  child: Material(
+                    type: .transparency,
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 100),
+                        BarHoverCard(
+                          kind: 'battery',
+                          size: const Size(420, 300),
+                          openOnTap: true,
+                          data: const {'ok': true},
+                          child: const SizedBox(
+                            width: 80,
+                            height: 32,
+                            child: Text('Battery'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Battery'));
+    await tester.pump();
+    BarPopup.openCard.value = 'battery';
+    controller.jumpTo(40);
+    await tester.pump();
+    final shows = calls.where((call) => call.method == 'show').toList();
+    final showAnchor = (shows.single.arguments as Map)['anchor'] as List;
+    final updates = calls.where((call) => call.method == 'update').toList();
+    expect(updates, hasLength(1));
+    final args = updates.single.arguments as Map;
+    final anchor = args['anchor'] as List;
+    expect(
+      (anchor[0] as num).toDouble(),
+      closeTo((showAnchor[0] as num).toDouble() - 40, 0.5),
+    );
+    BarPopup.openCard.value = null;
+    await tester.pumpWidget(const SizedBox());
+  });
 }

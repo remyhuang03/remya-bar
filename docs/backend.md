@@ -129,8 +129,11 @@ everything. New notifications that pop up play their `sound-file` or
 `canberra-gtk-play` (libcanberra, a separate process) unless sounds are off or
 the sender sets `suppress-sound`; replacements stay silent.
 
-The `notifications` pill shows the bell and the history count, and opens the
-`notifications` hover card. Popups use the separate `notification-toasts`
+The `notifications` pill shows the bell and the history count, and toggles the
+left-anchored `notifications` panel (`top.remya.bar/notifications-panel`),
+matching the Quick Settings sidebar interaction model: click-to-toggle,
+slide-in from the left, click-outside/Escape dismissal, pinned Do Not Disturb
+toggle, and mutually exclusive visibility with the right sidebar. Popups use the separate `notification-toasts`
 popup kind: native GTK places an OVERLAY layer surface (`top.remya.bar/notifications`)
 anchored top-left, sliding in from the left edge, 8 px from the edges, with no keyboard focus or exclusive
 zone. It is not hidden by hover cards, menus, the sidebar or fullscreen, and
@@ -138,7 +141,7 @@ closes only when no popup remains. The output focused when the first popup
 arrives claims the stack through `notificationsClaimPopups`; Rust keeps that
 single `popupHost` until no popup remains, so outputs racing on a focus change
 cannot both show it. The host hides the stack while its own `notifications`
-card is open, since the card lists the same notifications in that corner.
+panel is open, since the panel lists the same notifications in that corner.
 
 ## Validation
 
@@ -374,8 +377,11 @@ handling, and migration of the former VPN tile in saved sidebar layouts.
 
 The editor sends the old and new visible tile order to Settings for an atomic
 update. Hidden IDs are inferred from the full tile list. The Power menu asks
-logind to lock or terminate the current graphical session, reboot, or power off.
-Log out, restart and shut down require a second click within three seconds.
+logind to lock, suspend, or terminate the current graphical session, reboot, or
+power off. Suspend, log out, restart and shut down require a second click within
+three seconds. Screenshot, screen record, and color picker tiles launch
+`remya_screen_capture` (no arguments, `--record`, and `--color-picker`) from the
+sibling debug bundle in debug mode or the XDG-installed bundle/command.
 
 The installed Bar can toggle its sidebar through a session D-Bus signal. To
 bind Super+A manually in Hyprland Lua, use:
@@ -513,8 +519,8 @@ The optional `codexbar-cli` dependency supplies the `codexbar` executable. A
 worker in the warm popup engine coalesces requests from all outputs into one
 sample every five minutes. Rust starts and supervises the CLI child, binds its
 HTTP server to a reserved port on `127.0.0.1` and ties the child to the bar
-process. The worker reads `Get("ai.bar")` from Settings (pins and threshold,
-without a provider probe) and re-polls when Settings signals `Changed` for
+process. Reads `Get("ai.bar")` from Settings (`pinned`, `lowPercent`, `showUsed`, and
+`ringOrder` without a provider probe) and re-polls when Settings signals `Changed` for
 `ai.providers` or `ai.bar`. Tracked providers are CodexBar's enabled set from
 `codexbar config providers`, which Settings > AI writes. The pill shows
 `pinned` in order (at most three, each only while it has data) or, without

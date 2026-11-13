@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
+import '../../widgets/percent_text.dart';
 import 'ai_quota_ring.dart';
 import 'ai_usage_data.dart';
 
@@ -248,9 +249,7 @@ class _WindowRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final compact = window.slot == 'tertiary';
-    final percent = showUsed
-        ? '${(100 - window.left).round()}%'
-        : window.percent;
+    final percentValue = window.percentValue(showUsed: showUsed);
     final caption = switch (window.cadence) {
       '1W' => compact ? 'weekly' : 'all models',
       final cadence when cadence != window.name =>
@@ -259,7 +258,22 @@ class _WindowRow extends StatelessWidget {
     };
     final reset = window.resetLabel;
     final pace = window.paceLabel;
+    final pacePercent = window.pacePercent;
     final small = _style(context, 12);
+    final valueStyle = _style(
+      context,
+      compact ? 12 : 20,
+      color: window.low
+          ? colors.error
+          : compact
+          ? colors.onSurfaceVariant
+          : _headline(colors),
+      weight: compact ? .w500 : .w700,
+    );
+    final paceStyle = small.copyWith(
+      fontWeight: .w500,
+      color: window.runningOut ? colors.error : null,
+    );
     return Column(
       crossAxisAlignment: .stretch,
       spacing: 6,
@@ -291,19 +305,7 @@ class _WindowRow extends StatelessWidget {
             Text.rich(
               TextSpan(
                 children: [
-                  TextSpan(
-                    text: percent,
-                    style: _style(
-                      context,
-                      compact ? 12 : 20,
-                      color: window.low
-                          ? colors.error
-                          : compact
-                          ? colors.onSurfaceVariant
-                          : _headline(colors),
-                      weight: compact ? .w500 : .w700,
-                    ),
-                  ),
+                  PercentText.span(context, '$percentValue', style: valueStyle),
                   TextSpan(text: showUsed ? ' used' : ' left'),
                 ],
               ),
@@ -334,14 +336,15 @@ class _WindowRow extends StatelessWidget {
               Expanded(child: Text(reset ?? '', style: small)),
               if (pace != null)
                 Expanded(
-                  child: Text(
-                    pace,
-                    textAlign: .end,
-                    style: small.copyWith(
-                      fontWeight: .w500,
-                      color: window.runningOut ? colors.error : null,
-                    ),
-                  ),
+                  child: pacePercent != null
+                      ? PercentText(
+                          '${pacePercent.delta}',
+                          suffix:
+                              ' in ${pacePercent.reserve ? 'reserve' : 'deficit'}',
+                          textAlign: .end,
+                          style: paceStyle,
+                        )
+                      : Text(pace, textAlign: .end, style: paceStyle),
                 ),
             ],
           ),
@@ -365,11 +368,10 @@ class _QuotaMeter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final fill = (showUsed ? 100 - window.left : window.left) / 100;
-    final expected = window.expectedLeft;
-    final pace = expected == null
-        ? null
-        : (showUsed ? 100 - expected : expected) / 100;
+    final reverse = !showUsed;
+    final fill = (showUsed ? window.used : window.left) / 100;
+    final expectedUsed = window.expectedUsed;
+    final pace = expectedUsed == null ? null : expectedUsed / 100;
     final height = compact ? 4.0 : 8.0;
     final activeColor = window.low ? colors.error : accent;
     final outer = Radius.circular(height / 2);
@@ -389,7 +391,8 @@ class _QuotaMeter extends StatelessWidget {
               children: [
                 if (fill > 0)
                   Positioned(
-                    left: 0,
+                    left: reverse ? null : 0,
+                    right: reverse ? 0 : null,
                     width: active,
                     top: 0,
                     bottom: 0,
@@ -397,31 +400,32 @@ class _QuotaMeter extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: activeColor,
                         borderRadius: .horizontal(
-                          left: outer,
-                          right: fill == 1 ? outer : inner,
+                          left: reverse ? (fill == 1 ? outer : inner) : outer,
+                          right: reverse ? outer : (fill == 1 ? outer : inner),
                         ),
                       ),
                     ),
                   ),
                 if (fill < 1)
                   Positioned(
-                    left: active + gap,
-                    right: 0,
+                    left: reverse ? 0 : active + gap,
+                    right: reverse ? active + gap : 0,
                     top: 0,
                     bottom: 0,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         color: colors.secondaryContainer,
                         borderRadius: .horizontal(
-                          left: fill == 0 ? outer : inner,
-                          right: outer,
+                          left: reverse ? outer : (fill == 0 ? outer : inner),
+                          right: reverse ? (fill == 0 ? outer : inner) : outer,
                         ),
                       ),
                     ),
                   ),
                 if (!compact && width - active - gap >= 6)
                   Positioned(
-                    right: 2,
+                    left: reverse ? 2 : null,
+                    right: reverse ? null : 2,
                     top: 2,
                     child: SvgPicture.asset(
                       'assets/icons/ai_usage/stop.svg',

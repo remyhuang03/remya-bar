@@ -4,7 +4,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../widgets/percent_text.dart';
 import '../../widgets/wave_progress.dart';
+import '../popups/popup_measure.dart';
 import '../tray/tray_icon.dart';
 
 typedef NotificationAction = ValueChanged<Map<String, Object?>>;
@@ -12,130 +14,275 @@ typedef NotificationAction = ValueChanged<Map<String, Object?>>;
 /// The popup kind of the notification stack surface.
 const notificationToastsKind = 'notification-toasts';
 
-/// The notification center hover card.
-class NotificationCenterCard extends StatelessWidget {
+/// The notification center panel and center widget.
+class NotificationCenterCard extends StatefulWidget {
   const NotificationCenterCard({
     super.key,
     required this.data,
     required this.onAction,
+    this.onHeight,
   });
 
   final Map<String, Object?> data;
   final NotificationAction onAction;
+  final ValueChanged<double>? onHeight;
+
+  @override
+  State<NotificationCenterCard> createState() => _NotificationCenterCardState();
+}
+
+class _NotificationCenterCardState extends State<NotificationCenterCard> {
+  double? _topHeight;
+  double? _bodyHeight;
+  double _lastPad = 0;
+
+  void _reportHeight(double pad) {
+    final top = _topHeight;
+    final body = _bodyHeight;
+    final onHeight = widget.onHeight;
+    if (top == null || body == null || onHeight == null) return;
+    onHeight(top + body + pad * 2 + 16);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final items = [
-      for (final item in data['notifications'] as List? ?? const [])
+      for (final item in widget.data['notifications'] as List? ?? const [])
         if (item is Map) item,
     ];
     final groups = <Object?, List<Map>>{};
     for (final item in items) {
       (groups[item['group']] ??= []).add(item);
     }
-    final dnd = data['dnd'];
-    final error = data['serviceError'];
-    return Column(
-      crossAxisAlignment: .stretch,
-      spacing: 16,
-      children: [
-        Row(
-          spacing: 10,
-          children: [
-            Text(
-              'Notifications',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontSize: 24,
-                height: 1.25,
-                fontWeight: .bold,
-                color: _emphasis(theme),
-              ),
-            ),
-            if (items.isNotEmpty)
-              _Chip(
-                '${items.length}',
-                color: colors.primary,
-                foreground: colors.onPrimary,
-              ),
-            const Spacer(),
-            if (items.isNotEmpty)
-              FilledButton.tonal(
-                onPressed: () =>
-                    onAction(const {'action': 'notification.clear'}),
-                child: const Text('Clear all'),
-              ),
-          ],
-        ),
-        if (error is String)
-          Text(
-            error,
-            style: theme.textTheme.bodyMedium?.copyWith(color: colors.error),
-          )
-        else if (items.isEmpty)
-          Padding(
-            padding: const .symmetric(vertical: 16),
-            child: Text(
-              'No notifications',
-              textAlign: .center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          ),
-        for (final group in groups.values)
-          Column(
-            crossAxisAlignment: .stretch,
-            spacing: 2,
+    final dnd = widget.data['dnd'];
+    final error = widget.data['serviceError'];
+    final panel = widget.onHeight != null;
+
+    Widget content(double pad) {
+      _lastPad = pad;
+      final headerAndDnd = Column(
+        mainAxisSize: .min,
+        crossAxisAlignment: .stretch,
+        spacing: 12,
+        children: [
+          Row(
+            spacing: 10,
             children: [
-              for (final (index, item) in group.indexed)
-                NotificationTile(
-                  data: item,
-                  onAction: onAction,
-                  // Later group members drop the repeated app header.
-                  showMeta: index == 0,
-                  dismissIds: index == 0
-                      ? [for (final item in group) item['id']]
-                      : null,
-                  radius: BorderRadius.vertical(
-                    top: Radius.circular(index == 0 ? 20 : 6),
-                    bottom: Radius.circular(index == group.length - 1 ? 20 : 6),
+              Flexible(
+                child: Text(
+                  'Notifications',
+                  maxLines: 1,
+                  overflow: .ellipsis,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontSize: 24,
+                    height: 1.25,
+                    fontWeight: .bold,
+                    color: _emphasis(theme),
                   ),
+                ),
+              ),
+              if (items.isNotEmpty)
+                _Chip(
+                  '${items.length}',
+                  color: colors.primary,
+                  foreground: colors.onPrimary,
+                ),
+              const Spacer(),
+              if (items.isNotEmpty)
+                FilledButton.tonal(
+                  onPressed: () =>
+                      widget.onAction(const {'action': 'notification.clear'}),
+                  child: const Text('Clear all'),
                 ),
             ],
           ),
-        if (dnd is bool)
-          Material(
-            color: colors.surfaceContainerHighest,
-            borderRadius: .circular(20),
-            clipBehavior: .antiAlias,
-            child: SwitchListTile(
-              contentPadding: const .only(left: 16, right: 12),
+          if (dnd is bool)
+            _DndTile(
               value: dnd,
-              onChanged: (value) =>
-                  onAction({'action': 'notification.dnd', 'value': value}),
-              title: Text(
-                'Do not disturb',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  fontWeight: .w500,
-                  color: _emphasis(theme),
-                ),
-              ),
-              subtitle: Text(
-                switch (data['quietReason']) {
-                  'schedule' => 'On by schedule',
-                  'fullscreen' => 'On while an app is full screen',
-                  _ => 'Critical notifications still show',
-                },
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 12,
+              quietReason: widget.data['quietReason'],
+              onChanged: (value) => widget.onAction({
+                'action': 'notification.dnd',
+                'value': value,
+              }),
+            ),
+          if (error is String)
+            Text(
+              error,
+              style: theme.textTheme.bodyMedium?.copyWith(color: colors.error),
+            ),
+        ],
+      );
+      final body = Column(
+        mainAxisSize: .min,
+        crossAxisAlignment: .stretch,
+        spacing: 16,
+        children: [
+          if (error == null && items.isEmpty)
+            Padding(
+              padding: const .symmetric(vertical: 16),
+              child: Text(
+                'No notifications',
+                textAlign: .center,
+                style: theme.textTheme.bodyMedium?.copyWith(
                   color: colors.onSurfaceVariant,
                 ),
               ),
             ),
+          for (final group in groups.values)
+            Column(
+              crossAxisAlignment: .stretch,
+              spacing: 2,
+              children: [
+                for (final (index, item) in group.indexed)
+                  NotificationTile(
+                    data: item,
+                    onAction: widget.onAction,
+                    // Later group members drop the repeated app header.
+                    showMeta: index == 0,
+                    dismissIds: index == 0
+                        ? [for (final item in group) item['id']]
+                        : null,
+                    radius: BorderRadius.vertical(
+                      top: Radius.circular(index == 0 ? 20 : 6),
+                      bottom: Radius.circular(
+                        index == group.length - 1 ? 20 : 6,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      );
+      return Padding(
+        padding: .symmetric(vertical: pad),
+        child: Column(
+          mainAxisSize: .min,
+          crossAxisAlignment: .stretch,
+          spacing: 16,
+          children: [
+            Padding(
+              padding: .symmetric(horizontal: pad),
+              child: PopupMeasure(
+                onHeight: (height) {
+                  _topHeight = height;
+                  _reportHeight(_lastPad);
+                },
+                child: headerAndDnd,
+              ),
+            ),
+            Flexible(
+              fit: .loose,
+              child: SingleChildScrollView(
+                primary: false,
+                padding: .symmetric(horizontal: pad),
+                child: PopupMeasure(
+                  onHeight: (height) {
+                    _bodyHeight = height;
+                    _reportHeight(_lastPad);
+                  },
+                  child: body,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!panel) return content(0);
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () =>
+            widget.onAction(const {'action': 'close'}),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Material(
+          color: colors.surfaceContainer,
+          shape: RoundedRectangleBorder(
+            borderRadius: .circular(32),
+            side: BorderSide(color: colors.surfaceContainerHighest),
           ),
-      ],
+          clipBehavior: .antiAlias,
+          child: LayoutBuilder(
+            builder: (context, constraints) =>
+                content(constraints.maxWidth < 340 ? 12.0 : 24.0),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DndTile extends StatelessWidget {
+  const _DndTile({
+    required this.value,
+    required this.quietReason,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final Object? quietReason;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Material(
+      color: colors.surfaceContainerHighest,
+      borderRadius: .circular(20),
+      clipBehavior: .antiAlias,
+      child: InkWell(
+        onTap: () => onChanged(!value),
+        child: Padding(
+          padding: const .fromLTRB(16, 12, 16, 12),
+          child: Row(
+            spacing: 12,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: .start,
+                  spacing: 2,
+                  children: [
+                    Text(
+                      'Do not disturb',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: .w500,
+                        color: _emphasis(theme),
+                      ),
+                    ),
+                    Text(
+                      switch (quietReason) {
+                        'schedule' => 'On by schedule',
+                        'fullscreen' => 'On while an app is full screen',
+                        _ => 'Critical notifications still show',
+                      },
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Semantics(
+                label: 'Do not disturb',
+                toggled: value,
+                excludeSemantics: true,
+                child: Switch(
+                  materialTapTargetSize: .shrinkWrap,
+                  value: value,
+                  onChanged: onChanged,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -397,7 +544,10 @@ class NotificationTile extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Text('$progress%', style: meta?.copyWith(fontWeight: .w500)),
+                  PercentText(
+                    '$progress',
+                    style: meta?.copyWith(fontWeight: .w500),
+                  ),
                 ],
               ),
             ),

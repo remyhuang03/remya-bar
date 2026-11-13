@@ -715,6 +715,86 @@ void main() {
       );
     },
   );
+
+  testWidgets('power menu includes Suspend with two-step confirmation', (
+    tester,
+  ) async {
+    final actions = <Map<String, Object?>>[];
+    await showSidebar(tester, actions);
+    await tester.tap(find.byTooltip('Power'));
+    await tester.pump();
+    final suspend = find.text('Suspend');
+    expect(suspend, findsOneWidget);
+    await tester.tap(suspend);
+    await tester.pump();
+    expect(actions, isEmpty);
+    await tester.tap(find.text('Confirm?'));
+    await tester.pump();
+    expect(actions, [
+      {'action': 'sidebar.session', 'value': 'suspend', 'target': null},
+    ]);
+  });
+
+  testWidgets('capture quick tiles send sidebar.capture targets', (
+    tester,
+  ) async {
+    final actions = <Map<String, Object?>>[];
+    await showSidebar(
+      tester,
+      actions,
+      overrides: {
+        'layout': ['screenshot', 'record', 'picker'],
+      },
+    );
+    for (final title in ['Screenshot', 'Screen record', 'Color picker']) {
+      await tester.tap(
+        find.byWidgetPredicate((w) => w is Tooltip && w.message == title),
+      );
+      await tester.pump();
+    }
+    expect(actions, [
+      {'action': 'sidebar.capture', 'value': null, 'target': 'screenshot'},
+      {'action': 'sidebar.capture', 'value': null, 'target': 'record'},
+      {'action': 'sidebar.capture', 'value': null, 'target': 'picker'},
+    ]);
+  });
+
+  testWidgets(
+    'detail view pins top controls and bottom actions outside scrollable list',
+    (tester) async {
+      await showSidebar(
+        tester,
+        [],
+        overrides: {
+          'network': {
+            'available': true,
+            'wifi_hardware_enabled': true,
+            'writable': true,
+            'wifi_enabled': true,
+            'adapter': 'wlan0',
+            'devices': [
+              {
+                'interface': 'wlan0',
+                'networks': [
+                  for (var i = 1; i <= 15; i++)
+                    {'ssid': 'Net-$i', 'signal': 90 - i, 'security': 'wpa2'},
+                ],
+              },
+            ],
+          },
+        },
+      );
+      await tester.tap(find.text('Internet'));
+      await tester.pumpAndSettle();
+      final headerBottom = tester
+          .getBottomLeft(find.text('Available networks'))
+          .dy;
+      final listRect = tester.getRect(find.byType(SingleChildScrollView));
+      final footerTop = tester.getTopLeft(find.text('Network settings')).dy;
+      expect(headerBottom, lessThanOrEqualTo(listRect.top));
+      expect(listRect.bottom, lessThanOrEqualTo(footerTop));
+    },
+  );
 }
 
 Future<void> _flush() => Future<void>.delayed(Duration.zero);

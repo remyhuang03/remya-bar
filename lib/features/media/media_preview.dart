@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../widgets/percent_text.dart';
 import '../popups/bar_card_surface.dart';
 import 'media_artwork.dart';
 
@@ -513,12 +514,16 @@ class _OutputVolume extends StatelessWidget {
                     : null,
               ),
             ),
-            Text(
-              percent == null ? '—' : '${percent.round()}%',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontSize: 14,
-                height: 1.2,
-              ),
+            Builder(
+              builder: (context) {
+                final style = theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: 14,
+                  height: 1.2,
+                );
+                return percent == null
+                    ? Text('—', style: style)
+                    : PercentText('${percent.round()}', style: style);
+              },
             ),
           ],
         ),

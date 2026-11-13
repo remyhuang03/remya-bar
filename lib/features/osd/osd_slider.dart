@@ -4,6 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_color_utilities/material_color_utilities.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../widgets/percent_text.dart';
+
 const osdKind = 'osd';
 const osdSize = Size(260, 76);
 
@@ -249,15 +251,19 @@ class OsdCapsuleSlider extends StatelessWidget {
                     child: FittedBox(
                       alignment: .centerRight,
                       fit: .scaleDown,
-                      child: Text(
-                        isMuted ? 'Muted' : '$percent%',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 12,
-                          fontWeight: .w500,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                          color: scheme.onSurface,
-                        ),
+                      child: Builder(
+                        builder: (_) {
+                          final style = TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 12,
+                            fontWeight: .w500,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                            color: scheme.onSurface,
+                          );
+                          return isMuted
+                              ? Text('Muted', style: style)
+                              : PercentText('$percent', style: style);
+                        },
                       ),
                     ),
                   ),

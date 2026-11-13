@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../widgets/percent_text.dart';
 import '../../widgets/wave_progress.dart';
 
 class BatteryCard extends StatelessWidget {
@@ -65,6 +66,7 @@ class BatteryCard extends StatelessWidget {
                 child: _Stat(
                   'Health',
                   health == null ? '—' : '${health.round()}%',
+                  percent: health?.round(),
                 ),
               ),
               Expanded(
@@ -135,16 +137,9 @@ class _BatteryHero extends StatelessWidget {
       letterSpacing: -1.28,
       fontWeight: .w500,
     );
-    final charge = Text.rich(
-      TextSpan(
-        text: percent == null ? '—' : '${percent.round()}',
-        children: [
-          if (percent != null)
-            TextSpan(text: '%', style: big?.copyWith(fontSize: 32)),
-        ],
-      ),
-      style: big,
-    );
+    final charge = percent == null
+        ? Text('—', style: big)
+        : PercentText('${percent.round()}', style: big);
     final details = Column(
       crossAxisAlignment: .end,
       spacing: 8,
@@ -251,25 +246,30 @@ class _BatteryHero extends StatelessWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat(this.label, this.value);
+  const _Stat(this.label, this.value, {this.percent});
 
   final String label;
   final String value;
+  final int? percent;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final valueStyle = theme.textTheme.titleLarge?.copyWith(
+      fontSize: 20,
+      height: 1.25,
+      fontWeight: .w500,
+      color: _emphasis(theme),
+    );
     return _BatteryTile(
       padding: const .symmetric(horizontal: 16, vertical: 12),
       child: _BatteryLabel(
         label: label,
         value: value,
-        valueStyle: theme.textTheme.titleLarge?.copyWith(
-          fontSize: 20,
-          height: 1.25,
-          fontWeight: .w500,
-          color: _emphasis(theme),
-        ),
+        valueWidget: percent == null
+            ? null
+            : PercentText('$percent', style: valueStyle),
+        valueStyle: valueStyle,
       ),
     );
   }
@@ -341,6 +341,10 @@ class _PowerControls extends StatelessWidget {
                       final int value when value > 0 => 'Turns on at $value%',
                       _ => 'Unavailable',
                     },
+                    labelPercent:
+                        threshold is int && threshold > 0 && threshold < 100
+                        ? threshold
+                        : null,
                     value: 'Auto battery saver',
                     valueStyle: theme.textTheme.titleMedium?.copyWith(
                       color: _emphasis(theme),
@@ -481,25 +485,33 @@ class _BatteryLabel extends StatelessWidget {
     required this.value,
     required this.valueStyle,
     this.valueFirst = false,
+    this.valueWidget,
+    this.labelPercent,
   });
 
   final String label;
   final String value;
   final TextStyle? valueStyle;
   final bool valueFirst;
+  final Widget? valueWidget;
+  final int? labelPercent;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final caption = Text(
-      label,
-      style: theme.textTheme.bodySmall?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-        fontSize: 12,
-        height: 1.25,
-      ),
+    final labelStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontSize: 12,
+      height: 1.25,
     );
-    final reading = Text(value, style: valueStyle);
+    final caption = labelPercent == null
+        ? Text(label, style: labelStyle)
+        : PercentText(
+            '$labelPercent',
+            prefix: 'Turns on at ',
+            style: labelStyle,
+          );
+    final reading = valueWidget ?? Text(value, style: valueStyle);
     return Column(
       crossAxisAlignment: .start,
       spacing: 2,

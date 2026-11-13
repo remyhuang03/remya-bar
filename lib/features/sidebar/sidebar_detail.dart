@@ -1,5 +1,17 @@
 part of 'right_sidebar.dart';
 
+class _DetailSections {
+  const _DetailSections({
+    required this.top,
+    this.items = const [],
+    this.bottom = const [],
+  });
+
+  final List<Widget> top;
+  final List<Widget> items;
+  final List<Widget> bottom;
+}
+
 class _SidebarDetail extends StatefulWidget {
   const _SidebarDetail({
     super.key,
@@ -9,6 +21,9 @@ class _SidebarDetail extends StatefulWidget {
     required this.onSelectAdapter,
     required this.busy,
     required this.send,
+    required this.pad,
+    required this.onHeight,
+    this.error,
   });
 
   final String kind;
@@ -18,6 +33,9 @@ class _SidebarDetail extends StatefulWidget {
   final bool busy;
   final Future<bool> Function(String action, {Object? value, Object? target})
   send;
+  final double pad;
+  final ValueChanged<double> onHeight;
+  final Widget? error;
 
   @override
   State<_SidebarDetail> createState() => _SidebarDetailState();
@@ -25,9 +43,21 @@ class _SidebarDetail extends StatefulWidget {
 
 class _SidebarDetailState extends State<_SidebarDetail> {
   String? _expanded;
+  double? _topHeight;
+  double? _itemsHeight;
+  double? _bottomHeight;
 
   void _expand(String id) =>
       setState(() => _expanded = _expanded == id ? null : id);
+
+  void _reportHeight({required bool hasItems, required bool hasBottom}) {
+    final top = _topHeight;
+    final items = hasItems ? _itemsHeight : 0.0;
+    final bottom = hasBottom ? _bottomHeight : 0.0;
+    if (top == null || items == null || bottom == null) return;
+    final gaps = (hasItems ? 12.0 : 0.0) + (hasBottom ? 12.0 : 0.0);
+    widget.onHeight(top + items + bottom + gaps);
+  }
 
   Widget _button(
     String label,
@@ -39,19 +69,80 @@ class _SidebarDetailState extends State<_SidebarDetail> {
   );
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: .stretch,
-    spacing: 8,
-    children: switch (widget.kind) {
+  Widget build(BuildContext context) {
+    final sections = switch (widget.kind) {
       'internet' => _wifi(),
       'bluetooth' => _bluetooth(),
       'audio' => _audio(),
       'power' => _power(),
-      _ => const [],
-    },
-  );
+      _ => const _DetailSections(top: []),
+    };
+    final top = [if (widget.error != null) widget.error!, ...sections.top];
+    final hasItems = sections.items.isNotEmpty;
+    final hasBottom = sections.bottom.isNotEmpty;
+    if (!hasItems) _itemsHeight = 0;
+    if (!hasBottom) _bottomHeight = 0;
+    return Column(
+      mainAxisSize: .min,
+      crossAxisAlignment: .stretch,
+      spacing: 12,
+      children: [
+        Padding(
+          padding: .symmetric(horizontal: widget.pad),
+          child: PopupMeasure(
+            onHeight: (height) {
+              _topHeight = height;
+              _reportHeight(hasItems: hasItems, hasBottom: hasBottom);
+            },
+            child: Column(
+              mainAxisSize: .min,
+              crossAxisAlignment: .stretch,
+              spacing: 8,
+              children: top,
+            ),
+          ),
+        ),
+        if (hasItems)
+          Flexible(
+            fit: .loose,
+            child: SingleChildScrollView(
+              primary: false,
+              padding: .symmetric(horizontal: widget.pad),
+              child: PopupMeasure(
+                onHeight: (height) {
+                  _itemsHeight = height;
+                  _reportHeight(hasItems: true, hasBottom: hasBottom);
+                },
+                child: Column(
+                  mainAxisSize: .min,
+                  crossAxisAlignment: .stretch,
+                  spacing: 8,
+                  children: sections.items,
+                ),
+              ),
+            ),
+          ),
+        if (hasBottom)
+          Padding(
+            padding: .symmetric(horizontal: widget.pad),
+            child: PopupMeasure(
+              onHeight: (height) {
+                _bottomHeight = height;
+                _reportHeight(hasItems: hasItems, hasBottom: true);
+              },
+              child: Column(
+                mainAxisSize: .min,
+                crossAxisAlignment: .stretch,
+                spacing: 8,
+                children: sections.bottom,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 
-  List<Widget> _wifi() {
+  _DetailSections _wifi() {
     final network = _map(widget.data['network']);
     final device = _rowsOf<Map>(network['devices'])
         .where((device) => device['interface'] == network['adapter'])
@@ -79,61 +170,69 @@ class _SidebarDetailState extends State<_SidebarDetail> {
         'known_uuid': device?['uuid'],
       });
     }
-    return [
-      Row(
-        children: [
-          const Expanded(child: Text('Available networks')),
-          IconButton(
-            tooltip: 'Scan for Wi-Fi networks',
-            onPressed: canConnect
-                ? () => widget.send('sidebar.wifi-scan')
-                : null,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
-      ),
-      if (network['available'] != true || device == null)
-        const Text('Wi-Fi unavailable')
-      else if (!enabled)
-        const Text('Wi-Fi is off')
-      else if (accessPoints.isEmpty)
-        const Text('No networks found'),
-      if (failure['ssid'] case final String ssid) ...[
-        Text(failure['message'] as String? ?? 'Could not connect to $ssid'),
-        if (failure['needs_password'] == true)
-          Align(
-            alignment: .centerLeft,
-            child: _button(
-              'Enter password',
-              () => _wifiCredentials(
-                ssid: ssid,
-                uuid: failure['uuid'] as String?,
-                hidden:
-                    failure['uuid'] == null &&
-                    !accessPoints.any((point) => point['ssid'] == ssid),
+    return _DetailSections(
+      top: [
+        Row(
+          children: [
+            const Expanded(child: Text('Available networks')),
+            IconButton(
+              tooltip: 'Scan for Wi-Fi networks',
+              onPressed: canConnect
+                  ? () => widget.send('sidebar.wifi-scan')
+                  : null,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ],
+        ),
+        if (network['available'] != true || device == null)
+          const Text('Wi-Fi unavailable')
+        else if (!enabled)
+          const Text('Wi-Fi is off')
+        else if (accessPoints.isEmpty)
+          const Text('No networks found'),
+        if (failure['ssid'] case final String ssid) ...[
+          Text(failure['message'] as String? ?? 'Could not connect to $ssid'),
+          if (failure['needs_password'] == true)
+            Align(
+              alignment: .centerLeft,
+              child: _button(
+                'Enter password',
+                () => _wifiCredentials(
+                  ssid: ssid,
+                  uuid: failure['uuid'] as String?,
+                  hidden:
+                      failure['uuid'] == null &&
+                      !accessPoints.any((point) => point['ssid'] == ssid),
+                ),
+                exclusive: true,
               ),
+            ),
+        ],
+      ],
+      items: [
+        if (enabled)
+          for (final point in accessPoints) _wifiRow(point, device, connecting),
+      ],
+      bottom: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _button(
+              'Network settings',
+              () => widget.send('sidebar.settings', target: 'wifi'),
+            ),
+            _button(
+              'Hidden network…',
+              canConnect && connecting == null
+                  ? () => _wifiCredentials()
+                  : null,
               exclusive: true,
             ),
-          ),
+          ],
+        ),
       ],
-      if (enabled)
-        for (final point in accessPoints) _wifiRow(point, device, connecting),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          _button(
-            'Network settings',
-            () => widget.send('sidebar.settings', target: 'wifi'),
-          ),
-          _button(
-            'Hidden network…',
-            canConnect && connecting == null ? () => _wifiCredentials() : null,
-            exclusive: true,
-          ),
-        ],
-      ),
-    ];
+    );
   }
 
   Widget _wifiRow(Map point, Map? device, Object? connecting) {
@@ -238,7 +337,8 @@ class _SidebarDetailState extends State<_SidebarDetail> {
         children: [
           if (point['security'] case final String security)
             Text('Security: ${security.toUpperCase()}'),
-          if (point['signal'] case final int signal) Text('Signal: $signal%'),
+          if (point['signal'] case final int signal)
+            PercentText('$signal', prefix: 'Signal: '),
           if (point['frequency'] case final int frequency)
             Text('Frequency: $frequency MHz'),
           if (device?['speed_mbps'] case final int speed)
@@ -297,7 +397,7 @@ class _SidebarDetailState extends State<_SidebarDetail> {
       ) ??
       false;
 
-  List<Widget> _bluetooth() {
+  _DetailSections _bluetooth() {
     final bluetooth = _map(widget.data['bluetooth']);
     final adapter = widget.adapter;
     final adapters = _rowsOf<Map>(bluetooth['adapters']);
@@ -323,124 +423,130 @@ class _SidebarDetailState extends State<_SidebarDetail> {
                 (b['connected'] == true ? 1 : 0) -
                 (a['connected'] == true ? 1 : 0),
           );
-    return [
-      Text(
-        adapterId == null
-            ? 'Bluetooth unavailable'
-            : enabled
-            ? 'Bluetooth devices'
-            : 'Bluetooth is off',
-      ),
-      if (adapters.length > 1)
-        DropdownButton<String>(
-          isExpanded: true,
-          value: adapterId as String?,
-          onChanged: pairing ? null : widget.onSelectAdapter,
-          items: [
-            for (final item in adapters)
-              DropdownMenuItem(
-                value: item['id'] as String,
-                child: Text(
-                  item['name'] as String? ?? item['address'] as String,
-                ),
-              ),
-          ],
+    return _DetailSections(
+      top: [
+        Text(
+          adapterId == null
+              ? 'Bluetooth unavailable'
+              : enabled
+              ? 'Bluetooth devices'
+              : 'Bluetooth is off',
         ),
-      if (bluetooth['error'] case final String error) Text(error),
-      if (prompt.isNotEmpty)
-        _PairPrompt(
-          key: ValueKey(prompt['id']),
-          prompt: prompt,
-          busy: widget.busy,
-          send: (value) =>
-              widget.send('sidebar.bluetooth-respond', value: value),
-        ),
-      if (pairing)
-        Align(
-          alignment: .centerLeft,
-          child: _button(
-            'Cancel pairing',
-            () => widget.send(
-              'sidebar.bluetooth-cancel',
-              value: <String, Object?>{},
-            ),
-            exclusive: true,
-          ),
-        ),
-      for (final device in devices) ...[
-        _DetailRow(
-          icon: Icons.bluetooth_rounded,
-          title: device['name'] as String? ?? device['address'] as String,
-          subtitle: device['connected'] == true
-              ? 'Connected'
-              : device['paired'] == true || device['bonded'] == true
-              ? 'Paired'
-              : 'Available',
-          selected: device['connected'] == true,
-          trailing: Icons.chevron_right_rounded,
-          onTap: () => _expand(device['id'] as String),
-        ),
-        if (_expanded == device['id'])
-          Wrap(
-            spacing: 8,
-            children: [
-              _button(
-                device['connected'] == true
-                    ? 'Disconnect'
-                    : device['paired'] == true
-                    ? 'Connect'
-                    : 'Pair',
-                enabled && !pairing
-                    ? () => _deviceAction(
-                        device['connected'] == true
-                            ? 'disconnect'
-                            : device['paired'] == true
-                            ? 'connect'
-                            : 'pair',
-                        device,
-                      )
-                    : null,
-                exclusive:
-                    device['connected'] != true && device['paired'] != true,
-              ),
-              if (device['paired'] == true || device['bonded'] == true)
-                _button(
-                  'Forget',
-                  !pairing && enabled
-                      ? () async {
-                          if (await _confirm(
-                                'Forget ${device['name'] ?? device['address']}?',
-                                'Forget',
-                              ) &&
-                              mounted) {
-                            await _deviceAction('forget', device);
-                          }
-                        }
-                      : null,
-                  exclusive: true,
+        if (adapters.length > 1)
+          DropdownButton<String>(
+            isExpanded: true,
+            value: adapterId as String?,
+            onChanged: pairing ? null : widget.onSelectAdapter,
+            items: [
+              for (final item in adapters)
+                DropdownMenuItem(
+                  value: item['id'] as String,
+                  child: Text(
+                    item['name'] as String? ?? item['address'] as String,
+                  ),
                 ),
             ],
           ),
+        if (bluetooth['error'] case final String error) Text(error),
+        if (prompt.isNotEmpty)
+          _PairPrompt(
+            key: ValueKey(prompt['id']),
+            prompt: prompt,
+            busy: widget.busy,
+            send: (value) =>
+                widget.send('sidebar.bluetooth-respond', value: value),
+          ),
+        if (pairing)
+          Align(
+            alignment: .centerLeft,
+            child: _button(
+              'Cancel pairing',
+              () => widget.send(
+                'sidebar.bluetooth-cancel',
+                value: <String, Object?>{},
+              ),
+              exclusive: true,
+            ),
+          ),
       ],
-      Wrap(
-        spacing: 8,
-        children: [
-          _button(
-            'Bluetooth settings',
-            () => widget.send('sidebar.settings', target: 'bluetooth'),
+      items: [
+        for (final device in devices) ...[
+          _DetailRow(
+            icon: Icons.bluetooth_rounded,
+            title: device['name'] as String? ?? device['address'] as String,
+            subtitle: device['connected'] == true
+                ? 'Connected'
+                : device['paired'] == true || device['bonded'] == true
+                ? 'Paired'
+                : 'Available',
+            selected: device['connected'] == true,
+            trailing: Icons.chevron_right_rounded,
+            onTap: () => _expand(device['id'] as String),
           ),
-          _button(
-            scanning ? 'Stop scan' : 'Scan',
-            enabled && !pairing
-                ? () => widget.send(
-                    'sidebar.bluetooth-scan',
-                    value: {'adapter': adapterId, 'enabled': !scanning},
-                  )
-                : null,
-          ),
+          if (_expanded == device['id'])
+            Wrap(
+              spacing: 8,
+              children: [
+                _button(
+                  device['connected'] == true
+                      ? 'Disconnect'
+                      : device['paired'] == true
+                      ? 'Connect'
+                      : 'Pair',
+                  enabled && !pairing
+                      ? () => _deviceAction(
+                          device['connected'] == true
+                              ? 'disconnect'
+                              : device['paired'] == true
+                              ? 'connect'
+                              : 'pair',
+                          device,
+                        )
+                      : null,
+                  exclusive:
+                      device['connected'] != true && device['paired'] != true,
+                ),
+                if (device['paired'] == true || device['bonded'] == true)
+                  _button(
+                    'Forget',
+                    !pairing && enabled
+                        ? () async {
+                            if (await _confirm(
+                                  'Forget ${device['name'] ?? device['address']}?',
+                                  'Forget',
+                                ) &&
+                                mounted) {
+                              await _deviceAction('forget', device);
+                            }
+                          }
+                        : null,
+                    exclusive: true,
+                  ),
+              ],
+            ),
         ],
-      ),
-    ];
+      ],
+      bottom: [
+        Wrap(
+          spacing: 8,
+          children: [
+            _button(
+              'Bluetooth settings',
+              () => widget.send('sidebar.settings', target: 'bluetooth'),
+            ),
+            _button(
+              scanning ? 'Stop scan' : 'Scan',
+              enabled && !pairing
+                  ? () => widget.send(
+                      'sidebar.bluetooth-scan',
+                      value: {'adapter': adapterId, 'enabled': !scanning},
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   Future<bool> _deviceAction(String action, Map device) => widget.send(
@@ -448,68 +554,82 @@ class _SidebarDetailState extends State<_SidebarDetail> {
     value: {'adapter': device['adapter'], 'device': device['id']},
   );
 
-  List<Widget> _audio() {
+  _DetailSections _audio() {
     final system = _map(_map(widget.data['sound'])['system']);
     final devices = _rowsOf<Map>(system['devices'])
         .where((device) => device['direction'] == 'output')
         .toList();
-    return [
-      Text(devices.isEmpty ? 'Audio output unavailable' : 'Output devices'),
-      for (final device in devices)
-        _DetailRow(
-          icon: Icons.headphones_rounded,
-          title: device['description'] as String? ?? device['name'] as String,
-          subtitle: device['name'] == system['default_output']
-              ? 'Default output'
-              : 'Available',
-          selected: device['name'] == system['default_output'],
-          onTap: device['name'] == system['default_output']
-              ? null
-              : () => widget.send(
-                  'sidebar.output-device',
-                  target: device['name'],
-                ),
+    return _DetailSections(
+      top: [
+        Text(devices.isEmpty ? 'Audio output unavailable' : 'Output devices'),
+      ],
+      items: [
+        for (final device in devices)
+          _DetailRow(
+            icon: Icons.headphones_rounded,
+            title: device['description'] as String? ?? device['name'] as String,
+            subtitle: device['name'] == system['default_output']
+                ? 'Default output'
+                : 'Available',
+            selected: device['name'] == system['default_output'],
+            onTap: device['name'] == system['default_output']
+                ? null
+                : () => widget.send(
+                    'sidebar.output-device',
+                    target: device['name'],
+                  ),
+          ),
+      ],
+      bottom: [
+        Align(
+          alignment: .centerLeft,
+          child: _button(
+            'Sound settings',
+            () => widget.send('sidebar.settings', target: 'sound-volume'),
+          ),
         ),
-      Align(
-        alignment: .centerLeft,
-        child: _button(
-          'Sound settings',
-          () => widget.send('sidebar.settings', target: 'sound-volume'),
-        ),
-      ),
-    ];
+      ],
+    );
   }
 
-  List<Widget> _power() {
+  _DetailSections _power() {
     final power = _map(widget.data['power']);
     final system = _map(power['system']);
     final profiles = _rowsOf<String>(system['profiles']);
-    return [
-      Text(profiles.isEmpty ? 'Power modes unavailable' : 'Power mode'),
-      if (power['conflict'] == true)
-        const Text('Resolve the power mode conflict in Settings.'),
-      for (final profile in profiles)
-        _DetailRow(
-          icon: switch (profile) {
-            'power-saver' => Icons.energy_savings_leaf_rounded,
-            'performance' => Icons.speed_rounded,
-            _ => Icons.bolt_rounded,
-          },
-          title: _profileLabel(profile),
-          subtitle: profile == system['profile'] ? 'Current mode' : 'Available',
-          selected: profile == system['profile'],
-          onTap: power['conflict'] == true || profile == system['profile']
-              ? null
-              : () => widget.send('sidebar.profile', value: profile),
+    return _DetailSections(
+      top: [
+        Text(profiles.isEmpty ? 'Power modes unavailable' : 'Power mode'),
+        if (power['conflict'] == true)
+          const Text('Resolve the power mode conflict in Settings.'),
+      ],
+      items: [
+        for (final profile in profiles)
+          _DetailRow(
+            icon: switch (profile) {
+              'power-saver' => Icons.energy_savings_leaf_rounded,
+              'performance' => Icons.speed_rounded,
+              _ => Icons.bolt_rounded,
+            },
+            title: _profileLabel(profile),
+            subtitle: profile == system['profile']
+                ? 'Current mode'
+                : 'Available',
+            selected: profile == system['profile'],
+            onTap: power['conflict'] == true || profile == system['profile']
+                ? null
+                : () => widget.send('sidebar.profile', value: profile),
+          ),
+      ],
+      bottom: [
+        Align(
+          alignment: .centerLeft,
+          child: _button(
+            'Power settings',
+            () => widget.send('sidebar.settings', target: 'power'),
+          ),
         ),
-      Align(
-        alignment: .centerLeft,
-        child: _button(
-          'Power settings',
-          () => widget.send('sidebar.settings', target: 'power'),
-        ),
-      ),
-    ];
+      ],
+    );
   }
 }
 

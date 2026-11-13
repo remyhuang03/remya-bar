@@ -90,7 +90,6 @@ class _BarPopupAppState extends State<BarPopupApp>
     'battery',
     'datetime',
     'resources',
-    'notifications',
     aiUsageKind,
   }.contains(_kind);
   bool get _reduceMotion =>
@@ -284,7 +283,9 @@ class _BarPopupAppState extends State<BarPopupApp>
         child: MouseRegion(
           onEnter: (_) => _send(widget.channel.invokeMethod<void>('enter')),
           onExit: (_) {
-            if (_kind != 'sidebar' && _kind != keyboardKind) {
+            if (_kind != 'sidebar' &&
+                _kind != 'notifications' &&
+                _kind != keyboardKind) {
               _navigator.currentState?.popUntil((route) => route.isFirst);
             }
             _send(widget.channel.invokeMethod<void>('leave'));
@@ -306,24 +307,31 @@ class _BarPopupAppState extends State<BarPopupApp>
                 child: KeyboardPanel(data: details, channel: widget.channel),
               ),
             )
-          : _kind == 'sidebar'
+          : _kind == 'sidebar' || _kind == 'notifications'
           ? Align(
-              alignment: .topRight,
+              alignment: _kind == 'notifications' ? .topLeft : .topRight,
               child: TweenAnimationBuilder<double>(
                 key: ValueKey(_opening),
                 duration: const Duration(milliseconds: 350),
                 curve: Curves.easeOutCubic,
-                tween: Tween(begin: 1, end: 0),
+                tween: Tween(begin: _kind == 'notifications' ? -1 : 1, end: 0),
                 builder: (context, offset, child) => FractionalTranslation(
                   translation: Offset(offset, 0),
                   child: child,
                 ),
-                child: RightSidebar(
-                  data: details,
-                  onAction: (action) =>
-                      widget.channel.invokeMethod<void>('action', action),
-                  onHeight: _resize,
-                ),
+                child: _kind == 'notifications'
+                    ? NotificationCenterCard(
+                        data: details,
+                        onAction: (action) =>
+                            widget.channel.invokeMethod<void>('action', action),
+                        onHeight: _resize,
+                      )
+                    : RightSidebar(
+                        data: details,
+                        onAction: (action) =>
+                            widget.channel.invokeMethod<void>('action', action),
+                        onHeight: _resize,
+                      ),
               ),
             )
           : _CardScrollbar(

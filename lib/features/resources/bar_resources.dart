@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/bar_pill.dart';
+import '../../widgets/percent_text.dart';
 import '../system/system_backend.dart';
 import 'resource_data.dart';
 import 'resource_style.dart';
@@ -171,9 +172,16 @@ class _PillSegment extends StatelessWidget {
     final width = segment.valueWidth(context);
     final style = _valueStyle(context)
         .copyWith(color: critical ? scheme.error : foreground);
-    Widget value(String text) => SizedBox(
+    Widget value(String text, {bool percent = false}) => SizedBox(
       width: width,
-      child: Text(text, maxLines: 1, overflow: .ellipsis, style: style),
+      child: percent && segment.value != null
+          ? PercentText(
+              '${segment.value!.round()}',
+              maxLines: 1,
+              overflow: .ellipsis,
+              style: style,
+            )
+          : Text(text, maxLines: 1, overflow: .ellipsis, style: style),
     );
     final caption = segment.metric.caption;
     final semantics = switch (segment.metric) {
@@ -230,7 +238,7 @@ class _PillSegment extends StatelessWidget {
                     ],
                   )
                 else
-                  value(segment.label),
+                  value(segment.label, percent: true),
               ],
             ),
           ),

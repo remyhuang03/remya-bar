@@ -13,6 +13,7 @@ import 'features/ai_usage/ai_usage_data.dart';
 import 'features/ai_usage/bar_ai_quota.dart';
 import 'features/sidebar/right_sidebar.dart';
 import 'features/sidebar/sidebar_backend.dart';
+import 'features/sidebar/sidebar_screen_capture.dart';
 import 'features/battery/bar_battery.dart';
 import 'features/media/bar_media.dart';
 import 'features/notifications/bar_notifications.dart';
@@ -35,6 +36,8 @@ import 'widgets/bar_groups_layout.dart';
 import 'widgets/bar_tooltip.dart';
 
 Future<void> _openPowerSettings() => openRemyaSettings(page: 'power');
+Future<void> _defaultLaunchScreenCapture(List<String> arguments) =>
+    openRemyaScreenCapture(arguments: arguments);
 
 class RemyaBarApp extends StatefulWidget {
   const RemyaBarApp({
@@ -50,6 +53,7 @@ class RemyaBarApp extends StatefulWidget {
     this.showTray = false,
     this.onOpenSettings = openRemyaSettings,
     this.onOpenPowerSettings = _openPowerSettings,
+    this.onLaunchScreenCapture = _defaultLaunchScreenCapture,
   });
 
   final SettingsThemeController preferences;
@@ -63,6 +67,7 @@ class RemyaBarApp extends StatefulWidget {
   final bool showTray;
   final Future<void> Function() onOpenSettings;
   final Future<void> Function() onOpenPowerSettings;
+  final Future<void> Function(List<String> arguments) onLaunchScreenCapture;
 
   @override
   State<RemyaBarApp> createState() => _RemyaBarAppState();
@@ -83,6 +88,17 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     _sidebarOpenValue = value;
     if (mounted) setState(() {});
   }
+
+  bool _notificationsOpenValue = false;
+  bool get _notificationsOpen => _notificationsOpenValue;
+  set _notificationsOpen(bool value) {
+    if (value == _notificationsOpenValue) return;
+    _notificationsOpenValue = value;
+    if (mounted) setState(() {});
+  }
+
+  double _notificationsScale = 1;
+  int? _notificationsReservedHeight;
 
   bool _fullscreen = false;
   bool? _reportedFullscreen;
@@ -143,6 +159,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       await BarPopup.hide(kind: 'sidebar');
       return;
     }
+    _notificationsOpen = false;
+    unawaited(_syncToasts());
     _sidebar ??= SidebarBackend()..addListener(_updateSidebar);
     _sidebarOpen = true;
     try {
@@ -208,6 +226,82 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     return matches.length == 1 ? matches.single : null;
   }
 
+  Map<String, Object?> _notificationsData(double scale, {int? reservedHeight}) {
+    final backend = widget.notifications;
+    return {
+      'notifications': [
+        if (backend != null)
+          for (final item in backend.history) backend.toData(item),
+      ],
+      'dnd': backend?.doNotDisturb,
+      'quietReason': backend?.quietReason,
+      'serviceError': backend?.error,
+      'scale': scale,
+      'reservedHeight': ?reservedHeight,
+    };
+  }
+
+  Future<void> _toggleNotifications(Rect anchor, double scale) async {
+    if (_fullscreen) return;
+    if (_notificationsOpen) {
+      _notificationsOpen = false;
+      await BarPopup.hide(kind: 'notifications');
+      unawaited(_syncToasts());
+      return;
+    }
+    _sidebarOpen = false;
+    _sidebar?.close();
+    _notificationsOpen = true;
+    _notificationsScale = scale;
+    unawaited(_syncToasts());
+    try {
+      final monitor = await _sidebarMonitor();
+      if (!mounted || !_notificationsOpen) return;
+      final reserved = monitor?['reserved'];
+      _notificationsReservedHeight = switch (reserved) {
+        [_, final int top, _, final int bottom] => top + bottom,
+        _ => null,
+      };
+      await BarPopup.show(
+        kind: 'notifications',
+        anchor: anchor,
+        size: const Size(420, 663),
+        data: _notificationsData(
+          scale,
+          reservedHeight: _notificationsReservedHeight,
+        ),
+        theme: widget.preferences.theme,
+      );
+    } catch (error) {
+      _notificationsOpen = false;
+      unawaited(_syncToasts());
+      debugPrint('Notifications: $error');
+    }
+  }
+
+  void _updateNotifications() {
+    if (!_notificationsOpen) return;
+    unawaited(
+      BarPopup.update(
+        kind: 'notifications',
+        anchor: _popupAnchor,
+        size: const Size(420, 663),
+        data: _notificationsData(
+          _notificationsScale,
+          reservedHeight: _notificationsReservedHeight,
+        ),
+        theme: widget.preferences.theme,
+      ).catchError(
+        (Object error) => debugPrint('Notifications update: $error'),
+      ),
+    );
+  }
+
+  void _onNotificationsChanged() {
+    _updateNotifications();
+    unawaited(_syncToasts());
+  }
+
   void _updateSidebar() {
     if (!_sidebarOpen) return;
     unawaited(
@@ -223,6 +317,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 
   void _updatePopupThemes() {
     _updateSidebar();
+    _updateNotifications();
     if (_showingOsd) unawaited(_syncOsd());
     unawaited(
       BarPopup.update(
@@ -259,9 +354,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       _scheduleFullscreenCheck();
     }
     widget.account?.addListener(_updateSidebar);
-    widget.notifications?.addListener(_syncToasts);
+    widget.notifications?.addListener(_onNotificationsChanged);
     widget.osd?.addListener(_syncOsd);
-    BarPopup.openCard.addListener(_syncToasts);
     widget.preferences.addListener(_updatePopupThemes);
     _window.setMethodCallHandler((call) async {
       if (call.method == 'outputChanged') {
@@ -386,9 +480,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         }
       }
       final visible =
-          popups.isNotEmpty &&
-          host == output &&
-          BarPopup.openCard.value != 'notifications';
+          popups.isNotEmpty && host == output && !_notificationsOpen;
       if (!visible) {
         if (_showingToasts) {
           _showingToasts = false;
@@ -449,7 +541,6 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
             'battery',
             'datetime',
             'resources',
-            'notifications',
             aiUsageKind,
           }.contains(kind) ||
           open is! bool) {
@@ -465,6 +556,20 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     } else if (action == 'sidebar.closed') {
       _sidebarOpen = false;
       _sidebar?.close();
+    } else if (action == 'notifications.closed') {
+      _notificationsOpen = false;
+      unawaited(_syncToasts());
+    } else if (action == 'sidebar.capture') {
+      final arguments = switch (args['target']) {
+        'screenshot' => const <String>[],
+        'record' => const ['--record'],
+        'picker' => const ['--color-picker'],
+        _ => throw const FormatException('Invalid capture target'),
+      };
+      await BarPopup.hide(kind: 'sidebar');
+      _sidebarOpen = false;
+      _sidebar?.close();
+      await widget.onLaunchScreenCapture(arguments);
     } else if (action == 'sidebar.keyboard' && args['value'] is bool) {
       if (!_sidebarOpen) throw StateError('Sidebar is closed');
       if (args['value'] == false) {
@@ -613,9 +718,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 
   @override
   void dispose() {
-    widget.notifications?.removeListener(_syncToasts);
+    widget.notifications?.removeListener(_onNotificationsChanged);
     widget.osd?.removeListener(_syncOsd);
-    BarPopup.openCard.removeListener(_syncToasts);
     widget.notifications?.dispose();
     widget.osd?.dispose();
     _fullscreenCheck?.cancel();
@@ -668,8 +772,10 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
                 aiUsage: widget.aiUsage,
                 pillSnapshot: _pillSnapshot,
                 sidebarOpen: _sidebarOpen,
+                notificationsOpen: _notificationsOpen,
                 tray: widget.showTray ? BarTray(key: _tray) : null,
                 onToggleSidebar: _toggleSidebar,
+                onToggleNotifications: _toggleNotifications,
               ),
             ),
           ),
@@ -683,8 +789,10 @@ class _BarContent extends StatelessWidget {
   const _BarContent({
     required this.error,
     required this.onToggleSidebar,
+    required this.onToggleNotifications,
     required this.pillSnapshot,
     required this.sidebarOpen,
+    required this.notificationsOpen,
     this.hyprland,
     this.system,
     this.notifications,
@@ -700,7 +808,9 @@ class _BarContent extends StatelessWidget {
   final AiUsageBackend? aiUsage;
   final Widget? tray;
   final bool sidebarOpen;
+  final bool notificationsOpen;
   final Future<void> Function(Rect, double) onToggleSidebar;
+  final Future<void> Function(Rect, double) onToggleNotifications;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -801,6 +911,8 @@ class _BarContent extends StatelessWidget {
         'clock' => clock,
         'notifications' when notifications != null => BarNotifications(
           backend: notifications!,
+          onToggle: onToggleNotifications,
+          open: notificationsOpen,
         ),
         'tray' when tray != null => ConstrainedBox(
           constraints: const .new(maxWidth: 290),

@@ -436,10 +436,14 @@ class _PowerButton extends StatelessWidget {
         spacing: 6,
         children: [
           Icon(icon, size: 22),
-          Text(
-            confirm ? 'Confirm?' : label,
-            textAlign: .center,
-            style: const TextStyle(fontSize: 12),
+          FittedBox(
+            fit: .scaleDown,
+            child: Text(
+              confirm ? 'Confirm?' : label,
+              maxLines: 1,
+              textAlign: .center,
+              style: const TextStyle(fontSize: 12),
+            ),
           ),
         ],
       ),
@@ -721,15 +725,22 @@ class _SidebarSliderState extends State<_SidebarSlider> {
                     child: IgnorePointer(
                       child: ExcludeSemantics(
                         child: Center(
-                          child: Text(
-                            label,
-                            style: readoutStyle?.copyWith(
-                              color: onActiveTrack
-                                  ? onChange == null
-                                        ? colors.onSurface
-                                        : onActive
-                                  : colors.onSecondaryContainer,
-                            ),
+                          child: Builder(
+                            builder: (_) {
+                              final style = readoutStyle?.copyWith(
+                                color: onActiveTrack
+                                    ? onChange == null
+                                          ? colors.onSurface
+                                          : onActive
+                                    : colors.onSecondaryContainer,
+                              );
+                              return label.endsWith('%')
+                                  ? PercentText(
+                                      label.substring(0, label.length - 1),
+                                      style: style,
+                                    )
+                                  : Text(label, style: style);
+                            },
                           ),
                         ),
                       ),

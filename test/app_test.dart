@@ -15,6 +15,7 @@ import 'package:remya_bar/features/sidebar/right_sidebar.dart';
 import 'package:remya_bar/features/system/system_backend.dart';
 import 'package:remya_bar/features/window/bar_active_window.dart';
 import 'package:remya_bar/features/workspaces/bar_workspaces.dart';
+import 'package:remya_bar/widgets/percent_text.dart';
 import 'package:remya_settings_client/remya_settings_client.dart';
 
 Future<void> _openSettings(WidgetTester tester) async {
@@ -513,5 +514,80 @@ void main() {
     await preferences.reload();
     expect(preferences.theme.styleVariant, DynamicSchemeVariant.tonalSpot);
     expect(preferences.error, isNull);
+  });
+
+  testWidgets('sidebar.capture launches screen capture with expected args', (
+    tester,
+  ) async {
+    final calls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      BarPopup.channel,
+      (call) async {
+        calls.add(call);
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        BarPopup.channel,
+        null,
+      ),
+    );
+    final launched = <List<String>>[];
+    await tester.pumpWidget(
+      RemyaBarApp(
+        preferences: SettingsThemeController(
+          () => File('/nonexistent/theme.toml'),
+        ),
+        onLaunchScreenCapture: (args) async => launched.add(args),
+      ),
+    );
+    const codec = StandardMethodCodec();
+    for (final target in ['screenshot', 'record', 'picker']) {
+      final reply = await tester.binding.defaultBinaryMessenger
+          .handlePlatformMessage(
+            BarPopup.channel.name,
+            codec.encodeMethodCall(
+              MethodCall('action', {
+                'action': 'sidebar.capture',
+                'target': target,
+              }),
+            ),
+            (_) {},
+          );
+      codec.decodeEnvelope(reply!);
+    }
+    expect(calls.where((call) => call.method == 'hide').length, 3);
+    expect(launched, [
+      const <String>[],
+      const ['--record'],
+      const ['--color-picker'],
+    ]);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('PercentText styles % like clock seconds', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Center(
+          child: PercentText(
+            '42',
+            style: TextStyle(fontSize: 15, color: Color(0xFFFFFFFF)),
+          ),
+        ),
+      ),
+    );
+    final rich = tester.widget<RichText>(find.byType(RichText));
+    TextSpan? unitSpan;
+    rich.text.visitChildren((span) {
+      if (span is TextSpan && span.text == '%') {
+        unitSpan = span;
+        return false;
+      }
+      return true;
+    });
+    expect(unitSpan?.text, '%');
+    expect(unitSpan?.style?.fontSize, 12);
+    expect(unitSpan?.style?.color?.a, closeTo(0.7, 0.01));
   });
 }

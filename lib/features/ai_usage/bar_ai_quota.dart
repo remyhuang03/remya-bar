@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/bar_pill.dart';
+import '../../widgets/percent_text.dart';
 import 'ai_quota_ring.dart';
 import 'ai_usage_backend.dart';
 import 'ai_usage_data.dart';
@@ -42,6 +43,7 @@ class BarAiQuota extends StatelessWidget {
                 index: index,
                 state: state,
                 showUsed: data['showUsed'] == true,
+                ringOrder: data['ringOrder'] as String? ?? '5h-outer',
               ),
           ],
         ),
@@ -57,12 +59,14 @@ class _Segment extends StatelessWidget {
     required this.index,
     required this.state,
     required this.showUsed,
+    required this.ringOrder,
   });
 
   final AiQuotaProvider provider;
   final int index;
   final BarPillState state;
   final bool showUsed;
+  final String ringOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -73,25 +77,40 @@ class _Segment extends StatelessWidget {
     final reset = state.expanded || tightest?.low == true
         ? tightest?.resetShort
         : null;
+    final providerName = provider.id == 'antigravity'
+        ? 'AGY'
+        : provider.name.toUpperCase();
     final label = [
-      provider.name.toUpperCase(),
+      providerName,
       if (windows.isNotEmpty)
         windows.map((window) => window.cadence).join(' / '),
     ].join(' · ');
     final text = values.isEmpty
         ? '—'
-        : values.map((window) => window.percent).join(' / ');
+        : values
+              .map((window) => window.percentText(showUsed: showUsed))
+              .join(' / ');
     final dim = Theme.of(context).textTheme.bodySmall!
         .copyWith(color: colors.onSurfaceVariant, fontSize: 12, height: 1.25);
+    final valueStyle = dim.copyWith(
+      fontSize: 14,
+      fontWeight: .w500,
+      color: state.foreground,
+    );
     return Semantics(
-      label: provider.tooltip,
+      label: provider.tooltipText(showUsed: showUsed),
       child: Opacity(
         opacity: tightest == null ? .6 : 1,
         child: Row(
           mainAxisSize: .min,
           spacing: 6,
           children: [
-            AiQuotaRing(provider, showUsed: showUsed, index: index),
+            AiQuotaRing(
+              provider,
+              showUsed: showUsed,
+              ringOrder: ringOrder,
+              index: index,
+            ),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 114),
               child: Column(
@@ -139,11 +158,14 @@ class _Segment extends StatelessWidget {
                             if (values.isEmpty) const TextSpan(text: '—'),
                             for (final (index, window) in values.indexed) ...[
                               if (index > 0) const TextSpan(text: ' / '),
-                              TextSpan(
-                                text: window.percent,
-                                style: window.low
-                                    ? TextStyle(color: colors.error)
-                                    : null,
+                              PercentText.span(
+                                context,
+                                '${window.percentValue(showUsed: showUsed)}',
+                                style: valueStyle.copyWith(
+                                  color: window.low
+                                      ? colors.error
+                                      : valueStyle.color,
+                                ),
                               ),
                             ],
                             if (reset != null)
@@ -152,11 +174,7 @@ class _Segment extends StatelessWidget {
                         ),
                         maxLines: 1,
                         overflow: .ellipsis,
-                        style: dim.copyWith(
-                          fontSize: 14,
-                          fontWeight: .w500,
-                          color: state.foreground,
-                        ),
+                        style: valueStyle,
                       ),
                     ),
                   ),

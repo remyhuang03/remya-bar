@@ -415,6 +415,54 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'supports showUsed, 5h-inner ring order, AGY label, and % style',
+    (tester) async {
+      final now = DateTime.now();
+      final backend = _AiUsageBackend()
+        ..data = {
+          'showUsed': true,
+          'ringOrder': '5h-inner',
+          'providers': [
+            aiProviderData({
+              'id': 'antigravity',
+              'name': 'Antigravity',
+            }, _usage(now, used: 70)),
+          ],
+        };
+      addTearDown(backend.dispose);
+      await tester.pumpWidget(
+        BarPopupScope(
+          theme: const RemyaTheme(),
+          child: MaterialApp(
+            home: Center(
+              child: SizedBox(height: 40, child: BarAiQuota(backend: backend)),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('70%', findRichText: true), findsOneWidget);
+      BarPopup.openCard.value = aiUsageKind;
+      addTearDown(() => BarPopup.openCard.value = null);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('AGY'), findsOneWidget);
+      expect(find.textContaining('ANTIGRAVITY'), findsNothing);
+      expect(find.textContaining('70%', findRichText: true), findsOneWidget);
+      final ring = tester.widget<AiQuotaRing>(find.byType(AiQuotaRing));
+      expect(ring.showUsed, isTrue);
+      expect(ring.ringOrder, '5h-inner');
+      final (:outer, :inner) = ring.resolveWindows();
+      expect(outer?.slot, 'secondary');
+      expect(inner?.slot, 'primary');
+      expect(inner?.percentValue(showUsed: true), 70);
+      expect(inner?.used, 70);
+      expect(inner?.expectedUsed, 68);
+      BarPopup.openCard.value = null;
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 }
 
 class _AiUsageBackend extends AiUsageBackend {

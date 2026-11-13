@@ -89,12 +89,15 @@ class AiQuotaProvider {
         tightest == null || window.left < tightest.left ? window : tightest,
   );
 
-  String get tooltip => [
+  String get tooltip => tooltipText();
+
+  String tooltipText({bool showUsed = false}) => [
     [name, ?aiText(data['plan'])].join(' · '),
     ?error,
     for (final window in pillWindows)
       [
-        '${window.cadence} ${window.percent} left',
+        '${window.cadence} ${window.percentText(showUsed: showUsed)} '
+            '${showUsed ? 'used' : 'left'}',
         ?window.resetLabel,
         ?window.paceLabel,
       ].join(' · '),
@@ -109,8 +112,12 @@ class AiQuotaWindow {
   final DateTime now;
   final double threshold;
 
-  double get left => 100 - aiPercent(data['used'])!;
+  double get used => aiPercent(data['used'])!;
+  double get left => 100 - used;
   bool get low => left <= threshold;
+  int percentValue({bool showUsed = false}) => (showUsed ? used : left).round();
+  String percentText({bool showUsed = false}) =>
+      '${percentValue(showUsed: showUsed)}%';
   String get percent => '${left.round()}%';
   DateTime? get reset => aiDate(data['resetsAt']);
   double? get expectedLeft {
@@ -125,6 +132,8 @@ class AiQuotaWindow {
     if (remaining < 0 || remaining > minutes) return null;
     return remaining / minutes * 100;
   }
+
+  double? get expectedUsed => expectedLeft == null ? null : 100 - expectedLeft!;
 
   bool get runningOut => data['willLast'] == false;
 
@@ -164,6 +173,20 @@ class AiQuotaWindow {
     }
     String padded(int value) => value.toString().padLeft(2, '0');
     return 'Resets $short ${padded(date.hour)}:${padded(date.minute)}';
+  }
+
+  ({int delta, bool reserve})? get pacePercent {
+    if (aiNumber(data['eta']) case final seconds?
+        when runningOut &&
+            seconds > 0 &&
+            seconds < const Duration(days: 366).inSeconds) {
+      return null;
+    }
+    final expected = expectedLeft;
+    if (expected == null) return null;
+    final delta = (left - expected).round();
+    if (delta.abs() <= 2) return null;
+    return (delta: delta.abs(), reserve: delta > 0);
   }
 
   String? get paceLabel {

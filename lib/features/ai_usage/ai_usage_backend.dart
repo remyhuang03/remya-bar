@@ -19,6 +19,7 @@ const _workerName = 'top.remya.bar/ai-usage';
 class AiUsageBackend extends ChangeNotifier {
   Map<String, Object?> data = const {};
   Timer? _timer;
+  StreamSubscription<SettingsChange>? _changes;
   bool _disposed = false;
   bool refreshing = false;
   int tick = 0;
@@ -28,6 +29,12 @@ class AiUsageBackend extends ChangeNotifier {
   void start() {
     unawaited(_read());
     _timer = Timer.periodic(const Duration(seconds: 15), (_) => _read());
+    _changes = SettingsClient().changes.listen((change) {
+      if (change.topic == aiBarSettingId ||
+          change.topic == aiProvidersSettingId) {
+        unawaited(_read());
+      }
+    }, onError: (Object _) {});
   }
 
   Future<void> refresh() async {
@@ -67,6 +74,7 @@ class AiUsageBackend extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    unawaited(_changes?.cancel());
     super.dispose();
   }
 }
@@ -173,7 +181,10 @@ class _AiUsageWorker {
           );
       _sample = {
         'providers': data,
-        'showUsed': aiMap(shell['host'])['usageBarsShowUsed'] == true,
+        'showUsed': bar?['showUsed'] is bool
+            ? bar!['showUsed'] == true
+            : aiMap(shell['host'])['usageBarsShowUsed'] == true,
+        'ringOrder': bar?['ringOrder'] == '5h-inner' ? '5h-inner' : '5h-outer',
         'threshold': threshold,
         'pinned': [...?(bar?['pinned'] as List?)?.whereType<String>()],
         'updatedAt': updated?.toIso8601String(),

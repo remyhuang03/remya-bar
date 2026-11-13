@@ -14,6 +14,7 @@ import 'features/osd/osd_controller.dart';
 import 'features/settings/bar_theme_controller.dart';
 import 'features/popups/popup_app.dart';
 import 'features/popups/bar_popup.dart';
+import 'features/sidebar/sidebar_screen_capture.dart';
 import 'features/system/system_backend.dart';
 
 Future<void> main(List<String> arguments) async {
@@ -62,6 +63,11 @@ Future<void> main(List<String> arguments) async {
       : File(
           '${Directory(root).parent.path}/remya-settings/build/linux/x64/debug/bundle/remya_settings',
         );
+  final debugScreenCapture = root == null
+      ? null
+      : File(
+          '${Directory(root).parent.path}/remya-screen-capture/build/linux/x64/debug/bundle/remya_screen_capture',
+        );
   runApp(
     RemyaBarApp(
       preferences: preferences,
@@ -77,6 +83,10 @@ Future<void> main(List<String> arguments) async {
       onOpenSettings: () => openRemyaSettings(debugExecutable: debugSettings),
       onOpenPowerSettings: () =>
           openRemyaSettings(debugExecutable: debugSettings, page: 'power'),
+      onLaunchScreenCapture: (arguments) => openRemyaScreenCapture(
+        debugExecutable: debugScreenCapture,
+        arguments: arguments,
+      ),
     ),
   );
 }

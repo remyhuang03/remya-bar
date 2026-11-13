@@ -4,6 +4,7 @@ use zbus::{Connection, Proxy};
 pub async fn action(action: &str) -> Result<(), String> {
     let method = match action {
         "lock" => "LockSession",
+        "suspend" => "Suspend",
         "logout" => "TerminateSession",
         "restart" => "Reboot",
         "shutdown" => "PowerOff",
@@ -39,7 +40,7 @@ mod tests {
             .build()
             .unwrap();
         assert_eq!(
-            runtime.block_on(super::action("suspend")).unwrap_err(),
+            runtime.block_on(super::action("hibernate")).unwrap_err(),
             "Unknown session action"
         );
     }

@@ -12,6 +12,7 @@ import 'package:remya_settings_client/remya_settings_client.dart'
 
 import '../../widgets/bar_pill.dart';
 import '../../widgets/bar_tooltip.dart';
+import '../../widgets/percent_text.dart';
 
 import '../osd/osd_slider.dart';
 import '../popups/bar_popup_button.dart';
@@ -134,6 +135,7 @@ class _RightSidebarState extends State<RightSidebar> {
 
   static const _powerActions = {
     'lock': ('Lock', Icons.lock_rounded),
+    'suspend': ('Suspend', Icons.bedtime_rounded),
     'logout': ('Log out', Icons.logout_rounded),
     'restart': ('Restart', Icons.restart_alt_rounded),
     'shutdown': ('Shut down', Icons.power_settings_new_rounded),
@@ -335,53 +337,43 @@ class _RightSidebarState extends State<RightSidebar> {
                       ),
                     ),
                     Flexible(
-                      child: SingleChildScrollView(
-                        controller: _scroll,
-                        padding: .symmetric(horizontal: pad),
-                        child: PopupMeasure(
-                          onHeight: (height) => widget.onHeight(
-                            height + pad * 2 + 16 + headerHeight,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: .stretch,
-                            spacing: 16,
-                            children: [
-                              if (_error case final error?)
-                                Row(
+                      fit: .loose,
+                      child: _detail == null
+                          ? SingleChildScrollView(
+                              controller: _scroll,
+                              padding: .symmetric(horizontal: pad),
+                              child: PopupMeasure(
+                                onHeight: (height) => widget.onHeight(
+                                  height + pad * 2 + 16 + headerHeight,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: .stretch,
+                                  spacing: 16,
                                   children: [
-                                    Expanded(
-                                      child: Text(
-                                        error,
-                                        style: TextStyle(
-                                          color: theme.colorScheme.error,
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.close_rounded),
-                                      tooltip: 'Dismiss error',
-                                      onPressed: () =>
-                                          setState(() => _error = null),
-                                    ),
+                                    if (_error case final error?)
+                                      _errorBanner(theme, error),
+                                    ..._overview(theme),
                                   ],
                                 ),
-                              if (_detail == null)
-                                ..._overview(theme)
-                              else
-                                _SidebarDetail(
-                                  key: ValueKey(_detail),
-                                  kind: _detail!,
-                                  data: widget.data,
-                                  adapter: _adapter,
-                                  onSelectAdapter: (id) =>
-                                      setState(() => _adapterId = id),
-                                  busy: _busy,
-                                  send: _send,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
+                              ),
+                            )
+                          : _SidebarDetail(
+                              key: ValueKey(_detail),
+                              kind: _detail!,
+                              data: widget.data,
+                              adapter: _adapter,
+                              onSelectAdapter: (id) =>
+                                  setState(() => _adapterId = id),
+                              busy: _busy,
+                              send: _send,
+                              pad: pad,
+                              error: _error == null
+                                  ? null
+                                  : _errorBanner(theme, _error!),
+                              onHeight: (height) => widget.onHeight(
+                                height + pad * 2 + 16 + headerHeight,
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -392,6 +384,19 @@ class _RightSidebarState extends State<RightSidebar> {
       ),
     );
   }
+
+  Widget _errorBanner(ThemeData theme, String error) => Row(
+    children: [
+      Expanded(
+        child: Text(error, style: TextStyle(color: theme.colorScheme.error)),
+      ),
+      IconButton(
+        icon: const Icon(Icons.close_rounded),
+        tooltip: 'Dismiss error',
+        onPressed: () => setState(() => _error = null),
+      ),
+    ],
+  );
 
   Widget _header(ThemeData theme) {
     if (_detail case final detail?) {
@@ -875,26 +880,41 @@ class _RightSidebarState extends State<RightSidebar> {
       'mic-mute' => _map(input?['preferences'])['muted'] as bool?,
       _ => null,
     };
+    final actionTile = id == 'record' || id == 'screenshot' || id == 'picker';
+    final available = actionTile || selected != null;
     final tile = _SmallTile(
       icon: icon,
-      title: selected == null ? '$title unavailable' : title,
+      title: available ? title : '$title unavailable',
       selected: selected,
       editing: _draft != null,
-      onTap: selected == null || _draft != null
+      onTap: _draft != null
           ? null
           : switch (id) {
-              'caffeine' => () => _send('sidebar.keep-awake', value: !selected),
-              'dark' => () => _send('sidebar.dark', value: !selected),
-              'dnd-quick' => () => _send('sidebar.dnd', value: !selected),
-              'airplane' when !_busy => () => _send(
+              'record' || 'screenshot' || 'picker' when !_busy => () => _send(
+                'sidebar.capture',
+                target: id,
+              ),
+              'caffeine' when selected != null => () => _send(
+                'sidebar.keep-awake',
+                value: !selected,
+              ),
+              'dark' when selected != null => () => _send(
+                'sidebar.dark',
+                value: !selected,
+              ),
+              'dnd-quick' when selected != null => () => _send(
+                'sidebar.dnd',
+                value: !selected,
+              ),
+              'airplane' when selected != null && !_busy => () => _send(
                 'sidebar.airplane',
                 value: !selected,
               ),
-              'keyboard' when !_busy => () => _send(
+              'keyboard' when selected != null && !_busy => () => _send(
                 'sidebar.keyboard',
                 value: !selected,
               ),
-              'mic-mute' => () => _send(
+              'mic-mute' when selected != null => () => _send(
                 'sidebar.input-muted',
                 target: input!['name'],
                 value: !selected,

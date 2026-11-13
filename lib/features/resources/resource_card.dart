@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../widgets/percent_text.dart';
 import 'resource_style.dart';
 
 class ResourceCard extends StatelessWidget {
@@ -207,24 +208,35 @@ class _Reading extends StatelessWidget {
   final double unitSize;
 
   @override
-  Widget build(BuildContext context) => Text.rich(
-    TextSpan(
-      children: [
-        TextSpan(
-          text: number,
-          style: _textStyle(
-            context,
-            size,
-          ).copyWith(fontWeight: .w700, color: color),
-        ),
-        if (unit.isNotEmpty)
+  Widget build(BuildContext context) {
+    if (unit == '%') {
+      return PercentText(
+        number,
+        style: _textStyle(
+          context,
+          size,
+        ).copyWith(fontWeight: .w700, color: color),
+      );
+    }
+    return Text.rich(
+      TextSpan(
+        children: [
           TextSpan(
-            text: unit,
-            style: _textStyle(context, unitSize).copyWith(fontWeight: .w500),
+            text: number,
+            style: _textStyle(
+              context,
+              size,
+            ).copyWith(fontWeight: .w700, color: color),
           ),
-      ],
-    ),
-  );
+          if (unit.isNotEmpty)
+            TextSpan(
+              text: unit,
+              style: _textStyle(context, unitSize).copyWith(fontWeight: .w500),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ComputeTile extends StatelessWidget {

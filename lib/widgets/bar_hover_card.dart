@@ -38,6 +38,8 @@ class _BarHoverCardState extends State<BarHoverCard> {
   bool _hovered = false;
   bool _shown = false;
   Map<String, Object?>? _lastContent;
+  Rect? _lastAnchor;
+  ScrollPosition? _scrollPosition;
 
   void _send(Future<void> request) {
     request.catchError((Object error) => debugPrint('Bar card: $error'));
@@ -51,7 +53,14 @@ class _BarHoverCardState extends State<BarHoverCard> {
     final view = View.of(context);
     final viewport = Offset.zero & (view.physicalSize / view.devicePixelRatio);
     final anchor = (box.localToGlobal(.zero) & box.size).intersect(viewport);
-    if (anchor.isEmpty) return;
+    if (anchor.isEmpty) {
+      if (update && _shown) {
+        _shown = false;
+        _lastAnchor = null;
+        _send(BarPopup.hide(kind: widget.kind));
+      }
+      return;
+    }
     final data = {
       ...widget.data,
       if (widget.seedColor case final seed?)
@@ -63,11 +72,17 @@ class _BarHoverCardState extends State<BarHoverCard> {
       'data': data,
       'theme': (theme.seedColor, theme.styleVariant, theme.mode),
     };
+    final anchorChanged = _lastAnchor != anchor;
+    final contentChanged = !const DeepCollectionEquality().equals(
+      content,
+      _lastContent,
+    );
     if (update &&
         (BarPopup.openCard.value != widget.kind ||
-            const DeepCollectionEquality().equals(content, _lastContent))) {
+            (!anchorChanged && !contentChanged))) {
       return;
     }
+    _lastAnchor = anchor;
     _lastContent = content;
     final request = update ? BarPopup.update : BarPopup.show;
     _shown = true;
@@ -106,11 +121,19 @@ class _BarHoverCardState extends State<BarHoverCard> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final scrollPosition = Scrollable.maybeOf(context)?.position;
+    if (scrollPosition != _scrollPosition) {
+      _scrollPosition?.removeListener(_refresh);
+      _scrollPosition = scrollPosition;
+      _scrollPosition?.addListener(_refresh);
+    }
     _refresh();
   }
 
   @override
   void dispose() {
+    _scrollPosition?.removeListener(_refresh);
+    _scrollPosition = null;
     _timer?.cancel();
     if (_shown) _send(BarPopup.hide(kind: widget.kind));
     super.dispose();
