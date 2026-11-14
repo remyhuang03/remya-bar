@@ -12,7 +12,7 @@ class AiQuotaRing extends StatelessWidget {
     this.provider, {
     super.key,
     required this.showUsed,
-    this.ringOrder = '5h-outer',
+    this.ringOrder = '5h-inner',
     this.index = 0,
   });
 

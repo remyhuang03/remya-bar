@@ -168,9 +168,9 @@ const barOsdSettingIds = {barOsdSettingId};
 /// Preferences of the Remy'a Bar on-screen display, owned by Bar.
 class BarOsdPreferences {
   const BarOsdPreferences({
-    this.volumeStep = 5,
+    this.volumeStep = 3,
     this.volumeMax = 150,
-    this.brightnessStep = 5,
+    this.brightnessStep = 3,
     this.gammaMin = 10,
   });
 

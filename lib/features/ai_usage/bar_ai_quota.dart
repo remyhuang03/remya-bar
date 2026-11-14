@@ -43,7 +43,7 @@ class BarAiQuota extends StatelessWidget {
                 index: index,
                 state: state,
                 showUsed: data['showUsed'] == true,
-                ringOrder: data['ringOrder'] as String? ?? '5h-outer',
+                ringOrder: data['ringOrder'] as String? ?? '5h-inner',
               ),
           ],
         ),

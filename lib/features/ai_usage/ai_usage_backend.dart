@@ -75,7 +75,7 @@ class AiUsageBackend extends ChangeNotifier {
     data = {
       ..._sample,
       'showUsed': _bar?['showUsed'] == true,
-      'ringOrder': _bar?['ringOrder'] == '5h-inner' ? '5h-inner' : '5h-outer',
+      'ringOrder': _bar?['ringOrder'] == '5h-outer' ? '5h-outer' : '5h-inner',
       'threshold': aiLowPercent(_bar),
       'pinned': [...?(_bar?['pinned'] as List?)?.whereType<String>()],
     };

@@ -176,7 +176,7 @@ void main() {
       final controller = BarSettingsController(client: client);
       addTearDown(controller.dispose);
       await controller.start();
-      expect((controller.values['osd'] as Map)['volume-step'], 5);
+      expect((controller.values['osd'] as Map)['volume-step'], 3);
 
       // Another view writes; this view still edits the value it displayed.
       client.values['osd'] = {
@@ -189,8 +189,8 @@ void main() {
         controller.error('osd'),
         'Changed in another view. Reopen the editor.',
       );
-      expect((controller.values['osd'] as Map)['volume-step'], 5);
-      expect((client.values['osd'] as Map)['volume-step'], 5);
+      expect((controller.values['osd'] as Map)['volume-step'], 3);
+      expect((client.values['osd'] as Map)['volume-step'], 3);
 
       // A Changed reread updates the value but keeps the conflict visible.
       client.signals.add((topic: 'remya-bar.osd', value: const {}));
@@ -205,7 +205,7 @@ void main() {
       expect(client.values['osd'], {
         'volume-step': 10,
         'volume-max': 120,
-        'brightness-step': 5,
+        'brightness-step': 3,
         'gamma-min': 10,
       });
 

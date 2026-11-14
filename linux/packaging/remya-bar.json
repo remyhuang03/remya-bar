@@ -231,9 +231,9 @@
       "page": "osd",
       "keywords": [],
       "default": {
-        "volume-step": 5,
+        "volume-step": 3,
         "volume-max": 150,
-        "brightness-step": 5,
+        "brightness-step": 3,
         "gamma-min": 10
       },
       "schema": {
@@ -417,7 +417,7 @@
         "pinned": [],
         "low-percent": 20,
         "show-used": false,
-        "ring-order": "5h-outer"
+        "ring-order": "5h-inner"
       },
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

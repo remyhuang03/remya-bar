@@ -344,7 +344,10 @@ void main() {
 class _FakeSettingsClient extends SettingsClient {
   final changesController = StreamController<SettingsChange>.broadcast();
   final owners = StreamController<bool>.broadcast();
-  BarOsdPreferences osdPrefs = const BarOsdPreferences();
+  BarOsdPreferences osdPrefs = const BarOsdPreferences(
+    volumeStep: 5,
+    brightnessStep: 5,
+  );
   int volumePercent = 50;
   bool volumeMuted = false;
   int brightnessPercent = 50;
