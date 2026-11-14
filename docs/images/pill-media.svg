@@ -1,0 +1,15 @@
+<svg width="204" height="44" viewBox="0 0 204 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="pill_clip">
+      <rect width="204" height="44" rx="22"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#pill_clip)">
+    <rect width="204" height="44" fill="#131B1E"/>
+    <rect width="128" height="44" fill="#1A282C"/>
+    <circle cx="22" cy="22" r="14" fill="#8CD5E8"/>
+    <rect x="17.5" y="16" width="3" height="12" rx="1" fill="#0B2229"/>
+    <rect x="23.5" y="16" width="3" height="12" rx="1" fill="#0B2229"/>
+    <text x="44" y="27" font-family="'Inter', 'Noto Sans', system-ui, sans-serif" font-size="14" font-weight="500" fill="#9CE1F3">Latest updates, G...</text>
+  </g>
+</svg>

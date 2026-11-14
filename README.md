@@ -4,156 +4,283 @@
 
 <h1 align="center">Remy'a Bar</h1>
 
+<h3 align="center">A feature-rich status bar for Arch Linux Hyprland</h3>
+
 <p align="center">
   <img src="https://img.shields.io/badge/Platform-Arch%20Linux%20%7C%20Hyprland-1793D1?logo=archlinux" alt="Platform">
-  <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?logo=flutter" alt="Flutter">
+  <img src="https://img.shields.io/badge/Flutter-3.47.9-02569B?logo=flutter" alt="Flutter">
   <img src="https://img.shields.io/badge/Rust-2024-dea584?logo=rust" alt="Rust">
-  <a href="https://github.com/wmww/gtk-layer-shell"><img src="https://img.shields.io/badge/Wayland-gtk--layer--shell-blue" alt="Wayland"></a>
-  <a href="docs/backend.md"><img src="https://img.shields.io/badge/D--Bus-top.remya.settings-5865F2" alt="D-Bus"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial-blue" alt="License"></a>
+  <img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial-blue" alt="License">
 </p>
 
-A modern, fluid desktop status bar for **Hyprland on Linux**, crafted with **Flutter** and **Material Design 3 Expressive**, backed by a high-performance **Rust** engine.
+<p align="center">
+  <strong>English</strong> ·
+  <a href="docs/README.zh-CN.md">简体中文</a> ·
+  <a href="docs/README.zh-TW.md">繁體中文</a> ·
+  <a href="docs/README.ru.md">Русский</a> ·
+  <a href="docs/README.de.md">Deutsch</a> ·
+  <a href="docs/README.es.md">Español</a> ·
+  <a href="docs/README.ja.md">日本語</a>
+</p>
 
-Remy'a Bar blends refined desktop aesthetics with deep Linux system integration. Drawing visual inspiration from [illogical-impulse's Bar](https://github.com/end-4/dots-hyprland/tree/main/dots/.config/quickshell/ii/modules/ii/bar), it delivers smooth animations, real-time compositor awareness, artwork-adaptive media controls, rich hover dashboards, and an Android/macOS-style Quick Settings control center—all while keeping system overhead minimal.
+A modern, fluid desktop status bar for **Linux Hyprland**, built with **Flutter** and **Material Design 3 Expressive**, powered by a high-performance **Rust** engine. Visually inspired by [illogical-impulse's Bar](https://github.com/end-4/dots-hyprland/tree/main/dots/.config/quickshell/ii/modules/ii/bar), it provides a rich set of status widgets.
 
-> [!CAUTION]
-> **Early Development & Preview Only — Not Ready for Daily Use**
->
-> This repository is currently intended strictly for design preview and development reference. Use at your own risk on real systems.
+> [!WARNING]
+> This software is currently in **Beta** and may contain bugs or instability. Features and behavior are still being refined, and performance optimization is ongoing.
 
----
+<p align="center">
+  <video src="docs/images/hero-demo.mp4" controls autoplay loop muted playsinline width="100%"></video>
+</p>
 
-## Features
+## 🚀 Installation
 
-- **Workspaces and Displays**. Each output features a 40 px bar that auto-hides in fullscreen mode. On standard displays (≥ 700 logical px), the default layout arranges pills into four distinct groups: (1) notifications, active window, system resources, and media; (2) centered workspaces and clock; (3) application tray; and (4) battery and Quick Settings. Narrower displays fall back to a centered clock and Quick Settings toggle. Bar layout configuration, Material 3 theme tokens, and dynamic appearance policies are owned by the companion Remya Settings service.
-- **Media and System Status**. The media player provides playback controls alongside gauges for default metrics (CPU, memory, and network), with an optional GPU display (via DRM or NVML for NVIDIA). Hovering reveals detailed metric graphs and hardware history.
-- **Quick Settings**. A slide-out panel houses configurable quick settings toggles, hardware sliders, session actions, and an on-screen keyboard. Users can reorder tiles and hide unused options to customize the layout.
-- **Tray and Notifications**. The system tray supports pinned or folded applications alongside an integrated notification center. Do Not Disturb filters popups and sounds while retaining persistent notification history.
-- **AI Quota**. Colored provider rings show the remaining 5-hour and weekly quota of up to three AI subscriptions pinned in Remya Settings > AI, with a usage card on hover. Requires the optional `codexbar-cli` package with providers signed in.
-- **On-Screen Display (OSD)**. A non-interactive top-centered MD3E capsule slider (`top.remya.bar/osd`) displays live feedback for volume (`0%` up to a configurable `100%–150%` maximum, with a `100%` threshold marker and harmonized `Boost` segment/tag), mute (preserving pre-mute slider position; `0%` and mute are the same state), hardware brightness (`0%–100%`), and `hyprsunset` software gamma dimming (`Gamma` tag), with step sizes, maximum volume, and minimum gamma configured in Remya Settings. The sidebar volume and brightness sliders use the same thresholds and colors.
+`remya-bar` depends on the `top.remya.Core1` D-Bus service provided by **Remya Core** (`remya-core` / `remyad`) to manage shared theme tokens and configuration persistence. Please install and enable **Remya Core** before installing **Remy'a Bar** (`top.remya.bar.service` is automatically ordered to start after `top.remya.core.service`; **Remya Settings** is an optional system settings frontend).
 
----
+### 1a. Install via AUR (Recommended)
 
-## Getting Started
-
-### Prerequisites
-
-- **Desktop Environment**: Hyprland (or Wayland compositor supporting `wlr-layer-shell-unstable-v1`).
-- **Dependencies**:
-  - `gtk-layer-shell` (system package)
-  - SQLite (`sqlite` on Arch) for notification history
-  - Wayland client and XKB libraries (`wayland`, `libxkbcommon` on Arch), with `wayland-scanner` at build time
-  - `inter-font` and `noto-fonts-cjk`
-  - NetworkManager and BlueZ (for network & Bluetooth toggles)
-  - NVIDIA Management Library (`libnvidia-ml.so.1`, provided by `nvidia-utils` on Arch) for optional NVIDIA GPU metrics. Without NVML, the resource monitor hides NVIDIA GPUs.
-  - Remya Settings (`remya_settings`, provides theme, layout, & system D-Bus services)
-  - Optional: `codexbar-cli` (provides the `codexbar` executable) for AI Quota
-
-### Installation
-
-For paired setups, install **Remya Settings** before installing **Remy'a Bar** so the D-Bus services, theme tokens, and configuration schemas are available.
-
-#### From Release Archive (Linux x86_64)
-
-For paired setups, install Remya Settings before Bar. To install using a Linux x86_64 release archive downloaded from [Releases](https://github.com/remyhuang03/remya-bar/releases) using its bundled `tool/install.py`:
+Install `remya-bar` using your preferred AUR helper:
 
 ```bash
-# Verify checksum
+paru -S remya-bar || yay -S remya-bar
+```
+
+### 1b. Install from Release Archive (Linux x86_64)
+
+After downloading the Linux x86_64 release archive from [Releases](https://github.com/remyhuang03/remya-bar/releases), you can install it using the bundled `tool/install.py`:
+
+```bash
+# Verify file checksum
 sha256sum -c SHA256SUMS --ignore-missing
 
 # Extract and install
-tar --zstd -xf remya_bar-0.1.0-dev.20261111.0-linux-x86_64.tar.zst
-cd remya_bar-0.1.0-dev.20261111.0-linux-x86_64
+tar --zstd -xf remya_bar-<version>-linux-x86_64.tar.zst
+cd remya_bar-<version>-linux-x86_64
 python tool/install.py
 ```
 
-#### Building from Source
+The installer copies files into `~/.local/bin` and `XDG_DATA_HOME`, writes and enables the `top.remya.bar.service` systemd user unit, and configures the bar to start with `graphical-session.target` (requiring `WAYLAND_DISPLAY` and `HYPRLAND_INSTANCE_SIGNATURE` in the user manager environment, e.g., provided by `uwsm`). Reinstalling automatically stops the unit, replaces the bundle, and restarts the service. Run `systemctl --user disable --now top.remya.bar.service` to disable autostart.
 
-For paired setups, install Remya Settings before compiling and installing Bar. To compile and install from source:
+### 2. Hyprland Configuration
 
-```bash
-fvm flutter build linux --release
-python tool/install.py
+Add the following keybindings to your Hyprland Lua configuration (e.g., `~/.config/hypr/hyprland.lua`) (if you already have existing bindings, you can remove them first with `hl.unbind(...)`):
+
+```lua
+local barShortcutSignal = 'gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.'
+
+-- Toggle Quick Settings sidebar
+hl.bind(
+    "SUPER + A",
+    hl.dsp.exec_cmd(barShortcutSignal .. 'ToggleSidebar "$HYPRLAND_INSTANCE_SIGNATURE"')
+)
+
+-- Volume and brightness keybindings
+hl.bind(
+    "XF86AudioRaiseVolume",
+    hl.dsp.exec_cmd(barShortcutSignal .. 'VolumeUp "$HYPRLAND_INSTANCE_SIGNATURE"'),
+    { locked = true, repeating = true }
+)
+hl.bind(
+    "XF86AudioLowerVolume",
+    hl.dsp.exec_cmd(barShortcutSignal .. 'VolumeDown "$HYPRLAND_INSTANCE_SIGNATURE"'),
+    { locked = true, repeating = true }
+)
+hl.bind(
+    "XF86AudioMute",
+    hl.dsp.exec_cmd(barShortcutSignal .. 'VolumeMute "$HYPRLAND_INSTANCE_SIGNATURE"'),
+    { locked = true }
+)
+hl.bind(
+    "XF86MonBrightnessUp",
+    hl.dsp.exec_cmd(barShortcutSignal .. 'BrightnessUp "$HYPRLAND_INSTANCE_SIGNATURE"'),
+    { locked = true, repeating = true }
+)
+hl.bind(
+    "XF86MonBrightnessDown",
+    hl.dsp.exec_cmd(barShortcutSignal .. 'BrightnessDown "$HYPRLAND_INSTANCE_SIGNATURE"'),
+    { locked = true, repeating = true }
+)
 ```
 
-The installer copies files into `~/.local/bin` and `XDG_DATA_HOME`, writes and enables the `top.remya.bar.service` systemd user unit, and configures the bar to start with the graphical session (`graphical-session.target`, requiring `WAYLAND_DISPLAY` and `HYPRLAND_INSTANCE_SIGNATURE` in the user manager environment, as provided by uwsm). Reinstalling stops the unit, replaces the bundle, and restarts the service. Remove other autostart entries to prevent duplicate instances; run `systemctl --user disable --now top.remya.bar.service` to turn autostart off.
+## ✨ Features
 
-### Hyprland Configuration
+### Status Bar Pills
 
-To bind an example shortcut (such as `Super + A`) to toggle the Quick Settings control center:
+<table>
+  <tr>
+    <th>Pill</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/pill-sidebar.svg" alt="Quick Settings toggle pill" height="34"></td>
+    <td><strong>Quick Controls Entry</strong>: Integrates network, Bluetooth, volume, and other statuses; click to expand the control center.</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/pill-media.svg" alt="Media control pill" height="34"></td>
+    <td><strong>Media Playback</strong>: Displays the currently playing track with one-click play/pause and track switching.</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/pill-clock.svg" alt="Clock pill" height="34"></td>
+    <td><strong>Clock &amp; Date</strong>: Accurately displays the current time and date; click or hover to expand the calendar.</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/pill-workspaces.svg" alt="Workspaces pill" height="34"></td>
+    <td><strong>Workspace Switcher</strong>: Displays app icons, focused windows, and urgency indicators across workspaces.</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/pill-resources.svg" alt="System resources pill" height="34"></td>
+    <td><strong>System Resources</strong>: Displays real-time CPU, memory, and other system resource metrics.</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/pill-ai-quota.svg" alt="AI quota pill" height="34"></td>
+    <td><strong>AI Usage</strong>: Clearly visualizes remaining quota and reset times across AI subscriptions.</td>
+  </tr>
+</table>
 
-```ini
-# Hyprland bind to toggle Quick Settings sidebar
-bind = SUPER, A, exec, gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.ToggleSidebar "$HYPRLAND_INSTANCE_SIGNATURE"
+### Hover Panels & Control Center
 
-# Optional volume and brightness/gamma OSD shortcuts
-bindel = , XF86AudioRaiseVolume, exec, gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.VolumeUp "$HYPRLAND_INSTANCE_SIGNATURE"
-bindel = , XF86AudioLowerVolume, exec, gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.VolumeDown "$HYPRLAND_INSTANCE_SIGNATURE"
-bindl  = , XF86AudioMute, exec, gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.VolumeMute "$HYPRLAND_INSTANCE_SIGNATURE"
-bindel = , XF86MonBrightnessUp, exec, gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.BrightnessUp "$HYPRLAND_INSTANCE_SIGNATURE"
-bindel = , XF86MonBrightnessDown, exec, gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.BrightnessDown "$HYPRLAND_INSTANCE_SIGNATURE"
-```
+<table>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/images/demo-card-resources.svg" alt="System resource monitor panel" width="100%">
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/images/demo-card-datetime.svg" alt="Date and time panel" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>System Monitor</b>: CPU, GPU, memory allocation, and 60-second network traffic graphs</sub></td>
+    <td align="center"><sub><b>Date &amp; Time</b>: Large clock, world time, week of year, and interactive monthly calendar</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/images/demo-card-media.svg" alt="Media control panel" width="100%">
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/images/demo-card-battery.svg" alt="Battery and power mode panel" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Media Controls</b>: Adaptive colors from album art, track scrubber, and volume slider</sub></td>
+    <td align="center"><sub><b>Battery &amp; Power</b>: Charge level, power draw, health, cycle count, and performance mode switching</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/images/demo-card-ai-quota.svg" alt="AI usage statistics panel" width="100%">
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src="docs/images/demo-sidebar.svg" alt="Quick Settings control center" width="97%">
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>AI Usage</b>: Multi-platform session/weekly quotas, reset countdowns, and daily consumption stats</sub></td>
+    <td align="center"><sub><b>Quick Settings</b>: System quick toggles and handy utility shortcuts</sub></td>
+  </tr>
+</table>
 
----
+### On-Screen Display (OSD)
 
-## Interactions & Shortcuts Cheat Sheet
+<table>
+  <tr>
+    <td width="45%" align="center">
+      <img src="docs/images/demo-osd.svg" alt="On-Screen Display OSD" width="280">
+    </td>
+    <td>
+      <ul>
+        <li><strong>Volume &amp; Boost</strong>: Pops up a live progress capsule centered at the top when adjusting volume or enabling overdrive boost.</li>
+        <li><strong>Brightness &amp; Software Dimming</strong>: Supports hardware backlight and software brightness adjustment indicators, clearly distinguishing the active mode.</li>
+        <li><strong>Notifications &amp; Do Not Disturb</strong>: Centrally logs missed desktop notifications with one-click clear and a Do Not Disturb toggle.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
-| Component | Gesture / Action | Result |
-| :--- | :--- | :--- |
-| **Workspaces** | **Left Click** | Switch to workspace, or create if empty |
-| | **Scroll Wheel** | Switch adjacent workspace (`r+1` / `r-1`) |
-| | **Mouse Back Button** | Toggle special / scratchpad workspace |
-| | **Hold Super** | Reveal workspace numbers and remote monitor tags |
-| | **Right Click** | Open workspace overview popup |
-| **Media Pill** | **Click** | Toggle play / pause or expand pill |
-| | **Hover** | Open media card with track scrubber and volume |
-| **Resources** | **Hover** | Open 60-second live performance graphs |
-| **Clock** | **Click / Hover** | Open datetime dashboard and interactive calendar |
-| **Notifications** | **Click / Hover** | Open the notification center and Do Not Disturb |
-| | **Click a notification** | Run its default action, if it has one |
-| **Quick Settings** | **Click the status pill** | Toggle the Quick Settings control center |
-| | **`Super + A` (example)** | Toggle the Quick Settings control center from anywhere |
-| | **Volume Slider Right-Click** | Open audio output device picker |
-| | **Sliders Scroll Wheel** | Adjust volume or brightness by 5% per step |
-| **System Tray** | **Left Click** | Activate tray application |
-| | **Right Click** | Open application context menu & Pin/Fold options |
-| | **Chevron Click** | Expand or collapse folded tray icons |
-| **Any Popup** | **Escape / Click Outside** | Dismiss popup or detail card |
+## ⌨️ Development
 
----
+### Tech Stack & Architecture
 
-## Architecture Overview
-
-Remy'a Bar utilizes a hybrid architecture engineered for responsiveness and reliability:
+- **Flutter**: Pinned to `3.47.9` via FVM, paired with Material Design 3 Expressive (`material_ui`).
+- **Rust**: `2024` edition, managed as a Cargo workspace using the root `rust-toolchain.toml`.
+- **FFI**: Bridges `remya_bar_hyprland` and `remya_bar_system` to Flutter via `flutter_rust_bridge`.
+- **Wayland**: Native GTK runtime dynamically linked against `gtk-layer-shell` for per-monitor status bar windows, `BarPopup` floating hosts, and the standalone `--settings` window.
+- **Core Integration**: Connects to `remya-core` over session D-Bus (`top.remya.Core1`) via the `remya_client` and `remya_ui` packages to manage shared themes and atomic preference persistence. See [docs/backend.md](docs/backend.md) for contract details.
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │                   Flutter UI Layer                     │
 │  - MD3 Expressive widgets & spring animations          │
 │  - Per-monitor GTK Layer-Shell views                   │
-│  - Floating Flutter popup host (BarPopup / Popups)     │
+│  - Floating popup host (BarPopup) & --settings window  │
 └───────────────────────────▲────────────────────────────┘
-                            │ flutter_rust_bridge 2.13.0
+                            │ flutter_rust_bridge
 ┌───────────────────────────▼────────────────────────────┐
 │                    Rust Workspace                      │
 │  - remya_bar_hyprland: Tokio Unix socket IPC & events  │
 │  - remya_bar_system: Cached /proc, sysfs, GPU & MPRIS  │
 │  - System tray SNI host & DBusMenu client              │
 └───────────────────────────▲────────────────────────────┘
-                            │ D-Bus Signals & Calls
+                            │ D-Bus (top.remya.Core1)
 ┌───────────────────────────▼────────────────────────────┐
-│                Remya Settings Ecosystem                │
-│  - Shared themes, colors, power profiles, and settings │
+│                   Remya Core (remyad)                  │
+│  - Shared theme tokens, system settings & preferences  │
 └────────────────────────────────────────────────────────┘
 ```
 
-- **Low Resource Usage**: Rust handles all heavy lifting—sampling hardware sensors, parsing Hyprland socket streams, and hosting D-Bus interfaces—sharing a single cached state across all outputs.
-- **Native Wayland Integration**: Built directly against `gtk-layer-shell` for true Wayland surface management, automatic exclusive zone handling, and zero-flicker monitor hotplugging.
-- **Decoupled Architecture**: Configuration, themes, power profiles, and layout persistence are managed via the companion [Remya Settings](https://github.com/remyhuang03/remya-settings) service (`top.remya.settings`), which emits D-Bus signals that Bar follows to update state.
+- **Directory Structure**:
+  - `lib/main.dart` and `lib/app.dart`: Application startup and root widget composition.
+  - `lib/features/`: Feature-based Flutter UI, state, and controllers.
+  - `lib/src/rust/`: Modular Rust crates (`hyprland`, `system`, `core`, and generated bridge crates).
+  - `linux/`: Native GTK runtime, `gtk-layer-shell` configuration, and desktop packaging scripts.
+  - `assets/icons/`: Application icon and feature icons.
+  - `tool/install.py`: XDG installation and systemd user service helper script.
 
----
+### Prerequisites & Setup
 
-## License
+- FVM with Flutter SDK `3.47.9`
+- Rust toolchain (`2024` edition) managed via `rustup`
+- A sibling `../remya-core` checkout during development to provide `packages/remya_client` and `packages/remya_ui` (compiled release bundles do not require a sibling source checkout)
+- **Remya Core** installed and enabled at runtime (providing `dbus-1/services/top.remya.Core1.service` and `top.remya.core.service`)
+- Arch Linux runtime and native build dependencies:
 
-Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE), matching `remya_settings`.
+| Dependency | Purpose |
+| :--- | :--- |
+| `gtk-layer-shell`, `wayland`, `libxkbcommon`, `wayland-protocols` | Wayland layer-shell surfaces, input handling, and `wayland-scanner` |
+| `sqlite` | Persistent notification history |
+| `inter-font`, `noto-fonts-cjk` | System typography and CJK fallback |
+| `networkmanager`, `bluez` | Network and Bluetooth Quick Settings toggles |
+| `nvidia-utils` *(optional)* | Provides `libnvidia-ml.so.1` for NVIDIA GPU metrics |
+| `codexbar-cli` *(optional)* | Provides `codexbar` executable for AI quota |
+
+```bash
+fvm install
+fvm flutter pub get
+```
+
+After modifying Rust bridge APIs, regenerate bindings using `flutter_rust_bridge_codegen` and `flutter_rust_bridge.yaml`.
+
+### Validation & Local Installation
+
+```bash
+# Dart formatting, static analysis, and tests
+fvm dart format --output=none --set-exit-if-changed lib test
+fvm flutter analyze
+fvm flutter test
+
+# Rust formatting, lints, and tests
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+
+# Linux debug build and native lifecycle / smoke tests
+fvm flutter build linux --debug
+cmake --build build/linux/x64/debug --target bar_lifecycle_test
+build/linux/x64/debug/bundle/bar_lifecycle_test
+python test/bar_window_smoke.py  # Requires a running Hyprland session
+
+# Release build and install to local XDG directories
+fvm flutter build linux --release
+python tool/install.py
+```
+
+## 📜 License
+
+This project is released under the [PolyForm Noncommercial License 1.0.0](LICENSE).
