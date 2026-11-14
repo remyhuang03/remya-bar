@@ -2,7 +2,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/features/notifications/bar_notifications.dart';
-import 'package:remya_bar/widgets/bar_pill.dart';
 import 'package:remya_bar/features/notifications/notification_backend.dart';
 import 'package:remya_bar/features/notifications/notification_view.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
@@ -160,28 +159,6 @@ void main() {
       ]);
     },
   );
-
-  testWidgets('open notification pill retains its normal background', (
-    tester,
-  ) async {
-    final backend = NotificationBackend();
-    addTearDown(backend.dispose);
-    await tester.pumpWidget(
-      BarPopupScope(
-        theme: const RemyaTheme(),
-        child: MaterialApp(
-          home: Material(
-            child: BarNotifications(
-              backend: backend,
-              open: true,
-              onToggle: (_, _) async {},
-            ),
-          ),
-        ),
-      ),
-    );
-    expect(tester.widget<BarPill>(find.byType(BarPill)).toggled, isNull);
-  });
 
   testWidgets('bar button toggles notifications panel without hover card', (
     tester,

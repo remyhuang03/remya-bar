@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_client/remya_client.dart';
+import 'package:remya_ui/settings_ui.dart';
 
 import '../ai_usage/ai_quota_ring.dart';
 import '../ai_usage/ai_usage_data.dart';
@@ -18,62 +19,45 @@ const _pageKeys = {
   'ai-ring': ['ai-ring'],
 };
 
-/// One registered page of the Bar settings window.
+/// Whether a value of page [id] is still loading without an error.
+bool barSettingsPageLoading(BarSettingsController controller, String id) =>
+    (_pageKeys[id] ?? const []).any(
+      (key) =>
+          !controller.values.containsKey(key) && controller.error(key) == null,
+    );
+
+/// The content of one registered page of the Bar settings window.
 class BarSettingsPage extends StatelessWidget {
   const BarSettingsPage({
     super.key,
     required this.id,
-    required this.title,
     required this.controller,
   });
 
   final String id;
-  final String title;
   final BarSettingsController controller;
 
   @override
-  Widget build(BuildContext context) {
-    final keys = _pageKeys[id]!;
-    final loading = keys.any(
-      (key) =>
-          !controller.values.containsKey(key) && controller.error(key) == null,
-    );
-    return ListView(
-      padding: const .fromLTRB(24, 24, 24, 32),
-      children: [
-        Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
-            child: Column(
-              crossAxisAlignment: .stretch,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.headlineSmall),
-                for (final key in keys)
-                  if (controller.error(key) case final message?)
-                    _ErrorBanner(
-                      message: message,
-                      onReload: controller.busy(key)
-                          ? null
-                          : () => controller.reloadKey(key),
-                    ),
-                if (loading)
-                  const Padding(
-                    padding: .only(top: 16),
-                    child: LinearProgressIndicator(),
-                  ),
-                ...switch (id) {
-                  'layout' => _layout(context),
-                  'osd' => _osd(),
-                  'notifications' => _notifications(context),
-                  _ => _aiRing(context),
-                },
-              ],
-            ),
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: .stretch,
+    children: [
+      for (final key in _pageKeys[id]!)
+        if (controller.error(key) case final message?)
+          SettingsErrorCard(
+            message: message,
+            actionLabel: 'Reload',
+            onRetry: controller.busy(key)
+                ? null
+                : () => controller.reloadKey(key),
           ),
-        ),
-      ],
-    );
-  }
+      ...switch (id) {
+        'layout' => _layout(context),
+        'osd' => _osd(),
+        'notifications' => _notifications(context),
+        _ => _aiRing(context),
+      },
+    ],
+  );
 
   Map? _map(String key) => controller.values[key] as Map?;
 
@@ -83,7 +67,6 @@ class BarSettingsPage extends StatelessWidget {
       : (value) => controller.update(key, field, value as Object);
 
   List<Widget> _layout(BuildContext context) {
-    final text = Theme.of(context).textTheme;
     final json = controller.values['layout'];
     final layout = json == null ? null : BarLayout.fromJson(json);
     final seconds = controller.values['clock-seconds'] as bool?;
@@ -93,16 +76,13 @@ class BarSettingsPage extends StatelessWidget {
     void setLayout(BarLayout next) => controller.write('layout', next.toJson());
     return [
       if (layout != null) ...[
-        _Section(
-          title: 'Pills',
-          padding: const .all(16),
-          children: [
-            BarPillLayoutEditor(
-              layout: layout,
-              showSeconds: seconds ?? true,
-              onChanged: layoutBusy ? null : setLayout,
-            ),
-          ],
+        const SettingsSectionTitle('Pills'),
+        SettingsSurface(
+          child: BarPillLayoutEditor(
+            layout: layout,
+            showSeconds: seconds ?? true,
+            onChanged: layoutBusy ? null : setLayout,
+          ),
         ),
         _PillOptions(
           layout: layout,
@@ -114,24 +94,22 @@ class BarSettingsPage extends StatelessWidget {
         ),
       ],
       if (folded != null)
-        _Section(
+        SettingsGroup(
           title: 'App tray',
           children: [
-            Padding(
-              padding: const .fromLTRB(16, 12, 16, 4),
-              child: Text(
-                'Folded apps are hidden from the bar. Fold an app from its '
-                'tray menu, and pin it here to show it again.',
-                style: text.bodySmall,
-              ),
+            _row(
+              'Folded apps',
+              detail:
+                  'Folded apps are hidden from the bar. Fold an app from its '
+                  'tray menu, and pin it here to show it again.',
             ),
             if (folded.isEmpty)
-              const ListTile(title: Text('No folded apps'))
+              _row('No folded apps')
             else
               for (final id in [...folded.cast<String>()]..sort())
-                ListTile(
-                  title: Text(id),
-                  trailing: FilledButton.tonalIcon(
+                _row(
+                  id,
+                  control: FilledButton.tonalIcon(
                     onPressed: controller.busy('folded-apps')
                         ? null
                         : () => controller.write('folded-apps', [
@@ -145,17 +123,15 @@ class BarSettingsPage extends StatelessWidget {
           ],
         ),
       if (preview != null)
-        _Section(
+        SettingsGroup(
           title: 'On-screen keyboard',
           children: [
-            SwitchListTile(
-              title: const Text('Show touch key previews'),
-              subtitle: const Text(
-                'Show a character preview when pressing a key on a '
-                'touchscreen.',
-              ),
-              value: preview,
-              onChanged: controller.busy('keyboard-preview')
+            _switch(
+              'Show touch key previews',
+              'Show a character preview when pressing a key on a '
+                  'touchscreen.',
+              preview,
+              controller.busy('keyboard-preview')
                   ? null
                   : (value) => controller.write('keyboard-preview', value),
             ),
@@ -183,7 +159,7 @@ class BarSettingsPage extends StatelessWidget {
       onChanged: _edit<int>('osd', field),
     );
     return [
-      _Section(
+      SettingsGroup(
         title: 'Shortcuts',
         children: [
           slider(
@@ -231,15 +207,10 @@ class BarSettingsPage extends StatelessWidget {
       String field,
       String title,
       String detail,
-    ) => SwitchListTile(
-      title: Text(title),
-      subtitle: Text(detail),
-      value: value[field] as bool,
-      onChanged: _edit<bool>(key, field),
-    );
+    ) => _switch(title, detail, value[field] as bool, _edit<bool>(key, field));
     return [
       if (notifications != null)
-        _Section(
+        SettingsGroup(
           title: 'Notifications',
           children: [
             toggle(
@@ -250,13 +221,12 @@ class BarSettingsPage extends StatelessWidget {
               'Hide notification popups and sounds. Critical and priority '
                   'notifications still show; history keeps everything.',
             ),
-            ListTile(
-              title: const Text('Popup duration'),
-              subtitle: const Text(
-                'How long popups stay when the sender does not set a '
-                'duration. Critical notifications stay until closed.',
-              ),
-              trailing: _Choice<int>(
+            _row(
+              'Popup duration',
+              detail:
+                  'How long popups stay when the sender does not set a '
+                  'duration. Critical notifications stay until closed.',
+              control: _Choice<int>(
                 selected: notifications['popup-duration'] as int,
                 choices: {
                   for (final seconds in const [3, 5, 8, 10, 15, 30])
@@ -276,7 +246,7 @@ class BarSettingsPage extends StatelessWidget {
           ],
         ),
       if (quiet != null)
-        _Section(
+        SettingsGroup(
           title: 'Automatic Do Not Disturb',
           children: [
             toggle(
@@ -302,10 +272,10 @@ class BarSettingsPage extends StatelessWidget {
                 value: quiet['end'] as String,
                 onChanged: _edit<String>('quiet-schedule', 'end'),
               ),
-              ListTile(
-                title: const Text('Repeat'),
-                subtitle: const Text('Days on which the schedule starts.'),
-                trailing: _Choice<String>(
+              _row(
+                'Repeat',
+                detail: 'Days on which the schedule starts.',
+                control: _Choice<String>(
                   selected: quiet['repeat'] as String,
                   choices: const {
                     'every-day': 'Every day',
@@ -327,7 +297,7 @@ class BarSettingsPage extends StatelessWidget {
           ],
         ),
       if (priority != null)
-        _Section(
+        SettingsGroup(
           title: 'Priority notifications',
           children: [
             toggle(
@@ -371,18 +341,20 @@ class BarSettingsPage extends StatelessWidget {
     void pin(List<String> next) => controller.update('ai-ring', 'pinned', next);
     return [
       if (controller.aiError case final message?)
-        _ErrorBanner(message: message, onReload: controller.loadAi),
+        SettingsErrorCard(
+          message: message,
+          actionLabel: 'Reload',
+          onRetry: controller.loadAi,
+        ),
       if (providers != null) ...[
-        _Section(
+        SettingsGroup(
           title: 'Shown in Remya Bar',
           trailing: Text('${pinned.length} of 3'),
           children: [
             if (pinned.isEmpty)
-              const ListTile(
-                title: Text(
-                  'No providers pinned. The bar shows the first three '
-                  'tracked providers that report usage.',
-                ),
+              _row(
+                'No providers pinned. The bar shows the first three '
+                'tracked providers that report usage.',
               )
             else
               ReorderableListView.builder(
@@ -431,7 +403,7 @@ class BarSettingsPage extends StatelessWidget {
           ],
         ),
         if (others.isNotEmpty)
-          _Section(
+          SettingsGroup(
             title: 'Other tracked providers',
             children: [
               for (final id in others)
@@ -454,13 +426,13 @@ class BarSettingsPage extends StatelessWidget {
             ],
           ),
       ],
-      _Section(
+      SettingsGroup(
         title: 'Bar display',
         children: [
-          ListTile(
-            title: const Text('Quota metric'),
-            subtitle: const Text('Show remaining or used quota'),
-            trailing: SegmentedButton<bool>(
+          _row(
+            'Quota metric',
+            detail: 'Show remaining or used quota',
+            control: SegmentedButton<bool>(
               showSelectedIcon: false,
               segments: const [
                 ButtonSegment(value: false, label: Text('Remaining')),
@@ -473,10 +445,10 @@ class BarSettingsPage extends StatelessWidget {
                         controller.update('ai-ring', 'show-used', values.first),
             ),
           ),
-          ListTile(
-            title: const Text('Quota rings'),
-            subtitle: const Text('Which window sits on the outer ring'),
-            trailing: SegmentedButton<String>(
+          _row(
+            'Quota rings',
+            detail: 'Which window sits on the outer ring',
+            control: SegmentedButton<String>(
               showSelectedIcon: false,
               segments: const [
                 ButtonSegment(value: '5h-outer', label: Text('Outer 5h')),
@@ -494,7 +466,7 @@ class BarSettingsPage extends StatelessWidget {
           ),
         ],
       ),
-      _Section(
+      SettingsGroup(
         title: 'Alerts',
         children: [
           _SliderTile(
@@ -518,90 +490,36 @@ class BarSettingsPage extends StatelessWidget {
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section({
-    required this.title,
-    required this.children,
-    this.trailing,
-    this.padding = const .symmetric(vertical: 8),
-  });
-
-  final String title;
-  final List<Widget> children;
-  final Widget? trailing;
-  final EdgeInsetsGeometry padding;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: .stretch,
-    children: [
-      Padding(
-        padding: const .fromLTRB(4, 24, 4, 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            ?trailing,
-          ],
-        ),
-      ),
-      Card.filled(
-        margin: .zero,
-        color: Theme.of(context).colorScheme.surfaceContainer,
-        clipBehavior: .antiAlias,
-        shape: RoundedRectangleBorder(borderRadius: .circular(20)),
-        child: Padding(
-          padding: padding,
-          child: Column(crossAxisAlignment: .stretch, children: children),
-        ),
-      ),
-    ],
+Widget _row(String title, {String? detail, Widget? control, Widget? leading}) {
+  final label = SettingLabel(title, description: detail);
+  return SettingRow(
+    id: title,
+    label: leading == null
+        ? label
+        : Row(
+            mainAxisSize: .min,
+            spacing: 16,
+            children: [
+              leading,
+              Flexible(child: label),
+            ],
+          ),
+    control: control,
   );
 }
 
-/// Core or validation error for one preference; its last valid value stays.
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message, required this.onReload});
-
-  final String message;
-  final VoidCallback? onReload;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const .only(top: 16),
-      child: Material(
-        color: colors.errorContainer,
-        borderRadius: .circular(16),
-        child: Padding(
-          padding: const .fromLTRB(16, 8, 8, 8),
-          child: Row(
-            spacing: 12,
-            children: [
-              Icon(Icons.error_outline_rounded, color: colors.onErrorContainer),
-              Expanded(
-                child: Text(
-                  message,
-                  style: TextStyle(color: colors.onErrorContainer),
-                ),
-              ),
-              TextButton.icon(
-                onPressed: onReload,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Reload'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+Widget _switch(
+  String title,
+  String? detail,
+  bool value,
+  ValueChanged<bool>? onChanged, {
+  Widget? leading,
+}) => _row(
+  title,
+  detail: detail,
+  leading: leading,
+  control: Switch(value: value, onChanged: onChanged),
+);
 
 /// Options of visible pills; options of hidden pills are omitted.
 class _PillOptions extends StatelessWidget {
@@ -630,22 +548,16 @@ class _PillOptions extends StatelessWidget {
       String title,
       bool value,
       ValueChanged<bool>? on,
-    ) => SwitchListTile(
-      secondary: sample(pill),
-      title: Text(title),
-      subtitle: Text(barPillNames[pill]!),
-      value: value,
-      onChanged: on,
-    );
+    ) => _switch(title, barPillNames[pill], value, on, leading: sample(pill));
     final rows = [
       if (!hidden.contains('clock') && showSeconds != null)
         toggle('clock', 'Show seconds', showSeconds!, onSeconds),
       if (!hidden.contains('workspaces'))
-        ListTile(
+        _row(
+          'Workspaces shown',
+          detail: barPillNames['workspaces'],
           leading: sample('workspaces'),
-          title: const Text('Workspaces shown'),
-          subtitle: Text(barPillNames['workspaces']!),
-          trailing: _Choice<int>(
+          control: _Choice<int>(
             selected: layout.workspaceCount,
             choices: {
               for (var count = 1; count <= 10; count++) count: '$count',
@@ -656,39 +568,54 @@ class _PillOptions extends StatelessWidget {
           ),
         ),
       if (!hidden.contains('resources'))
-        ListTile(
-          leading: sample('resources'),
-          title: const Text('Shown metrics'),
-          subtitle: Padding(
-            padding: const .only(top: 8),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final id in barResourceIds)
-                  FilterChip(
-                    label: Text(barResourceNames[id]!),
-                    selected: layout.resources.contains(id),
-                    // At least one metric stays; hide the pill to remove it.
-                    onSelected:
-                        onLayout == null ||
-                            layout.resources.length == 1 &&
-                                layout.resources.contains(id)
-                        ? null
-                        : (selected) => onLayout!(
-                            layout.copyWith(
-                              resources: [
-                                for (final metric in barResourceIds)
-                                  if (metric == id
-                                      ? selected
-                                      : layout.resources.contains(metric))
-                                    metric,
-                              ],
-                            ),
-                          ),
+        SettingRow(
+          id: 'Shown metrics',
+          label: Column(
+            crossAxisAlignment: .start,
+            spacing: 12,
+            children: [
+              Row(
+                mainAxisSize: .min,
+                spacing: 16,
+                children: [
+                  sample('resources'),
+                  Flexible(
+                    child: SettingLabel(
+                      'Shown metrics',
+                      description: barPillNames['resources'],
+                    ),
                   ),
-              ],
-            ),
+                ],
+              ),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final id in barResourceIds)
+                    FilterChip(
+                      label: Text(barResourceNames[id]!),
+                      selected: layout.resources.contains(id),
+                      // At least one metric stays; hide the pill to remove it.
+                      onSelected:
+                          onLayout == null ||
+                              layout.resources.length == 1 &&
+                                  layout.resources.contains(id)
+                          ? null
+                          : (selected) => onLayout!(
+                              layout.copyWith(
+                                resources: [
+                                  for (final metric in barResourceIds)
+                                    if (metric == id
+                                        ? selected
+                                        : layout.resources.contains(metric))
+                                      metric,
+                                ],
+                              ),
+                            ),
+                    ),
+                ],
+              ),
+            ],
           ),
         ),
       if (!hidden.contains('media'))
@@ -712,7 +639,7 @@ class _PillOptions extends StatelessWidget {
     ];
     return rows.isEmpty
         ? const SizedBox.shrink()
-        : _Section(title: 'Pill options', children: rows);
+        : SettingsGroup(title: 'Pill options', children: rows);
   }
 }
 
@@ -776,10 +703,10 @@ class _SliderTileState extends State<_SliderTile> {
   @override
   Widget build(BuildContext context) {
     final value = _drag ?? widget.value;
-    return ListTile(
-      title: Text(widget.title),
-      subtitle: Text(widget.detail),
-      trailing: SizedBox(
+    return _row(
+      widget.title,
+      detail: widget.detail,
+      control: SizedBox(
         width: 280,
         child: Row(
           children: [
@@ -835,10 +762,10 @@ class _TimeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final [hours, minutes] = value.split(':').map(int.parse).toList();
-    return ListTile(
-      title: Text(title),
-      subtitle: Text(detail),
-      trailing: OutlinedButton.icon(
+    return _row(
+      title,
+      detail: detail,
+      control: OutlinedButton.icon(
         icon: const Icon(Icons.schedule_rounded),
         label: Text(value),
         onPressed: onChanged == null
@@ -874,50 +801,44 @@ class _PriorityApps extends StatelessWidget {
   final ValueChanged<List<Map>>? onChanged;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: .stretch,
-    children: [
-      ListTile(
-        title: const Text('Priority apps'),
-        subtitle: const Text(
-          'Apps whose notifications show during Do Not '
-          'Disturb.',
-        ),
-        trailing: FilledButton.tonalIcon(
+  Widget build(BuildContext context) => settingsRows([
+    _row(
+      'Priority apps',
+      detail: 'Apps whose notifications show during Do Not Disturb.',
+      control: FilledButton.tonalIcon(
+        onPressed: onChanged == null
+            ? null
+            : () async {
+                final app = await showDialog<Map>(
+                  context: context,
+                  builder: (context) => _AppPicker(
+                    client: client,
+                    exclude: {for (final app in apps) app['id']},
+                  ),
+                );
+                if (app != null) onChanged?.call([...apps, app]);
+              },
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Add app'),
+      ),
+    ),
+    if (apps.isEmpty) _row('No priority apps'),
+    for (final app in apps)
+      _row(
+        app['name'] as String,
+        detail: app['id'] as String,
+        control: IconButton(
+          tooltip: 'Remove',
           onPressed: onChanged == null
               ? null
-              : () async {
-                  final app = await showDialog<Map>(
-                    context: context,
-                    builder: (context) => _AppPicker(
-                      client: client,
-                      exclude: {for (final app in apps) app['id']},
-                    ),
-                  );
-                  if (app != null) onChanged?.call([...apps, app]);
-                },
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Add app'),
+              : () => onChanged!([
+                  for (final other in apps)
+                    if (other['id'] != app['id']) other,
+                ]),
+          icon: const Icon(Icons.remove_circle_outline_rounded),
         ),
       ),
-      if (apps.isEmpty) const ListTile(title: Text('No priority apps')),
-      for (final app in apps)
-        ListTile(
-          title: Text(app['name'] as String),
-          subtitle: Text(app['id'] as String),
-          trailing: IconButton(
-            tooltip: 'Remove',
-            onPressed: onChanged == null
-                ? null
-                : () => onChanged!([
-                    for (final other in apps)
-                      if (other['id'] != app['id']) other,
-                  ]),
-            icon: const Icon(Icons.remove_circle_outline_rounded),
-          ),
-        ),
-    ],
-  );
+  ]);
 }
 
 /// Installed desktop applications, filtered by name.
@@ -986,7 +907,10 @@ class _AppPickerState extends State<_AppPicker> {
                 }
                 final apps = snapshot.data;
                 if (apps == null) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Align(
+                    alignment: .topCenter,
+                    child: RemyaLoadingBar(),
+                  );
                 }
                 final shown = [
                   for (final app in apps)
@@ -1038,6 +962,7 @@ class _ProviderTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListTile(
+    contentPadding: const .symmetric(horizontal: 20, vertical: 4),
     leading: Row(
       mainAxisSize: .min,
       spacing: 12,

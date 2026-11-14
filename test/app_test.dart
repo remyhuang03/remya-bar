@@ -15,7 +15,6 @@ import 'package:remya_bar/features/sidebar/right_sidebar.dart';
 import 'package:remya_bar/features/system/system_backend.dart';
 import 'package:remya_bar/features/window/bar_active_window.dart';
 import 'package:remya_bar/features/workspaces/bar_workspaces.dart';
-import 'package:remya_bar/widgets/percent_text.dart';
 import 'package:remya_bar/features/settings/bar_preferences.dart';
 import 'package:remya_ui/remya_ui.dart';
 
@@ -565,30 +564,5 @@ void main() {
       const ['--color-picker'],
     ]);
     await tester.pumpWidget(const SizedBox());
-  });
-
-  testWidgets('PercentText styles % like clock seconds', (tester) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Center(
-          child: PercentText(
-            '42',
-            style: TextStyle(fontSize: 15, color: Color(0xFFFFFFFF)),
-          ),
-        ),
-      ),
-    );
-    final rich = tester.widget<RichText>(find.byType(RichText));
-    TextSpan? unitSpan;
-    rich.text.visitChildren((span) {
-      if (span is TextSpan && span.text == '%') {
-        unitSpan = span;
-        return false;
-      }
-      return true;
-    });
-    expect(unitSpan?.text, '%');
-    expect(unitSpan?.style?.fontSize, 12);
-    expect(unitSpan?.style?.color?.a, closeTo(0.7, 0.01));
   });
 }

@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../bar_theme.dart';
 import 'bar_preference_models.dart';
 
 const barPillNames = {
@@ -568,7 +569,8 @@ class BarPillSample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
+    // Samples keep the bar's typography inside the settings theme.
+    final text = barTheme(Theme.of(context)).textTheme;
     Widget pill(List<Widget> children, {Color? color, Color? foreground}) =>
         Material(
           color: color ?? colors.surfaceContainerHighest,

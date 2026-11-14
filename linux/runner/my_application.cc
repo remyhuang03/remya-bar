@@ -73,8 +73,10 @@ static void open_settings(MyApplication* self, const char* page) {
   if (self->settings_window == nullptr) {
     auto* window = gtk_application_window_new(GTK_APPLICATION(self));
     self->settings_window = window;
-    gtk_window_set_title(GTK_WINDOW(window), "Remya Bar Settings");
-    gtk_window_set_default_size(GTK_WINDOW(window), 900, 640);
+    gtk_window_set_title(GTK_WINDOW(window), "Remy'a Bar Settings");
+    // The Flutter title bar is the only one; it moves and closes through the settings channel.
+    gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
+    gtk_window_set_default_size(GTK_WINDOW(window), 1100, 720);
     auto* implicit = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->popup_engine_window)));
     auto* view = fl_view_new_for_engine(fl_view_get_engine(implicit));
     gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
@@ -113,6 +115,19 @@ static FlMethodChannel* settings_channel(MyApplication* self, FlEngine* engine) 
             return;
           }
           open_settings(self, page);
+          fl_method_call_respond_success(call, nullptr, nullptr);
+        } else if (g_strcmp0(method, "close") == 0) {
+          if (self->settings_window != nullptr) gtk_window_close(GTK_WINDOW(self->settings_window));
+          fl_method_call_respond_success(call, nullptr, nullptr);
+        } else if (g_strcmp0(method, "startMove") == 0) {
+          // Called while the primary button is held; Wayland uses the press serial.
+          if (self->settings_window != nullptr) {
+            auto* seat = gdk_display_get_default_seat(gtk_widget_get_display(self->settings_window));
+            gint x, y;
+            gdk_device_get_position(gdk_seat_get_pointer(seat), nullptr, &x, &y);
+            gtk_window_begin_move_drag(GTK_WINDOW(self->settings_window), GDK_BUTTON_PRIMARY,
+                                       x, y, gtk_get_current_event_time());
+          }
           fl_method_call_respond_success(call, nullptr, nullptr);
         } else {
           fl_method_call_respond_not_implemented(call, nullptr);
