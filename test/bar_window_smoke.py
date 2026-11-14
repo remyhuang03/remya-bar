@@ -43,7 +43,7 @@ def check_settings(binary, process, before):
         deadline = time.monotonic() + 10
         while True:
             clients = [c for c in hyprctl('clients') if c['pid'] == process.pid]
-            if len(clients) == 1 and clients[0]['title'] == 'Remya Bar Settings':
+            if len(clients) == 1 and clients[0]['title'] == "Remy'a Bar Settings":
                 break
             assert time.monotonic() < deadline, clients
             time.sleep(0.1)

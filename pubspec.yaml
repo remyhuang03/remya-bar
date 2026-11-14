@@ -1,7 +1,7 @@
 name: remya_bar
 description: "A Material Design 3 Expressive bar for Hyprland on Linux."
 publish_to: 'none'
-version: 0.1.0-dev.20261111.0
+version: 0.1.0
 
 environment:
   sdk: ^3.13.7

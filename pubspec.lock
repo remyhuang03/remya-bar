@@ -262,14 +262,14 @@ packages:
       path: "../remya-core/packages/remya_client"
       relative: true
     source: path
-    version: "0.1.0-dev.20261113.0"
+    version: "0.1.0"
   remya_ui:
     dependency: "direct main"
     description:
       path: "../remya-core/packages/remya_ui"
       relative: true
     source: path
-    version: "0.1.0-dev.20261113.0"
+    version: "0.1.0"
   sky_engine:
     dependency: transitive
     description: flutter
