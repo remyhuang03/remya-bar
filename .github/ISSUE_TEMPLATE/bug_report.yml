@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a problem with Remy'a Bar.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search [existing issues](https://github.com/remyhuang03/remya-bar/issues?q=is%3Aissue) before filing.
+        This report is public. Remove private information from logs and attachments.
+        Report suspected vulnerabilities [privately](https://github.com/remyhuang03/remya-bar/security/advisories/new).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Bar or monitors
+        - Workspaces or window integration
+        - Sidebar or OSD
+        - Notifications or tray
+        - Installation or startup
+        - Other or unsure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version and installation method
+      placeholder: "Example: an installed release, package version, or source commit"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Linux distribution and Hyprland version
+      description: Include the relevant version from `hyprctl version` if available.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the relevant command, action, or shortcut.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Describe what you expected and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Relevant setup and logs
+      description: >-
+        For window or display issues, include the monitor count, scale, and hotplug or resume sequence. For settings issues, include the Remya Core version. Remove private notification and tray contents.

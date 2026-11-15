@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest an improvement to Remy'a Bar.
+body:
+  - type: markdown
+    attributes:
+      value: Search [existing issues](https://github.com/remyhuang03/remya-bar/issues?q=is%3Aissue) before opening a request.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: What are you trying to do, and where do you get stuck today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Desired behavior
+      description: Describe the result you would like to see.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or examples
+      description: Include workarounds, examples, or mockups if useful. Remove private information before attaching anything.

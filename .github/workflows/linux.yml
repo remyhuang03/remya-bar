@@ -1,0 +1,124 @@
+name: Linux CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+jobs:
+  linux:
+    name: Linux x86_64
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    container: archlinux:base-devel
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+    steps:
+      - name: Restrict candidate builds to main
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo "::error::Select main to build a candidate."
+            exit 1
+          fi
+
+      - name: Install Arch Linux build dependencies
+        run: |
+          pacman -Syu --noconfirm --needed git curl cmake ninja clang rustup python zstd \
+            gtk3 gtk-layer-shell glib2-devel wayland wayland-protocols libxkbcommon inter-font python-jsonschema unzip xz
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          path: source/remya-bar
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Check out Remy'a Core v0.1.0
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: remyhuang03/remya-core
+          ref: 50e6817b35aabba60e5271d049c14c3d37592e7e
+          path: source/remya-core
+          persist-credentials: false
+
+      - name: Install FVM
+        run: |
+          archive=$(mktemp)
+          curl --fail --location --retry 3 \
+            https://github.com/btwld/fvm/releases/download/4.3.2/fvm-4.3.2-linux-x64.tar.gz \
+            --output "$archive"
+          echo "17dfced05f5b0cb32398dadd0691acc2bc458e8c4b0045a781cd5aa6c85f6ecb  $archive" | sha256sum --check
+          tar -xzf "$archive" -C /opt
+          ln -s /opt/fvm/fvm /usr/local/bin/fvm
+          rm "$archive"
+
+      - name: Check and build
+        working-directory: source/remya-bar
+        run: |
+          useradd --create-home remya-ci
+          chown -R remya-ci:remya-ci ..
+          runuser --user remya-ci -- bash -euo pipefail -s -- "$PWD" <<'BUILD'
+          cd "$1"
+          flutter_version=$(python -c 'import json; print(json.load(open(".fvmrc"))["flutter"])')
+          fvm install "$flutter_version" --skip-pub-get
+          git diff --check HEAD^ HEAD
+          cargo fmt --all -- --check
+          fvm flutter pub get --enforce-lockfile
+          fvm dart format --output=none --set-exit-if-changed lib test
+          fvm flutter analyze --no-pub
+          fvm flutter test --no-pub
+          python -m unittest test/install_test.py test/bar_registration_test.py
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo test --locked --workspace
+          fvm flutter build linux --debug --no-pub
+          cmake --build build/linux/x64/debug --target bar_lifecycle_test
+          build/linux/x64/debug/bundle/bar_lifecycle_test --popup-only
+          BUILD
+
+      - name: Build and archive candidate
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: source/remya-bar
+        run: |
+          runuser --user remya-ci -- bash -euo pipefail -s -- "$PWD" <<'BUILD'
+          cd "$1"
+          fvm flutter build linux --release --no-pub
+
+          test -x build/linux/x64/release/bundle/remya_bar
+          commit=$(git rev-parse HEAD)
+          archive="remya-bar-linux-x86_64-${commit:0:12}.tar.zst"
+          mkdir -p candidate
+          printf 'repository=%s\ncommit=%s\n' "$(basename "$PWD")" "$commit" > candidate/build-info.txt
+          printf 'core_commit=%s\n' "$(git -C ../remya-core rev-parse HEAD)" >> candidate/build-info.txt
+          tar --zstd --owner=0 --group=0 --mode=go-w -cf "candidate/$archive" \
+            LICENSE README.md \
+            build/linux/x64/release/bundle \
+            linux/packaging \
+            tool/install.py \
+            assets/icons/app_icon.svg \
+            assets/licenses
+          cd candidate
+          sha256sum "$archive" > SHA256SUMS
+          sha256sum --check SHA256SUMS
+          BUILD
+
+      - name: Upload candidate
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: remya-bar-linux-x86_64-${{ github.sha }}
+          path: source/remya-bar/candidate/
+          if-no-files-found: error
