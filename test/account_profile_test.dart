@@ -13,6 +13,7 @@ class _Client extends SettingsClient {
     'error': null,
   };
   bool closed = false;
+  Future<Map<String, dynamic>>? delayedRead;
   final updates = StreamController<SettingsChange>.broadcast();
 
   @override
@@ -22,7 +23,9 @@ class _Client extends SettingsClient {
   ]) async {
     expect(method, 'Get');
     expect(arguments, [accountInformationKey]);
-    return value;
+    final pending = delayedRead;
+    delayedRead = null;
+    return pending ?? value;
   }
 
   @override
@@ -69,12 +72,16 @@ void main() {
     },
   );
 
-  test('Settings account change refreshes the profile', () async {
+  test('an avatar write refreshes the profile during a pending read', () async {
     final client = _Client();
+    final staleRead = Completer<Map<String, dynamic>>();
+    client.delayedRead = staleRead.future;
     final profile = AccountProfileController(client: client)..start();
-    await Future<void>.delayed(Duration.zero);
-    client.value = {...client.value, 'avatar_revision': '2'};
+    final original = client.value;
+    client.value = {...original, 'avatar_revision': '2'};
     client.updates.add((topic: accountInformationKey, value: client.value));
+    await Future<void>.delayed(Duration.zero);
+    staleRead.complete(original);
     await Future<void>.delayed(Duration.zero);
     expect(profile.data['avatar_revision'], '2');
     profile.dispose();

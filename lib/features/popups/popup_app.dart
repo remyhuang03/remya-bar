@@ -232,6 +232,7 @@ class _BarPopupAppState extends State<BarPopupApp>
           : RemyaTheme(
               styleVariant: baseTheme.styleVariant,
               mode: baseTheme.mode,
+              contrast: baseTheme.contrast,
               seedColor: seed,
             );
       final data = Map<String, Object?>.from(arguments['data'] as Map);

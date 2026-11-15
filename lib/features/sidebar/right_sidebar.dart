@@ -527,7 +527,7 @@ class _RightSidebarState extends State<RightSidebar> {
                 ),
                 BarPopupButton(
                   const Icon(Icons.close_rounded, size: 20),
-                  'Quit Remya Bar',
+                  "Quit Remy'a Bar",
                   () => _send('quit'),
                 ),
                 BarPopupButton(

@@ -16,9 +16,13 @@ Compiled bundles do not require sibling checkouts.
 ## Bar preferences and settings window
 
 [linux/packaging/remya-bar.json](../linux/packaging/remya-bar.json) owns schemas,
-defaults and pages (`layout`, `osd`, `notifications`, `ai-ring`). It is installed
-at `$XDG_DATA_HOME/remya/apps/remya-bar.json`. `BarPreferences` accesses values
-only through `AppPreferences('remya-bar')`; editors use revision-checked Replace.
+defaults and pages (`layout`, `osd`, `notifications`, `ai-ring`). The
+`material-theme` and `account` pages link to Core’s shared theme and avatar
+editors. An avatar saved in either the Bar Account page or Remya Settings
+updates Bar’s sidebar profile.
+It is installed at `$XDG_DATA_HOME/remya/apps/remya-bar.json`. `BarPreferences`
+accesses values only through `AppPreferences('remya-bar')`; editors use
+revision-checked Replace.
 Bar additionally validates pill uniqueness, center bounds, identifier UTF-8 byte
 bounds and priority app uniqueness. Invalid values retain the last valid value
 and revision. Conflicts are shown without retrying or silently repairing data.

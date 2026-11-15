@@ -300,7 +300,7 @@ static int my_application_command_line(GApplication* application,
   }
   if (!gtk_layer_is_supported()) {
     g_application_command_line_printerr(command_line,
-        "Remya Bar requires a Wayland compositor with layer-shell support.\n");
+        "Remy'a Bar requires a Wayland compositor with layer-shell support.\n");
     return 1;
   }
   if (self->dart_entrypoint_arguments == nullptr) {

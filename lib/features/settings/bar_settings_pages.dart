@@ -348,7 +348,7 @@ class BarSettingsPage extends StatelessWidget {
         ),
       if (providers != null) ...[
         SettingsGroup(
-          title: 'Shown in Remya Bar',
+          title: "Shown in Remy'a Bar",
           trailing: Text('${pinned.length} of 3'),
           children: [
             if (pinned.isEmpty)
@@ -482,7 +482,7 @@ class BarSettingsPage extends StatelessWidget {
       Padding(
         padding: const .only(top: 16),
         child: Text(
-          'Usage comes from CodexBar. Track providers in Remya Settings.',
+          "Usage comes from CodexBar. Track providers in Remy'a Settings.",
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ),

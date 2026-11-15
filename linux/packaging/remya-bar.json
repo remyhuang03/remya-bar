@@ -2,7 +2,7 @@
   "version": 1,
   "id": "remya-bar",
   "app": "top.remya.bar",
-  "title": "Remya Bar",
+  "title": "Remy'a Bar",
   "icon": "top.remya.bar",
   "config": "bar",
   "pages": [
@@ -25,6 +25,16 @@
       "id": "ai-ring",
       "title": "AI quota rings",
       "keywords": []
+    },
+    {
+      "id": "material-theme",
+      "title": "Material theme",
+      "keywords": []
+    },
+    {
+      "id": "account",
+      "title": "Account",
+      "keywords": ["avatar", "profile picture"]
     }
   ],
   "settings": {

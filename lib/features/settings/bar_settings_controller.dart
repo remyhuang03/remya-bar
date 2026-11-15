@@ -22,7 +22,7 @@ const barSettingsKeys = [
 String barSettingsError(Object error) => switch (error) {
   StateError(:final message) => message,
   FormatException(:final message) => message,
-  TimeoutException() => 'Remya Core did not respond. Try again.',
+  TimeoutException() => "Remy'a Core did not respond. Try again.",
   _ =>
     '$error'
         .replaceFirst('top.remya.Core1.', '')

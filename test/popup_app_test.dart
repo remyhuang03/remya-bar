@@ -239,9 +239,11 @@ void main() {
             const StandardMethodCodec().encodeMethodCall(
               MethodCall('content', {
                 'kind': 'tooltip',
+                'seed': 0x328074,
                 'theme': ThemeConfig(
                   styleVariant: 'vibrant',
                   mode: mode,
+                  contrast: .high,
                 ).toMap(),
                 'data': {'message': message, 'scale': 1.5},
               }),
@@ -256,7 +258,12 @@ void main() {
       expect(find.text(message), findsOneWidget);
       final context = tester.element(find.text(message));
       final theme = RemyaTheme.fromConfig(
-        ThemeConfig(styleVariant: 'vibrant', mode: mode),
+        ThemeConfig(
+          styleVariant: 'vibrant',
+          mode: mode,
+          contrast: .high,
+          seedColor: '#328074',
+        ),
       );
       final expected = theme.theme(mode == 'dark' ? .dark : .light);
       final material = tester.widget<Material>(find.byType(Material).first);

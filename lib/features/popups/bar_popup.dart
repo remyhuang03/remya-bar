@@ -76,6 +76,7 @@ abstract final class BarPopup {
     'theme': ThemeConfig(
       styleVariant: theme.styleVariant.configKey,
       mode: theme.mode.name,
+      contrast: theme.contrast,
     ).toMap(),
   });
 

@@ -91,7 +91,7 @@ static void check_settings_window(MyApplication* self) {
   const auto first_id = fl_view_get_id(first);
   g_assert_true(fl_view_get_engine(first) == engine);
   g_assert_false(gtk_layer_is_layer_window(GTK_WINDOW(self->settings_window)));
-  g_assert_cmpstr(gtk_window_get_title(GTK_WINDOW(self->settings_window)), ==, "Remya Bar Settings");
+  g_assert_cmpstr(gtk_window_get_title(GTK_WINDOW(self->settings_window)), ==, "Remy'a Bar Settings");
   open_settings(self, "notifications");
   g_assert_true(first == FL_VIEW(gtk_bin_get_child(GTK_BIN(self->settings_window))));
   g_assert_cmpstr(self->settings_page, ==, "notifications");
@@ -105,6 +105,8 @@ static void check_settings_window(MyApplication* self) {
   gtk_widget_destroy(self->settings_window);
   g_assert_null(self->settings_window);
   g_assert_true(valid_settings_page("quiet-schedule"));
+  g_assert_true(valid_settings_page("material-theme"));
+  g_assert_true(valid_settings_page("account"));
   g_assert_false(valid_settings_page("../invalid"));
   g_assert_false(valid_settings_page("layout\n"));
   g_print("PASS: normal settings window, page reuse, close/reopen with warm engine\n");

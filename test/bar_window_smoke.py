@@ -36,7 +36,7 @@ def check_bars(process, before):
 
 
 def check_settings(binary, process, before):
-    for page in ('layout', 'notifications'):
+    for page in ('layout', 'notifications', 'material-theme', 'account'):
         forwarded = subprocess.run([str(binary), '--settings', page],
                                    capture_output=True, text=True, timeout=10)
         assert forwarded.returncode == 0, forwarded.stderr

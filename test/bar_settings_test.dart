@@ -10,6 +10,7 @@ import 'package:remya_bar/features/settings/bar_settings_controller.dart';
 import 'package:remya_bar/features/settings/bar_settings_entry.dart';
 import 'package:remya_bar/features/settings/remya_settings_installed.dart';
 import 'package:remya_client/remya_client.dart';
+import 'package:remya_ui/settings_ui.dart';
 
 /// Core stand-in with registration defaults, revisions and Changed signals.
 class _Client extends SettingsClient {
@@ -64,6 +65,42 @@ class _Client extends SettingsClient {
               'enabled': true,
             },
           ],
+        },
+      };
+    }
+    if (arguments.first == accountInformationKey) {
+      return const {
+        'api_version': 1,
+        'username': 'test-user',
+        'avatar_path': null,
+        'avatar_revision': null,
+        'error': null,
+      };
+    }
+    if (arguments.first == 'theme') {
+      return const ThemeConfig().toMap();
+    }
+    if (arguments.first == 'accent') {
+      return const {'source': 'custom', 'color': null};
+    }
+    if (arguments.first == 'appearance') {
+      return const {'saved': 'light', 'system': 'light', 'conflict': false};
+    }
+    if (arguments.first == 'system') {
+      return const {'mode': 'light', 'targets': <Object?>[]};
+    }
+    if (!arguments.first.startsWith('remya-bar.')) {
+      return {
+        'id': arguments.first,
+        'availability': 'available',
+        'reason': '',
+        'value': switch (arguments.first) {
+          materialThemeModeSettingId => 'light',
+          materialStyleSettingId => 'tonal_spot',
+          materialContrastSettingId => 'standard',
+          accentSourceSettingId => 'Custom',
+          accentColorSettingId => ThemeConfig.defaultSeedColor,
+          _ => null,
         },
       };
     }
@@ -261,6 +298,83 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     controller.dispose();
   });
+
+  testWidgets(
+    'settings routing opens Layout first and supports shared settings pages',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final client = _Client();
+      final controller = BarSettingsController(client: client);
+      await tester.runAsync(controller.start);
+
+      await tester.pumpWidget(
+        BarSettingsEntry(page: '', request: 1, controller: controller),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('content-layout')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('nav-$remyaMaterialThemePageId')),
+        findsOneWidget,
+      );
+
+      await tester.pumpWidget(
+        BarSettingsEntry(
+          page: remyaMaterialThemePageId,
+          request: 2,
+          controller: controller,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('content-$remyaMaterialThemePageId')),
+        findsOneWidget,
+      );
+      expect(find.text('Theme mode'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('nav-layout')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('content-layout')), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('nav-$remyaMaterialThemePageId')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('content-$remyaMaterialThemePageId')),
+        findsOneWidget,
+      );
+      expect(find.text('Theme mode'), findsOneWidget);
+
+      await tester.pumpWidget(
+        BarSettingsEntry(page: 'account', request: 3, controller: controller),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(RemyaAvatarEditor), findsOneWidget);
+      expect(find.text('Change avatar'), findsOneWidget);
+
+      final registration = jsonDecode(
+        File('linux/packaging/remya-bar.json').readAsStringSync(),
+      ) as Map<String, dynamic>;
+      final pages = (registration['pages'] as List)
+          .cast<Map<String, dynamic>>()
+          .map((page) => page['id'])
+          .toList();
+      expect(pages, containsAll([remyaMaterialThemePageId, 'account']));
+      expect(
+        (registration['settings'] as Map<String, dynamic>).values.any(
+          (setting) =>
+              (setting as Map<String, dynamic>)['page'] ==
+              remyaMaterialThemePageId,
+        ),
+        isFalse,
+      );
+
+      await tester.pumpWidget(const SizedBox());
+      controller.dispose();
+    },
+  );
 
   test('Settings installation follows absolute XDG data roots', () {
     final root = Directory.systemTemp.createTempSync('bar-settings-xdg-');

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:remya_client/remya_client.dart';
 
-/// Settings owns identity and avatar paths; the bar only observes its public API.
+/// Observes Core’s shared profile for the Bar sidebar.
 class AccountProfileController extends ChangeNotifier {
   AccountProfileController({SettingsClient? client})
     : _client = client ?? SettingsClient();
@@ -12,6 +12,7 @@ class AccountProfileController extends ChangeNotifier {
   StreamSubscription<SettingsChange>? _changes;
   Timer? _timer;
   bool _loading = false;
+  bool _refreshQueued = false;
   bool _disposed = false;
   Map<String, Object?> data = const {};
 
@@ -21,12 +22,16 @@ class AccountProfileController extends ChangeNotifier {
       if (change.topic == accountInformationKey) unawaited(refresh());
     }, onError: (Object error) => debugPrint('Account profile: $error'));
     unawaited(refresh());
-    // Only edits made outside Settings (another accounts tool) lack a signal.
+    // Periodic readback catches changes made outside Core.
     _timer = Timer.periodic(const Duration(minutes: 1), (_) => refresh());
   }
 
   Future<void> refresh() async {
-    if (_disposed || _loading) return;
+    if (_disposed) return;
+    if (_loading) {
+      _refreshQueued = true;
+      return;
+    }
     _loading = true;
     try {
       final next = await _client.readAccountInformation();
@@ -39,7 +44,7 @@ class AccountProfileController extends ChangeNotifier {
           username.isEmpty ||
           (path != null && (path is! String || !path.startsWith('/'))) ||
           (revision != null && revision is! String)) {
-        throw const FormatException('Invalid Settings account profile');
+        throw const FormatException("Invalid Remy'a account profile");
       }
       if (_disposed) return;
       final profile = <String, Object?>{
@@ -55,6 +60,10 @@ class AccountProfileController extends ChangeNotifier {
       debugPrint('Account profile: $error');
     } finally {
       _loading = false;
+      if (_refreshQueued) {
+        _refreshQueued = false;
+        unawaited(refresh());
+      }
     }
   }
 

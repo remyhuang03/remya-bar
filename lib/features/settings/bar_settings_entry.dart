@@ -15,16 +15,34 @@ const barSettingsChannel = MethodChannel('top.remya.bar/settings');
 Future<void> openBarSettings({String page = ''}) =>
     barSettingsChannel.invokeMethod<void>('open', page);
 
-/// Pages registered in linux/packaging/remya-bar.json, in navigation order.
+const _accountPage = 'account';
+
+/// Bar preference pages in navigation order.
 const barSettingsPages = [
-  (id: 'layout', title: 'Layout', icon: Icons.view_agenda_rounded),
-  (id: 'osd', title: 'On-screen display', icon: Icons.tune_rounded),
+  (
+    id: 'layout',
+    title: 'Layout',
+    icon: Icons.view_agenda_rounded,
+    category: RemyaSettingsCategory.personalization,
+  ),
+  (
+    id: 'osd',
+    title: 'On-screen display',
+    icon: Icons.tune_rounded,
+    category: RemyaSettingsCategory.system,
+  ),
   (
     id: 'notifications',
     title: 'Notifications',
     icon: Icons.notifications_rounded,
+    category: RemyaSettingsCategory.system,
   ),
-  (id: 'ai-ring', title: 'AI quota rings', icon: Icons.donut_large_rounded),
+  (
+    id: 'ai-ring',
+    title: 'AI quota rings',
+    icon: Icons.donut_large_rounded,
+    category: RemyaSettingsCategory.system,
+  ),
 ];
 
 /// The Remya Bar settings window hosted on the popup engine. [request]
@@ -54,7 +72,11 @@ class _BarSettingsEntryState extends State<BarSettingsEntry> {
   var _selected = barSettingsPages.first.id;
 
   void _open(String page) {
-    if (barSettingsPages.any((entry) => entry.id == page)) _selected = page;
+    if (page == remyaMaterialThemePageId ||
+        page == _accountPage ||
+        barSettingsPages.any((entry) => entry.id == page)) {
+      _selected = page;
+    }
   }
 
   @override
@@ -124,9 +146,19 @@ class _BarSettingsEntryState extends State<BarSettingsEntry> {
                       id: page.id,
                       title: page.title,
                       icon: page.icon,
+                      category: page.category,
                       builder: (context) =>
                           BarSettingsPage(id: page.id, controller: _controller),
                     ),
+                  remyaMaterialThemePage(client: _controller.client),
+                  RemyaSettingsPage(
+                    id: _accountPage,
+                    title: 'Account',
+                    icon: Icons.person_outline_rounded,
+                    category: .privacy,
+                    builder: (_) =>
+                        RemyaAvatarEditor(client: _controller.client),
+                  ),
                 ],
                 footerPages: [
                   RemyaSettingsPage(

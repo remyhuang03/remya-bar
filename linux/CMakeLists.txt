@@ -75,6 +75,9 @@ set_target_properties(${BINARY_NAME}
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
+foreach(plugin ${FLUTTER_PLUGIN_LIST})
+  target_link_libraries(bar_lifecycle_test PRIVATE ${plugin}_plugin)
+endforeach()
 
 find_program(CARGO_EXECUTABLE cargo REQUIRED)
 set(RUST_WORKSPACE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")

@@ -30,7 +30,7 @@ void main() {
         null,
       ),
     );
-    const sharedTheme = RemyaTheme(styleVariant: .expressive);
+    const sharedTheme = RemyaTheme(styleVariant: .expressive, contrast: .high);
     Widget app(String message) => BarPopupScope(
       theme: sharedTheme,
       child: MaterialApp(
@@ -58,7 +58,7 @@ void main() {
     expect((request['size'] as List)[1] as int, greaterThan(16));
     expect(
       request['theme'],
-      const ThemeConfig(styleVariant: 'expressive').toMap(),
+      const ThemeConfig(styleVariant: 'expressive', contrast: .high).toMap(),
     );
     expect(
       tester.getSemantics(find.byType(BarTooltip)).getSemanticsData().tooltip,
