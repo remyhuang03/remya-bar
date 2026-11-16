@@ -82,12 +82,30 @@ class OsdCapsuleSlider extends StatelessWidget {
   static const _tagHeight = 28.0;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) =>
-        _capsule(context, math.min(osdSize.width, constraints.maxWidth)),
-  );
+  Widget build(BuildContext context) {
+    final isMuted = type == .volume && (muted || value <= 0);
+    final maxValue = type == .volume ? max : 100;
+    final level = isMuted ? preMuteValue ?? value : value;
+    // Glide the handle between quick successive values instead of snapping;
+    // a new type starts in place.
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(type),
+      tween: Tween(end: level.clamp(0, maxValue).toDouble()),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 160),
+      curve: Easing.emphasizedDecelerate,
+      builder: (context, shown, _) => LayoutBuilder(
+        builder: (context, constraints) => _capsule(
+          context,
+          math.min(osdSize.width, constraints.maxWidth),
+          shown,
+        ),
+      ),
+    );
+  }
 
-  Widget _capsule(BuildContext context, double width) {
+  Widget _capsule(BuildContext context, double width, double shown) {
     final scheme = Theme.of(context).colorScheme;
     final isVolume = type == .volume;
     // Zero volume and mute are the same state.
@@ -105,9 +123,9 @@ class OsdCapsuleSlider extends StatelessWidget {
 
     const left = 4.0;
     final right = 196 * width / osdSize.width;
-    double position(int value) =>
+    double position(num value) =>
         (44 + 150 * value / maxValue) * width / osdSize.width;
-    final thumb = position(level);
+    final thumb = position(shown);
     final threshold = position(100);
     final filledEnd = isBoost
         ? threshold - 2

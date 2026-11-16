@@ -148,15 +148,18 @@ class OsdController extends ChangeNotifier {
     switch (topic) {
       case 'sound':
         if (!_writingVolume) {
-          _applySoundPayload(change.value, showChanges: true);
+          _applySoundPayload(change.value, showChanges: _shortcuts.isEmpty);
         }
       case 'display-brightness' || 'display.5d419889':
         if (!_writingBrightness) {
-          _applyBrightnessPayload(change.value, showChanges: true);
+          _applyBrightnessPayload(
+            change.value,
+            showChanges: _shortcuts.isEmpty,
+          );
         }
       case 'display-gamma' || 'night-light':
         if (!_writingBrightness) {
-          _applyGammaPayload(change.value, showChanges: true);
+          _applyGammaPayload(change.value, showChanges: _shortcuts.isEmpty);
         }
     }
   }
@@ -302,6 +305,9 @@ class OsdController extends ChangeNotifier {
 
   Future<void> handleShortcut(String action) {
     if (_disposed) return Future.value();
+    // While earlier presses are still being written, the shown state already
+    // predicts them, so this press continues from it.
+    _preview(action, _drainingShortcuts ? state : null);
     final pending = _shortcuts.lastOrNull;
     if (pending != null &&
         action != 'VolumeMute' &&
@@ -315,6 +321,90 @@ class OsdController extends ChangeNotifier {
     _shortcuts.add(batch);
     if (!_drainingShortcuts) unawaited(_drainShortcuts());
     return batch.done.future;
+  }
+
+  /// Shows the result of a key press at once, before Core confirms it.
+  /// Readbacks replace it when the queue settles; failures dismiss it.
+  void _preview(String action, OsdState? predicted) {
+    switch (action) {
+      case 'VolumeUp' || 'VolumeDown' || 'VolumeMute':
+        final base = predicted?.type == .volume ? predicted : null;
+        final current = base?.value ?? _volumePercent;
+        if (current == null) return;
+        final muted = base?.muted ?? (_volumeMuted == true || current == 0);
+        final plan = _volumePlan(current, muted, switch (action) {
+          'VolumeUp' => preferences.volumeStep,
+          'VolumeDown' => -preferences.volumeStep,
+          _ => null,
+        });
+        _show(
+          OsdState(
+            type: .volume,
+            value: plan.target,
+            muted: plan.mute || plan.target == 0,
+            preMuteValue: plan.mute
+                ? base?.preMuteValue ?? _preMuteVolume
+                : plan.target,
+            max: math.max(preferences.volumeMax, plan.target),
+          ),
+        );
+      case 'BrightnessUp' || 'BrightnessDown':
+        if (!_brightnessInitialized) return;
+        final (hardware, gamma) = switch (predicted) {
+          OsdState(type: .brightness, :final value) => (value, 100),
+          OsdState(type: .gamma, :final value) => (_hwBrightness, value),
+          _ => (_hwBrightness, _gamma),
+        };
+        if (gamma == null) return;
+        final step = preferences.brightnessStep;
+        final plan = _brightnessPlan(
+          hardware,
+          gamma,
+          action == 'BrightnessUp' ? step : -step,
+          1,
+        );
+        _show(OsdState(type: plan.type, value: plan.target));
+    }
+  }
+
+  /// Zero volume and mute are one state: stepping down to 0 mutes, and
+  /// unmuting or stepping up from 0 restores at least one step.
+  ({int target, bool mute}) _volumePlan(int current, bool muted, int? delta) {
+    // An externally raised level above the ceiling is kept, not cut.
+    final ceiling = math.max(preferences.volumeMax, current);
+    final target = switch (delta) {
+      null when muted && current == 0 => preferences.volumeStep,
+      null => current,
+      _ => (current + delta).clamp(0, ceiling),
+    };
+    final mute = delta == null ? !muted : target == 0 || (muted && delta < 0);
+    return (target: target, mute: mute);
+  }
+
+  /// Hardware brightness above full gamma, software gamma below it.
+  ({OsdType type, int current, int target, int steps}) _brightnessPlan(
+    int? brightness,
+    int gamma,
+    int delta,
+    int count,
+  ) {
+    final hardware =
+        _hardwareSupported &&
+        brightness != null &&
+        gamma == 100 &&
+        (delta > 0 || brightness > 1);
+    final current = hardware ? brightness : gamma;
+    final floor = hardware ? 1 : math.min(gamma, preferences.gammaMin);
+    final limit = delta > 0 ? 100 : floor;
+    final steps = current == limit
+        ? 0
+        : math.min(count, ((limit - current).abs() / delta.abs()).ceil());
+    return (
+      type: hardware ? .brightness : .gamma,
+      current: current,
+      target: (current + steps * delta).clamp(floor, 100),
+      steps: steps,
+    );
   }
 
   Future<void> _drainShortcuts() async {
@@ -361,8 +451,6 @@ class OsdController extends ChangeNotifier {
     );
   }
 
-  /// Zero volume and mute are one state: stepping down to 0 mutes, and
-  /// unmuting or stepping up from 0 restores at least one step.
   Future<void> _changeVolume(int? delta) async {
     final revision = _serviceRevision;
     if (_volumePercent == null) await _refreshSound();
@@ -370,15 +458,11 @@ class OsdController extends ChangeNotifier {
     if (_disposed || _serviceRevision != revision || current == null) return;
     _writingVolume = true;
     try {
-      final muted = _volumeMuted == true || current == 0;
-      // An externally raised level above the ceiling is kept, not cut.
-      final ceiling = math.max(preferences.volumeMax, current);
-      final target = switch (delta) {
-        null when muted && current == 0 => preferences.volumeStep,
-        null => current,
-        _ => (current + delta).clamp(0, ceiling),
-      };
-      final mute = delta == null ? !muted : target == 0 || (muted && delta < 0);
+      final (:target, :mute) = _volumePlan(
+        current,
+        _volumeMuted == true || current == 0,
+        delta,
+      );
       Future<bool> write(String id, Map<String, Object?> value) async {
         final sound = await _settings.changeSound(id, value);
         if (_disposed || _serviceRevision != revision) return false;
@@ -394,10 +478,12 @@ class OsdController extends ChangeNotifier {
           !await write(soundOutputMutedSettingId, {'muted': mute})) {
         return;
       }
-      _showVolume();
+      // Later presses already show their predicted level.
+      if (_shortcuts.isEmpty) _showVolume();
     } catch (error) {
       if (!_disposed && _serviceRevision == revision) {
         _volumePercent = null;
+        if (state?.type == .volume) dismiss();
         debugPrint('OSD volume write: $error');
       }
     } finally {
@@ -419,42 +505,35 @@ class OsdController extends ChangeNotifier {
       while (count > 0 && !_disposed && _outputRevision == revision) {
         final gamma = _gamma;
         if (gamma == null) return;
-        final brightness = _hwBrightness;
-        final hardware =
-            _hardwareSupported &&
-            brightness != null &&
-            gamma == 100 &&
-            (delta > 0 || brightness > 1);
-        final current = hardware ? brightness : gamma;
-        final floor = hardware ? 1 : math.min(gamma, preferences.gammaMin);
-        final limit = delta > 0 ? 100 : floor;
-        final type = hardware ? OsdType.brightness : OsdType.gamma;
-        if (current == limit) {
-          _show(OsdState(type: type, value: current));
+        final plan = _brightnessPlan(_hwBrightness, gamma, delta, count);
+        if (plan.steps == 0) {
+          if (_shortcuts.isEmpty) {
+            _show(OsdState(type: plan.type, value: plan.current));
+          }
           return;
         }
-        final steps = math.min(
-          count,
-          ((limit - current).abs() / delta.abs()).ceil(),
-        );
-        final target = (current + steps * delta).clamp(floor, 100);
+        final hardware = plan.type == .brightness;
         final key = hardware
             ? 'display-brightness:$output'
             : displayGammaSettingId;
-        final response = await _settings.call('Set', [key, '$target']);
+        final response = await _settings.call('Set', [key, '${plan.target}']);
         if (_disposed || _outputRevision != revision) return;
         final actual = hardware
             ? _applyBrightnessPayload(response)
             : _applyGammaPayload(response);
         if (actual == null) throw StateError('Missing brightness readback');
-        _show(OsdState(type: type, value: actual));
-        count -= steps;
+        count -= plan.steps;
+        // Intermediate and superseded readbacks would step backwards.
+        if (count == 0 && _shortcuts.isEmpty) {
+          _show(OsdState(type: plan.type, value: actual));
+        }
       }
     } catch (error) {
       if (!_disposed && _outputRevision == revision) {
         _brightnessInitialized = false;
         _hwBrightness = null;
         _gamma = null;
+        if (state?.type != .volume) dismiss();
         debugPrint('OSD brightness write: $error');
       }
     } finally {

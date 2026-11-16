@@ -108,6 +108,8 @@ void main() {
             ),
           ),
         );
+        // The handle glides between values.
+        await tester.pumpAndSettle();
         final x = tester.getCenter(handle).dx;
         final right = tester.getTopRight(find.text('$percent%')).dx;
         readoutRight ??= right;
@@ -322,6 +324,29 @@ void main() {
         expect(controller.state, const OsdState(type: .brightness, value: 30));
       },
     );
+
+    test('rapid presses show at once and never step backwards', () async {
+      final shown = <int>[];
+      controller.addListener(() {
+        if (controller.state case final state?) shown.add(state.value);
+      });
+      final presses = [
+        for (var i = 0; i < 3; i++) controller.handleShortcut('VolumeUp'),
+      ];
+      // Shown before Core confirms any write.
+      expect(controller.state?.value, 65);
+      await Future.wait(presses);
+      expect(settings.volumePercent, 65);
+      expect(shown, [55, 60, 65]);
+
+      final brightness = [
+        for (var i = 0; i < 2; i++) controller.handleShortcut('BrightnessDown'),
+      ];
+      expect(controller.state, const OsdState(type: .brightness, value: 40));
+      await Future.wait(brightness);
+      expect(settings.brightnessPercent, 40);
+      expect(controller.state, const OsdState(type: .brightness, value: 40));
+    });
 
     test('a late brightness read for the old output cannot overwrite the new output', () async {
       final pending = Completer<Map<String, dynamic>>();
