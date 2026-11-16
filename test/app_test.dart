@@ -479,6 +479,9 @@ void main() {
     hasWindow = false;
     await hyprland.refresh();
     await tester.pump();
+    // The pill animates out before unmounting.
+    expect(find.byType(BarActiveWindow), findsOneWidget);
+    await tester.pumpAndSettle();
     expect(find.byType(BarActiveWindow), findsNothing);
     expect(tester.getCenter(find.byType(BarClock)).dx, 960);
     hasWindow = true;
