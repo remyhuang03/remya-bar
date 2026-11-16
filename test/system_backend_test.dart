@@ -48,6 +48,7 @@ class _Settings extends SettingsClient {
   final writes = <({double percent, Completer<Map<String, dynamic>> result})>[];
   Completer<Map<String, dynamic>>? read;
   Completer<Map<String, dynamic>>? layout;
+  String position = 'top';
   int reads = 0;
   final gets = <String>[];
 
@@ -76,6 +77,9 @@ class _Settings extends SettingsClient {
     }
     if (method == 'Get' && arguments.single == barClockSecondsSettingId) {
       return {'value': true, 'revision': 'a' * 64};
+    }
+    if (method == 'Get' && arguments.single == barPositionSettingId) {
+      return {'value': position, 'revision': 'a' * 64};
     }
     if (method == 'Get' && arguments.single == barLayoutSettingId) {
       return layout?.future ??
@@ -279,5 +283,11 @@ void main() {
     await _flush();
     await _flush();
     expect(settings.gets, [barLayoutSettingId, barLayoutSettingId]);
+    expect(backend.bottom, isFalse);
+    settings.position = 'bottom';
+    settings.updates.add((topic: barPositionSettingId, value: {}));
+    await _flush();
+    await _flush();
+    expect(backend.bottom, isTrue);
   });
 }

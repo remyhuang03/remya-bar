@@ -27,6 +27,9 @@ Bar additionally validates pill uniqueness, center bounds, identifier UTF-8 byte
 bounds and priority app uniqueness. Invalid values retain the last valid value
 and revision. Conflicts are shown without retrying or silently repairing data.
 Tray edits read a fresh value before Replace; sidebar edits use the displayed revision.
+`position` (`top` or `bottom`) picks the layer-shell edge the bar anchors to;
+cards, tooltips, menus, panels, toasts and the OSD follow that edge, and the
+attached pill corners and card neck flip with it. Changes apply live.
 
 `remya_bar --settings [page]` forwards to the resident GApplication. The primary
 creates a normal GTK toplevel on the warm popup engine with

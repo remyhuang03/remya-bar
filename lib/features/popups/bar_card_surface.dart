@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
+import 'bar_popup.dart';
+
 /// The body emerges from the pill without changing the popup's layout size.
 Path attachedCardPath(
   Rect body,
@@ -89,8 +91,16 @@ class BarCardSurface extends StatelessWidget {
   static const shadowInsets = EdgeInsets.fromLTRB(40, 12, 40, 52);
 
   /// Near a screen edge the popup is clamped while the pill is not, so the body
-  /// shifts into the shadow room to stay under its pill.
-  static EdgeInsets insetsFor(Rect? pill, double width) {
+  /// shifts into the shadow room to stay under its pill. A bottom bar puts the
+  /// neck at the bottom.
+  static EdgeInsets insetsFor(Rect? pill, double width, {bool bottom = false}) {
+    final insets = _shifted(pill, width);
+    return bottom
+        ? insets.copyWith(top: insets.bottom, bottom: insets.top)
+        : insets;
+  }
+
+  static EdgeInsets _shifted(Rect? pill, double width) {
     if (pill == null) return shadowInsets;
     final left = shadowInsets.left;
     final right = width - shadowInsets.right;
@@ -122,13 +132,14 @@ class BarCardSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = colors(theme, seedColor, styleVariant);
+    final bottom = BarPopupScope.bottomOf(context);
     return Theme(
       data: theme.copyWith(colorScheme: scheme),
       child: AnimatedBuilder(
         animation: emergence,
         child: LayoutBuilder(
           builder: (context, constraints) => Padding(
-            padding: insetsFor(pill, constraints.maxWidth),
+            padding: insetsFor(pill, constraints.maxWidth, bottom: bottom),
             child: Material(
               type: .transparency,
               child: SingleChildScrollView(
@@ -140,7 +151,7 @@ class BarCardSurface extends StatelessWidget {
         ),
         builder: (context, child) {
           final progress = emergence.value.clamp(0.0, 1.0);
-          final clipper = _CardClipper(pill, progress);
+          final clipper = _CardClipper(pill, progress, bottom);
           return CustomPaint(
             painter: _CardPainter(clipper, scheme.surfaceContainer),
             child: ClipPath(
@@ -158,27 +169,39 @@ class BarCardSurface extends StatelessWidget {
 }
 
 class _CardClipper extends CustomClipper<Path> {
-  const _CardClipper(this.pill, this.progress);
+  const _CardClipper(this.pill, this.progress, this.bottom);
   final Rect? pill;
   final double progress;
+  final bool bottom;
 
   @override
   Path getClip(Size size) {
+    // Built for a top bar, then mirrored so a bottom card grows upwards.
     final body = BarCardSurface.insetsFor(
       pill,
       size.width,
     ).deflateRect(Offset.zero & size);
     final anchor = pill;
-    return anchor == null
+    final path = anchor == null
         ? (Path()..addRRect(
             RRect.fromRectAndRadius(body, const Radius.circular(32)),
           ))
         : attachedCardPath(body, anchor.left, anchor.width, progress: progress);
+    if (!bottom) return path;
+    return path.transform(
+      (Matrix4.translationValues(
+        0,
+        size.height,
+        0,
+      )..scaleByDouble(1, -1, 1, 1)).storage,
+    );
   }
 
   @override
   bool shouldReclip(_CardClipper oldClipper) =>
-      pill != oldClipper.pill || progress != oldClipper.progress;
+      pill != oldClipper.pill ||
+      progress != oldClipper.progress ||
+      bottom != oldClipper.bottom;
 }
 
 class _CardPainter extends CustomPainter {
@@ -198,7 +221,11 @@ class _CardPainter extends CustomPainter {
     final path = clipper.getClip(size);
     // Keep the neck and bar seam free of shadow above the body.
     canvas.save();
-    canvas.clipRect(Rect.fromLTRB(0, 12, size.width, size.height));
+    canvas.clipRect(
+      clipper.bottom
+          ? Rect.fromLTRB(0, 0, size.width, size.height - 12)
+          : Rect.fromLTRB(0, 12, size.width, size.height),
+    );
     final shadow = path.shift(_shadow.offset);
     canvas.drawPath(
       shadow,

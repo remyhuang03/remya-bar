@@ -39,10 +39,13 @@ class SystemBackend extends ChangeNotifier {
   StreamSubscription<SettingsChange>? _settingsChanges;
   bool _writingPower = false;
   int _powerRevision = 0;
-  bool _refreshingClock = false;
   bool showClockSeconds = true;
-  bool _refreshingLayout = false;
   BarLayout layout = BarLayout.defaults;
+
+  /// Whether the bar sits on the bottom output edge.
+  bool bottom = false;
+  final _readingPreferences = <String>{};
+  final _stalePreferences = <String>{};
   bool _refreshingStatus = false;
   // Signals that arrive during a read rerun it, since nothing polls anymore.
   final _stale = <Future<void> Function()>{};
@@ -74,6 +77,8 @@ class SystemBackend extends ChangeNotifier {
           unawaited(_refreshClockPreference());
         case barLayoutSettingId:
           unawaited(_refreshLayout());
+        case barPositionSettingId:
+          unawaited(_refreshPosition());
         case 'network' || 'bluetooth':
           unawaited(_refreshQuickStatus());
         case 'power':
@@ -92,6 +97,7 @@ class SystemBackend extends ChangeNotifier {
     unawaited(_refreshPower());
     unawaited(_refreshClockPreference());
     unawaited(_refreshLayout());
+    unawaited(_refreshPosition());
     unawaited(_refreshQuickStatus());
     void refresh() {
       unawaited(_refresh());
@@ -117,46 +123,52 @@ class SystemBackend extends ChangeNotifier {
     }
   }
 
-  Future<void> _refreshClockPreference() async {
-    if (_disposed) return;
-    if (_refreshingClock) {
-      _stale.add(_refreshClockPreference);
-      return;
-    }
-    _refreshingClock = true;
-    try {
-      final next = await _preferences.readClockSeconds();
-      if (_disposed || next == showClockSeconds) return;
-      showClockSeconds = next;
-      notifyListeners();
-    } catch (failure) {
-      if (!_disposed) debugPrint('Settings clock: $failure');
-    } finally {
-      _refreshingClock = false;
-      if (_stale.remove(_refreshClockPreference)) {
-        unawaited(_refreshClockPreference());
-      }
-    }
-  }
+  Future<void> _refreshClockPreference() => _refreshPreference(
+    'clock',
+    _preferences.readClockSeconds,
+    () => showClockSeconds,
+    (next) => showClockSeconds = next,
+  );
 
-  // Errors keep the last valid layout, like the theme.
-  Future<void> _refreshLayout() async {
+  Future<void> _refreshPosition() => _refreshPreference(
+    'position',
+    _preferences.readBottom,
+    () => bottom,
+    (next) => bottom = next,
+  );
+
+  Future<void> _refreshLayout() => _refreshPreference(
+    'layout',
+    _preferences.readLayout,
+    () => layout,
+    (next) => layout = next,
+  );
+
+  /// Reads one Bar preference, rerunning once if it changed mid-read. Errors
+  /// keep the last valid value, like the theme.
+  Future<void> _refreshPreference<T>(
+    String name,
+    Future<T> Function() read,
+    T Function() current,
+    void Function(T) apply,
+  ) async {
     if (_disposed) return;
-    if (_refreshingLayout) {
-      _stale.add(_refreshLayout);
+    if (!_readingPreferences.add(name)) {
+      _stalePreferences.add(name);
       return;
     }
-    _refreshingLayout = true;
     try {
-      final next = await _preferences.readLayout();
-      if (_disposed || next == layout) return;
-      layout = next;
+      final next = await read();
+      if (_disposed || next == current()) return;
+      apply(next);
       notifyListeners();
     } catch (failure) {
-      if (!_disposed) debugPrint('Settings bar layout: $failure');
+      if (!_disposed) debugPrint('Settings bar $name: $failure');
     } finally {
-      _refreshingLayout = false;
-      if (_stale.remove(_refreshLayout)) unawaited(_refreshLayout());
+      _readingPreferences.remove(name);
+      if (_stalePreferences.remove(name)) {
+        unawaited(_refreshPreference(name, read, current, apply));
+      }
     }
   }
 

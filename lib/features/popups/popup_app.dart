@@ -186,6 +186,7 @@ class _BarPopupAppState extends State<BarPopupApp>
   int _contentGeneration = 0;
   int _opening = 0;
   Map<String, Object?> _data = const {};
+  bool _bottom = false;
   RemyaTheme? _theme;
   String? _actionError;
   bool _batteryActionPending = false;
@@ -259,6 +260,7 @@ class _BarPopupAppState extends State<BarPopupApp>
             _opening++;
           }
           _kind = arguments['kind'] as String;
+          _bottom = arguments['bottom'] == true;
           _data = data;
           _theme = theme;
           if (_card) {
@@ -307,19 +309,23 @@ class _BarPopupAppState extends State<BarPopupApp>
       theme: barTheme(theme.theme(.light)),
       darkTheme: barTheme(theme.theme(.dark)),
       themeMode: theme.mode,
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(textScaler: .linear(textScale)),
-        child: MouseRegion(
-          onEnter: (_) => _send(widget.channel.invokeMethod<void>('enter')),
-          onExit: (_) {
-            if (_kind != 'sidebar' &&
-                _kind != 'notifications' &&
-                _kind != keyboardKind) {
-              _navigator.currentState?.popUntil((route) => route.isFirst);
-            }
-            _send(widget.channel.invokeMethod<void>('leave'));
-          },
-          child: child!,
+      builder: (context, child) => BarPopupScope(
+        theme: theme,
+        bottom: _bottom,
+        child: MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: .linear(textScale)),
+          child: MouseRegion(
+            onEnter: (_) => _send(widget.channel.invokeMethod<void>('enter')),
+            onExit: (_) {
+              if (_kind != 'sidebar' &&
+                  _kind != 'notifications' &&
+                  _kind != keyboardKind) {
+                _navigator.currentState?.popUntil((route) => route.isFirst);
+              }
+              _send(widget.channel.invokeMethod<void>('leave'));
+            },
+            child: child!,
+          ),
         ),
       ),
       home: _kind == keyboardKind
@@ -388,9 +394,12 @@ class _BarPopupAppState extends State<BarPopupApp>
                             opacity: progress,
                             child: Transform.scale(
                               scale: .96 + .04 * progress,
-                              alignment: _kind == 'tray-menu'
-                                  ? .topLeft
-                                  : .topCenter,
+                              alignment: switch ((_kind, _bottom)) {
+                                ('tray-menu', false) => .topLeft,
+                                ('tray-menu', true) => .bottomLeft,
+                                (_, false) => .topCenter,
+                                (_, true) => .bottomCenter,
+                              },
                               child: child,
                             ),
                           ),
@@ -550,7 +559,11 @@ class _CardScrollbar extends StatelessWidget {
             // Material scrollbars inset their track by the MediaQuery padding.
             data: MediaQuery.of(context).copyWith(
               padding:
-                  BarCardSurface.insetsFor(pill, constraints.maxWidth) +
+                  BarCardSurface.insetsFor(
+                    pill,
+                    constraints.maxWidth,
+                    bottom: BarPopupScope.bottomOf(context),
+                  ) +
                   const EdgeInsets.fromLTRB(0, 24, 4, 24),
             ),
             child: child,

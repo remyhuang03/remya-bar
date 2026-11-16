@@ -6,6 +6,7 @@ import 'bar_preference_models.dart';
 
 export 'bar_preference_models.dart';
 
+const barPositionSettingId = 'remya-bar.position';
 const barClockSecondsSettingId = 'remya-bar.clock-seconds';
 const barKeyboardPreviewSettingId = 'remya-bar.keyboard-preview';
 const barFoldedAppsSettingId = 'remya-bar.folded-apps';
@@ -73,6 +74,9 @@ class BarPreferences {
 
   Future<BarLayout> readLayout() async =>
       BarLayout.fromJson(await read('layout'));
+
+  /// Whether the bar sits on the bottom edge instead of the top.
+  Future<bool> readBottom() async => await read('position') == 'bottom';
   Future<bool> readClockSeconds() async => await read('clock-seconds') as bool;
   Future<bool> readKeyboardPreview() async =>
       await read('keyboard-preview') as bool;
@@ -153,6 +157,8 @@ class BarPreferences {
   static void validate(String key, Object? value) {
     bool valid;
     switch (key) {
+      case 'position':
+        valid = value == 'top' || value == 'bottom';
       case 'clock-seconds' || 'keyboard-preview':
         valid = value is bool;
       case 'folded-apps':

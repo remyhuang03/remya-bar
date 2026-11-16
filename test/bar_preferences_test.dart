@@ -83,6 +83,7 @@ void main() {
         expect(await prefs.read(key), values[key], reason: key);
       }
       expect(await prefs.readLayout(), BarLayout.defaults);
+      expect(await prefs.readBottom(), isFalse);
       expect(await prefs.readClockSeconds(), isTrue);
       expect(await prefs.readKeyboardPreview(), isTrue);
       expect(await prefs.readOsd(), const BarOsdPreferences());
@@ -188,6 +189,12 @@ void main() {
         () => BarPreferences.validate('sidebar-layout', ['vpn']),
         throwsFormatException,
       );
+      for (final position in ['left', 'Top', true]) {
+        expect(
+          () => BarPreferences.validate('position', position),
+          throwsFormatException,
+        );
+      }
     },
   );
 }

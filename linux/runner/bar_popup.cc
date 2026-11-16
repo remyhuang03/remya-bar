@@ -7,169 +7,17 @@
 #include <memory>
 #include <vector>
 
+#include "bar_popup_state.h"
 #include "flutter/generated_plugin_registrant.h"
 #include "virtual_keyboard.h"
 
-namespace {
+namespace bar_popup_internal {
 
-constexpr int kSidebarRightMargin = 6;
-constexpr int kKeyboardShadow = 20;
-
-const char* kind_of(FlValue* content);
-bool is_card(const char* kind);
-struct BarPopup;
 BarPopup* open_keyboard = nullptr;
-void send_content(BarPopup* state);
-void report_keyboard_visibility(FlView* owner);
-bool int_at(FlValue* list, size_t index, int64_t minimum, int64_t maximum, int* output);
 
 gchar* popup_channel_name(int64_t view_id) {
   return g_strdup_printf("top.remya.bar/popup/%" G_GINT64_FORMAT, view_id);
 }
-
-struct BarPopup {
-  FlView* owner;
-  FlEngine* engine = nullptr;
-  GtkWidget* window = nullptr;
-  FlView* view = nullptr;
-  int64_t view_id = -1;
-  FlMethodChannel* channel = nullptr;
-  FlMethodChannel* owner_channel = nullptr;
-  FlValue* content = nullptr;
-  BarPopup* sidebar_popup = nullptr;
-  BarPopup* notifications_popup = nullptr;
-  BarPopup* tray_popup = nullptr;
-  BarPopup* tooltip_popup = nullptr;
-  BarPopup* tray_overflow = nullptr;
-  BarPopup* toast_popup = nullptr;
-  BarPopup* osd_popup = nullptr;
-  BarPopup* keyboard_popup = nullptr;
-  std::unique_ptr<VirtualKeyboard> keyboard = nullptr;
-  bool is_keyboard = false;
-  bool docked = false;
-  int keyboard_requested_width = 1;
-  int keyboard_requested_height = 1;
-  int keyboard_height = 1;
-  int keyboard_left = 0;
-  int keyboard_bottom = 24;
-  int drag_left = 0;
-  int drag_bottom = 0;
-  guint hide_timer = 0;
-  bool ready = false;
-  bool visible = false;
-  bool sidebar = false;
-  bool notifications = false;
-  bool tray = false;
-  bool tooltip = false;
-  bool toast = false;
-  bool osd = false;
-  bool is_panel() const { return sidebar || notifications; }
-  std::vector<GtkWidget*> dismiss_windows;
-  bool dismissing = false;
-  bool owner_hovered = false;
-  bool popup_hovered = false;
-  guint dismiss_timer = 0;
-  int pill_left = 0;
-  int pill_width = 1;
-  int width = 1;
-  int monitor_width = 1;
-  int vertical_insets = 56;
-
-  void clear_dismiss_windows() {
-    for (auto* window : dismiss_windows) gtk_widget_destroy(window);
-    dismiss_windows.clear();
-  }
-
-  void cancel_hide() {
-    if (hide_timer != 0) g_source_remove(hide_timer);
-    hide_timer = 0;
-  }
-  void cancel_dismiss() {
-    if (dismiss_timer != 0) g_source_remove(dismiss_timer);
-    dismiss_timer = 0;
-    dismissing = false;
-  }
-  void enter() {
-    cancel_hide();
-    if (!dismissing) return;
-    cancel_dismiss();
-    fl_value_set_string_take(content, "opening", fl_value_new_bool(false));
-    send_content(this);
-  }
-  void card_state(bool open) {
-    g_autoptr(FlValue) args = fl_value_new_map();
-    fl_value_set_string_take(args, "action", fl_value_new_string("card.state"));
-    fl_value_set_string_take(args, "kind", fl_value_new_string(kind_of(content)));
-    fl_value_set_string_take(args, "open", fl_value_new_bool(open));
-    fl_method_channel_invoke_method(owner_channel, "action", args, nullptr, nullptr, nullptr);
-  }
-  void hide() {
-    cancel_hide();
-    cancel_dismiss();
-    owner_hovered = popup_hovered = false;
-    if (visible && is_card(kind_of(content))) card_state(false);
-    if (visible && tray && g_strcmp0(kind_of(content), "tray-menu") == 0) {
-      g_autoptr(FlValue) args = fl_value_new_map();
-      fl_value_set_string_take(args, "action", fl_value_new_string("tray.closed"));
-      FlValue* details = content != nullptr ? fl_value_lookup_string(content, "data") : nullptr;
-      if (details != nullptr) {
-        FlValue* token = fl_value_lookup_string(details, "token");
-        if (token != nullptr) fl_value_set_string(args, "token", token);
-      }
-      fl_method_channel_invoke_method(owner_channel, "action", args, nullptr, nullptr, nullptr);
-    }
-    if (visible && sidebar) {
-      g_autoptr(FlValue) args = fl_value_new_map();
-      fl_value_set_string_take(args, "action", fl_value_new_string("sidebar.closed"));
-      fl_method_channel_invoke_method(owner_channel, "action", args, nullptr, nullptr, nullptr);
-    }
-    if (visible && notifications) {
-      g_autoptr(FlValue) args = fl_value_new_map();
-      fl_value_set_string_take(args, "action", fl_value_new_string("notifications.closed"));
-      fl_method_channel_invoke_method(owner_channel, "action", args, nullptr, nullptr, nullptr);
-    }
-    visible = false;
-    if (open_keyboard == this) {
-      open_keyboard = nullptr;
-      report_keyboard_visibility(owner);
-    }
-    keyboard.reset();
-    destroy_window();
-    g_clear_pointer(&content, fl_value_unref);
-  }
-  void destroy_window() {
-    cancel_hide();
-    cancel_dismiss();
-    clear_dismiss_windows();
-    if (channel != nullptr) {
-      g_autofree gchar* name = popup_channel_name(view_id);
-      fl_binary_messenger_set_message_handler_on_channel(
-          fl_engine_get_binary_messenger(engine), name, nullptr, nullptr, nullptr);
-      g_clear_object(&channel);
-    }
-    if (window != nullptr) {
-      gtk_widget_destroy(window);
-      g_object_unref(window);
-    }
-    window = nullptr;
-    view = nullptr;
-    ready = false;
-  }
-  ~BarPopup() {
-    if (open_keyboard == this) open_keyboard = nullptr;
-    delete sidebar_popup;
-    delete notifications_popup;
-    delete tray_popup;
-    delete tooltip_popup;
-    delete tray_overflow;
-    delete toast_popup;
-    delete osd_popup;
-    delete keyboard_popup;
-    destroy_window();
-    g_clear_object(&owner_channel);
-    g_clear_pointer(&content, fl_value_unref);
-  }
-};
 
 void report_keyboard_visibility(FlView* owner) {
   auto* parent = GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(owner)));
@@ -184,108 +32,6 @@ void report_keyboard_visibility(FlView* owner) {
     auto* root = static_cast<BarPopup*>(g_object_get_data(G_OBJECT(view), "remya-popup"));
     if (root != nullptr)
       fl_method_channel_invoke_method(root->owner_channel, "action", args, nullptr, nullptr, nullptr);
-  }
-}
-
-gchar* keyboard_state_path() {
-  const char* base = g_getenv("XDG_STATE_HOME");
-  if (base != nullptr && g_path_is_absolute(base))
-    return g_build_filename(base, "remya", "bar", "keyboard.ini", nullptr);
-  return g_build_filename(g_get_home_dir(), ".local", "state", "remya", "bar",
-                          "keyboard.ini", nullptr);
-}
-
-GdkRectangle monitor_geometry(GdkMonitor* monitor) {
-  GdkRectangle geometry = {};
-  if (monitor != nullptr) gdk_monitor_get_geometry(monitor, &geometry);
-  return geometry;
-}
-
-void size_keyboard(BarPopup* state, const GdkRectangle& monitor) {
-  const int width = state->keyboard_requested_width;
-  const int height = state->keyboard_requested_height;
-  state->width = MAX(1, MIN(width, MIN(monitor.width - 16,
-      MAX(1, monitor.height - 56) * width / height)));
-  state->keyboard_height = MAX(1, height * state->width / width);
-}
-
-void place_keyboard(BarPopup* state, const GdkRectangle& monitor, bool resize = false) {
-  const int center = (monitor.width - state->width) / 2;
-  state->keyboard_left = CLAMP(state->keyboard_left, -center,
-                               monitor.width - state->width - center);
-  state->keyboard_bottom = CLAMP(state->keyboard_bottom, 0,
-                                 MAX(0, monitor.height - state->keyboard_height));
-  auto* window = GTK_WINDOW(state->window);
-  gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_LEFT,
-                       state->docked ? 0 : center + state->keyboard_left - kKeyboardShadow);
-  gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_BOTTOM,
-                       state->docked ? 0 : state->keyboard_bottom - kKeyboardShadow);
-  if (!resize) return;
-  gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_LEFT, !state->docked);
-  gtk_layer_set_exclusive_zone(window, state->docked ? state->keyboard_height : -1);
-  const int width = state->width + 2 * kKeyboardShadow;
-  const int height = state->keyboard_height + (state->docked ? 1 : 2) * kKeyboardShadow;
-  gtk_widget_set_size_request(GTK_WIDGET(state->view), width, height);
-  gtk_window_resize(window, width, height);
-  const cairo_rectangle_int_t panel = {
-      kKeyboardShadow, kKeyboardShadow, state->width, state->keyboard_height};
-  auto* input = cairo_region_create_rectangle(&panel);
-  gtk_widget_input_shape_combine_region(state->window, input);
-  cairo_region_destroy(input);
-}
-
-bool keyboard_drag(BarPopup* state, FlValue* value, bool drop) {
-  constexpr int limit = 1 << 24;
-  if (value == nullptr || fl_value_get_type(value) != FL_VALUE_TYPE_LIST) return false;
-  const size_t length = fl_value_get_length(value);
-  int dx, dy;
-  if ((length != 2 && !(drop && length == 4)) ||
-      !int_at(value, 0, -limit, limit, &dx) || !int_at(value, 1, -limit, limit, &dy)) {
-    return false;
-  }
-  auto* window = GTK_WINDOW(state->window);
-  auto* monitor = gtk_layer_get_monitor(window);
-  const auto geometry = monitor_geometry(monitor);
-  const int left = state->drag_left + dx;
-  const int bottom = state->drag_bottom - dy;
-  if (drop) {
-    const int center = geometry.x + geometry.width / 2 + left;
-    const int top = geometry.y + geometry.height - state->keyboard_height - bottom;
-    int x = center;
-    int y = top + 11;
-    if (length == 4 &&
-        (!int_at(value, 2, -limit, limit, &x) || !int_at(value, 3, -limit, limit, &y))) {
-      return false;
-    }
-    auto* target = gdk_display_get_monitor_at_point(gtk_widget_get_display(state->window), x, y);
-    const auto bounds = monitor_geometry(target);
-    if (target != monitor && x >= bounds.x && x < bounds.x + bounds.width &&
-        y >= bounds.y && y < bounds.y + bounds.height) {
-      // Remapping a layer surface ends its pointer grab, so switch outputs on drop.
-      gtk_layer_set_monitor(window, target);
-      size_keyboard(state, bounds);
-      state->keyboard_left = center - bounds.x - bounds.width / 2;
-      state->keyboard_bottom = bounds.y + bounds.height - state->keyboard_height - top;
-      place_keyboard(state, bounds, true);
-      return true;
-    }
-  }
-  state->keyboard_left = left;
-  state->keyboard_bottom = bottom;
-  place_keyboard(state, geometry);
-  return true;
-}
-
-void save_keyboard_position(BarPopup* state) {
-  g_autofree gchar* path = keyboard_state_path();
-  g_autofree gchar* directory = g_path_get_dirname(path);
-  g_autofree gchar* contents = g_strdup_printf("[floating]\nleft=%d\nbottom=%d\n",
-                                               state->keyboard_left, state->keyboard_bottom);
-  g_autoptr(GError) error = nullptr;
-  if (g_mkdir_with_parents(directory, 0700) != 0 ||
-      !g_file_set_contents_full(path, contents, -1, G_FILE_SET_CONTENTS_CONSISTENT, 0600, &error)) {
-    g_warning("Could not save virtual keyboard position: %s",
-              error != nullptr ? error->message : g_strerror(errno));
   }
 }
 
@@ -311,9 +57,27 @@ FlValue* copy_map(FlValue* source) {
   return copy;
 }
 
+// The bar window records its edge; popups sit against it and the bar's
+// exclusive zone keeps them clear of the bar itself.
+bool owner_bottom(const BarPopup* state) {
+  if (state->owner == nullptr) return false;
+  auto* owner = gtk_widget_get_toplevel(GTK_WIDGET(state->owner));
+  return g_object_get_data(G_OBJECT(owner), "bottom") != nullptr;
+}
+
+void place_vertical(BarPopup* state, int margin) {
+  auto* window = GTK_WINDOW(state->window);
+  const bool bottom = owner_bottom(state);
+  gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_TOP, !bottom);
+  gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_BOTTOM, bottom);
+  gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_TOP, bottom ? 0 : margin);
+  gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_BOTTOM, bottom ? margin : 0);
+}
+
 void replace_content(BarPopup* state, FlValue* args, bool opening) {
   g_autoptr(FlValue) content = copy_map(args);
   fl_value_set_string_take(content, "opening", fl_value_new_bool(opening));
+  fl_value_set_string_take(content, "bottom", fl_value_new_bool(owner_bottom(state)));
   if (state->sidebar) {
     g_autoptr(FlValue) details = copy_map(fl_value_lookup_string(content, "data"));
     fl_value_set_string_take(details, "keyboardOpen", fl_value_new_bool(open_keyboard != nullptr));
@@ -374,55 +138,6 @@ void schedule_hide(BarPopup* state) {
     }, state);
     return G_SOURCE_REMOVE;
   }, state);
-}
-
-bool keyboard_action(BarPopup* state, FlMethodCall* call, FlValue* args, const char* action) {
-  if (!state->is_keyboard || !state->visible || !state->keyboard) return false;
-  auto* value = fl_value_lookup_string(args, "value");
-  if (g_strcmp0(action, "keyboard.configure") == 0) {
-    g_autoptr(FlValue) layout = state->keyboard->configure(value);
-    if (layout != nullptr) fl_method_call_respond_success(call, layout, nullptr);
-    else fl_method_call_respond_error(call, "keymap", "Could not load the keyboard layout", nullptr, nullptr);
-    return true;
-  }
-  if (g_strcmp0(action, "keyboard.press") == 0) {
-    int code, modifiers, locks;
-    if (value != nullptr && fl_value_get_type(value) == FL_VALUE_TYPE_LIST &&
-        fl_value_get_length(value) == 3 && int_at(value, 0, 1, 127, &code) &&
-        int_at(value, 1, 0, 31, &modifiers) && int_at(value, 2, 0, 3, &locks) &&
-        state->keyboard->press(code, modifiers, locks & 1, locks & 2)) {
-      fl_method_call_respond_success(call, nullptr, nullptr);
-    } else {
-      fl_method_call_respond_error(call, "key", "Could not send the key", nullptr, nullptr);
-    }
-    return true;
-  }
-  if (g_strcmp0(action, "keyboard.dock") == 0 && value != nullptr &&
-      fl_value_get_type(value) == FL_VALUE_TYPE_BOOL) {
-    state->docked = fl_value_get_bool(value);
-    place_keyboard(state, monitor_geometry(gtk_layer_get_monitor(GTK_WINDOW(state->window))), true);
-  } else if (!state->docked && g_strcmp0(action, "keyboard.drag-start") == 0) {
-    state->drag_left = state->keyboard_left;
-    state->drag_bottom = state->keyboard_bottom;
-  } else if (!state->docked && (g_strcmp0(action, "keyboard.drag") == 0 ||
-                               g_strcmp0(action, "keyboard.drag-end") == 0)) {
-    const bool drop = g_strcmp0(action, "keyboard.drag-end") == 0;
-    const bool canceled = drop && (value == nullptr || fl_value_get_type(value) == FL_VALUE_TYPE_NULL);
-    if (!canceled && !keyboard_drag(state, value, drop)) {
-      fl_method_call_respond_error(call, "invalid-position", "Invalid keyboard position", nullptr, nullptr);
-      return true;
-    }
-    if (drop) save_keyboard_position(state);
-  } else if (!state->docked && g_strcmp0(action, "keyboard.reset-position") == 0) {
-    state->keyboard_left = 0;
-    state->keyboard_bottom = 24;
-    place_keyboard(state, monitor_geometry(gtk_layer_get_monitor(GTK_WINDOW(state->window))));
-    save_keyboard_position(state);
-  } else {
-    return false;
-  }
-  fl_method_call_respond_success(call, nullptr, nullptr);
-  return true;
 }
 
 void popup_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
@@ -531,28 +246,23 @@ void create_popup(BarPopup* state, bool sidebar, bool tray, bool tooltip, bool t
       : card ? "top.remya.bar/card" : "top.remya.bar/tooltip");
   gtk_layer_set_monitor(window, gtk_layer_get_monitor(owner));
   gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_OVERLAY);
-  gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_TOP, !keyboard);
   gtk_layer_set_exclusive_zone(window, 0);
   if (keyboard) {
     gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_BOTTOM, TRUE);
     gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
   } else if (osd) {
-    gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_TOP, 8);
     gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
   } else if (toast) {
     gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
     gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_LEFT, 8);
-    gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_TOP, 8);
     gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
   } else if (panel) {
     auto edge = sidebar ? GTK_LAYER_SHELL_EDGE_RIGHT : GTK_LAYER_SHELL_EDGE_LEFT;
     gtk_layer_set_anchor(window, edge, TRUE);
     gtk_layer_set_margin(window, edge, kSidebarRightMargin);
-    gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_TOP, 8);
     gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_ON_DEMAND);
   } else {
     gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
-    gtk_layer_set_margin(window, GTK_LAYER_SHELL_EDGE_TOP, card ? 0 : 2);
     gtk_layer_set_keyboard_mode(window, tray ? GTK_LAYER_SHELL_KEYBOARD_MODE_EXCLUSIVE
         : card ? GTK_LAYER_SHELL_KEYBOARD_MODE_ON_DEMAND
                     : GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
@@ -834,6 +544,7 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   if (toast || osd) {
     // Notification toasts and OSD are independent of hover cards, menus and the sidebar.
     if (state->window == nullptr) create_popup(state, false, false, false, toast, false, osd);
+    place_vertical(state, state->edge_margin());
     auto* owner = GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(state->owner)));
     GdkRectangle monitor;
     gdk_monitor_get_geometry(gtk_layer_get_monitor(owner), &monitor);
@@ -857,6 +568,8 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
     return;
   }
   if (state->window == nullptr) create_popup(state, sidebar, tray, tooltip, false, false, false, notifications);
+  // The bar may have moved edges since this popup was last shown.
+  if (!tooltip) place_vertical(state, state->edge_margin());
   if (panel || tray || tooltip) root->hide();
   if (card && root->tray_overflow != nullptr && !root->tray_overflow->dismiss_windows.empty()) {
     g_autoptr(FlValue) args = fl_value_new_map();
@@ -887,8 +600,10 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   if (tooltip) {
     const int left = CLAMP(rect.x + (rect.width - width) / 2, 0, MAX(0, monitor.width - width));
     gtk_layer_set_margin(GTK_WINDOW(state->window), GTK_LAYER_SHELL_EDGE_LEFT, left);
-    gtk_layer_set_margin(GTK_WINDOW(state->window), GTK_LAYER_SHELL_EDGE_TOP,
-        MAX(0, rect.y + rect.height + 6 - gtk_widget_get_allocated_height(GTK_WIDGET(state->owner))));
+    // 6px beyond the pill, on the side facing away from the screen edge.
+    const int bar_height = gtk_widget_get_allocated_height(GTK_WIDGET(state->owner));
+    place_vertical(state, MAX(0, owner_bottom(state) ? 6 - rect.y
+                                                     : rect.y + rect.height + 6 - bar_height));
   }
   if (tray) {
     // The pill ends 4px above the bar's exclusive edge.
@@ -910,7 +625,9 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   fl_method_call_respond_success(call, nullptr, nullptr);
 }
 
-}  // namespace
+}  // namespace bar_popup_internal
+
+using namespace bar_popup_internal;
 
 void bar_popup_monitor_removed(GdkMonitor* monitor) {
   if (open_keyboard == nullptr) return;

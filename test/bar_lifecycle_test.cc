@@ -1,6 +1,7 @@
 #include "../linux/runner/bar_icons.cc"
 #include "../linux/runner/my_application.cc"
 #include "../linux/runner/bar_popup.cc"
+#include "../linux/runner/bar_popup_keyboard.cc"
 
 static guint released_engines = 0;
 static guint restart_requests = 0;

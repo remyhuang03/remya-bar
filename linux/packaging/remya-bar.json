@@ -147,6 +147,23 @@
         "additionalProperties": false
       }
     },
+    "position": {
+      "title": "Bar position",
+      "page": "layout",
+      "keywords": [
+        "top",
+        "bottom",
+        "edge"
+      ],
+      "default": "top",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "enum": [
+          "top",
+          "bottom"
+        ]
+      }
+    },
     "clock-seconds": {
       "title": "Clock seconds",
       "page": "layout",

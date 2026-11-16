@@ -3,16 +3,30 @@ import 'package:material_ui/material_ui.dart';
 import 'package:remya_client/remya_client.dart';
 import 'package:remya_ui/remya_ui.dart';
 
-/// The owning view supplies the same Settings theme to its popup Flutter view.
+/// The owning view supplies the same Settings theme to its popup Flutter view,
+/// and both know which output edge the bar sits on.
 class BarPopupScope extends InheritedWidget {
-  const BarPopupScope({super.key, required this.theme, required super.child});
+  const BarPopupScope({
+    super.key,
+    required this.theme,
+    this.bottom = false,
+    required super.child,
+  });
   final RemyaTheme theme;
+
+  /// Whether the bar is on the bottom edge, so cards open upwards.
+  final bool bottom;
 
   static RemyaTheme themeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<BarPopupScope>()!.theme;
 
+  static bool bottomOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<BarPopupScope>()?.bottom ??
+      false;
+
   @override
-  bool updateShouldNotify(BarPopupScope oldWidget) => theme != oldWidget.theme;
+  bool updateShouldNotify(BarPopupScope oldWidget) =>
+      theme != oldWidget.theme || bottom != oldWidget.bottom;
 }
 
 abstract final class BarPopup {

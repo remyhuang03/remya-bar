@@ -123,8 +123,11 @@ class _BarPillState extends State<BarPill> {
         : widget.toggled == true
         ? scheme.onPrimary
         : scheme.onSurface;
+    // The attached side opens into the card, which faces away from the bar edge.
     final radius = attached
-        ? const BorderRadius.vertical(top: Radius.circular(20))
+        ? BarPopupScope.bottomOf(context)
+              ? const BorderRadius.vertical(bottom: Radius.circular(20))
+              : const BorderRadius.vertical(top: Radius.circular(20))
         : BorderRadius.circular(
             _pressed
                 ? 12

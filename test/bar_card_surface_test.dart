@@ -54,4 +54,21 @@ void main() {
     );
     expect((left.horizontal, right.left, right.right), (80, 70, 10));
   });
+
+  test('a bottom bar moves the neck under the body', () {
+    const width = 500.0;
+    final top = BarCardSurface.insetsFor(
+      const Rect.fromLTWH(24, 0, 50, 0),
+      width,
+    );
+    final bottom = BarCardSurface.insetsFor(
+      const Rect.fromLTWH(24, 0, 50, 0),
+      width,
+      bottom: true,
+    );
+    expect(
+      (bottom.left, bottom.right, bottom.top, bottom.bottom),
+      (top.left, top.right, top.bottom, top.top),
+    );
+  });
 }

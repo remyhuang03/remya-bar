@@ -8,6 +8,7 @@ import 'bar_preferences.dart';
 /// Keys edited in the Bar settings window, as registered in remya-bar.json.
 const barSettingsKeys = [
   'layout',
+  'position',
   'clock-seconds',
   'keyboard-preview',
   'folded-apps',

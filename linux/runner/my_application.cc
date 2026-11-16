@@ -49,6 +49,15 @@ static void set_bar_fullscreen(GtkWindow* window, bool fullscreen) {
   }
 }
 
+// Popups read the "bottom" flag to open towards the screen centre.
+static void set_bar_bottom(GtkWindow* window, bool bottom) {
+  if (bottom == (g_object_get_data(G_OBJECT(window), "bottom") != nullptr)) return;
+  g_object_set_data(G_OBJECT(window), "bottom", bottom ? GINT_TO_POINTER(1) : nullptr);
+  hide_bar_popup(FL_VIEW(gtk_bin_get_child(GTK_BIN(window))));
+  gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_TOP, !bottom);
+  gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_BOTTOM, bottom);
+}
+
 static void schedule_output_restart(MyApplication* self);
 
 static void send_settings_page(MyApplication* self) {
@@ -205,15 +214,17 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
         if (g_strcmp0(method, "output") == 0) {
           g_autoptr(FlValue) geometry = output_geometry(monitor);
           fl_method_call_respond_success(call, geometry, nullptr);
-        } else if (g_strcmp0(method, "setFullscreen") == 0) {
+        } else if (g_strcmp0(method, "setFullscreen") == 0 ||
+                   g_strcmp0(method, "setBottom") == 0) {
           FlValue* value = fl_method_call_get_args(call);
           if (fl_value_get_type(value) != FL_VALUE_TYPE_BOOL) {
-            fl_method_call_respond_error(call, "invalid-arguments", "Expected fullscreen boolean", nullptr, nullptr);
+            fl_method_call_respond_error(call, "invalid-arguments", "Expected boolean", nullptr, nullptr);
             return;
           }
           auto* view = GTK_WIDGET(g_object_get_data(G_OBJECT(channel), "owner"));
           auto* window = GTK_WINDOW(gtk_widget_get_toplevel(view));
-          set_bar_fullscreen(window, fl_value_get_bool(value));
+          if (g_strcmp0(method, "setBottom") == 0) set_bar_bottom(window, fl_value_get_bool(value));
+          else set_bar_fullscreen(window, fl_value_get_bool(value));
           fl_method_call_respond_success(call, nullptr, nullptr);
         } else {
           fl_method_call_respond_not_implemented(call, nullptr);
