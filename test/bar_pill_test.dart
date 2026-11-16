@@ -147,50 +147,51 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('hover card updates popup anchor while scrolling horizontally', (
-    tester,
-  ) async {
-    final calls = <MethodCall>[];
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      BarPopup.channel,
-      (call) async {
-        calls.add(call);
-        return null;
-      },
-    );
-    final controller = ScrollController();
-    addTearDown(controller.dispose);
-    await tester.pumpWidget(
-      BarPopupScope(
-        theme: const RemyaTheme(),
-        child: MaterialApp(
-          home: Center(
-            child: SizedBox(
-              width: 300,
-              height: 40,
-              child: SingleChildScrollView(
-                controller: controller,
-                scrollDirection: .horizontal,
-                child: SizedBox(
-                  width: 600,
-                  height: 40,
-                  child: Material(
-                    type: .transparency,
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 100),
-                        BarHoverCard(
-                          kind: 'battery',
-                          size: const Size(420, 300),
-                          openOnTap: true,
-                          data: const {'ok': true},
-                          child: const SizedBox(
-                            width: 80,
-                            height: 32,
-                            child: Text('Battery'),
+  testWidgets(
+    'hover card follows its anchor while scrolling, also after a card switch',
+    (tester) async {
+      final calls = <MethodCall>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        BarPopup.channel,
+        (call) async {
+          calls.add(call);
+          return null;
+        },
+      );
+      final controller = ScrollController();
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        BarPopupScope(
+          theme: const RemyaTheme(),
+          child: MaterialApp(
+            home: Center(
+              child: SizedBox(
+                width: 300,
+                height: 40,
+                child: SingleChildScrollView(
+                  controller: controller,
+                  scrollDirection: .horizontal,
+                  child: SizedBox(
+                    width: 600,
+                    height: 40,
+                    child: Material(
+                      type: .transparency,
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 100),
+                          BarHoverCard(
+                            kind: 'battery',
+                            size: const Size(420, 300),
+                            openOnTap: true,
+                            data: const {'ok': true},
+                            child: const SizedBox(
+                              width: 80,
+                              height: 32,
+                              child: Text('Battery'),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -198,29 +199,33 @@ void main() {
             ),
           ),
         ),
-      ),
-    );
-    await tester.tap(find.text('Battery'));
-    await tester.pump();
-    BarPopup.openCard.value = 'battery';
-    controller.jumpTo(40);
-    await tester.pump();
-    final shows = calls.where((call) => call.method == 'show').toList();
-    final showAnchor = (shows.single.arguments as Map)['anchor'] as List;
-    final updates = calls.where((call) => call.method == 'update').toList();
-    expect(updates, hasLength(1));
-    final args = updates.single.arguments as Map;
-    final anchor = args['anchor'] as List;
-    expect(anchor[0], showAnchor[0] - 40);
-    controller.jumpTo(120);
-    await tester.pump();
-    final clipped = (calls.last.arguments as Map)['anchor'] as List;
-    expect(clipped[0], showAnchor[0] - 100);
-    expect(clipped[2], 60);
-    controller.jumpTo(180);
-    await tester.pump();
-    expect(calls.last.method, 'hide');
-    BarPopup.openCard.value = null;
-    await tester.pumpWidget(const SizedBox());
-  });
+      );
+      await tester.tap(find.text('Battery'));
+      await tester.pump();
+      // Switching from another card reports it closed before this one opens.
+      BarPopup.openCard.value = 'resources';
+      BarPopup.openCard.value = null;
+      BarPopup.openCard.value = 'battery';
+      await tester.pump();
+      controller.jumpTo(40);
+      await tester.pump();
+      final shows = calls.where((call) => call.method == 'show').toList();
+      final showAnchor = (shows.single.arguments as Map)['anchor'] as List;
+      final updates = calls.where((call) => call.method == 'update').toList();
+      expect(updates, hasLength(1));
+      final args = updates.single.arguments as Map;
+      final anchor = args['anchor'] as List;
+      expect(anchor[0], showAnchor[0] - 40);
+      controller.jumpTo(120);
+      await tester.pump();
+      final clipped = (calls.last.arguments as Map)['anchor'] as List;
+      expect(clipped[0], showAnchor[0] - 100);
+      expect(clipped[2], 60);
+      controller.jumpTo(180);
+      await tester.pump();
+      expect(calls.last.method, 'hide');
+      BarPopup.openCard.value = null;
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 }

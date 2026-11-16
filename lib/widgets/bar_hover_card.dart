@@ -38,6 +38,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
   Timer? _timer;
   bool _hovered = false;
   bool _shown = false;
+  bool _tracking = false;
   Map<String, Object?>? _lastContent;
   Rect? _lastAnchor;
 
@@ -58,7 +59,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
       anchor = anchor.intersect(scroll.localToGlobal(.zero) & scroll.size);
     }
     if (anchor.isEmpty) {
-      if (update && _shown) {
+      if (update) {
         _shown = false;
         _lastAnchor = null;
         _send(BarPopup.hide(kind: widget.kind));
@@ -105,19 +106,23 @@ class _BarHoverCardState extends State<BarHoverCard> {
     _show(activated: true);
   }
 
-  // An anchor can move on a rendered frame without this widget rebuilding.
+  // An anchor can move on a rendered frame without this widget rebuilding,
+  // so follow it for as long as the native side reports this card open.
+  // Only the reported state counts: switching cards briefly reports none
+  // open, which must not end tracking of the card that is opening.
   void _trackAnchor(Duration _) {
-    if (!mounted || BarPopup.openCard.value != widget.kind) return;
+    if (!mounted || BarPopup.openCard.value != widget.kind) {
+      _tracking = false;
+      return;
+    }
     _show(update: true);
-    if (_shown) WidgetsBinding.instance.addPostFrameCallback(_trackAnchor);
+    WidgetsBinding.instance.addPostFrameCallback(_trackAnchor);
   }
 
   void _onOpenCard() {
-    if (BarPopup.openCard.value == widget.kind) {
-      WidgetsBinding.instance.addPostFrameCallback(_trackAnchor);
-    } else {
-      _shown = false;
-    }
+    if (BarPopup.openCard.value != widget.kind || _tracking) return;
+    _tracking = true;
+    WidgetsBinding.instance.addPostFrameCallback(_trackAnchor);
   }
 
   @override
