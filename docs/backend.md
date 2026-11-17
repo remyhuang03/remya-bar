@@ -19,7 +19,10 @@ Compiled bundles do not require sibling checkouts.
 defaults and pages (`layout`, `osd`, `notifications`, `ai-ring`). The
 `material-theme` and `account` pages link to Core’s shared theme and avatar
 editors. An avatar saved in either the Bar Account page or Remya Settings
-updates Bar’s sidebar profile.
+updates Bar’s sidebar profile. The Account page also uses Core's Google OAuth
+service for identity-only sign-in. Bar links to the [Remya Apps privacy policy](https://apps.remya.top/privacy),
+and allows users to disconnect the shared authorization. Core owns the tokens
+and browser flow.
 It is installed at `$XDG_DATA_HOME/remya/apps/remya-bar.json`. `BarPreferences`
 accesses values only through `AppPreferences('remya-bar')`; editors use
 revision-checked Replace.

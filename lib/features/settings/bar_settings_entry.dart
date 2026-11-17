@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:remya_ui/remya_ui.dart';
 import 'package:remya_ui/settings_ui.dart';
 
+import 'bar_google_account.dart';
 import 'bar_settings_controller.dart';
 import 'bar_settings_pages.dart';
 
@@ -152,12 +153,20 @@ class _BarSettingsEntryState extends State<BarSettingsEntry> {
                     title: 'Account',
                     icon: Icons.person_outline_rounded,
                     category: .privacy,
-                    builder: (context) => RemyaAvatarEditor(
-                      client: _controller.client,
-                      pickImage: () => barSettingsChannel.invokeMethod<String>(
-                        'pickAvatar',
-                        View.of(context).viewId,
-                      ),
+                    builder: (context) => Column(
+                      crossAxisAlignment: .stretch,
+                      children: [
+                        BarGoogleAccount(client: _controller.client),
+                        const SettingsSectionTitle('Profile picture'),
+                        RemyaAvatarEditor(
+                          client: _controller.client,
+                          pickImage: () =>
+                              barSettingsChannel.invokeMethod<String>(
+                                'pickAvatar',
+                                View.of(context).viewId,
+                              ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
