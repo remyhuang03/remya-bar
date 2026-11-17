@@ -10,6 +10,7 @@ import 'package:remya_bar/features/settings/bar_settings_controller.dart';
 import 'package:remya_bar/features/settings/bar_settings_entry.dart';
 import 'package:remya_bar/features/settings/remya_settings_installed.dart';
 import 'package:remya_client/remya_client.dart';
+import 'package:remya_ui/remya_ui.dart';
 import 'package:remya_ui/settings_ui.dart';
 
 /// Core stand-in with registration defaults, revisions and Changed signals.
@@ -28,6 +29,8 @@ class _Client extends SettingsClient {
   final Map<String, dynamic> values;
   final signals = StreamController<SettingsChange>.broadcast();
   final versions = <String, int>{};
+  ThemeConfig theme = const .new();
+  String? accent;
   Object? failure;
 
   /// Core revisions are per setting.
@@ -78,10 +81,10 @@ class _Client extends SettingsClient {
       };
     }
     if (arguments.first == 'theme') {
-      return const ThemeConfig().toMap();
+      return theme.toMap();
     }
     if (arguments.first == 'accent') {
-      return const {'source': 'custom', 'color': null};
+      return {'source': 'custom', 'color': accent};
     }
     if (arguments.first == 'appearance') {
       return const {'saved': 'light', 'system': 'light', 'conflict': false};
@@ -262,10 +265,17 @@ void main() {
     addTearDown(tester.view.reset);
     final client = _Client();
     final controller = BarSettingsController(client: client);
+    final preferences = SettingsThemeController.service(client: client);
+    addTearDown(preferences.dispose);
     await tester.runAsync(controller.start);
     Future<void> open(String page, int request) async {
       await tester.pumpWidget(
-        BarSettingsEntry(page: page, request: request, controller: controller),
+        BarSettingsEntry(
+          page: page,
+          request: request,
+          preferences: preferences,
+          controller: controller,
+        ),
       );
       await tester.pumpAndSettle();
     }
@@ -300,20 +310,42 @@ void main() {
   });
 
   testWidgets(
-    'settings routing opens Layout first and supports shared settings pages',
+    'settings opens with the loaded theme and supports shared pages',
     (tester) async {
       tester.view.physicalSize = const Size(1200, 1000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      final client = _Client();
+      final client = _Client()
+        ..theme = const ThemeConfig(mode: 'dark', styleVariant: 'expressive')
+        ..accent = '#26A269';
       final controller = BarSettingsController(client: client);
+      final preferences = SettingsThemeController.service(client: client);
+      addTearDown(preferences.dispose);
       await tester.runAsync(controller.start);
+      await tester.runAsync(preferences.start);
 
       await tester.pumpWidget(
-        BarSettingsEntry(page: '', request: 1, controller: controller),
+        BarSettingsEntry(
+          page: '',
+          request: 1,
+          preferences: preferences,
+          controller: controller,
+        ),
       );
+      final layout = find.byKey(const ValueKey('content-layout'));
+      expect(layout, findsOneWidget);
+      final palette = Theme.of(tester.element(layout)).colorScheme;
+      expect(palette.brightness, Brightness.dark);
+      expect(
+        palette.primary,
+        const RemyaTheme(
+          styleVariant: .expressive,
+          seedColor: .new(0xFF26A269),
+        ).theme(.dark).colorScheme.primary,
+      );
+      client.signals.add((topic: 'theme', value: const ThemeConfig().toMap()));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('content-layout')), findsOneWidget);
+      expect(Theme.of(tester.element(layout)).brightness, Brightness.light);
       expect(
         find.byKey(const ValueKey('nav-$remyaMaterialThemePageId')),
         findsOneWidget,
@@ -323,6 +355,7 @@ void main() {
         BarSettingsEntry(
           page: remyaMaterialThemePageId,
           request: 2,
+          preferences: preferences,
           controller: controller,
         ),
       );
@@ -348,7 +381,12 @@ void main() {
       expect(find.text('Theme mode'), findsOneWidget);
 
       await tester.pumpWidget(
-        BarSettingsEntry(page: 'account', request: 3, controller: controller),
+        BarSettingsEntry(
+          page: 'account',
+          request: 3,
+          preferences: preferences,
+          controller: controller,
+        ),
       );
       await tester.pumpAndSettle();
       expect(find.byType(RemyaAvatarEditor), findsOneWidget);

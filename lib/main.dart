@@ -24,14 +24,14 @@ Future<void> main(List<String> arguments) async {
   await loadAiIdentity().catchError(
     (Object error) => debugPrint('AI provider identity unavailable: $error'),
   );
-  if (arguments.contains('--remya-popup')) {
-    runWidget(const BarPopupHost());
-    startAiUsageWorker();
-    return;
-  }
   final root = await barRepositoryRoot();
   final preferences = barThemeController(root);
   await preferences.start();
+  if (arguments.contains('--remya-popup')) {
+    runWidget(BarPopupHost(preferences: preferences));
+    startAiUsageWorker();
+    return;
+  }
   await HyprlandBackend.initialize();
   await SystemBackend.initialize();
   final output = await const MethodChannel('top.remya.bar/window')

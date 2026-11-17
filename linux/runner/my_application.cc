@@ -61,11 +61,11 @@ static void set_bar_bottom(GtkWindow* window, bool bottom) {
 static void schedule_output_restart(MyApplication* self);
 
 static void send_settings_page(MyApplication* self) {
-  if (!self->settings_ready || self->settings_window == nullptr) return;
   auto* view = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->settings_window)));
   g_autoptr(FlValue) args = fl_value_new_map();
   fl_value_set_string_take(args, "viewId", fl_value_new_int(fl_view_get_id(view)));
   fl_value_set_string_take(args, "page", fl_value_new_string(self->settings_page));
+  g_clear_pointer(&self->settings_page, g_free);
   fl_method_channel_invoke_method(self->settings_channel, "open", args,
                                  nullptr, nullptr, nullptr);
 }
@@ -76,9 +76,8 @@ static bool valid_settings_page(const char* page) {
                            G_REGEX_DOLLAR_ENDONLY, G_REGEX_MATCH_DEFAULT));
 }
 
-static void open_settings(MyApplication* self, const char* page) {
-  g_free(self->settings_page);
-  self->settings_page = g_strdup(page);
+static void show_settings(MyApplication* self) {
+  if (!self->settings_ready || self->settings_page == nullptr) return;
   if (self->settings_window == nullptr) {
     auto* window = gtk_application_window_new(GTK_APPLICATION(self));
     self->settings_window = window;
@@ -97,10 +96,25 @@ static void open_settings(MyApplication* self, const char* page) {
                                      nullptr, nullptr, nullptr);
       self->settings_window = nullptr;
     }), self);
-    gtk_widget_show_all(window);
+    // Keep the toplevel hidden until Flutter has rendered the themed view.
+    g_signal_connect(view, "first-frame", G_CALLBACK(+[](FlView* view, gpointer) {
+      gtk_window_present(GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(view))));
+    }), nullptr);
+    send_settings_page(self);
+    gtk_widget_show(GTK_WIDGET(view));
+    gtk_widget_realize(GTK_WIDGET(view));
+  } else {
+    send_settings_page(self);
+    if (gtk_widget_get_visible(self->settings_window)) {
+      gtk_window_present(GTK_WINDOW(self->settings_window));
+    }
   }
-  send_settings_page(self);
-  gtk_window_present(GTK_WINDOW(self->settings_window));
+}
+
+static void open_settings(MyApplication* self, const char* page) {
+  g_free(self->settings_page);
+  self->settings_page = g_strdup(page);
+  show_settings(self);
 }
 
 static FlMethodChannel* settings_channel(MyApplication* self, FlEngine* engine) {
@@ -114,7 +128,15 @@ static FlMethodChannel* settings_channel(MyApplication* self, FlEngine* engine) 
         if (g_strcmp0(method, "ready") == 0) {
           self->settings_ready = true;
           fl_method_call_respond_success(call, nullptr, nullptr);
-          send_settings_page(self);
+          show_settings(self);
+        } else if (g_strcmp0(method, "isSettingsView") == 0) {
+          FlValue* args = fl_method_call_get_args(call);
+          auto* view = self->settings_window == nullptr ? nullptr :
+              FL_VIEW(gtk_bin_get_child(GTK_BIN(self->settings_window)));
+          g_autoptr(FlValue) settings = fl_value_new_bool(
+              view != nullptr && fl_value_get_type(args) == FL_VALUE_TYPE_INT &&
+              fl_view_get_id(view) == fl_value_get_int(args));
+          fl_method_call_respond_success(call, settings, nullptr);
         } else if (g_strcmp0(method, "open") == 0) {
           FlValue* args = fl_method_call_get_args(call);
           const char* page = fl_value_get_type(args) == FL_VALUE_TYPE_STRING

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show FlutterView;
 
 import 'package:flutter/foundation.dart' show listEquals;
@@ -22,7 +23,9 @@ import 'popup_measure.dart';
 import '../sidebar/right_sidebar.dart';
 
 class BarPopupHost extends StatefulWidget {
-  const BarPopupHost({super.key});
+  const BarPopupHost({super.key, required this.preferences});
+
+  final SettingsThemeController preferences;
 
   @override
   State<BarPopupHost> createState() => _BarPopupHostState();
@@ -30,7 +33,8 @@ class BarPopupHost extends StatefulWidget {
 
 class _BarPopupHostState extends State<BarPopupHost>
     with WidgetsBindingObserver {
-  late List<FlutterView> _views;
+  List<FlutterView> _views = const [];
+  final _popupIds = <int>{};
   final _settingsPages = <int, String>{};
   var _settingsRequest = 0;
 
@@ -42,10 +46,36 @@ class _BarPopupHostState extends State<BarPopupHost>
     ];
   }
 
+  void _updateViews() {
+    final views = _popupViews();
+    final previous = _views;
+    if (listEquals(previous, views)) return;
+    setState(() {
+      _views = views;
+      _popupIds.retainWhere((id) => views.any((view) => view.viewId == id));
+    });
+    for (final view in views) {
+      if (!previous.contains(view) &&
+          !_settingsPages.containsKey(view.viewId)) {
+        unawaited(_classifyView(view));
+      }
+    }
+  }
+
+  Future<void> _classifyView(FlutterView view) async {
+    // A settings view can report metrics before its native open message.
+    final settings = await barSettingsChannel.invokeMethod<bool>(
+      'isSettingsView',
+      view.viewId,
+    );
+    if (settings == false && mounted && _views.contains(view)) {
+      setState(() => _popupIds.add(view.viewId));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _views = _popupViews();
     barSettingsChannel.setMethodCallHandler((call) async {
       switch (call.method) {
         case 'open':
@@ -58,43 +88,45 @@ class _BarPopupHostState extends State<BarPopupHost>
           setState(() {
             _settingsPages[args['viewId'] as int] = args['page'] as String;
             _settingsRequest++;
-            _views = _popupViews();
           });
+          _updateViews();
         case 'closed':
           setState(() => _settingsPages.remove(call.arguments));
       }
     });
     barSettingsChannel.invokeMethod<void>('ready');
     WidgetsBinding.instance.addObserver(this);
+    _updateViews();
   }
 
   @override
   void dispose() {
     barSettingsChannel.setMethodCallHandler(null);
     WidgetsBinding.instance.removeObserver(this);
+    widget.preferences.dispose();
     super.dispose();
   }
 
   @override
-  void didChangeMetrics() {
-    final views = _popupViews();
-    if (!listEquals(_views, views)) setState(() => _views = views);
-  }
+  void didChangeMetrics() => _updateViews();
 
   @override
   Widget build(BuildContext context) => ViewCollection(
     views: [
       for (final view in _views)
-        View(
-          key: ValueKey(view.viewId),
-          view: view,
-          child: _settingsPages.containsKey(view.viewId)
-              ? BarSettingsEntry(
-                  page: _settingsPages[view.viewId]!,
-                  request: _settingsRequest,
-                )
-              : BarPopupApp(channel: BarPopup.viewChannel(view.viewId)),
-        ),
+        if (_settingsPages.containsKey(view.viewId) ||
+            _popupIds.contains(view.viewId))
+          View(
+            key: ValueKey(view.viewId),
+            view: view,
+            child: _settingsPages.containsKey(view.viewId)
+                ? BarSettingsEntry(
+                    page: _settingsPages[view.viewId]!,
+                    request: _settingsRequest,
+                    preferences: widget.preferences,
+                  )
+                : BarPopupApp(channel: BarPopup.viewChannel(view.viewId)),
+          ),
     ],
   );
 }

@@ -8,7 +8,6 @@ import 'package:remya_ui/settings_ui.dart';
 
 import 'bar_settings_controller.dart';
 import 'bar_settings_pages.dart';
-import 'bar_theme_controller.dart';
 
 const barSettingsChannel = MethodChannel('top.remya.bar/settings');
 
@@ -52,11 +51,13 @@ class BarSettingsEntry extends StatefulWidget {
     super.key,
     required this.page,
     required this.request,
+    required this.preferences,
     this.controller,
   });
 
   final String page;
   final int request;
+  final SettingsThemeController preferences;
 
   /// Injected by tests; the window creates and owns its own otherwise.
   final BarSettingsController? controller;
@@ -68,7 +69,6 @@ class BarSettingsEntry extends StatefulWidget {
 class _BarSettingsEntryState extends State<BarSettingsEntry> {
   late final _controller = widget.controller ?? BarSettingsController();
   late final _version = remyaAppVersion();
-  SettingsThemeController? _theme;
   var _selected = barSettingsPages.first.id;
 
   void _open(String page) {
@@ -85,15 +85,7 @@ class _BarSettingsEntryState extends State<BarSettingsEntry> {
     _open(widget.page);
     if (widget.controller == null) {
       unawaited(_controller.start());
-      unawaited(_startTheme());
     }
-  }
-
-  Future<void> _startTheme() async {
-    final theme = barThemeController(await barRepositoryRoot());
-    if (!mounted) return theme.dispose();
-    setState(() => _theme = theme);
-    await theme.start();
   }
 
   @override
@@ -104,7 +96,6 @@ class _BarSettingsEntryState extends State<BarSettingsEntry> {
 
   @override
   void dispose() {
-    _theme?.dispose();
     if (widget.controller == null) _controller.dispose();
     super.dispose();
   }
@@ -113,9 +104,9 @@ class _BarSettingsEntryState extends State<BarSettingsEntry> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: Listenable.merge([_controller, ?_theme]),
+    listenable: Listenable.merge([_controller, widget.preferences]),
     builder: (context, _) {
-      final theme = _theme?.theme ?? const RemyaTheme();
+      final theme = widget.preferences.theme;
       return MaterialApp(
         title: _title,
         debugShowCheckedModeBanner: false,
