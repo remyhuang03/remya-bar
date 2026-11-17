@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/app.dart';
+import 'package:remya_bar/bar_content.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
 import 'package:remya_bar/features/resources/bar_resources.dart';
 import 'package:remya_bar/features/resources/resource_style.dart';
@@ -97,17 +98,20 @@ void main() {
       Widget app() => RemyaBarApp(preferences: preferences, system: system);
       BarResources pill() => tester.widget(find.byType(BarResources));
       await tester.pumpWidget(app());
+      final materialApp = tester.widget(find.byType(MaterialApp));
+      final content = tester.widget(find.byType(BarContent));
       system.resourceSnapshot = const SystemSnapshot(
         cpuPercent: 42,
         gpus: [],
         batteries: [],
       );
-      await tester.pumpWidget(app());
       await tester.pump(const Duration(seconds: 2));
       expect(pill().snapshot?.cpuPercent, 91);
       expect(pill().cardSnapshot?.cpuPercent, 42);
+      expect(tester.widget(find.byType(BarContent)), same(content));
       await tester.pump(const Duration(seconds: 1));
       expect(pill().snapshot?.cpuPercent, 42);
+      expect(tester.widget(find.byType(MaterialApp)), same(materialApp));
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

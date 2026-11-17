@@ -162,11 +162,77 @@ void main() {
     () => binding.defaultBinaryMessenger.setMockMethodCallHandler(icons, null),
   );
 
+  test('workspace count retries after a failed snapshot', () async {
+    final counts = <int>[];
+    final backend = HyprlandBackend(
+      outputName: 'DP-1',
+      readSnapshot: ({required slotCount}) async {
+        counts.add(slotCount);
+        if (counts.length == 1) throw StateError('Compositor unavailable');
+        return _snapshot;
+      },
+    );
+    addTearDown(backend.dispose);
+    await backend.setWorkspaceCount(10);
+    expect(backend.error, 'Hyprland unavailable');
+    await backend.setWorkspaceCount(10);
+    expect(backend.error, isNull);
+    await backend.setWorkspaceCount(10);
+    expect(counts, [10, 10]);
+  });
+
+  test('workspace snapshots publish only the latest count', () async {
+    final counts = <int>[];
+    final first = Completer<HyprlandSnapshot>();
+    final entered = Completer<void>();
+    final backend = HyprlandBackend(
+      outputName: 'DP-1',
+      readSnapshot: ({required slotCount}) async {
+        counts.add(slotCount);
+        if (counts.length == 1) {
+          entered.complete();
+          return first.future;
+        }
+        return _snapshot;
+      },
+    );
+    addTearDown(backend.dispose);
+    var changes = 0;
+    backend.addListener(() => changes++);
+    final eight = backend.setWorkspaceCount(8);
+    await entered.future;
+    final ten = backend.setWorkspaceCount(10);
+    final six = backend.setWorkspaceCount(6);
+    first.complete(_snapshot);
+    await Future.wait([eight, ten, six]);
+    expect(counts, [8, 6]);
+    expect(changes, 1);
+  });
+
+  test('disposing drops a pending workspace snapshot', () async {
+    final pending = Completer<HyprlandSnapshot>();
+    final entered = Completer<void>();
+    final backend = HyprlandBackend(
+      outputName: 'DP-1',
+      readSnapshot: ({required slotCount}) {
+        entered.complete();
+        return pending.future;
+      },
+    );
+    final reading = backend.setWorkspaceCount(10);
+    await entered.future;
+    backend.dispose();
+    pending.complete(_snapshot);
+    await reading;
+    expect(backend.connected, isFalse);
+    expect(backend.output, isNull);
+  });
+
   test('ambiguous output geometry does not select another monitor', () async {
     final backend = HyprlandBackend(
       outputX: 0,
       outputY: 0,
-      readSnapshot: () async => const HyprlandSnapshot(
+      readSnapshot: ({required slotCount}) async => const HyprlandSnapshot(
         monitors: [
           HyprlandMonitor(
             name: 'DP-1',
@@ -199,7 +265,7 @@ void main() {
     final backend = HyprlandBackend(
       outputX: 1920,
       outputY: 0,
-      readSnapshot: () async {
+      readSnapshot: ({required slotCount}) async {
         if (fail) throw StateError('Disconnected');
         return _snapshot;
       },
@@ -230,7 +296,7 @@ void main() {
       var maximum = 0;
       final backend = HyprlandBackend(
         outputName: 'DP-1',
-        readSnapshot: () async {
+        readSnapshot: ({required slotCount}) async {
           reads++;
           concurrent++;
           if (concurrent > maximum) maximum = concurrent;
@@ -255,10 +321,15 @@ void main() {
       final activations = <(String, int)>[];
       final backend = HyprlandBackend(
         outputName: 'DP-1',
-        readSnapshot: () async => _snapshot,
-        activateWorkspace: ({required outputName, required workspaceId}) async {
-          activations.add((outputName, workspaceId));
-        },
+        readSnapshot: ({required slotCount}) async => _snapshot,
+        activateWorkspace:
+            ({
+              required outputName,
+              required workspaceId,
+              required slotCount,
+            }) async {
+              activations.add((outputName, workspaceId));
+            },
       );
       addTearDown(backend.dispose);
       await backend.refresh();
@@ -337,7 +408,7 @@ void main() {
       );
       final backend = HyprlandBackend(
         outputName: 'DP-1',
-        readSnapshot: () async => _snapshot,
+        readSnapshot: ({required slotCount}) async => _snapshot,
       );
       addTearDown(backend.dispose);
       await backend.refresh();
@@ -407,7 +478,7 @@ void main() {
       });
       final backend = HyprlandBackend(
         outputName: 'DP-1',
-        readSnapshot: () async => _snapshot,
+        readSnapshot: ({required slotCount}) async => _snapshot,
       );
       addTearDown(backend.dispose);
       await backend.refresh();
@@ -428,12 +499,19 @@ void main() {
     final specials = <String>[];
     final backend = HyprlandBackend(
       outputName: 'DP-1',
-      readSnapshot: () async => _snapshot,
-      scrollWorkspace: ({required outputName, required direction}) async {
-        directions.add((outputName, direction));
-      },
-      toggleSpecialWorkspace: ({required outputName}) async =>
-          specials.add(outputName),
+      readSnapshot: ({required slotCount}) async => _snapshot,
+      scrollWorkspace:
+          ({
+            required outputName,
+            required direction,
+            required slotCount,
+          }) async {
+            directions.add((outputName, direction));
+          },
+      toggleSpecialWorkspace: ({
+        required outputName,
+        required slotCount,
+      }) async => specials.add(outputName),
     );
     addTearDown(backend.dispose);
     await backend.refresh();
@@ -479,7 +557,7 @@ void main() {
       var snapshot = _snapshot;
       final backend = HyprlandBackend(
         outputName: 'DP-1',
-        readSnapshot: () async => snapshot,
+        readSnapshot: ({required slotCount}) async => snapshot,
       );
       addTearDown(backend.dispose);
       await backend.refresh();
@@ -544,7 +622,7 @@ void main() {
     (tester) async {
       final backend = HyprlandBackend(
         outputName: 'DP-1',
-        readSnapshot: () async => HyprlandSnapshot(
+        readSnapshot: ({required slotCount}) async => HyprlandSnapshot(
           monitors: [
             HyprlandMonitor(
               name: 'DP-1',
@@ -602,7 +680,7 @@ void main() {
   ) async {
     final backend = HyprlandBackend(
       outputName: 'DP-1',
-      readSnapshot: () async => _snapshot,
+      readSnapshot: ({required slotCount}) async => _snapshot,
     );
     addTearDown(backend.dispose);
     await backend.refresh();

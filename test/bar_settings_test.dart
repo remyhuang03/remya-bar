@@ -343,7 +343,11 @@ void main() {
           seedColor: .new(0xFF26A269),
         ).theme(.dark).colorScheme.primary,
       );
-      client.signals.add((topic: 'theme', value: const ThemeConfig().toMap()));
+      await tester.runAsync(() async {
+        client.theme = const ThemeConfig();
+        client.signals.add((topic: 'theme', value: client.theme.toMap()));
+        await pumpEventQueue();
+      });
       await tester.pumpAndSettle();
       expect(Theme.of(tester.element(layout)).brightness, Brightness.light);
       expect(

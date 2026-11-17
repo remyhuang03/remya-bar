@@ -56,13 +56,30 @@ class SystemBackend extends ChangeNotifier {
   Map<String, Object?> batteryPower = const {};
   bool isPowerSaver = false;
   api.BatterySnapshot? get battery => resourceSnapshot?.batteries.firstOrNull;
-  api.SystemSnapshot? resourceSnapshot;
+  final _hardware = ValueNotifier<api.SystemSnapshot?>(null);
+  ValueListenable<api.SystemSnapshot?> get hardware => _hardware;
+  api.SystemSnapshot? get resourceSnapshot => _hardware.value;
+  set resourceSnapshot(api.SystemSnapshot? value) {
+    final hadBattery = battery?.percent?.isFinite == true;
+    _hardware.value = value;
+    if (hadBattery != (battery?.percent?.isFinite == true)) notifyListeners();
+  }
 
-  static Future<void> initialize() => SystemRustLib.init(
-    externalLibrary: ExternalLibrary.open(
-      '${File(Platform.resolvedExecutable).parent.path}/lib/libremya_bar_system.so',
-    ),
-  );
+  static Future<void>? _initializing;
+
+  static Future<void> initialize() => _initializing ??= _initialize()
+      .catchError((Object error, StackTrace stack) {
+        _initializing = null;
+        Error.throwWithStackTrace(error, stack);
+      });
+
+  static Future<void> _initialize() async {
+    await SystemRustLib.init(
+      externalLibrary: ExternalLibrary.open(
+        '${File(Platform.resolvedExecutable).parent.path}/lib/libremya_bar_system.so',
+      ),
+    );
+  }
 
   void start() {
     if (_disposed || _timer != null) return;
@@ -115,7 +132,6 @@ class SystemBackend extends ChangeNotifier {
       final next = await api.hardwareSnapshot();
       if (_disposed) return;
       resourceSnapshot = next;
-      notifyListeners();
     } catch (failure) {
       if (!_disposed) debugPrint('System hardware: $failure');
     } finally {
@@ -514,6 +530,7 @@ class SystemBackend extends ChangeNotifier {
     unawaited(_mediaSubscription?.cancel());
     unawaited(_settingsChanges?.cancel());
     unawaited(_settings.close());
+    _hardware.dispose();
     super.dispose();
   }
 }

@@ -76,9 +76,17 @@ GTK maintains one bar per GDK monitor. Dart matches logical geometry against
 Hyprland snapshots; ambiguous mirrored geometry is unavailable. Connector names
 identify workspace ownership, never monitor indices. Coalesced event reads and
 a two-second reconciliation recover missed workspace updates. Failed reads keep
-valid state but hide the pill until recovery. Workspace actions target the owning
+valid state but hide the pill until recovery. Each output passes its workspace
+count to snapshot and action requests. Workspace actions target the owning
 output; wheel uses monitor-relative `r±1`, Back toggles the special workspace,
-and right click opens the overview. One shared worker observes Super every 100 ms.
+and right click opens the overview. When at least one output subscribes, one
+shared worker checks Super every 100 ms while connected. There are no Super
+queries without a subscriber or a compositor connection.
+
+Workspace and notification icon lookups use bounded LRUs with a 15-second
+retry delay for misses. GTK icon theme changes invalidate cached lookups.
+Each output's notification icon byte cache is limited to 16 MiB. Absolute
+notification image paths are rechecked every 30 seconds while referenced.
 
 Fullscreen clients on the active or open special workspace hide only their
 output's bar, close its popups and release its exclusive zone. Leaving fullscreen
@@ -138,8 +146,9 @@ History and the next ID commit transactionally to
 `$XDG_STATE_HOME/remya/bar/notifications.sqlite3` with absolute HOME fallback.
 Transient entries stay in memory. Restored entries never replay popups, sounds
 or actions belonging to the old daemon. Tests use isolated state roots and buses.
-Bar notification preferences configure manual/scheduled/fullscreen Do Not Disturb;
-Rust checks schedules every 30 seconds. Critical, priority-call and priority-app
+The warm popup engine applies Core's notification preferences to Rust in order.
+All outputs observe the same applied Do Not Disturb setting. Rust checks schedules
+every 30 seconds. Critical, priority-call and priority-app
 notifications bypass suppression. Sound uses `canberra-gtk-play` unless disabled
 or suppressed; replacements stay silent.
 

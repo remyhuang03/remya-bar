@@ -3,7 +3,6 @@ use crate::api::{
 };
 use serde::Deserialize;
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicU8, Ordering};
 
 #[derive(Deserialize)]
 struct WorkspaceRef {
@@ -59,6 +58,7 @@ pub fn parse(
     clients: &str,
     active_window: &str,
     urgent: &HashSet<i32>,
+    slot_count: u8,
 ) -> Result<HyprlandSnapshot, String> {
     let mut monitors: Vec<Monitor> =
         serde_json::from_str(monitors).map_err(|error| error.to_string())?;
@@ -131,13 +131,7 @@ pub fn parse(
                         .clone()
                         .filter(|name| !name.is_empty()),
                     current_window: current_window.map(window),
-                    workspace_slots: slots(
-                        active_id,
-                        SLOT_COUNT.load(Ordering::Relaxed),
-                        &workspaces,
-                        &clients,
-                        urgent,
-                    ),
+                    workspace_slots: slots(active_id, slot_count, &workspaces, &clients, urgent),
                 }
             })
             .collect(),
@@ -166,9 +160,6 @@ pub fn parse(
         },
     })
 }
-
-/// Workspace slots per group, shared by every output engine in this process.
-pub static SLOT_COUNT: AtomicU8 = AtomicU8::new(8);
 
 fn slots(
     active_id: i32,
@@ -356,6 +347,7 @@ mod tests {
             &clients.to_string(),
             r#"{"address":"0xa"}"#,
             &HashSet::from([10]),
+            8,
         )
         .unwrap()
     }
@@ -372,6 +364,7 @@ mod tests {
             "[]",
             "{}",
             &HashSet::new(),
+            8,
         ).unwrap();
         assert_eq!(
             state
@@ -419,6 +412,7 @@ mod tests {
             r#"[{"address":"0xa","title":"Scratch","class":"terminal","workspace":{"id":-99},"monitor":0,"mapped":true,"hidden":false,"focusHistoryID":0}]"#,
             "{}",
             &HashSet::new(),
+            8,
         ).unwrap();
         assert_eq!(state.workspaces.len(), 1);
         assert_eq!(state.workspaces[0].id, -1337);
@@ -430,8 +424,8 @@ mod tests {
 
     #[test]
     fn invalid_data_and_command_targets_are_rejected() {
-        assert!(parse("{}", "[]", "[]", "{}", &HashSet::new()).is_err());
-        assert!(parse("[]", "[]", "[]", "invalid", &HashSet::new()).is_err());
+        assert!(parse("{}", "[]", "[]", "{}", &HashSet::new(), 8).is_err());
+        assert!(parse("[]", "[]", "[]", "invalid", &HashSet::new(), 8).is_err());
         let state = snapshot(false, 2);
         assert!(switch_command(&state, "DP-1\n", 1).is_err());
         assert!(switch_command(&state, "DP-1", 0).is_err());
@@ -453,6 +447,7 @@ mod tests {
             r#"[{"address":"0xa","title":"Small","class":"small","workspace":{"id":14},"monitor":0,"mapped":true,"hidden":false,"focusHistoryID":0,"size":[100,100]},{"address":"0xc","title":"Large","class":"large","workspace":{"id":14},"monitor":0,"mapped":true,"hidden":false,"focusHistoryID":1,"size":[1000,500]},{"address":"0xb","title":"Other output","class":"other","workspace":{"id":10},"monitor":1,"mapped":true,"hidden":false,"focusHistoryID":2,"size":[300,300]}]"#,
             r#"{"address":"0xa"}"#,
             &HashSet::from([10]),
+            8,
         ).unwrap();
         let slots = &state.monitors[0].workspace_slots;
         assert_eq!(

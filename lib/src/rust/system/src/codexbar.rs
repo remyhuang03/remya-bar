@@ -7,7 +7,13 @@ use tokio::process::{Child, Command};
 use tokio::sync::Mutex;
 use tokio::time::timeout;
 
-static SERVER: Mutex<Option<(u16, Child)>> = Mutex::const_new(None);
+struct Server {
+    token: String,
+    port: u16,
+    child: Child,
+}
+
+static SERVER: Mutex<Option<Server>> = Mutex::const_new(None);
 
 fn command() -> Command {
     let mut command = Command::new("codexbar");
@@ -31,10 +37,11 @@ fn command() -> Command {
 
 pub async fn server_port(token: &str) -> Option<i32> {
     let mut server = SERVER.lock().await;
-    if let Some((port, child)) = server.as_mut()
-        && matches!(child.try_wait(), Ok(None))
+    if let Some(running) = server.as_mut()
+        && running.token == token
+        && matches!(running.child.try_wait(), Ok(None))
     {
-        return Some(i32::from(*port));
+        return Some(i32::from(running.port));
     }
     *server = None;
     let reservation = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).ok()?;
@@ -79,7 +86,11 @@ pub async fn server_port(token: &str) -> Option<i32> {
     tokio::spawn(async move {
         let _ = tokio::io::copy(&mut stderr, &mut tokio::io::sink()).await;
     });
-    *server = Some((port, child));
+    *server = Some(Server {
+        token: token.to_owned(),
+        port,
+        child,
+    });
     Some(i32::from(port))
 }
 

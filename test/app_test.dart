@@ -256,7 +256,7 @@ void main() {
       ];
     final hyprland = HyprlandBackend(
       outputName: 'DP-1',
-      readSnapshot: () async => const HyprlandSnapshot(
+      readSnapshot: ({required slotCount}) async => const HyprlandSnapshot(
         monitors: [
           HyprlandMonitor(
             name: 'DP-1',
@@ -427,7 +427,7 @@ void main() {
     var hasWindow = true;
     final hyprland = HyprlandBackend(
       outputName: 'DP-1',
-      readSnapshot: () async => HyprlandSnapshot(
+      readSnapshot: ({required slotCount}) async => HyprlandSnapshot(
         monitors: [
           HyprlandMonitor(
             name: 'DP-1',

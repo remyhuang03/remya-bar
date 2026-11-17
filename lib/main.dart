@@ -11,6 +11,7 @@ import 'features/account/account_profile_controller.dart';
 import 'features/ai_usage/ai_usage_backend.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/notifications/notification_backend.dart';
+import 'features/notifications/notification_settings.dart';
 import 'features/osd/osd_controller.dart';
 import 'features/settings/bar_theme_controller.dart';
 import 'features/popups/popup_app.dart';
@@ -30,6 +31,7 @@ Future<void> main(List<String> arguments) async {
   if (arguments.contains('--remya-popup')) {
     runWidget(BarPopupHost(preferences: preferences));
     startAiUsageWorker();
+    NotificationSettings().start();
     return;
   }
   await HyprlandBackend.initialize();

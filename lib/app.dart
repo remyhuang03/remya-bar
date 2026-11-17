@@ -70,7 +70,7 @@ class RemyaBarApp extends StatefulWidget {
 }
 
 class _RemyaBarAppState extends State<RemyaBarApp> {
-  SystemSnapshot? _pillSnapshot;
+  final _pillSnapshot = ValueNotifier<SystemSnapshot?>(null);
   Timer? _pillRefresh;
   final _tray = GlobalKey<BarTrayState>();
   SidebarBackend? _sidebar;
@@ -344,15 +344,14 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   void initState() {
     super.initState();
     if (widget.system case final system?) {
-      _pillSnapshot = system.resourceSnapshot;
-      system.addListener(_showFirstResourceSample);
+      _pillSnapshot.value = system.resourceSnapshot;
+      system.hardware.addListener(_showFirstResourceSample);
       system.addListener(_applyWorkspaceCount);
       system.addListener(_applyEdge);
+      _applyWorkspaceCount();
+      _applyEdge();
       _pillRefresh = Timer.periodic(const Duration(seconds: 3), (_) {
-        final next = system.resourceSnapshot;
-        if (!identical(_pillSnapshot, next)) {
-          setState(() => _pillSnapshot = next);
-        }
+        _pillSnapshot.value = system.resourceSnapshot;
       });
     }
     if (widget.hyprland case final hyprland?) {
@@ -549,8 +548,9 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 
   void _showFirstResourceSample() {
     final next = widget.system?.resourceSnapshot;
-    if (!BarResources.hasData(_pillSnapshot) && BarResources.hasData(next)) {
-      setState(() => _pillSnapshot = next);
+    if (!BarResources.hasData(_pillSnapshot.value) &&
+        BarResources.hasData(next)) {
+      _pillSnapshot.value = next;
     }
   }
 
@@ -571,11 +571,12 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     widget.account?.dispose();
     widget.preferences.removeListener(_updatePopupThemes);
     _window.setMethodCallHandler(null);
-    widget.system?.removeListener(_showFirstResourceSample);
+    widget.system?.hardware.removeListener(_showFirstResourceSample);
     widget.system?.removeListener(_applyWorkspaceCount);
     widget.system?.removeListener(_applyEdge);
     BarPopup.channel.setMethodCallHandler(null);
     widget.preferences.dispose();
+    _pillSnapshot.dispose();
     widget.hyprland?.dispose();
     widget.system?.dispose();
     widget.aiUsage?.dispose();
@@ -585,32 +586,37 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([
-        widget.preferences,
-        widget.hyprland,
-        widget.system,
-        widget.notifications,
-        widget.aiUsage,
-      ]),
-      builder: (context, _) => BarPopupScope(
-        theme: widget.preferences.theme,
-        bottom: widget.system?.bottom ?? false,
-        child: MaterialApp(
-          title: "Remy'a Bar",
-          debugShowCheckedModeBanner: false,
-          theme: barTheme(widget.preferences.theme.theme(.light)),
-          darkTheme: barTheme(widget.preferences.theme.theme(.dark)),
-          themeMode: widget.preferences.theme.mode,
-          home: ClipRRect(
-            borderRadius: .circular(20),
-            child: Scaffold(
-              body: BarContent(
+      listenable: widget.preferences,
+      builder: (context, child) => MaterialApp(
+        title: "Remy'a Bar",
+        debugShowCheckedModeBanner: false,
+        theme: barTheme(widget.preferences.theme.theme(.light)),
+        darkTheme: barTheme(widget.preferences.theme.theme(.dark)),
+        themeMode: widget.preferences.theme.mode,
+        home: child,
+      ),
+      child: ClipRRect(
+        borderRadius: .circular(20),
+        child: Scaffold(
+          body: ListenableBuilder(
+            listenable: Listenable.merge([
+              widget.preferences,
+              widget.hyprland,
+              widget.system,
+              widget.notifications,
+              widget.aiUsage,
+              _pillSnapshot,
+            ]),
+            builder: (context, _) => BarPopupScope(
+              theme: widget.preferences.theme,
+              bottom: widget.system?.bottom ?? false,
+              child: BarContent(
                 error: widget.preferences.error,
                 hyprland: widget.hyprland,
                 system: widget.system,
                 notifications: widget.notifications,
                 aiUsage: widget.aiUsage,
-                pillSnapshot: _pillSnapshot,
+                pillSnapshot: _pillSnapshot.value,
                 sidebarOpen: _sidebarOpen,
                 notificationsOpen: _notificationsOpen,
                 tray: widget.showTray ? BarTray(key: _tray) : null,

@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import '../../src/rust/hyprland_bridge/api.dart';
 import '../../src/rust/hyprland_bridge/frb_generated.dart';
+import '../../widgets/bar_icon_cache.dart';
 
 export '../../src/rust/hyprland_bridge/api.dart'
     show
@@ -27,27 +27,34 @@ class HyprlandBackend extends ChangeNotifier {
     this.activateWorkspace = hyprlandSwitchWorkspace,
     this.scrollWorkspace = hyprlandScrollWorkspace,
     this.toggleSpecialWorkspace = hyprlandToggleSpecial,
-    this.setSlotCount = hyprlandSetWorkspaceCount,
   }) : _position = (outputX, outputY);
 
   final String? outputName;
-  final Future<HyprlandSnapshot> Function() readSnapshot;
+  final Future<HyprlandSnapshot> Function({required int slotCount})
+  readSnapshot;
   final Future<void> Function({
     required String outputName,
     required int workspaceId,
+    required int slotCount,
   })
   activateWorkspace;
   final Future<void> Function({
     required String outputName,
     required int direction,
+    required int slotCount,
   })
   scrollWorkspace;
-  final Future<void> Function({required String outputName})
+  final Future<void> Function({
+    required String outputName,
+    required int slotCount,
+  })
   toggleSpecialWorkspace;
-  final Future<void> Function({required int count}) setSlotCount;
   int _workspaceCount = 8;
-  final _iconPaths = <String, String>{};
-  final _requestedIcons = <String>{};
+  int? _snapshotWorkspaceCount;
+  late final _icons = BarIconCache<String>(
+    lookup: lookupBarIconPaths,
+    onChanged: notifyListeners,
+  );
   (int?, int?) _position;
   StreamSubscription<HyprlandUpdate>? _subscription;
   Timer? _reconcile;
@@ -100,20 +107,21 @@ class HyprlandBackend extends ChangeNotifier {
   List<HyprlandWorkspace> get allWorkspaces => _snapshot?.workspaces ?? [];
   List<HyprlandWorkspaceSlot> get workspaceSlots =>
       output?.workspaceSlots ?? [];
-  String? iconPath(String appId) => _iconPaths[appId];
+  String? iconPath(String appId) => _icons[appId];
 
   HyprlandWindow? get currentWindow => output?.currentWindow;
 
-  /// Applies the Settings workspace count, shared by every output in Rust.
-  Future<void> setWorkspaceCount(int count) async {
-    if (_disposed || count == _workspaceCount) return;
-    _workspaceCount = count;
-    try {
-      await setSlotCount(count: count);
-      await refresh();
-    } catch (error) {
-      debugPrint('Hyprland workspace count: $error');
+  /// Updates the workspace count for reads and actions on this output.
+  Future<void> setWorkspaceCount(int count) {
+    if (_disposed || count < 1 || count > 10) return Future.value();
+    if (count == _workspaceCount) {
+      if (_refreshing case final refresh?) return refresh;
+      if (count == _snapshotWorkspaceCount && error == null) {
+        return Future.value();
+      }
     }
+    _workspaceCount = count;
+    return refresh();
   }
 
   void updateOutput({required int x, required int y}) {
@@ -215,30 +223,40 @@ class HyprlandBackend extends ChangeNotifier {
   Future<void> refresh() {
     if (_disposed) return Future.value();
     _pendingRefresh = true;
-    return _refreshing ??= _refreshLoop().whenComplete(
-      () => _refreshing = null,
-    );
+    if (_refreshing case final active?) return active;
+    final completion = Completer<void>();
+    _refreshing = completion.future;
+    completion.complete(_refreshLoop());
+    return completion.future;
   }
 
   Future<void> _refreshLoop() async {
-    while (_pendingRefresh && !_disposed) {
-      _pendingRefresh = false;
-      try {
-        final snapshot = await readSnapshot();
-        if (_disposed) return;
-        _snapshot = snapshot;
-        connected = true;
-        error = output == null ? 'Output unavailable' : null;
-      } catch (failure) {
-        if (_disposed) return;
-        error = 'Hyprland unavailable';
-        debugPrint('Hyprland workspace refresh: $failure');
+    try {
+      while (_pendingRefresh && !_disposed) {
+        _pendingRefresh = false;
+        final count = _workspaceCount;
+        try {
+          final snapshot = await readSnapshot(slotCount: count);
+          if (_disposed) return;
+          if (count != _workspaceCount) continue;
+          _snapshot = snapshot;
+          _snapshotWorkspaceCount = count;
+          connected = true;
+          error = output == null ? 'Output unavailable' : null;
+        } catch (failure) {
+          if (_disposed) return;
+          if (count != _workspaceCount) continue;
+          error = 'Hyprland unavailable';
+          debugPrint('Hyprland workspace refresh: $failure');
+        }
+        notifyListeners();
+        _resolveIcons();
+        if (_pendingRefresh) {
+          await Future<void>.delayed(const Duration(milliseconds: 80));
+        }
       }
-      notifyListeners();
-      unawaited(_resolveIcons());
-      if (_pendingRefresh) {
-        await Future<void>.delayed(const Duration(milliseconds: 80));
-      }
+    } finally {
+      _refreshing = null;
     }
   }
 
@@ -249,30 +267,46 @@ class HyprlandBackend extends ChangeNotifier {
       return false;
     }
     return _workspaceAction(
-      (name) => activateWorkspace(outputName: name, workspaceId: id),
+      (name, count) => activateWorkspace(
+        outputName: name,
+        workspaceId: id,
+        slotCount: count,
+      ),
     );
   }
 
   Future<void> scroll(int direction) async {
     if (direction != -1 && direction != 1) return;
     await _workspaceAction(
-      (name) => scrollWorkspace(outputName: name, direction: direction),
+      (name, count) => scrollWorkspace(
+        outputName: name,
+        direction: direction,
+        slotCount: count,
+      ),
     );
   }
 
   Future<void> toggleSpecial() async {
-    await _workspaceAction((name) => toggleSpecialWorkspace(outputName: name));
+    await _workspaceAction(
+      (name, count) =>
+          toggleSpecialWorkspace(outputName: name, slotCount: count),
+    );
   }
 
   Future<bool> _workspaceAction(
-    Future<void> Function(String output) action,
+    Future<void> Function(String output, int slotCount) action,
   ) async {
     final monitor = output;
-    if (_disposed || !connected || error != null || monitor == null) {
+    final count = _snapshotWorkspaceCount;
+    if (_disposed ||
+        !connected ||
+        error != null ||
+        monitor == null ||
+        count == null) {
       return false;
     }
     try {
-      await action(monitor.name);
+      await action(monitor.name, count);
       await refresh();
       return true;
     } catch (failure) {
@@ -281,31 +315,13 @@ class HyprlandBackend extends ChangeNotifier {
     }
   }
 
-  Future<void> _resolveIcons() async {
-    if (_disposed) return;
-    final classes = <String>{
+  void _resolveIcons() {
+    _icons.resolve({
       for (final monitor in _snapshot?.monitors ?? <HyprlandMonitor>[])
         for (final slot in monitor.workspaceSlots)
           for (final app in slot.apps)
             if (app.isNotEmpty) app,
-    }.difference(_requestedIcons);
-    if (classes.isEmpty) return;
-    _requestedIcons.addAll(classes);
-    try {
-      final paths = await const MethodChannel('top.remya.bar/icons')
-          .invokeMapMethod<String, String>('lookup', classes.toList());
-      if (_disposed || paths == null) return;
-      for (final entry in paths.entries) {
-        if (classes.contains(entry.key) &&
-            entry.value.startsWith('/') &&
-            entry.value.toLowerCase().endsWith('.png')) {
-          _iconPaths[entry.key] = entry.value;
-        }
-      }
-      notifyListeners();
-    } catch (failure) {
-      debugPrint('Workspace icons unavailable: $failure');
-    }
+    });
   }
 
   Future<bool> isOutputFullscreen(int x, int y) =>
@@ -319,6 +335,7 @@ class HyprlandBackend extends ChangeNotifier {
     _reconcile?.cancel();
     _eventRefresh?.cancel();
     _subscription?.cancel();
+    _icons.dispose();
     super.dispose();
   }
 }

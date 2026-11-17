@@ -120,12 +120,22 @@ class BarContent extends StatelessWidget {
               snapshot: pillSnapshot,
               metrics: metrics,
             ),
-            child: BarResources(
-              snapshot: pillSnapshot,
-              cardSnapshot: system?.resourceSnapshot,
-              compact: compactResources,
-              metrics: metrics,
-            ),
+            child: system == null
+                ? BarResources(
+                    snapshot: pillSnapshot,
+                    cardSnapshot: null,
+                    compact: compactResources,
+                    metrics: metrics,
+                  )
+                : ValueListenableBuilder(
+                    valueListenable: system!.hardware,
+                    builder: (context, sample, _) => BarResources(
+                      snapshot: pillSnapshot,
+                      cardSnapshot: sample,
+                      compact: compactResources,
+                      metrics: metrics,
+                    ),
+                  ),
           ),
         'media' when system?.players.isNotEmpty == true => ConstrainedBox(
           constraints: const .new(maxWidth: BarMedia.width),
@@ -163,11 +173,15 @@ class BarContent extends StatelessWidget {
         aiUsageKind when aiUsage?.visible == true => BarAiQuota(
           backend: aiUsage!,
         ),
-        'battery' when system?.battery?.percent?.isFinite == true => BarBattery(
-          battery: system!.battery,
-          isPowerSaver: system!.isPowerSaver,
-          power: system!.batteryPower,
-        ),
+        'battery' when system?.battery?.percent?.isFinite == true =>
+          ValueListenableBuilder(
+            valueListenable: system!.hardware,
+            builder: (context, sample, _) => BarBattery(
+              battery: sample?.batteries.firstOrNull,
+              isPowerSaver: system!.isPowerSaver,
+              power: system!.batteryPower,
+            ),
+          ),
         'sidebar' => sidebar,
         _ => null,
       };

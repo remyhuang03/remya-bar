@@ -36,6 +36,7 @@ struct Daemon {
     next_id: u32,
     history: Option<History>,
     preferences: NotificationPreferences,
+    preferences_loaded: bool,
     fullscreen: HashSet<String>,
     quiet: Option<&'static str>,
     hovered: bool,
@@ -63,6 +64,7 @@ impl Daemon {
                 priority_calls: true,
                 priority_apps: Vec::new(),
             },
+            preferences_loaded: false,
             fullscreen: HashSet::new(),
             quiet: None,
             hovered: false,
@@ -89,6 +91,9 @@ impl Daemon {
                 .iter()
                 .map(|entry| entry.snapshot.clone())
                 .collect(),
+            do_not_disturb: self
+                .preferences_loaded
+                .then_some(self.preferences.do_not_disturb),
             quiet_reason: self.quiet.unwrap_or_default().into(),
             popup_host: self.popup_host.clone(),
             error: self.error.clone(),
@@ -317,7 +322,20 @@ async fn closed(connection: Option<zbus::Connection>, ids: Vec<u32>, reason: u32
     }
 }
 
-struct Server;
+struct Server {
+    ready: watch::Receiver<bool>,
+}
+
+impl Server {
+    async fn wait_until_ready(&self) -> zbus::fdo::Result<()> {
+        self.ready
+            .clone()
+            .wait_for(|ready| *ready)
+            .await
+            .map(|_| ())
+            .map_err(|_| zbus::fdo::Error::Failed("Notification service startup failed".into()))
+    }
+}
 
 #[zbus::interface(name = "org.freedesktop.Notifications")]
 impl Server {
@@ -332,7 +350,8 @@ impl Server {
         actions: Vec<String>,
         hints: HashMap<String, OwnedValue>,
         expire_timeout: i32,
-    ) -> u32 {
+    ) -> zbus::fdo::Result<u32> {
+        self.wait_until_ready().await?;
         let mut daemon = daemon().lock().await;
         let urgency = hint_byte(&hints, "urgency")
             .filter(|value| *value <= 2)
@@ -437,10 +456,11 @@ impl Server {
         if !dropped.is_empty() {
             tokio::spawn(closed(connection, dropped, EXPIRED));
         }
-        id
+        Ok(id)
     }
 
-    async fn close_notification(&self, id: u32) {
+    async fn close_notification(&self, id: u32) -> zbus::fdo::Result<()> {
+        self.wait_until_ready().await?;
         let mut daemon = daemon().lock().await;
         if daemon.remove(id) {
             daemon.save_history(None, &[id]);
@@ -449,6 +469,7 @@ impl Server {
             drop(daemon);
             tokio::spawn(closed(connection, vec![id], CLOSED));
         }
+        Ok(())
     }
 
     fn get_capabilities(&self) -> Vec<&'static str> {
@@ -743,44 +764,56 @@ fn ensure_started() {
 }
 
 async fn serve() {
-    loop {
-        let mut daemon = daemon().lock().await;
-        match own_name().await {
-            Ok(connection) => {
-                match history::open() {
-                    Ok((history, entries, next_id)) => {
-                        daemon.history = Some(history);
-                        daemon.entries = entries;
-                        daemon.next_id = next_id;
-                    }
-                    Err(error) => eprintln!("Notification history open: {error}"),
-                }
-                daemon.connection = Some(connection);
-                daemon.error = None;
-                publish(&mut daemon);
-                return;
-            }
-            Err(error) => {
-                if daemon.error.as_deref() != Some(error.as_str()) {
-                    daemon.error = Some(error);
-                    publish(&mut daemon);
-                }
-            }
-        }
-        drop(daemon);
+    while !start_server(own_name).await {
         // Another daemon may release the name later.
         tokio::time::sleep(Duration::from_secs(5)).await;
     }
 }
 
-async fn own_name() -> Result<zbus::Connection, String> {
+async fn start_server(claim: impl AsyncFnOnce(Server) -> Result<zbus::Connection, String>) -> bool {
+    let (ready, server) = watch::channel(false);
+    let result = tokio::time::timeout(Duration::from_secs(3), claim(Server { ready: server }))
+        .await
+        .unwrap_or_else(|_| Err("Notification D-Bus ownership timed out".into()));
+    match result {
+        Ok(connection) => {
+            let history = tokio::task::spawn_blocking(history::open).await;
+            let mut daemon = daemon().lock().await;
+            match history {
+                Ok(Ok((history, entries, next_id))) => {
+                    daemon.history = Some(history);
+                    daemon.entries = entries;
+                    daemon.next_id = next_id;
+                }
+                Ok(Err(error)) => eprintln!("Notification history open: {error}"),
+                Err(error) => eprintln!("Notification history worker: {error}"),
+            }
+            daemon.connection = Some(connection);
+            daemon.error = None;
+            publish(&mut daemon);
+            // Calls can arrive as soon as the bus grants the name.
+            ready.send_replace(true);
+            true
+        }
+        Err(error) => {
+            let mut daemon = daemon().lock().await;
+            if daemon.error.as_deref() != Some(error.as_str()) {
+                daemon.error = Some(error);
+                publish(&mut daemon);
+            }
+            false
+        }
+    }
+}
+
+async fn own_name(server: Server) -> Result<zbus::Connection, String> {
     use zbus::fdo::{RequestNameFlags, RequestNameReply};
     let connection = zbus::Connection::session()
         .await
         .map_err(|e| e.to_string())?;
     connection
         .object_server()
-        .at(PATH, Server)
+        .at(PATH, server)
         .await
         .map_err(|e| e.to_string())?;
     let reply = connection
@@ -852,11 +885,17 @@ pub(crate) async fn subscribe(sink: StreamSink<NotificationCenter>) {
 pub(crate) async fn configure(preferences: NotificationPreferences) {
     let mut daemon = daemon().lock().await;
     daemon.preferences = preferences;
+    daemon.preferences_loaded = true;
     let ended = daemon.refresh_quiet(Local::now().naive_local());
     publish(&mut daemon);
     let connection = daemon.connection.clone();
     drop(daemon);
-    closed(connection, ended, EXPIRED).await;
+    if tokio::time::timeout(Duration::from_secs(2), closed(connection, ended, EXPIRED))
+        .await
+        .is_err()
+    {
+        eprintln!("Timed out sending notification close signals after settings change");
+    }
 }
 
 pub(crate) async fn fullscreen(output: String, fullscreen: bool) {
@@ -938,6 +977,62 @@ pub(crate) async fn invoke(id: u32, action: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dbus_calls_wait_for_history_and_abort_if_startup_fails() {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let (ready, server) = watch::channel(false);
+                let server = Server { ready: server };
+                assert!(
+                    tokio::time::timeout(Duration::ZERO, server.wait_until_ready())
+                        .await
+                        .is_err()
+                );
+                ready.send_replace(true);
+                drop(ready);
+                assert!(server.wait_until_ready().await.is_ok());
+
+                let (ready, server) = watch::channel(false);
+                drop(ready);
+                assert!(Server { ready: server }.wait_until_ready().await.is_err());
+            });
+    }
+
+    #[test]
+    fn daemon_state_stays_available_while_dbus_ownership_is_pending() {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let claimed = std::sync::Arc::new(Notify::new());
+                let claim_started = claimed.clone();
+                let (finish, wait_for_test) = tokio::sync::oneshot::channel();
+                let ownership = tokio::spawn(async move {
+                    start_server(async move |_| {
+                        claim_started.notify_one();
+                        wait_for_test.await.unwrap();
+                        Err("D-Bus is unavailable".into())
+                    })
+                    .await
+                });
+                tokio::time::timeout(Duration::from_secs(1), async {
+                    claimed.notified().await;
+                    let preferences = Daemon::new().preferences;
+                    configure(preferences).await;
+                    fullscreen("test-output".into(), true).await;
+                    assert!(daemon().lock().await.fullscreen.contains("test-output"));
+                    finish.send(()).unwrap();
+                })
+                .await
+                .unwrap();
+                assert!(!ownership.await.unwrap());
+            });
+    }
 
     fn text(runs: &[NotificationText]) -> String {
         runs.iter().map(|run| run.text.as_str()).collect()

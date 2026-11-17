@@ -1191,11 +1191,13 @@ impl SseDecode for crate::api::NotificationCenter {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_notifications =
             <Vec<crate::api::NotificationSnapshot>>::sse_decode(deserializer);
+        let mut var_doNotDisturb = <Option<bool>>::sse_decode(deserializer);
         let mut var_quietReason = <String>::sse_decode(deserializer);
         let mut var_popupHost = <Option<String>>::sse_decode(deserializer);
         let mut var_error = <Option<String>>::sse_decode(deserializer);
         return crate::api::NotificationCenter {
             notifications: var_notifications,
+            do_not_disturb: var_doNotDisturb,
             quiet_reason: var_quietReason,
             popup_host: var_popupHost,
             error: var_error,
@@ -1313,6 +1315,17 @@ impl SseDecode for Option<String> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<String>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<bool> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<bool>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -1682,6 +1695,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::NotificationCenter {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.notifications.into_into_dart().into_dart(),
+            self.do_not_disturb.into_into_dart().into_dart(),
             self.quiet_reason.into_into_dart().into_dart(),
             self.popup_host.into_into_dart().into_dart(),
             self.error.into_into_dart().into_dart(),
@@ -2162,6 +2176,7 @@ impl SseEncode for crate::api::NotificationCenter {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <Vec<crate::api::NotificationSnapshot>>::sse_encode(self.notifications, serializer);
+        <Option<bool>>::sse_encode(self.do_not_disturb, serializer);
         <String>::sse_encode(self.quiet_reason, serializer);
         <Option<String>>::sse_encode(self.popup_host, serializer);
         <Option<String>>::sse_encode(self.error, serializer);
@@ -2234,6 +2249,16 @@ impl SseEncode for Option<String> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <String>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<bool> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <bool>::sse_encode(value, serializer);
         }
     }
 }

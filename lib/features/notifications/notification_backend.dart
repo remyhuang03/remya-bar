@@ -1,35 +1,29 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:remya_client/remya_client.dart';
 import 'package:remya_bar/features/settings/bar_preferences.dart';
 
 import '../../src/rust/system_bridge/api.dart' as api;
+import '../../widgets/bar_icon_cache.dart';
 
-const _icons = MethodChannel('top.remya.bar/icons');
-
-/// Mirrors the process-wide Rust notification server for one output and
-/// applies the Bar Do not disturb and popup duration preferences.
+/// Mirrors the process-wide Rust notification server for one output.
 class NotificationBackend extends ChangeNotifier {
   NotificationBackend({SettingsClient? settings})
-    : _settings = settings ?? SettingsClient();
+    : _settings = settings ?? SettingsClient(),
+      _ownsSettings = settings == null;
 
   final SettingsClient _settings;
+  final bool _ownsSettings;
   late final _preferences = BarPreferences(client: _settings);
   StreamSubscription<api.NotificationCenter>? _subscription;
-  StreamSubscription<SettingsChange>? _changes;
   Timer? _retry;
   bool _disposed = false;
   api.NotificationCenter? center;
 
-  /// Saved Bar preferences; null until Core answers.
-  NotificationPreferences? preferences;
-
-  /// The manual Do Not Disturb switch; null until Core answers.
-  bool? get doNotDisturb => preferences?.doNotDisturb;
+  /// The manual Do Not Disturb switch; null until Rust applies Core's values.
+  bool? get doNotDisturb => center?.doNotDisturb;
 
   /// Why Do Not Disturb is in effect: null, manual, schedule or fullscreen.
   String? get quietReason => switch (center?.quietReason) {
@@ -37,8 +31,19 @@ class NotificationBackend extends ChangeNotifier {
     final reason => reason,
   };
   String? _output;
-  final _iconBytes = <String, Uint8List?>{};
-  final _iconPaths = <String, String?>{};
+  late final _iconBytes = BarIconCache<Uint8List>(
+    lookup: _lookupIconBytes,
+    onChanged: notifyListeners,
+    size: (bytes) => bytes.lengthInBytes,
+    refreshAfter: (key) =>
+        key.startsWith('/') ? const Duration(seconds: 30) : null,
+    retryOnIdle: true,
+  );
+  late final _iconPaths = BarIconCache<String>(
+    lookup: lookupBarIconPaths,
+    onChanged: notifyListeners,
+    retryOnIdle: true,
+  );
 
   List<api.NotificationSnapshot> get history => [
     ...?center?.notifications.where((item) => !item.transient),
@@ -51,12 +56,6 @@ class NotificationBackend extends ChangeNotifier {
 
   void start() {
     if (_disposed || _subscription != null) return;
-    _changes = _settings.changes.listen((change) {
-      if (notificationSettingIds.contains(change.topic)) {
-        unawaited(_readPreferences());
-      }
-    }, onError: (Object error) => debugPrint('Notification settings: $error'));
-    unawaited(_readPreferences());
     _subscribe();
   }
 
@@ -64,9 +63,10 @@ class NotificationBackend extends ChangeNotifier {
     if (_disposed) return;
     _subscription = api.subscribeNotifications().listen(
       (next) {
+        if (_disposed) return;
         center = next;
         notifyListeners();
-        unawaited(_resolveIcons(next.notifications));
+        _resolveIcons(next.notifications);
       },
       onError: (Object error) => debugPrint('Notifications: $error'),
       onDone: () {
@@ -76,51 +76,8 @@ class NotificationBackend extends ChangeNotifier {
     );
   }
 
-  // Errors keep the last valid preferences, like the theme.
-  Future<void> _readPreferences() async {
-    try {
-      final next = await _preferences.readNotifications();
-      if (_disposed) return;
-      preferences = next;
-      notifyListeners();
-      await _configure(next);
-    } catch (error) {
-      if (!_disposed) debugPrint('Notification preferences: $error');
-    }
-  }
-
-  Future<void> _configure(NotificationPreferences preferences) {
-    int minutes(String time) {
-      final [hours, minutes] = time.split(':').map(int.parse).toList();
-      return hours * 60 + minutes;
-    }
-
-    return api.notificationsConfigure(
-      preferences: api.NotificationPreferences(
-        doNotDisturb: preferences.doNotDisturb,
-        timeoutSeconds: preferences.popupDuration,
-        sounds: preferences.sounds,
-        schedule: preferences.schedule,
-        scheduleStartMinutes: minutes(preferences.scheduleStart),
-        scheduleEndMinutes: minutes(preferences.scheduleEnd),
-        scheduleDays: Uint32List.fromList(switch (preferences.scheduleRepeat) {
-          'weekdays' => [1, 2, 3, 4, 5],
-          'weekends' => [6, 7],
-          _ => [1, 2, 3, 4, 5, 6, 7],
-        }),
-        fullscreen: preferences.fullscreen,
-        priorityCalls: preferences.priorityCalls,
-        priorityApps: [
-          for (final app in preferences.priorityApps)
-            api.NotificationPriorityApp(id: app.id, name: app.name),
-        ],
-      ),
-    );
-  }
-
   Future<void> setDoNotDisturb(bool enabled) async {
     await _preferences.setDoNotDisturb(enabled);
-    await _readPreferences();
   }
 
   /// Reports this output's full screen state for automatic Do Not Disturb.
@@ -138,54 +95,20 @@ class NotificationBackend extends ChangeNotifier {
 
   /// Resolves app icons and image paths to PNG bytes or files the popup
   /// views can read.
-  Future<void> _resolveIcons(List<api.NotificationSnapshot> items) async {
+  void _resolveIcons(List<api.NotificationSnapshot> items) {
     final names = <String>{};
     final entries = <String>{};
-    for (final item in items) {
+    for (final item in items.reversed) {
       for (final name in [item.appIcon, item.imagePath]) {
         final resolved = _iconName(name);
-        if (resolved != null && !_iconBytes.containsKey(resolved)) {
-          names.add(resolved);
-        }
+        if (resolved != null) names.add(resolved);
       }
-      if (item.appIcon.isEmpty &&
-          item.desktopEntry.isNotEmpty &&
-          !_iconPaths.containsKey(item.desktopEntry)) {
+      if (item.appIcon.isEmpty && item.desktopEntry.isNotEmpty) {
         entries.add(item.desktopEntry);
       }
     }
-    if (names.isEmpty && entries.isEmpty) return;
-    for (final name in names) {
-      _iconBytes[name] = null;
-    }
-    for (final entry in entries) {
-      _iconPaths[entry] = null;
-    }
-    try {
-      final (bytes, paths) = await (
-        names.isEmpty
-            ? Future.value(const <String, Uint8List>{})
-            : _icons.invokeMapMethod<String, Uint8List>('lookupTray', [
-                for (final name in names) [name, ''],
-              ]),
-        entries.isEmpty
-            ? Future.value(const <String, String>{})
-            : _icons.invokeMapMethod<String, String>(
-                'lookup',
-                entries.toList(),
-              ),
-      ).wait;
-      if (_disposed) return;
-      for (final name in names) {
-        _iconBytes[name] = bytes?['\n$name'];
-      }
-      for (final entry in entries) {
-        _iconPaths[entry] = paths?[entry];
-      }
-      notifyListeners();
-    } catch (error) {
-      debugPrint('Notification icons: $error');
-    }
+    _iconBytes.resolve(names);
+    _iconPaths.resolve(entries);
   }
 
   /// Popup view data; images travel as PNG bytes or raw ARGB.
@@ -238,10 +161,24 @@ class NotificationBackend extends ChangeNotifier {
     }
     _retry?.cancel();
     unawaited(_subscription?.cancel());
-    unawaited(_changes?.cancel());
-    unawaited(_settings.close());
+    _iconBytes.dispose();
+    _iconPaths.dispose();
+    if (_ownsSettings) unawaited(_settings.close());
     super.dispose();
   }
+}
+
+Future<Map<String, Uint8List>> _lookupIconBytes(List<String> names) async {
+  final bytes = await barIconChannel.invokeMapMethod<String, Uint8List>(
+    'lookupTray',
+    [
+      for (final name in names) [name, ''],
+    ],
+  );
+  return {
+    for (final name in names)
+      if (bytes?['\n$name'] case final icon? when icon.isNotEmpty) name: icon,
+  };
 }
 
 /// Icon names stay names; paths and file URIs become absolute paths.
@@ -251,6 +188,8 @@ String? _iconName(String value) {
     try {
       return Uri.parse(value).toFilePath();
     } on FormatException {
+      return null;
+    } on UnsupportedError {
       return null;
     }
   }

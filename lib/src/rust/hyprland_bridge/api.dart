@@ -7,39 +7,41 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `dispatch_workspace_command`, `output_fullscreen`, `super_update`, `watch_super`
+// These functions are ignored because they are not marked as `pub`: `dispatch_workspace_command`, `new`, `output_fullscreen`, `publish_super`, `read_super`, `subscribe`, `super_update`, `watch_super`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Hub`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
-/// Sets the workspace slots per numbered group (1 to 10) for every output.
-Future<void> hyprlandSetWorkspaceCount({required int count}) => HyprlandRustLib
-    .instance
-    .api
-    .crateApiHyprlandSetWorkspaceCount(count: count);
-
-Future<HyprlandSnapshot> hyprlandSnapshot() =>
-    HyprlandRustLib.instance.api.crateApiHyprlandSnapshot();
+/// Captures a snapshot with the caller's workspace slots per numbered group.
+Future<HyprlandSnapshot> hyprlandSnapshot({required int slotCount}) =>
+    HyprlandRustLib.instance.api.crateApiHyprlandSnapshot(slotCount: slotCount);
 
 Future<void> hyprlandSwitchWorkspace({
   required String outputName,
   required int workspaceId,
+  required int slotCount,
 }) => HyprlandRustLib.instance.api.crateApiHyprlandSwitchWorkspace(
   outputName: outputName,
   workspaceId: workspaceId,
+  slotCount: slotCount,
 );
 
 Future<void> hyprlandScrollWorkspace({
   required String outputName,
   required int direction,
+  required int slotCount,
 }) => HyprlandRustLib.instance.api.crateApiHyprlandScrollWorkspace(
   outputName: outputName,
   direction: direction,
+  slotCount: slotCount,
 );
 
-Future<void> hyprlandToggleSpecial({required String outputName}) =>
-    HyprlandRustLib.instance.api.crateApiHyprlandToggleSpecial(
-      outputName: outputName,
-    );
+Future<void> hyprlandToggleSpecial({
+  required String outputName,
+  required int slotCount,
+}) => HyprlandRustLib.instance.api.crateApiHyprlandToggleSpecial(
+  outputName: outputName,
+  slotCount: slotCount,
+);
 
 Future<String> hyprlandRequest({required String command}) =>
     HyprlandRustLib.instance.api.crateApiHyprlandRequest(command: command);

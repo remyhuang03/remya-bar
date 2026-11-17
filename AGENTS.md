@@ -21,6 +21,7 @@
 
 ## Core Integration and XDG
 - Remya Bar depends on separately installed Remya Core (`remyad`, CLI `remya`, session D-Bus `top.remya.Core1` at `/top/remya/Core1`, interface `top.remya.Core1`). Use the pure Dart `remya_client` and Flutter `remya_ui` packages from `../remya-core/packages/` during development. Never import Settings GUI or backend code.
+- Bar uses the same sibling path dependencies for development and candidate builds. CI checks out and verifies the full `CORE_REVISION` in `.github/workflows/linux.yml`, then records it in candidate build metadata.
 - Core owns system settings, shared theme, validation and atomic persistence. Bar owns its preference schemas/defaults in `linux/packaging/remya-bar.json` and uses `BarPreferences` over `AppPreferences('remya-bar')` exclusively. Never read or write app preference files directly. Recheck cross-field constraints in Dart and keep the last valid state on errors.
 - Install the registration at `$XDG_DATA_HOME/remya/apps/remya-bar.json`. Core persists its values at `$XDG_CONFIG_HOME/remya/bar/settings.toml`; system settings live in `remya/system/`, shared theme in `remya/shared/theme.toml`. Ignore relative XDG roots and use absolute HOME fallbacks. Do not create unused cache/state directories.
 - Use revision-checked `Replace` for tray read-modify-write and sidebar editors; surface Core conflicts without retrying or overwriting another view.
@@ -32,7 +33,7 @@
 
 ## Toolchains & Dependencies
 - Always invoke Flutter and Dart as `fvm flutter ...` and `fvm dart ...`, never through global SDK commands.
-- `.fvmrc` pins Flutter to `3.47.8`. Do not change versions without explicit instruction. Run `fvm install` for fresh setup.
+- `.fvmrc` is the source of truth for the Flutter version. Do not change it without explicit instruction. Run `fvm install` for fresh setup.
 - Use the root `rust-toolchain.toml` and inherit common crate metadata from the workspace.
 - Commit `.fvmrc`, `pubspec.lock`, and `Cargo.lock`; ignore SDK caches, build output, and local configuration.
 - Reuse existing helpers and dependencies. Add packages only for concrete requirements.

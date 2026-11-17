@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 
 import 'package:remya_client/remya_client.dart';
@@ -40,23 +41,38 @@ class BarPreferences {
   final AppPreferences _store;
   final _last = <String, Object>{};
   final _revisions = <String, String>{};
+  late final Map<String, Object> values = UnmodifiableMapView(_last);
 
   Object? lastValid(String key) => _last[key];
   String revision(String key) =>
       _revisions[key] ?? (throw StateError('Read $key before replacing it'));
 
-  Future<Object> read(String key) async => _accept(key, await _store.get(key));
+  Future<Object> read(String key, {bool Function()? isCurrent}) async =>
+      _accept(key, await _store.get(key), isCurrent: isCurrent);
   Future<Object> set(String key, Object value) async {
     validate(key, value);
     return _accept(key, await _store.set(key, value));
   }
 
-  Future<Object> replace(String key, Object value, String revision) async {
+  Future<Object> replace(
+    String key,
+    Object value,
+    String revision, {
+    bool Function()? isCurrent,
+  }) async {
     validate(key, value);
-    return _accept(key, await _store.replace(key, value, revision));
+    return _accept(
+      key,
+      await _store.replace(key, value, revision),
+      isCurrent: isCurrent,
+    );
   }
 
-  Object _accept(String key, Map<String, dynamic> reply) {
+  Object _accept(
+    String key,
+    Map<String, dynamic> reply, {
+    bool Function()? isCurrent,
+  }) {
     final value = reply['value'];
     validate(key, value);
     final revision = reply['revision'];
@@ -67,8 +83,10 @@ class BarPreferences {
     }
     // Freeze collections so callers cannot corrupt the last validated value.
     final frozen = _freeze(value!);
-    _last[key] = frozen;
-    _revisions[key] = revision;
+    if (isCurrent == null || isCurrent()) {
+      _last[key] = frozen;
+      _revisions[key] = revision;
+    }
     return frozen;
   }
 

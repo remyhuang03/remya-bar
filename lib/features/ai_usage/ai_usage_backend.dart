@@ -12,14 +12,21 @@ import 'package:remya_bar/features/settings/bar_preferences.dart';
 import '../../src/rust/system_bridge/api.dart' as rust;
 import '../system/system_backend.dart';
 import 'ai_usage_data.dart';
+import 'ai_usage_poll.dart';
 
 const _workerName = 'top.remya.bar/ai-usage';
+ReceivePort? _workerInbox;
 
 /// Per-output view of the process-wide sample. Revisit it for countdowns and
 /// to pick up a refresh initiated on another monitor.
 class AiUsageBackend extends ChangeNotifier {
+  AiUsageBackend({SettingsClient? settings})
+    : _settings = settings ?? SettingsClient(),
+      _ownsSettings = settings == null;
+
   Map<String, Object?> data = const {};
-  final _settings = SettingsClient();
+  final SettingsClient _settings;
+  final bool _ownsSettings;
   late final _preferences = BarPreferences(client: _settings);
   Map<String, Object?> _sample = const {};
   Map<String, dynamic>? _bar;
@@ -28,12 +35,17 @@ class AiUsageBackend extends ChangeNotifier {
   Timer? _timer;
   StreamSubscription<SettingsChange>? _changes;
   bool _disposed = false;
+  SendPort? _readingWorker;
+  final _replies = <ReceivePort>{};
+  int _nextRead = 0;
+  int _appliedRead = 0;
   bool refreshing = false;
   int tick = 0;
 
   bool get visible => aiPillProviders(data, DateTime.now()).isNotEmpty;
 
   void start() {
+    if (_disposed || _timer != null) return;
     unawaited(_read());
     unawaited(_readBar());
     _timer = Timer.periodic(const Duration(seconds: 15), (_) {
@@ -83,7 +95,7 @@ class AiUsageBackend extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    if (refreshing) return;
+    if (_disposed || refreshing) return;
     refreshing = true;
     notifyListeners();
     try {
@@ -95,22 +107,34 @@ class AiUsageBackend extends ChangeNotifier {
   }
 
   Future<void> _read({bool force = false}) async {
-    if (!force && refreshing) return;
+    if (_disposed || (!force && refreshing)) return;
     final worker = IsolateNameServer.lookupPortByName(_workerName);
     if (worker == null) return;
+    if (!force) {
+      if (_readingWorker == worker) return;
+      _readingWorker = worker;
+    }
+    final sequence = ++_nextRead;
     final reply = ReceivePort();
+    _replies.add(reply);
     try {
       worker.send([reply.sendPort, force]);
-      final value = await reply.first.timeout(const Duration(seconds: 90));
-      if (!_disposed) {
+      // A forced read can wait for an ordinary round and then run its own.
+      final value = await reply.first.timeout(const Duration(minutes: 3));
+      if (!_disposed && sequence > _appliedRead && value is Map) {
+        _appliedRead = sequence;
         _sample = aiMap(value);
         tick++;
         _publish();
       }
     } on TimeoutException {
       // The next poll can reconnect after an engine restart.
+    } on StateError {
+      if (!_disposed) rethrow;
     } finally {
       reply.close();
+      _replies.remove(reply);
+      if (!force && _readingWorker == worker) _readingWorker = null;
     }
   }
 
@@ -118,26 +142,33 @@ class AiUsageBackend extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    for (final reply in _replies) {
+      reply.close();
+    }
     unawaited(_changes?.cancel());
-    unawaited(_settings.close());
+    if (_ownsSettings) unawaited(_settings.close());
     super.dispose();
   }
 }
 
 /// Lives in the warm popup engine, which survives monitor removal.
 void startAiUsageWorker() {
+  if (_workerInbox != null) return;
+  // The sole warm engine owns this name, including after an engine restart.
+  IsolateNameServer.removePortNameMapping(_workerName);
   final inbox = ReceivePort();
   if (!IsolateNameServer.registerPortWithName(inbox.sendPort, _workerName)) {
     inbox.close();
     return;
   }
+  _workerInbox = inbox;
   final worker = _AiUsageWorker();
   inbox.listen((message) async {
     final [SendPort reply, bool force] = message as List;
     try {
       reply.send(await worker.read(force));
     } catch (_) {
-      reply.send(const <String, Object?>{});
+      reply.send(null);
     }
   });
 }
@@ -148,7 +179,7 @@ class _AiUsageWorker {
       if (change.topic == aiRingSettingId) {
         unawaited(_readBar().then((bar) => _notifyAlerts(aiLowPercent(bar))));
       } else if (change.topic == aiProvidersSettingId) {
-        _nextPoll = null;
+        _polling.invalidate();
       }
     }, onError: (Object _) {});
   }
@@ -172,48 +203,39 @@ class _AiUsageWorker {
     List<int>.generate(32, (_) => _random.nextInt(256)),
   );
   final _alerts = AiQuotaAlerts();
-  late final _rustReady = SystemBackend.initialize();
   Map<String, Object?> _sample = const {};
-  DateTime? _nextPoll;
-  Future<void>? _pending;
+  late final _polling = AiUsagePoll(_poll);
 
   Future<Map<String, Object?>> read(bool force) async {
-    final now = DateTime.now();
-    if (force || _nextPoll == null || !now.isBefore(_nextPoll!)) {
-      await (_pending ??= _poll(force).whenComplete(() => _pending = null));
-    } else if (_sample.isEmpty) {
-      await _pending;
-    }
+    await _polling.read(force);
     return _sample;
   }
 
-  Future<void> _poll(bool force) async {
-    _nextPoll = DateTime.now().add(aiRefreshInterval);
+  Future<bool> _poll(bool force) async {
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 2)
       ..findProxy = (_) => 'DIRECT';
     try {
-      await _rustReady;
+      await SystemBackend.initialize();
       final port = await rust.codexbarServerPort(token: _token);
-      final shell = aiMap(
-        await _get(
+      final (shell, _, configured, (usage, _), (cost, costCurrent)) = await (
+        _get(
           client,
           port,
           '/dashboard/v1/snapshot?detail=shell',
           authenticate: true,
         ),
-      );
-      final (_, configured) = await (_readBar(), _cli('providers')).wait;
-      final automatic = configured == null;
-      final (usage, cost) = await (
+        _readBar(),
+        _cli('providers'),
         _endpoint(client, port, 'usage', refresh: true),
         _endpoint(client, port, 'cost', refresh: force),
       ).wait;
+      if (usage == null || (configured == null && shell is! Map)) return false;
       final data = aiProviderSamples(
-        configured ?? aiRows(shell['providers']),
+        configured ?? aiRows(aiMap(shell)['providers']),
         usage,
         previous: aiRows(_sample['providers']),
-        automatic: automatic,
+        automatic: configured == null,
       );
       final updated =
           [
@@ -224,12 +246,19 @@ class _AiUsageWorker {
             (latest, time) =>
                 latest == null || time.isAfter(latest) ? time : latest,
           );
+      final previousCost = aiRows(_sample['cost']);
       _sample = {
         'providers': data,
         'updatedAt': updated?.toIso8601String(),
-        'cost': _costData(cost, data),
+        'cost': cost != null && (costCurrent || previousCost.isEmpty)
+            ? _costData(cost, data)
+            : [
+                for (final row in previousCost)
+                  if (data.any((provider) => provider['id'] == row['id'])) row,
+              ],
       };
       _notifyAlerts(aiLowPercent(_bar));
+      return costCurrent;
     } finally {
       client.close(force: true);
     }
@@ -247,7 +276,7 @@ class _AiUsageWorker {
     }
   }
 
-  Future<List<Map<String, Object?>>?> _endpoint(
+  Future<(List<Map<String, Object?>>?, bool)> _endpoint(
     HttpClient client,
     int? port,
     String endpoint, {
@@ -257,7 +286,7 @@ class _AiUsageWorker {
     final refreshCost = endpoint == 'cost' && refresh;
     if (refreshCost) {
       final fresh = await _cli(endpoint, refresh: true);
-      if (fresh != null) return fresh;
+      if (fresh != null) return (fresh, true);
     }
     // Tracked providers are filtered locally, so always probe all of them.
     final selection = endpoint == 'cost' ? 'provider=both&' : 'provider=all&';
@@ -266,8 +295,9 @@ class _AiUsageWorker {
       port,
       '/$endpoint?$selection${refresh ? 'refresh=1' : ''}',
     );
-    if (value is List) return aiRows(value);
-    return refreshCost ? null : _cli(endpoint, refresh: refresh);
+    if (value is List) return (aiRows(value), !refreshCost);
+    final rows = refreshCost ? null : await _cli(endpoint, refresh: refresh);
+    return (rows, rows != null);
   }
 
   Future<Object?> _get(

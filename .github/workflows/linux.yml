@@ -27,6 +27,7 @@ jobs:
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
+      CORE_REVISION: c85db17dc41ebc4c154c10feca293efa51ec59ec
     steps:
       - name: Restrict candidate builds to main
         if: github.event_name == 'workflow_dispatch'
@@ -47,11 +48,11 @@ jobs:
           persist-credentials: false
           fetch-depth: 2
 
-      - name: Check out Remy'a Core v0.1.0
+      - name: Check out pinned Remy'a Core
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           repository: remyhuang03/remya-core
-          ref: 6834087a0f07cfe0171f77fda2870a332d5c1746
+          ref: ${{ env.CORE_REVISION }}
           path: source/remya-core
           persist-credentials: false
 
@@ -73,7 +74,21 @@ jobs:
           chown -R remya-ci:remya-ci ..
           runuser --user remya-ci -- bash -euo pipefail -s -- "$PWD" <<'BUILD'
           cd "$1"
+          test "$(git -C ../remya-core rev-parse HEAD)" = "$CORE_REVISION"
           flutter_version=$(python -c 'import json; print(json.load(open(".fvmrc"))["flutter"])')
+          python - "$flutter_version" <<'DOCS'
+          import re
+          import sys
+          from pathlib import Path
+
+          expected = sys.argv[1]
+          for path in (Path("AGENTS.md"), Path("README.md"), *Path("docs").glob("README.*.md")):
+              for number, line in enumerate(path.read_text().splitlines(), 1):
+                  if "Flutter" in line or "FVM" in line:
+                      for version in re.findall(r"\b\d+\.\d+\.\d+\b", line):
+                          if version != expected:
+                              raise SystemExit(f"{path}:{number}: expected Flutter {expected}, found {version}")
+          DOCS
           fvm install "$flutter_version" --skip-pub-get
           git diff --check HEAD^ HEAD
           cargo fmt --all -- --check
@@ -102,7 +117,7 @@ jobs:
           archive="remya-bar-linux-x86_64-${commit:0:12}.tar.zst"
           mkdir -p candidate
           printf 'repository=%s\ncommit=%s\n' "$(basename "$PWD")" "$commit" > candidate/build-info.txt
-          printf 'core_commit=%s\n' "$(git -C ../remya-core rev-parse HEAD)" >> candidate/build-info.txt
+          printf 'core_commit=%s\n' "$CORE_REVISION" >> candidate/build-info.txt
           tar --zstd --owner=0 --group=0 --mode=go-w -cf "candidate/$archive" \
             LICENSE README.md \
             build/linux/x64/release/bundle \

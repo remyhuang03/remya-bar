@@ -1,16 +1,36 @@
 use crate::frb_generated::StreamSink;
 use std::collections::HashSet;
 use std::sync::{
-    OnceLock,
+    Arc, OnceLock,
     atomic::{AtomicBool, Ordering},
 };
 use std::time::Duration;
-use tokio::sync::{broadcast, watch};
+use tokio::sync::{Notify, broadcast, watch};
 
 struct Hub {
     events: broadcast::Sender<HyprlandUpdate>,
     status: watch::Sender<Option<HyprlandUpdate>>,
     super_held: AtomicBool,
+    subscriber_added: Notify,
+}
+
+impl Hub {
+    fn new() -> Self {
+        let (events, _) = broadcast::channel(256);
+        let (status, _) = watch::channel(None);
+        Self {
+            events,
+            status,
+            super_held: AtomicBool::new(false),
+            subscriber_added: Notify::new(),
+        }
+    }
+
+    fn subscribe(&self) -> broadcast::Receiver<HyprlandUpdate> {
+        let receiver = self.events.subscribe();
+        self.subscriber_added.notify_one();
+        receiver
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -71,16 +91,11 @@ pub struct HyprlandSnapshot {
     pub workspaces: Vec<HyprlandWorkspace>,
 }
 
-/// Sets the workspace slots per numbered group (1 to 10) for every output.
-pub fn hyprland_set_workspace_count(count: u8) -> Result<(), String> {
-    if !(1..=10).contains(&count) {
+/// Captures a snapshot with the caller's workspace slots per numbered group.
+pub async fn hyprland_snapshot(slot_count: u8) -> Result<HyprlandSnapshot, String> {
+    if !(1..=10).contains(&slot_count) {
         return Err("Workspace count must be between 1 and 10".into());
     }
-    crate::workspace_state::SLOT_COUNT.store(count, Ordering::Relaxed);
-    Ok(())
-}
-
-pub async fn hyprland_snapshot() -> Result<HyprlandSnapshot, String> {
     let monitors = hyprland_request("j/monitors".into()).await?;
     let workspaces = hyprland_request("j/workspaces".into()).await?;
     let clients = hyprland_request("j/clients".into()).await?;
@@ -98,26 +113,38 @@ pub async fn hyprland_snapshot() -> Result<HyprlandSnapshot, String> {
         .map(str::parse)
         .collect::<Result<HashSet<i32>, _>>()
         .map_err(|e| e.to_string())?;
-    crate::workspace_state::parse(&monitors, &workspaces, &clients, &active_window, &urgent)
+    crate::workspace_state::parse(
+        &monitors,
+        &workspaces,
+        &clients,
+        &active_window,
+        &urgent,
+        slot_count,
+    )
 }
 
 pub async fn hyprland_switch_workspace(
     output_name: String,
     workspace_id: i32,
+    slot_count: u8,
 ) -> Result<(), String> {
-    let snapshot = hyprland_snapshot().await?;
+    let snapshot = hyprland_snapshot(slot_count).await?;
     let command = crate::workspace_state::switch_command(&snapshot, &output_name, workspace_id)?;
     dispatch_workspace_command(command).await
 }
 
-pub async fn hyprland_scroll_workspace(output_name: String, direction: i32) -> Result<(), String> {
-    let snapshot = hyprland_snapshot().await?;
+pub async fn hyprland_scroll_workspace(
+    output_name: String,
+    direction: i32,
+    slot_count: u8,
+) -> Result<(), String> {
+    let snapshot = hyprland_snapshot(slot_count).await?;
     let command = crate::workspace_state::scroll_command(&snapshot, &output_name, direction)?;
     dispatch_workspace_command(command).await
 }
 
-pub async fn hyprland_toggle_special(output_name: String) -> Result<(), String> {
-    let snapshot = hyprland_snapshot().await?;
+pub async fn hyprland_toggle_special(output_name: String, slot_count: u8) -> Result<(), String> {
+    let snapshot = hyprland_snapshot(slot_count).await?;
     let command = crate::workspace_state::special_command(&snapshot, &output_name)?;
     dispatch_workspace_command(command).await
 }
@@ -138,20 +165,14 @@ pub async fn hyprland_request(command: String) -> Result<String, String> {
 }
 
 pub async fn subscribe_hyprland(sink: StreamSink<HyprlandUpdate>) {
-    static EVENTS: OnceLock<Hub> = OnceLock::new();
+    static EVENTS: OnceLock<Arc<Hub>> = OnceLock::new();
     let hub = EVENTS.get_or_init(|| {
-        let (events, _) = broadcast::channel(256);
-        let (status, _) = watch::channel(None);
-        let hub = Hub {
-            events,
-            status,
-            super_held: AtomicBool::new(false),
-        };
+        let hub = Arc::new(Hub::new());
         tokio::spawn(crate::ipc::listen(hub.events.clone(), hub.status.clone()));
-        tokio::spawn(watch_super(&EVENTS));
+        tokio::spawn(watch_super(hub.clone(), read_super));
         hub
     });
-    let mut receiver = hub.events.subscribe();
+    let mut receiver = hub.subscribe();
     let initial = hub.status.borrow().clone();
     if let Some(update) = initial
         && sink.add(update).is_err()
@@ -200,26 +221,50 @@ fn super_update(held: bool) -> HyprlandUpdate {
     }
 }
 
-async fn watch_super(hub: &'static OnceLock<Hub>) {
+async fn watch_super<F: Future<Output = bool>>(hub: Arc<Hub>, read: impl Fn() -> F) {
     // One compositor read serves all bar views without taking keyboard focus.
+    let mut status = hub.status.subscribe();
     loop {
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        let Some(hub) = hub.get() else { continue };
-        let connected = hub
-            .status
+        if hub.events.receiver_count() == 0 {
+            hub.super_held.store(false, Ordering::Relaxed);
+            hub.subscriber_added.notified().await;
+            continue;
+        }
+        if !status
             .borrow()
             .as_ref()
-            .is_some_and(|update| update.kind == "connected");
-        let held = connected
-            && hyprland_request(
-                "repl return tostring(hl.is_key_down('Super_L') or hl.is_key_down('Super_R'))"
-                    .into(),
-            )
-            .await
-            .is_ok_and(|reply| reply.trim() == "true");
-        if hub.super_held.swap(held, Ordering::Relaxed) != held {
-            let _ = hub.events.send(super_update(held));
+            .is_some_and(|update| update.kind == "connected")
+        {
+            publish_super(&hub, false);
+            if status
+                .wait_for(|update| {
+                    update
+                        .as_ref()
+                        .is_some_and(|update| update.kind == "connected")
+                })
+                .await
+                .is_err()
+            {
+                return;
+            }
+            continue;
         }
+        publish_super(&hub, read().await);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
+async fn read_super() -> bool {
+    hyprland_request(
+        "repl return tostring(hl.is_key_down('Super_L') or hl.is_key_down('Super_R'))".into(),
+    )
+    .await
+    .is_ok_and(|reply| reply.trim() == "true")
+}
+
+fn publish_super(hub: &Hub, held: bool) {
+    if hub.super_held.swap(held, Ordering::Relaxed) != held {
+        let _ = hub.events.send(super_update(held));
     }
 }
 
@@ -271,9 +316,47 @@ fn output_fullscreen(
 }
 
 #[cfg(test)]
-mod fullscreen_tests {
-    use super::output_fullscreen;
+mod tests {
+    use super::*;
     use serde_json::json;
+
+    #[test]
+    fn super_polls_only_with_a_connection_and_subscriber() {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let hub = Arc::new(Hub::new());
+                let (samples, mut reads) = tokio::sync::mpsc::unbounded_channel();
+                let worker = tokio::spawn(watch_super(hub.clone(), move || {
+                    samples.send(()).unwrap();
+                    std::future::ready(true)
+                }));
+                let initial = hub.subscribe();
+                let interval = Duration::from_millis(150);
+                assert!(tokio::time::timeout(interval, reads.recv()).await.is_err());
+                drop(initial);
+                hub.status.send_replace(Some(HyprlandUpdate {
+                    kind: "connected".into(),
+                    name: String::new(),
+                    data: String::new(),
+                }));
+                assert!(tokio::time::timeout(interval, reads.recv()).await.is_err());
+                let mut subscribed = hub.subscribe();
+                assert_eq!(
+                    tokio::time::timeout(Duration::from_secs(1), subscribed.recv())
+                        .await
+                        .unwrap()
+                        .unwrap(),
+                    super_update(true)
+                );
+                assert_eq!(reads.try_recv(), Ok(()));
+                drop(subscribed);
+                assert!(tokio::time::timeout(interval, reads.recv()).await.is_err());
+                worker.abort();
+            });
+    }
 
     #[test]
     fn only_visible_fullscreen_clients_hide_their_output_bar() {

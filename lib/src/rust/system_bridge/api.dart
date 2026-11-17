@@ -327,6 +327,9 @@ class NotificationCenter {
   /// Newest first.
   final List<NotificationSnapshot> notifications;
 
+  /// The manual switch, once preferences have been applied.
+  final bool? doNotDisturb;
+
   /// Why Do Not Disturb is in effect: empty, `manual`, `schedule` or
   /// `fullscreen`.
   final String quietReason;
@@ -339,6 +342,7 @@ class NotificationCenter {
 
   const NotificationCenter({
     required this.notifications,
+    this.doNotDisturb,
     required this.quietReason,
     this.popupHost,
     this.error,
@@ -347,6 +351,7 @@ class NotificationCenter {
   @override
   int get hashCode =>
       notifications.hashCode ^
+      doNotDisturb.hashCode ^
       quietReason.hashCode ^
       popupHost.hashCode ^
       error.hashCode;
@@ -357,6 +362,7 @@ class NotificationCenter {
       other is NotificationCenter &&
           runtimeType == other.runtimeType &&
           notifications == other.notifications &&
+          doNotDisturb == other.doNotDisturb &&
           quietReason == other.quietReason &&
           popupHost == other.popupHost &&
           error == other.error;

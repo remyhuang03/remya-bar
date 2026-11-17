@@ -44,26 +44,29 @@ class BarSettingsController extends ChangeNotifier {
   final bool _ownsClient;
   late final BarPreferences preferences;
 
-  final values = <String, Object>{};
+  Map<String, Object> get values => preferences.values;
 
   /// Read errors clear on the next successful read; write errors (including
   /// conflicts) stay until the user reloads the key or writes it again.
   final readErrors = <String, String>{};
   final writeErrors = <String, String>{};
-  final _busy = <String>{};
+  final _writes = <String, Completer<void>>{};
+  final _readGeneration = <String, int>{};
 
   /// Tracked AI providers from Core's `ai.providers`, or null before a read.
   List<Map<String, dynamic>>? aiProviders;
   String? aiError;
+  int _aiGeneration = 0;
 
   final _subscriptions = <StreamSubscription<Object?>>[];
   bool _disposed = false;
 
-  bool busy(String key) => _busy.contains(key);
+  bool busy(String key) => _writes.containsKey(key);
   String? error(String key) => writeErrors[key] ?? readErrors[key];
 
   /// Subscribes before the first reads so concurrent writes are not missed.
   Future<void> start() async {
+    if (_disposed || _subscriptions.isNotEmpty) return;
     _subscriptions
       ..add(
         client.changes.listen((change) {
@@ -89,10 +92,18 @@ class BarSettingsController extends ChangeNotifier {
   }
 
   Future<void> load(String key) async {
+    while (busy(key)) {
+      await _writes[key]!.future;
+    }
+    if (_disposed) return;
+    final generation = _advanceRead(key);
+    bool isCurrent() => !_disposed && _readGeneration[key] == generation;
     try {
-      values[key] = await preferences.read(key);
+      await preferences.read(key, isCurrent: isCurrent);
+      if (!isCurrent()) return;
       readErrors.remove(key);
     } catch (error) {
+      if (!isCurrent()) return;
       readErrors[key] = barSettingsError(error);
     }
     _notify();
@@ -105,14 +116,18 @@ class BarSettingsController extends ChangeNotifier {
   }
 
   Future<void> loadAi() async {
+    if (_disposed) return;
+    final generation = ++_aiGeneration;
     try {
       final value = await client.readAi();
+      if (_disposed || generation != _aiGeneration) return;
       aiProviders = [
         for (final row in (value['providers'] as List?) ?? const [])
           if (row is Map) Map<String, dynamic>.from(row),
       ];
       aiError = null;
     } catch (error) {
+      if (_disposed || generation != _aiGeneration) return;
       aiError = barSettingsError(error);
     }
     _notify();
@@ -120,20 +135,26 @@ class BarSettingsController extends ChangeNotifier {
 
   /// Replaces [key] using the revision of the value currently displayed.
   Future<void> write(String key, Object value) async {
-    if (!values.containsKey(key) || !_busy.add(key)) return;
+    if (_disposed || !values.containsKey(key) || busy(key)) return;
+    final write = _writes[key] = Completer<void>();
+    final revision = preferences.revision(key);
+    _advanceRead(key);
     _notify();
     try {
-      values[key] = await preferences.replace(
+      await preferences.replace(
         key,
         value,
-        preferences.revision(key),
+        revision,
+        isCurrent: () => !_disposed,
       );
+      if (_disposed) return;
       writeErrors.remove(key);
       readErrors.remove(key);
     } catch (error) {
-      writeErrors[key] = barSettingsError(error);
+      if (!_disposed) writeErrors[key] = barSettingsError(error);
     } finally {
-      _busy.remove(key);
+      _writes.remove(key);
+      write.complete();
       _notify();
     }
   }
@@ -141,6 +162,9 @@ class BarSettingsController extends ChangeNotifier {
   /// Writes one field of an object preference.
   Future<void> update(String key, String field, Object value) =>
       write(key, {...values[key]! as Map, field: value});
+
+  int _advanceRead(String key) =>
+      _readGeneration.update(key, (value) => value + 1, ifAbsent: () => 1);
 
   void _notify() {
     if (!_disposed) notifyListeners();

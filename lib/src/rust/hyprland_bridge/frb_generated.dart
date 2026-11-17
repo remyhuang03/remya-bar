@@ -73,7 +73,7 @@ class HyprlandRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1765259113;
+  int get rustContentHash => 1869353342;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -95,18 +95,21 @@ abstract class HyprlandRustLibApi extends BaseApi {
   Future<void> crateApiHyprlandScrollWorkspace({
     required String outputName,
     required int direction,
+    required int slotCount,
   });
 
-  Future<void> crateApiHyprlandSetWorkspaceCount({required int count});
-
-  Future<HyprlandSnapshot> crateApiHyprlandSnapshot();
+  Future<HyprlandSnapshot> crateApiHyprlandSnapshot({required int slotCount});
 
   Future<void> crateApiHyprlandSwitchWorkspace({
     required String outputName,
     required int workspaceId,
+    required int slotCount,
   });
 
-  Future<void> crateApiHyprlandToggleSpecial({required String outputName});
+  Future<void> crateApiHyprlandToggleSpecial({
+    required String outputName,
+    required int slotCount,
+  });
 
   Stream<HyprlandUpdate> crateApiSubscribeHyprland();
 }
@@ -187,6 +190,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   Future<void> crateApiHyprlandScrollWorkspace({
     required String outputName,
     required int direction,
+    required int slotCount,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -194,6 +198,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(outputName, serializer);
           sse_encode_i_32(direction, serializer);
+          sse_encode_u_8(slotCount, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -206,7 +211,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiHyprlandScrollWorkspaceConstMeta,
-        argValues: [outputName, direction],
+        argValues: [outputName, direction, slotCount],
         apiImpl: this,
       ),
     );
@@ -215,16 +220,16 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   TaskConstMeta get kCrateApiHyprlandScrollWorkspaceConstMeta =>
       const TaskConstMeta(
         debugName: "hyprland_scroll_workspace",
-        argNames: ["outputName", "direction"],
+        argNames: ["outputName", "direction", "slotCount"],
       );
 
   @override
-  Future<void> crateApiHyprlandSetWorkspaceCount({required int count}) {
+  Future<HyprlandSnapshot> crateApiHyprlandSnapshot({required int slotCount}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_u_8(count, serializer);
+          sse_encode_u_8(slotCount, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -233,28 +238,34 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
+          decodeSuccessData: sse_decode_hyprland_snapshot,
           decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiHyprlandSetWorkspaceCountConstMeta,
-        argValues: [count],
+        constMeta: kCrateApiHyprlandSnapshotConstMeta,
+        argValues: [slotCount],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiHyprlandSetWorkspaceCountConstMeta =>
-      const TaskConstMeta(
-        debugName: "hyprland_set_workspace_count",
-        argNames: ["count"],
-      );
+  TaskConstMeta get kCrateApiHyprlandSnapshotConstMeta => const TaskConstMeta(
+    debugName: "hyprland_snapshot",
+    argNames: ["slotCount"],
+  );
 
   @override
-  Future<HyprlandSnapshot> crateApiHyprlandSnapshot() {
+  Future<void> crateApiHyprlandSwitchWorkspace({
+    required String outputName,
+    required int workspaceId,
+    required int slotCount,
+  }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(outputName, serializer);
+          sse_encode_i_32(workspaceId, serializer);
+          sse_encode_u_8(slotCount, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -263,30 +274,33 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_hyprland_snapshot,
+          decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiHyprlandSnapshotConstMeta,
-        argValues: [],
+        constMeta: kCrateApiHyprlandSwitchWorkspaceConstMeta,
+        argValues: [outputName, workspaceId, slotCount],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiHyprlandSnapshotConstMeta =>
-      const TaskConstMeta(debugName: "hyprland_snapshot", argNames: []);
+  TaskConstMeta get kCrateApiHyprlandSwitchWorkspaceConstMeta =>
+      const TaskConstMeta(
+        debugName: "hyprland_switch_workspace",
+        argNames: ["outputName", "workspaceId", "slotCount"],
+      );
 
   @override
-  Future<void> crateApiHyprlandSwitchWorkspace({
+  Future<void> crateApiHyprlandToggleSpecial({
     required String outputName,
-    required int workspaceId,
+    required int slotCount,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(outputName, serializer);
-          sse_encode_i_32(workspaceId, serializer);
+          sse_encode_u_8(slotCount, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -298,39 +312,8 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_String,
         ),
-        constMeta: kCrateApiHyprlandSwitchWorkspaceConstMeta,
-        argValues: [outputName, workspaceId],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiHyprlandSwitchWorkspaceConstMeta =>
-      const TaskConstMeta(
-        debugName: "hyprland_switch_workspace",
-        argNames: ["outputName", "workspaceId"],
-      );
-
-  @override
-  Future<void> crateApiHyprlandToggleSpecial({required String outputName}) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(outputName, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 7,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: sse_decode_String,
-        ),
         constMeta: kCrateApiHyprlandToggleSpecialConstMeta,
-        argValues: [outputName],
+        argValues: [outputName, slotCount],
         apiImpl: this,
       ),
     );
@@ -339,7 +322,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   TaskConstMeta get kCrateApiHyprlandToggleSpecialConstMeta =>
       const TaskConstMeta(
         debugName: "hyprland_toggle_special",
-        argNames: ["outputName"],
+        argNames: ["outputName", "slotCount"],
       );
 
   @override
@@ -354,7 +337,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 8,
+              funcId: 7,
               port: port_,
             );
           },

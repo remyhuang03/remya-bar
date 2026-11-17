@@ -926,6 +926,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  bool dco_decode_box_autoadd_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as bool;
+  }
+
+  @protected
   double dco_decode_box_autoadd_f_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as double;
@@ -1132,13 +1138,14 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   NotificationCenter dco_decode_notification_center(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return NotificationCenter(
       notifications: dco_decode_list_notification_snapshot(arr[0]),
-      quietReason: dco_decode_String(arr[1]),
-      popupHost: dco_decode_opt_String(arr[2]),
-      error: dco_decode_opt_String(arr[3]),
+      doNotDisturb: dco_decode_opt_box_autoadd_bool(arr[1]),
+      quietReason: dco_decode_String(arr[2]),
+      popupHost: dco_decode_opt_String(arr[3]),
+      error: dco_decode_opt_String(arr[4]),
     );
   }
 
@@ -1222,6 +1229,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   String? dco_decode_opt_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_String(raw);
+  }
+
+  @protected
+  bool? dco_decode_opt_box_autoadd_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_bool(raw);
   }
 
   @protected
@@ -1410,6 +1423,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   bool sse_decode_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
+  bool sse_decode_box_autoadd_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_bool(deserializer));
   }
 
   @protected
@@ -1711,11 +1730,13 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_notifications = sse_decode_list_notification_snapshot(deserializer);
+    var var_doNotDisturb = sse_decode_opt_box_autoadd_bool(deserializer);
     var var_quietReason = sse_decode_String(deserializer);
     var var_popupHost = sse_decode_opt_String(deserializer);
     var var_error = sse_decode_opt_String(deserializer);
     return NotificationCenter(
       notifications: var_notifications,
+      doNotDisturb: var_doNotDisturb,
       quietReason: var_quietReason,
       popupHost: var_popupHost,
       error: var_error,
@@ -1833,6 +1854,17 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_String(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_bool(deserializer));
     } else {
       return null;
     }
@@ -2111,6 +2143,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_f_64(double self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_f_64(self, serializer);
@@ -2374,6 +2412,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_notification_snapshot(self.notifications, serializer);
+    sse_encode_opt_box_autoadd_bool(self.doNotDisturb, serializer);
     sse_encode_String(self.quietReason, serializer);
     sse_encode_opt_String(self.popupHost, serializer);
     sse_encode_opt_String(self.error, serializer);
@@ -2454,6 +2493,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_String(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_bool(self, serializer);
     }
   }
 

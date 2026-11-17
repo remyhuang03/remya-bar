@@ -235,7 +235,7 @@ hl.bind(
 
 ### Prerequisites & Setup
 
-- FVM with Flutter SDK `3.47.9`
+- FVM with the Flutter SDK pinned in [`.fvmrc`](.fvmrc)
 - Rust toolchain (`2024` edition) managed via `rustup`
 - A sibling `../remya-core` checkout during development to provide `packages/remya_client` and `packages/remya_ui` (compiled release bundles do not require a sibling source checkout)
 - **Remya Core** installed and enabled at runtime (providing `dbus-1/services/top.remya.Core1.service` and `top.remya.core.service`)
@@ -255,7 +255,16 @@ fvm install
 fvm flutter pub get
 ```
 
-After modifying Rust bridge APIs, regenerate bindings using `flutter_rust_bridge_codegen` and `flutter_rust_bridge.yaml`.
+After modifying Rust bridge APIs, regenerate the bindings with
+`flutter_rust_bridge_codegen` 2.13.0 and `cargo-expand` available on PATH.
+Use the Flutter SDK pinned by FVM, then run from the repository root:
+
+```bash
+PATH="$PWD/.fvm/flutter_sdk/bin:$PATH" flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.yaml
+PATH="$PWD/.fvm/flutter_sdk/bin:$PATH" flutter_rust_bridge_codegen generate --config-file flutter_rust_bridge.system.yaml
+fvm dart format lib/src/rust/hyprland_bridge lib/src/rust/system_bridge
+cargo fmt --all
+```
 
 ### Validation & Local Installation
 

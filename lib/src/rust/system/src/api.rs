@@ -348,6 +348,8 @@ pub struct NotificationSnapshot {
 pub struct NotificationCenter {
     /// Newest first.
     pub notifications: Vec<NotificationSnapshot>,
+    /// The manual switch, once preferences have been applied.
+    pub do_not_disturb: Option<bool>,
     /// Why Do Not Disturb is in effect: empty, `manual`, `schedule` or
     /// `fullscreen`.
     pub quiet_reason: String,

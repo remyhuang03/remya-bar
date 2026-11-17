@@ -28,7 +28,10 @@ Future<void> main() async {
             ? column
             : (a['name'] as String).compareTo(b['name'] as String);
       });
-    final snapshot = await hyprlandSnapshot();
+    final (snapshot, smaller) = await (
+      hyprlandSnapshot(slotCount: 8),
+      hyprlandSnapshot(slotCount: 3),
+    ).wait;
     if (snapshot.monitors.length != expected.length) {
       throw StateError('Output count changed during the snapshot');
     }
@@ -37,6 +40,10 @@ Future<void> main() async {
       if (monitor.name != expected[i]['name'] ||
           monitor.outputNumber != i + 1) {
         throw StateError('Output numbering disagrees with compositor geometry');
+      }
+      if (monitor.workspaceSlots.length != 8 ||
+          smaller.monitors[i].workspaceSlots.length != 3) {
+        throw StateError('Concurrent snapshots used the wrong workspace count');
       }
     }
     stdout.writeln(

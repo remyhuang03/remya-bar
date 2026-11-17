@@ -95,7 +95,8 @@ static void check_settings_window(MyApplication* self) {
   g_assert_cmpstr(gtk_window_get_title(GTK_WINDOW(self->settings_window)), ==, "Remy'a Bar Settings");
   open_settings(self, "notifications");
   g_assert_true(first == FL_VIEW(gtk_bin_get_child(GTK_BIN(self->settings_window))));
-  g_assert_cmpstr(self->settings_page, ==, "notifications");
+  // The ready engine receives the page immediately, clearing the pending request.
+  g_assert_null(self->settings_page);
   gtk_widget_destroy(self->settings_window);
   g_assert_null(self->settings_window);
   g_assert_true(gtk_widget_get_realized(self->popup_engine_window));

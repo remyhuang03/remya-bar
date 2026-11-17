@@ -2,7 +2,6 @@
 
 #include <gio/gdesktopappinfo.h>
 #include <gtk/gtk.h>
-#include <map>
 #include <string>
 
 namespace {
@@ -27,10 +26,9 @@ std::string icon_file(GtkIconInfo* info) {
   return result;
 }
 
-std::string lookup_icon(const std::string& app_id) {
+std::string lookup_icon(const std::string& app_id, GList* applications) {
   const std::string wanted = normalized(app_id.c_str());
   GtkIconTheme* theme = gtk_icon_theme_get_default();
-  GList* applications = g_app_info_get_all();
   std::string result;
   for (GList* entry = applications; entry != nullptr; entry = entry->next) {
     auto* app = G_APP_INFO(entry->data);
@@ -45,7 +43,6 @@ std::string lookup_icon(const std::string& app_id) {
         theme, icon, 32, GTK_ICON_LOOKUP_NO_SVG));
     if (!result.empty()) break;
   }
-  g_list_free_full(applications, g_object_unref);
   if (!result.empty()) return result;
   for (const auto& candidate : {app_id, wanted,
        wanted.substr(wanted.find_last_of('.') == std::string::npos
@@ -67,7 +64,7 @@ void icon_method(FlMethodChannel*, FlMethodCall* call, gpointer) {
     fl_method_call_respond_error(call, "invalid-arguments", "Expected application identifiers", nullptr, nullptr);
     return;
   }
-  static std::map<std::string, std::string> paths;
+  GList* applications = tray ? nullptr : g_app_info_get_all();
   g_autoptr(FlValue) result = fl_value_new_map();
   for (size_t index = 0; index < fl_value_get_length(args); ++index) {
     FlValue* item = fl_value_get_list_value(args, index);
@@ -117,12 +114,12 @@ void icon_method(FlMethodChannel*, FlMethodCall* call, gpointer) {
     if (fl_value_get_type(item) != FL_VALUE_TYPE_STRING) continue;
     const std::string app_id = fl_value_get_string(item);
     if (app_id.empty() || app_id.size() > 256 || app_id.find_first_of("/\\\n\r") != std::string::npos) continue;
-    auto path = paths.find(app_id);
-    if (path == paths.end()) path = paths.emplace(app_id, lookup_icon(app_id)).first;
-    if (!path->second.empty()) {
-      fl_value_set_string_take(result, app_id.c_str(), fl_value_new_string(path->second.c_str()));
+    const auto path = lookup_icon(app_id, applications);
+    if (!path.empty()) {
+      fl_value_set_string_take(result, app_id.c_str(), fl_value_new_string(path.c_str()));
     }
   }
+  g_list_free_full(applications, g_object_unref);
   fl_method_call_respond_success(call, result, nullptr);
 }
 
@@ -134,4 +131,13 @@ void register_bar_icons(FlView* owner) {
       fl_engine_get_binary_messenger(fl_view_get_engine(owner)),
       "top.remya.bar/icons", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(channel, icon_method, nullptr, nullptr);
+  g_object_set_data_full(G_OBJECT(owner), "icons-channel", g_object_ref(channel),
+                         g_object_unref);
+  g_signal_connect_object(gtk_icon_theme_get_default(), "changed",
+      G_CALLBACK(+[](GtkIconTheme*, FlView* view) {
+        auto* channel = FL_METHOD_CHANNEL(
+            g_object_get_data(G_OBJECT(view), "icons-channel"));
+        fl_method_channel_invoke_method(channel, "themeChanged", nullptr,
+                                        nullptr, nullptr, nullptr);
+      }), owner, G_CONNECT_DEFAULT);
 }
