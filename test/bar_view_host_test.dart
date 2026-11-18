@@ -119,6 +119,7 @@ void main() {
     initialList.complete(snapshot(1, {'10': 'popup'}));
     await tester.pump();
     expect(find.byType(RemyaBarApp), findsOneWidget);
+    final firstBar = tester.widget<RemyaBarApp>(find.byType(RemyaBarApp));
 
     binding.platformDispatcher.explicitViews.add(
       _ExplicitView(tester.view, 11),
@@ -126,6 +127,12 @@ void main() {
     binding.changeMetrics();
     await tester.pump();
     expect(view(11), findsOneWidget);
+    expect(
+      tester.widget<RemyaBarApp>(
+        find.descendant(of: view(10), matching: find.byType(RemyaBarApp)),
+      ),
+      same(firstBar),
+    );
     const action = MethodCall('action', {
       'action': 'card.state',
       'kind': 'resources',

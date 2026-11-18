@@ -1,22 +1,7 @@
 import 'dart:async';
-import 'dart:isolate';
-import 'dart:ui' show IsolateNameServer;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:remya_bar/features/ai_usage/ai_usage_backend.dart';
 import 'package:remya_bar/features/ai_usage/ai_usage_poll.dart';
-import 'package:remya_client/settings_contract.dart';
-
-class _Settings extends SettingsClient {
-  @override
-  Stream<SettingsChange> get changes => const Stream.empty();
-
-  @override
-  Future<Map<String, dynamic>> call(
-    String method, [
-    List<String> arguments = const [],
-  ]) async => throw StateError('Core unavailable');
-}
 
 void main() {
   test('manual refresh waits for its own poll and coalesces callers', () async {
@@ -93,39 +78,5 @@ void main() {
     await pending;
     await poll.read(false);
     expect(calls, 2);
-  });
-
-  test('a late ordinary response cannot revert a manual refresh', () async {
-    const name = 'top.remya.bar/ai-usage';
-    final inbox = ReceivePort();
-    expect(
-      IsolateNameServer.registerPortWithName(inbox.sendPort, name),
-      isTrue,
-    );
-    final messages = StreamIterator<dynamic>(inbox);
-    addTearDown(() async {
-      IsolateNameServer.removePortNameMapping(name);
-      await messages.cancel();
-      inbox.close();
-    });
-    final settings = _Settings();
-    addTearDown(settings.close);
-    final backend = AiUsageBackend(settings: settings)..start();
-    addTearDown(backend.dispose);
-
-    expect(await messages.moveNext(), isTrue);
-    final [SendPort ordinary, bool conventional] = messages.current as List;
-    expect(conventional, isFalse);
-    final refresh = backend.refresh();
-    expect(await messages.moveNext(), isTrue);
-    final [SendPort forced, bool manual] = messages.current as List;
-    expect(manual, isTrue);
-    forced.send({'version': 2});
-    await refresh;
-
-    ordinary.send({'version': 1});
-    await pumpEventQueue();
-    expect(backend.data['version'], 2);
-    expect(backend.tick, 1);
   });
 }

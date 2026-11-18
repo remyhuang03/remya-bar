@@ -36,6 +36,59 @@ Future<void> _openSettings(WidgetTester tester) async {
 void main() {
   setUp(() => _popup = BarPopup.forView(1));
   tearDown(() => _popup.dispose());
+  testWidgets(
+    'fullscreen retries a failed native transition without a new snapshot',
+    (tester) async {
+      const channel = MethodChannel('test/bar/window');
+      final transitions = <bool>[];
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method != 'setFullscreen') return null;
+        transitions.add(call.arguments as bool);
+        if (transitions.length == 1) throw PlatformException(code: 'temporary');
+        return null;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      final preferences = SettingsThemeController(
+        () => File('/nonexistent/theme.toml'),
+      );
+      final output = HyprlandBackend(
+        outputName: 'DP-1',
+        readSnapshot: ({required slotCount}) async => const HyprlandSnapshot(
+          monitors: [
+            HyprlandMonitor(
+              fullscreen: true,
+              name: 'DP-1',
+              outputNumber: 0,
+              x: 0,
+              y: 0,
+              activeWorkspaceId: 1,
+              workspaceSlots: [],
+            ),
+          ],
+          workspaces: [],
+        ),
+      );
+      addTearDown(preferences.dispose);
+      addTearDown(output.dispose);
+      await output.refresh();
+      await tester.pumpWidget(
+        RemyaBarApp(
+          popup: _popup,
+          preferences: preferences,
+          hyprland: output,
+          window: channel,
+        ),
+      );
+      expect(transitions, [true]);
+      await tester.pump(const Duration(seconds: 2));
+      expect(transitions, [true, true]);
+      await tester.pump(const Duration(seconds: 2));
+      expect(transitions, [true, true]);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   testWidgets('card state validates payloads and ignores stale close actions', (
     tester,
   ) async {

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/bar_pill.dart';
@@ -10,13 +11,13 @@ class BarResources extends StatelessWidget {
   const BarResources({
     super.key,
     this.snapshot,
-    required this.cardSnapshot,
+    this.cardSnapshot,
     this.compact = false,
     this.metrics,
   });
 
   final SystemSnapshot? snapshot;
-  final SystemSnapshot? cardSnapshot;
+  final ValueListenable<SystemSnapshot?>? cardSnapshot;
   final bool compact;
 
   /// Shown metric names (`cpu`, `memory`, `gpu`, `network`); null shows all.
@@ -56,7 +57,8 @@ class BarResources extends StatelessWidget {
         card: BarPillCard(
           kind: 'resources',
           size: const Size(420, 632),
-          data: resourcePopupData(cardSnapshot),
+          loadData: () => resourcePopupData(cardSnapshot?.value ?? snapshot),
+          dataChanges: cardSnapshot,
           openOnTap: true,
         ),
         builder: (context, state) => Row(

@@ -26,6 +26,7 @@ import 'features/keyboard/keyboard_panel.dart';
 import 'features/popups/bar_popup.dart';
 import 'features/resources/resource_data.dart';
 import 'features/tray/bar_tray.dart';
+import 'features/tray/tray_backend.dart';
 import 'features/workspaces/bar_workspaces.dart';
 
 part 'app_popup_actions.dart';
@@ -47,7 +48,7 @@ class RemyaBarApp extends StatefulWidget {
     this.notifications,
     this.osd,
     this.onOpenSettingsPage,
-    this.showTray = false,
+    this.tray,
     this.onOpenSettings = openRemyaSettings,
     this.onOpenPowerSettings = _openPowerSettings,
     this.onLaunchScreenCapture = _defaultLaunchScreenCapture,
@@ -63,7 +64,7 @@ class RemyaBarApp extends StatefulWidget {
   final NotificationBackend? notifications;
   final OsdController? osd;
   final Future<void> Function(String page)? onOpenSettingsPage;
-  final bool showTray;
+  final TrayBackend? tray;
   final Future<void> Function() onOpenSettings;
   final Future<void> Function() onOpenPowerSettings;
   final Future<void> Function(List<String> arguments) onLaunchScreenCapture;
@@ -101,6 +102,10 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   int _panelRequest = 0;
 
   bool _fullscreen = false;
+  bool _desiredFullscreen = false;
+  bool? _nativeFullscreen = false;
+  bool _applyingFullscreen = false;
+  Timer? _fullscreenRetry;
   bool _focused = false;
   int _outputRevision = 0;
   String? _outputName;
@@ -131,26 +136,52 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     final output = hyprland?.output;
     if (output == null) return;
     final outputChanged = _outputName != output.name;
-    final fullscreenChanged = output.fullscreen != _fullscreen;
+    final fullscreenChanged = output.fullscreen != _desiredFullscreen;
     final focusedChanged = _focused != hyprland!.isFocused;
     _outputName = output.name;
     _focused = hyprland.isFocused;
     widget.osd?.updateOutput(output.name);
     widget.notifications?.setFullscreen(this, output.name, output.fullscreen);
     if (fullscreenChanged) {
-      setState(() => _fullscreen = output.fullscreen);
-      unawaited(
-        _window
-            ?.invokeMethod<void>('setFullscreen', _fullscreen)
-            .catchError(
-              (Object error) => debugPrint('Bar fullscreen state: $error'),
-            ),
-      );
-      _updateResourceDemand();
-      unawaited(_syncOsd());
+      _desiredFullscreen = output.fullscreen;
+      _fullscreenRetry?.cancel();
+      _fullscreenRetry = null;
+      unawaited(_applyFullscreen());
     }
-    if (outputChanged || fullscreenChanged || focusedChanged) {
+    if (outputChanged || focusedChanged) {
       unawaited(_syncToasts());
+    }
+  }
+
+  Future<void> _applyFullscreen() async {
+    if (_applyingFullscreen) return;
+    _applyingFullscreen = true;
+    try {
+      while (mounted && _nativeFullscreen != _desiredFullscreen) {
+        final next = _desiredFullscreen;
+        try {
+          await _window?.invokeMethod<void>('setFullscreen', next);
+        } catch (error) {
+          if (!mounted) return;
+          debugPrint('Bar fullscreen state: $error');
+          _nativeFullscreen = null;
+          _fullscreenRetry = Timer(const Duration(seconds: 2), () {
+            _fullscreenRetry = null;
+            unawaited(_applyFullscreen());
+          });
+          return;
+        }
+        if (!mounted) return;
+        _nativeFullscreen = next;
+        if (_fullscreen != next) {
+          setState(() => _fullscreen = next);
+          _updateResourceDemand();
+          unawaited(_syncOsd());
+          unawaited(_syncToasts());
+        }
+      }
+    } finally {
+      _applyingFullscreen = false;
     }
   }
 
@@ -574,6 +605,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
 
   @override
   void dispose() {
+    _fullscreenRetry?.cancel();
     widget.notifications?.removeListener(_onNotificationsChanged);
     widget.osd?.removeListener(_syncOsd);
     widget.notifications?.releaseOutput(this);
@@ -629,9 +661,9 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
                 pillSnapshot: widget.system?.resourcePill.value,
                 sidebarOpen: _sidebarOpen,
                 notificationsOpen: _notificationsOpen,
-                tray: widget.showTray
-                    ? BarTray(key: _tray, popup: _popup)
-                    : null,
+                tray: widget.tray == null
+                    ? null
+                    : BarTray(key: _tray, popup: _popup, backend: widget.tray!),
                 onToggleSidebar: _toggleSidebar,
                 onToggleNotifications: _toggleNotifications,
               ),

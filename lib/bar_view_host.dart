@@ -32,6 +32,7 @@ enum _ViewRole { bar, popup, settings }
 class _BarViewHostState extends State<BarViewHost> with WidgetsBindingObserver {
   List<FlutterView> _views = const [];
   Map<int, _ViewRole> _roles = const {};
+  final _bars = <int, Widget>{};
   int _revision = -1;
   int _settingsRequest = 0;
   ({int id, String page})? _settings;
@@ -68,6 +69,7 @@ class _BarViewHostState extends State<BarViewHost> with WidgetsBindingObserver {
     setState(() {
       _revision = revision;
       _roles = roles;
+      _bars.removeWhere((id, _) => roles[id] != .bar);
     });
   }
 
@@ -124,6 +126,12 @@ class _BarViewHostState extends State<BarViewHost> with WidgetsBindingObserver {
   }
 
   @override
+  void didUpdateWidget(BarViewHost oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.buildBar != widget.buildBar) _bars.clear();
+  }
+
+  @override
   void didChangeMetrics() {
     final views = _platformViews();
     if (!listEquals(_views, views)) setState(() => _views = views);
@@ -138,7 +146,8 @@ class _BarViewHostState extends State<BarViewHost> with WidgetsBindingObserver {
   }
 
   Widget _buildView(int viewId, _ViewRole role) => switch (role) {
-    .bar => widget.buildBar(viewId),
+    // Other views opening or closing do not invalidate a bar's subtree.
+    .bar => _bars.putIfAbsent(viewId, () => widget.buildBar(viewId)),
     .popup => BarPopupApp(channel: BarPopup.viewChannel(viewId)),
     .settings => BarSettingsEntry(
       page: _settings?.id == viewId ? _settings!.page : '',

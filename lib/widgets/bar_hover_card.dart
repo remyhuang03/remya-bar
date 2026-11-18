@@ -14,6 +14,8 @@ class BarHoverCard extends StatefulWidget {
     required this.kind,
     required this.size,
     required this.data,
+    this.loadData,
+    this.dataChanges,
     this.child,
     this.builder,
     this.onTap,
@@ -24,6 +26,8 @@ class BarHoverCard extends StatefulWidget {
   final String kind;
   final Size size;
   final Map<String, Object?> data;
+  final ValueGetter<Map<String, Object?>>? loadData;
+  final Listenable? dataChanges;
   final Widget? child;
   final Widget Function(BuildContext context, VoidCallback? onTap)? builder;
   final VoidCallback? onTap;
@@ -69,7 +73,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
       return;
     }
     final data = {
-      ...widget.data,
+      ...(widget.loadData?.call() ?? widget.data),
       if (widget.seedColor case final seed?)
         'cardSeed': seed.toARGB32() & 0xFFFFFF,
       'scale': MediaQuery.textScalerOf(context).scale(1),
@@ -127,6 +131,27 @@ class _BarHoverCardState extends State<BarHoverCard> {
     WidgetsBinding.instance.addPostFrameCallback(_trackAnchor);
   }
 
+  void _onDataChanged() {
+    // The open card already tracks its anchor at the end of each frame.
+    if (_popup?.openCard.value == widget.kind) {
+      WidgetsBinding.instance.ensureVisualUpdate();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.dataChanges?.addListener(_onDataChanged);
+  }
+
+  @override
+  void didUpdateWidget(BarHoverCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.dataChanges == widget.dataChanges) return;
+    oldWidget.dataChanges?.removeListener(_onDataChanged);
+    widget.dataChanges?.addListener(_onDataChanged);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -140,6 +165,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
 
   @override
   void dispose() {
+    widget.dataChanges?.removeListener(_onDataChanged);
     _popup?.openCard.removeListener(_onOpenCard);
     _timer?.cancel();
     if (_popup case final popup? when _shown) {

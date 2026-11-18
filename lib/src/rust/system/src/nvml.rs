@@ -68,7 +68,7 @@ struct Nvml {
 struct State {
     initialized: bool,
     discovered: Option<Instant>,
-    identities: Vec<Option<(String, String)>>,
+    identities: Vec<Option<(usize, String, String)>>,
 }
 
 /// Call only from a blocking worker. A loaded driver stays resident for the process.
@@ -144,7 +144,7 @@ impl Nvml {
         &self,
         index: c_uint,
         details: bool,
-        identity: &mut Option<(String, String)>,
+        identity: &mut Option<(usize, String, String)>,
     ) -> Option<GpuSnapshot> {
         let mut device = ptr::null_mut();
         // SAFETY: Each output points to an initialized, writable C value.
@@ -153,12 +153,17 @@ impl Nvml {
             if (self.handle)(index, &mut device) != SUCCESS || device.is_null() {
                 return None;
             }
-            let (id, name) = match identity {
-                Some(identity) => identity,
-                None => {
-                    identity.insert((read_text(self.uuid, device)?, read_text(self.name, device)?))
-                }
-            };
+            if identity
+                .as_ref()
+                .is_none_or(|(handle, _, _)| *handle != device.addr())
+            {
+                *identity = Some((
+                    device.addr(),
+                    read_text(self.uuid, device)?,
+                    read_text(self.name, device)?,
+                ));
+            }
+            let (_, id, name) = identity.as_ref()?;
             let utilization = read_metric(|out| (self.utilization)(device, out))?;
             let memory = if !details {
                 None

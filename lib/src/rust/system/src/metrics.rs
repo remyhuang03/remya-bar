@@ -275,8 +275,9 @@ impl SensorWorker {
         self.last_started = Some((Instant::now(), demand));
         let mut sensors = self.sensors.take().unwrap_or_default();
         self.running = Some(tokio::task::spawn_blocking(move || {
+            let sampled_at = Instant::now();
             let sample = sensors.sample(demand == SensorDemand::Card);
-            (sensors, Instant::now(), demand, sample)
+            (sensors, sampled_at, demand, sample)
         }));
     }
 

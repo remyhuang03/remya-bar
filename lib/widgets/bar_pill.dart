@@ -8,7 +8,9 @@ class BarPillCard {
   const BarPillCard({
     required this.kind,
     required this.size,
-    required this.data,
+    this.data = const {},
+    this.loadData,
+    this.dataChanges,
     this.seedColor,
     this.openOnTap = false,
   });
@@ -16,6 +18,8 @@ class BarPillCard {
   final String kind;
   final Size size;
   final Map<String, Object?> data;
+  final ValueGetter<Map<String, Object?>>? loadData;
+  final Listenable? dataChanges;
   final Color? seedColor;
   final bool openOnTap;
 }
@@ -88,6 +92,8 @@ class _BarPillState extends State<BarPill> {
                 kind: card.kind,
                 size: card.size,
                 data: card.data,
+                loadData: card.loadData,
+                dataChanges: card.dataChanges,
                 seedColor: card.seedColor,
                 openOnTap: card.openOnTap,
                 onTap: widget.onTap,

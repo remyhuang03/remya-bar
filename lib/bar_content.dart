@@ -120,22 +120,12 @@ class BarContent extends StatelessWidget {
               snapshot: pillSnapshot,
               metrics: metrics,
             ),
-            child: system == null
-                ? BarResources(
-                    snapshot: pillSnapshot,
-                    cardSnapshot: null,
-                    compact: compactResources,
-                    metrics: metrics,
-                  )
-                : ValueListenableBuilder(
-                    valueListenable: system!.hardware,
-                    builder: (context, sample, _) => BarResources(
-                      snapshot: pillSnapshot,
-                      cardSnapshot: sample,
-                      compact: compactResources,
-                      metrics: metrics,
-                    ),
-                  ),
+            child: BarResources(
+              snapshot: pillSnapshot,
+              cardSnapshot: system?.hardware,
+              compact: compactResources,
+              metrics: metrics,
+            ),
           ),
         'media' when system?.players.isNotEmpty == true => ConstrainedBox(
           constraints: const .new(maxWidth: BarMedia.width),

@@ -19,6 +19,7 @@ import 'features/popups/bar_popup.dart';
 import 'features/settings/bar_theme_controller.dart';
 import 'features/sidebar/sidebar_screen_capture.dart';
 import 'features/system/system_backend.dart';
+import 'features/tray/tray_backend.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,6 +62,7 @@ class _BarApplicationState extends State<_BarApplication> {
   final _account = AccountProfileController();
   final _notifications = NotificationBackend();
   final _notificationSettings = NotificationSettings();
+  final _tray = TrayBackend();
   final _osdSettings = SettingsClient();
   late final _debugSettings = _debugExecutable(
     'remya-settings',
@@ -85,7 +87,6 @@ class _BarApplicationState extends State<_BarApplication> {
     super.initState();
     _hyprland.start();
     _system.start();
-    startAiUsageWorker();
     _aiUsage.start();
     _account.start();
     _notifications.start();
@@ -97,6 +98,7 @@ class _BarApplicationState extends State<_BarApplication> {
     unawaited(_notificationSettings.close());
     unawaited(_osdSettings.close());
     _notifications.dispose();
+    _tray.dispose();
     _account.dispose();
     _aiUsage.dispose();
     _system.dispose();
@@ -163,7 +165,7 @@ class _BarOutputState extends State<_BarOutput> {
       osd: _osd,
       onOpenSettingsPage: (page) =>
           openRemyaSettings(debugExecutable: app._debugSettings, page: page),
-      showTray: true,
+      tray: app._tray,
       onOpenSettings: () =>
           openRemyaSettings(debugExecutable: app._debugSettings),
       onOpenPowerSettings: () =>

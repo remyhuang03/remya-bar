@@ -41,6 +41,8 @@ void main() {
     tester,
   ) async {
     final calls = <MethodCall>[];
+    final samples = ValueNotifier<SystemSnapshot?>(_snapshot);
+    addTearDown(samples.dispose);
     final messenger = tester.binding.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(_popup.channel, (call) async {
       calls.add(call);
@@ -53,7 +55,7 @@ void main() {
           popup: _popup,
           theme: RemyaTheme(),
           child: Center(
-            child: BarResources(snapshot: _snapshot, cardSnapshot: _snapshot),
+            child: BarResources(snapshot: _snapshot, cardSnapshot: samples),
           ),
         ),
       ),
@@ -79,6 +81,18 @@ void main() {
     expect(show.arguments['kind'], 'resources');
     expect(show.arguments['data']['download'], isNull);
     expect(show.arguments['data']['upload'], 86000);
+    final pill = tester.widget(find.byType(BarResources));
+    _popup.openCard.value = 'resources';
+    await tester.pump();
+    samples.value = const SystemSnapshot(
+      cpuPercent: 42,
+      gpus: [],
+      batteries: [],
+    );
+    await tester.pump();
+    final update = calls.lastWhere((call) => call.method == 'update');
+    expect(update.arguments['data']['cpu'], 42);
+    expect(tester.widget(find.byType(BarResources)), same(pill));
     expect(tester.takeException(), isNull);
     await mouse.removePointer();
     await tester.pump();
@@ -104,6 +118,7 @@ void main() {
       await tester.pumpWidget(app());
       final materialApp = tester.widget(find.byType(MaterialApp));
       final content = tester.widget(find.byType(BarContent));
+      final initialPill = pill();
       system.resourceSnapshot = const SystemSnapshot(
         cpuPercent: 42,
         gpus: [],
@@ -111,7 +126,8 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 2));
       expect(pill().snapshot?.cpuPercent, 91);
-      expect(pill().cardSnapshot?.cpuPercent, 42);
+      expect(pill(), same(initialPill));
+      expect(pill().cardSnapshot?.value?.cpuPercent, 42);
       expect(tester.widget(find.byType(BarContent)), same(content));
       await tester.pump(const Duration(seconds: 1));
       expect(pill().snapshot?.cpuPercent, 42);

@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:math';
-import 'dart:ui' show IsolateNameServer;
 
 import 'package:flutter/foundation.dart';
 import 'package:remya_client/settings_contract.dart';
@@ -13,9 +11,6 @@ import '../../src/rust/system_bridge/api.dart' as rust;
 import '../system/system_backend.dart';
 import 'ai_usage_data.dart';
 import 'ai_usage_poll.dart';
-
-const _workerName = 'top.remya.bar/ai-usage';
-ReceivePort? _workerInbox;
 
 /// Shares one process-wide sample and refresh state with every bar view.
 class AiUsageBackend extends ChangeNotifier {
@@ -31,13 +26,12 @@ class AiUsageBackend extends ChangeNotifier {
   Map<String, dynamic>? _bar;
   Future<void>? _readingBar;
   bool _barDirty = false;
+  bool _retryBar = false;
   Timer? _timer;
   StreamSubscription<SettingsChange>? _changes;
+  StreamSubscription<bool>? _availability;
   bool _disposed = false;
-  SendPort? _readingWorker;
-  final _replies = <ReceivePort>{};
-  int _nextRead = 0;
-  int _appliedRead = 0;
+  bool _publishedVisible = false;
   bool refreshing = false;
   int tick = 0;
 
@@ -45,26 +39,38 @@ class AiUsageBackend extends ChangeNotifier {
 
   void start() {
     if (_disposed || _timer != null) return;
-    unawaited(_read());
-    unawaited(_readBar());
-    _timer = Timer.periodic(const Duration(seconds: 15), (_) {
-      unawaited(_read());
-      unawaited(_readBar());
-    });
     _changes = _settings.changes.listen((change) {
       if (change.topic == aiRingSettingId) {
         unawaited(_readBar());
       } else if (change.topic == aiProvidersSettingId) {
-        unawaited(_read());
+        _polling.invalidate();
+        unawaited(_polling.read(false));
       }
     }, onError: (Object _) {});
+    _availability = _settings.serviceAvailableChanges.listen((available) {
+      if (!available) return;
+      unawaited(_readBar());
+      _polling.invalidate();
+      unawaited(_polling.read(false));
+    }, onError: (Object _) {});
+    unawaited(_readBar());
+    unawaited(_polling.read(false));
+    _timer = Timer.periodic(const Duration(seconds: 15), (_) {
+      unawaited(_polling.read(false));
+      if (_retryBar) unawaited(_readBar());
+      if (_publishedVisible || visible) {
+        tick++;
+        _publish();
+      }
+    });
   }
 
   Future<void> _readBar() {
     _barDirty = true;
-    return _readingBar ??= _readBarChanges().whenComplete(
-      () => _readingBar = null,
-    );
+    return _readingBar ??= _readBarChanges().whenComplete(() {
+      _readingBar = null;
+      if (_barDirty && !_disposed) unawaited(_readBar());
+    });
   }
 
   Future<void> _readBarChanges() async {
@@ -74,15 +80,18 @@ class AiUsageBackend extends ChangeNotifier {
         final next = await _preferences.readAiRing();
         if (_disposed) return;
         _bar = next;
+        _retryBar = false;
         _publish();
+        _notifyAlerts(aiLowPercent(_bar));
       } catch (_) {
         // Keep the last valid preferences while Core reconnects.
+        _retryBar = true;
       }
     }
   }
 
   void _publish() {
-    final hadProviders = aiRows(data['providers']).isNotEmpty;
+    final wasVisible = _publishedVisible;
     data = {
       ..._sample,
       'showUsed': _bar?['showUsed'] == true,
@@ -90,7 +99,8 @@ class AiUsageBackend extends ChangeNotifier {
       'threshold': aiLowPercent(_bar),
       'pinned': [...?(_bar?['pinned'] as List?)?.whereType<String>()],
     };
-    if (visible || hadProviders) notifyListeners();
+    _publishedVisible = visible;
+    if (wasVisible || _publishedVisible) notifyListeners();
   }
 
   Future<void> refresh() async {
@@ -98,42 +108,10 @@ class AiUsageBackend extends ChangeNotifier {
     refreshing = true;
     notifyListeners();
     try {
-      await _read(force: true);
+      await _polling.read(true);
     } finally {
       refreshing = false;
       if (!_disposed) notifyListeners();
-    }
-  }
-
-  Future<void> _read({bool force = false}) async {
-    if (_disposed || (!force && refreshing)) return;
-    final worker = IsolateNameServer.lookupPortByName(_workerName);
-    if (worker == null) return;
-    if (!force) {
-      if (_readingWorker == worker) return;
-      _readingWorker = worker;
-    }
-    final sequence = ++_nextRead;
-    final reply = ReceivePort();
-    _replies.add(reply);
-    try {
-      worker.send([reply.sendPort, force]);
-      // A forced read can wait for an ordinary round and then run its own.
-      final value = await reply.first.timeout(const Duration(minutes: 3));
-      if (!_disposed && sequence > _appliedRead && value is Map) {
-        _appliedRead = sequence;
-        _sample = aiMap(value);
-        tick++;
-        _publish();
-      }
-    } on TimeoutException {
-      // The next poll can reconnect after an engine restart.
-    } on StateError {
-      if (!_disposed) rethrow;
-    } finally {
-      reply.close();
-      _replies.remove(reply);
-      if (!force && _readingWorker == worker) _readingWorker = null;
     }
   }
 
@@ -141,60 +119,10 @@ class AiUsageBackend extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
-    for (final reply in _replies) {
-      reply.close();
-    }
     unawaited(_changes?.cancel());
+    unawaited(_availability?.cancel());
     if (_ownsSettings) unawaited(_settings.close());
     super.dispose();
-  }
-}
-
-/// Lives in the application engine, which survives monitor removal.
-void startAiUsageWorker() {
-  if (_workerInbox != null) return;
-  // Replace stale registrations after an engine restart.
-  IsolateNameServer.removePortNameMapping(_workerName);
-  final inbox = ReceivePort();
-  if (!IsolateNameServer.registerPortWithName(inbox.sendPort, _workerName)) {
-    inbox.close();
-    return;
-  }
-  _workerInbox = inbox;
-  final worker = _AiUsageWorker();
-  inbox.listen((message) async {
-    final [SendPort reply, bool force] = message as List;
-    try {
-      reply.send(await worker.read(force));
-    } catch (_) {
-      reply.send(null);
-    }
-  });
-}
-
-class _AiUsageWorker {
-  _AiUsageWorker() {
-    _settings.changes.listen((change) {
-      if (change.topic == aiRingSettingId) {
-        unawaited(_readBar().then((bar) => _notifyAlerts(aiLowPercent(bar))));
-      } else if (change.topic == aiProvidersSettingId) {
-        _polling.invalidate();
-      }
-    }, onError: (Object _) {});
-  }
-
-  final _settings = SettingsClient();
-  late final _preferences = BarPreferences(client: _settings);
-  Map<String, dynamic>? _bar;
-
-  /// Bar preferences from Core; the last value is kept while Core
-  /// reconnects. Tracking itself is CodexBar's enabled set, which Settings
-  /// writes, so polling never makes Core probe every provider.
-  Future<Map<String, dynamic>?> _readBar() async {
-    try {
-      _bar = await _preferences.readAiRing();
-    } catch (_) {}
-    return _bar;
   }
 
   static final _random = Random.secure();
@@ -202,15 +130,10 @@ class _AiUsageWorker {
     List<int>.generate(32, (_) => _random.nextInt(256)),
   );
   final _alerts = AiQuotaAlerts();
-  Map<String, Object?> _sample = const {};
   late final _polling = AiUsagePoll(_poll);
 
-  Future<Map<String, Object?>> read(bool force) async {
-    await _polling.read(force);
-    return _sample;
-  }
-
   Future<bool> _poll(bool force) async {
+    if (_disposed) return false;
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 2)
       ..findProxy = (_) => 'DIRECT';
@@ -224,12 +147,14 @@ class _AiUsageWorker {
           '/dashboard/v1/snapshot?detail=shell',
           authenticate: true,
         ),
-        _readBar(),
+        _readingBar ?? Future<void>.value(),
         _cli('providers'),
         _endpoint(client, port, 'usage', refresh: true),
         _endpoint(client, port, 'cost', refresh: force),
       ).wait;
-      if (usage == null || (configured == null && shell is! Map)) return false;
+      if (_disposed || usage == null || (configured == null && shell is! Map)) {
+        return false;
+      }
       final data = aiProviderSamples(
         configured ?? aiRows(aiMap(shell)['providers']),
         usage,
@@ -256,6 +181,8 @@ class _AiUsageWorker {
                   if (data.any((provider) => provider['id'] == row['id'])) row,
               ],
       };
+      tick++;
+      _publish();
       _notifyAlerts(aiLowPercent(_bar));
       return costCurrent;
     } finally {
@@ -335,12 +262,15 @@ class _AiUsageWorker {
               }),
             )
             .join();
-        return jsonDecode(body);
+        return _decode(body);
       })().timeout(const Duration(seconds: 35));
     } catch (_) {
       return null;
     }
   }
+
+  Future<Object?> _decode(String body) async =>
+      body.length < 64 * 1024 ? jsonDecode(body) : compute(jsonDecode, body);
 
   Future<List<Map<String, Object?>>?> _cli(
     String kind, {
@@ -348,7 +278,7 @@ class _AiUsageWorker {
   }) async {
     try {
       final output = await rust.codexbarJson(kind: kind, refresh: refresh);
-      final value = output == null ? null : jsonDecode(output);
+      final value = output == null ? null : await _decode(output);
       return value is List ? aiRows(value) : null;
     } catch (_) {
       return null;

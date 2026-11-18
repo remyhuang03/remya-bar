@@ -170,8 +170,9 @@ the popup stack until empty, preventing duplicates across racing outputs; it hid
 the stack while that output's notification panel is open.
 
 The tray registers a StatusNotifierHost and supplies a watcher only if absent.
-Outputs share bounded concurrent item reads. Passive/disconnected items hide;
-icons validate ARGB or resolve through GTK. Menus load one level at a time with
+Visible tray widgets share one item poll and icon lookup. Identical snapshots
+retain their icons and skip UI updates. Passive or disconnected items hide.
+Icons validate ARGB or resolve through GTK. Menus load one level at a time with
 AboutToShow/GetLayout and revalidate enabled leaf actions before Event. Activation,
 secondary activation and scrolling target the current D-Bus owner. Without a
 usable DBusMenu, ContextMenu remains available. XEmbed is unsupported.
@@ -217,6 +218,12 @@ or rolls back on failure. Seek validates capabilities, unique owner and track ID
 Media artwork supplies the pill/card palette. Optional marquee runs at 20 Hz and
 pauses while the keyboard is visible. Core owns output-device volume writes.
 
+The application owns one AI usage poller and applies Core preference updates
+from change and service-availability signals. Normal and forced reads share the
+same single-flight logic. A failed fetch leaves the latest sample available
+until its freshness window expires. Large response bodies decode off the UI
+isolate.
+
 ## Local observations and keyboard
 
 One wall-clock timer serves visible bar clocks. It aligns to the second while
@@ -227,9 +234,10 @@ Battery and resource samples are shared across views. Only system batteries coun
 Low charge takes precedence over energy-saver color. Battery policy comes from Core.
 
 CPU, memory and network counters are sampled once per second. The resource pill
-updates every three seconds and the card shows a 60-second history. A separate
-blocking worker samples CPU frequency, temperature and GPU details while a
-resource card is visible. A visible pill with GPU enabled requests utilization
+updates every three seconds. Its card reads the latest sample and 60-second
+history when open. A separate blocking worker samples CPU frequency,
+temperature and GPU details while a resource card is visible. A visible pill
+with GPU enabled requests utilization
 at five-second intervals. Without those consumers the worker stays idle.
 GPU history only records measured utilization and shows gaps for unsampled
 intervals. CPU topology, GPU identity and sensor paths are cached with periodic

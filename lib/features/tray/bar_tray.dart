@@ -12,16 +12,17 @@ import 'package:remya_ui/remya_ui.dart';
 import '../../src/rust/system_bridge/api.dart' as api;
 import '../../widgets/bar_tooltip.dart';
 import '../popups/bar_popup.dart';
+import 'tray_backend.dart';
 import 'tray_icon.dart';
 
 const _menuKind = 'tray-menu';
 const _motion = Duration(milliseconds: 240);
-const _iconsChannel = MethodChannel('top.remya.bar/icons');
 
 class BarTray extends StatefulWidget {
-  const BarTray({super.key, required this.popup});
+  const BarTray({super.key, required this.popup, required this.backend});
 
   final BarPopup popup;
+  final TrayBackend backend;
 
   @override
   State<BarTray> createState() => BarTrayState();
@@ -31,11 +32,9 @@ class BarTrayState extends State<BarTray> {
   final _settings = SettingsClient();
   late final _preferences = BarPreferences(client: _settings);
   late final StreamSubscription<SettingsChange> _changes;
-  late final Timer _timer;
-  var _items = <api.TrayItem>[];
+  List<api.TrayItem> get _items => widget.backend.items;
   var _folded = <String>{};
-  var _icons = <String, Uint8List>{};
-  bool _refreshing = false;
+  bool _visible = false;
   bool _expanded = false;
   bool _writing = false;
   int _preferencesRevision = 0;
@@ -53,12 +52,28 @@ class BarTrayState extends State<BarTray> {
         .where((change) => change.topic == barFoldedAppsSettingId)
         .listen((_) => _readPreferences(), onError: (Object _) {});
     unawaited(_readPreferences());
-    unawaited(_refresh());
-    // Folded apps follow Settings signals; only tray items are polled.
-    _timer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => unawaited(_refresh()),
-    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final visible = TickerMode.valuesOf(context).enabled;
+    if (visible == _visible) return;
+    _visible = visible;
+    if (visible) {
+      widget.backend.addListener(_onTrayChanged);
+    } else {
+      widget.backend.removeListener(_onTrayChanged);
+    }
+  }
+
+  @override
+  void didUpdateWidget(BarTray oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_visible || oldWidget.backend == widget.backend) return;
+    oldWidget.backend.removeListener(_onTrayChanged);
+    widget.backend.addListener(_onTrayChanged);
+    _onTrayChanged();
   }
 
   Future<void> _readPreferences() async {
@@ -81,54 +96,20 @@ class BarTrayState extends State<BarTray> {
 
   bool _isFolded(api.TrayItem item) => _folded.contains(item.appId);
 
-  Future<void> _refresh() async {
-    if (_refreshing) return;
-    _refreshing = true;
-    try {
-      final items = await api.trayItems();
-      final icons = await _lookupIcons({
-        for (final item in items)
-          if (item.iconName.isNotEmpty &&
-              (item.iconWidth < 64 || item.iconHeight < 64))
-            (item.iconName, item.iconThemePath),
-      });
-      if (!mounted) return;
-      setState(() {
-        _items = items;
-        _icons = icons;
-      });
-      if (!_items.any(_isFolded)) _setExpanded(false);
-      if (_menuItem case final selected?
-          when !_items.any((item) => item.id == selected.id)) {
-        _closeMenu();
-      }
-    } catch (error) {
-      debugPrint('Tray: $error');
-    } finally {
-      _refreshing = false;
+  void _onTrayChanged() {
+    setState(() {});
+    if (!_items.any(_isFolded)) _setExpanded(false);
+    if (_menuItem case final selected?
+        when !_items.any((item) => item.id == selected.id)) {
+      _closeMenu();
     }
   }
-
-  Future<Map<String, Uint8List>> _lookupIcons(
-    Set<(String, String)> names,
-  ) async {
-    if (names.isEmpty) return {};
-    return await _iconsChannel.invokeMapMethod<String, Uint8List>(
-          'lookupTray',
-          [
-            for (final (name, path) in names) [name, path],
-          ],
-        ) ??
-        {};
-  }
-
-  String _iconKey(String name, String path) => '$path\n$name';
 
   Map<String, Object?> _artwork(api.TrayItem item) => {
     'argb': item.iconArgb,
     'width': item.iconWidth,
     'height': item.iconHeight,
-    'png': _icons[_iconKey(item.iconName, item.iconThemePath)],
+    'png': widget.backend.iconFor(item),
     'attention': item.attention,
   };
 
@@ -204,7 +185,7 @@ class BarTrayState extends State<BarTray> {
       }
     }
     if (!mounted || token != _menuToken) return;
-    final icons = await _lookupIcons({
+    final icons = await lookupTrayIcons({
       for (final entry in entries ?? const <api.TrayMenuEntry>[])
         if (entry.iconName.isNotEmpty && entry.iconData.isEmpty)
           (entry.iconName, item.iconThemePath),
@@ -229,7 +210,7 @@ class BarTrayState extends State<BarTray> {
             'submenu': entry.submenu,
             'iconName': entry.iconName,
             'icon': entry.iconData.isEmpty
-                ? icons[_iconKey(entry.iconName, item.iconThemePath)]
+                ? icons[trayIconKey(entry.iconName, item.iconThemePath)]
                 : entry.iconData,
             'toggleType': entry.toggleType,
             'toggleState': entry.toggleState,
@@ -314,7 +295,7 @@ class BarTrayState extends State<BarTray> {
 
   @override
   void dispose() {
-    _timer.cancel();
+    if (_visible) widget.backend.removeListener(_onTrayChanged);
     unawaited(_changes.cancel().whenComplete(_settings.close));
     if (_expanded) {
       _send(widget.popup.watchTrayOutside(false));
