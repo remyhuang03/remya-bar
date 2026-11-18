@@ -175,7 +175,6 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         _nativeFullscreen = next;
         if (_fullscreen != next) {
           setState(() => _fullscreen = next);
-          _updateResourceDemand();
           unawaited(_syncOsd());
           unawaited(_syncToasts());
         }
@@ -183,14 +182,6 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     } finally {
       _applyingFullscreen = false;
     }
-  }
-
-  void _updateResourceDemand() {
-    widget.system?.setResourcesVisible(this, !_fullscreen);
-    widget.system?.setResourceCardVisible(
-      this,
-      !_fullscreen && _popup.openCard.value == 'resources',
-    );
   }
 
   String? _sidebarOutput;
@@ -409,8 +400,6 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       system.addListener(_applyEdge);
       _applyWorkspaceCount();
       _applyEdge();
-      _popup.openCard.addListener(_updateResourceDemand);
-      _updateResourceDemand();
     }
     if (widget.hyprland case final hyprland?) {
       hyprland.addListener(_onOutputState);
@@ -617,9 +606,6 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     _window?.setMethodCallHandler(null);
     widget.system?.removeListener(_applyWorkspaceCount);
     widget.system?.removeListener(_applyEdge);
-    widget.system?.setResourcesVisible(this, false);
-    widget.system?.setResourceCardVisible(this, false);
-    _popup.openCard.removeListener(_updateResourceDemand);
     _popup.channel.setMethodCallHandler(null);
     super.dispose();
   }

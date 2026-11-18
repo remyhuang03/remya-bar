@@ -217,28 +217,12 @@ pub(crate) fn read_number(path: impl AsRef<Path>) -> Option<f64> {
     (number.is_finite() && number >= 0.0).then_some(number)
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum SensorDemand {
-    Pill,
-    Card,
-}
-
-impl SensorDemand {
-    fn interval(self) -> Duration {
-        match self {
-            Self::Pill => Duration::from_secs(5),
-            Self::Card => Duration::from_secs(1),
-        }
-    }
-}
-
 /// Slow driver queries never delay CPU/network collection or overlap each other.
 #[derive(Default)]
 pub(crate) struct SensorWorker {
     sensors: Option<Sensors>,
-    running: Option<tokio::task::JoinHandle<(Sensors, Instant, SensorDemand, SensorSample)>>,
-    last_started: Option<(Instant, SensorDemand)>,
-    last_sample: Option<(Instant, SensorDemand, SensorSample)>,
+    running: Option<tokio::task::JoinHandle<(Sensors, Instant, SensorSample)>>,
+    last_sample: Option<(Instant, SensorSample)>,
     last_published: Option<Instant>,
 }
 
@@ -251,63 +235,37 @@ impl SensorWorker {
                     .unwrap()
                     .await
                     .ok()
-                    .map(|(sensors, time, demand, sample)| {
+                    .map(|(sensors, time, sample)| {
                         self.sensors = Some(sensors);
-                        (time, demand, sample)
+                        (time, sample)
                     });
         }
     }
 
-    pub(crate) fn request(&mut self, demand: Option<SensorDemand>) {
-        let Some(demand) = demand else {
-            self.last_started = None;
-            self.last_sample = None;
-            return;
-        };
-        if self.running.is_some()
-            || self.last_started.is_some_and(|(time, previous)| {
-                (demand == previous || demand == SensorDemand::Pill)
-                    && time.elapsed() < demand.interval()
-            })
-        {
+    pub(crate) fn request(&mut self) {
+        if self.running.is_some() {
             return;
         }
-        self.last_started = Some((Instant::now(), demand));
         let mut sensors = self.sensors.take().unwrap_or_default();
         self.running = Some(tokio::task::spawn_blocking(move || {
             let sampled_at = Instant::now();
-            let sample = sensors.sample(demand == SensorDemand::Card);
-            (sensors, sampled_at, demand, sample)
+            let sample = sensors.sample();
+            (sensors, sampled_at, sample)
         }));
     }
 
-    pub(crate) fn apply(
-        &mut self,
-        demand: Option<SensorDemand>,
-        snapshot: &mut SystemSnapshot,
-    ) -> bool {
-        let Some((time, mode, sensors)) = self.last_sample.as_ref() else {
+    pub(crate) fn apply(&mut self, snapshot: &mut SystemSnapshot) -> bool {
+        let Some((time, sensors)) = self.last_sample.as_ref() else {
             return false;
         };
-        let Some(demand) = demand else {
-            return false;
-        };
-        if time.elapsed() >= demand.interval() + Duration::from_secs(2) {
+        if time.elapsed() >= Duration::from_secs(3) {
             return false;
         }
         snapshot.gpus.clone_from(&sensors.gpus);
-        if demand == SensorDemand::Card && *mode == SensorDemand::Card {
-            if let Some(details) = snapshot.resources.as_mut() {
-                details.cpu_cores = sensors.cpu_cores;
-                details.cpu_frequency_ghz = sensors.cpu_frequency_ghz;
-                details.cpu_temperature_celsius = sensors.cpu_temperature_celsius;
-            }
-        } else {
-            for gpu in &mut snapshot.gpus {
-                gpu.temperature_celsius = None;
-                gpu.memory_used_bytes = None;
-                gpu.memory_total_bytes = None;
-            }
+        if let Some(details) = snapshot.resources.as_mut() {
+            details.cpu_cores = sensors.cpu_cores;
+            details.cpu_frequency_ghz = sensors.cpu_frequency_ghz;
+            details.cpu_temperature_celsius = sensors.cpu_temperature_celsius;
         }
         self.last_published.replace(*time) != Some(*time)
     }
@@ -331,39 +289,37 @@ struct SensorSample {
 }
 
 impl Sensors {
-    fn sample(&mut self, details: bool) -> SensorSample {
+    fn sample(&mut self) -> SensorSample {
         let mut sample = SensorSample::default();
-        if details {
-            let info = fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
-            let (last, previous) = self
-                .topology
-                .get_or_insert_with(|| (Instant::now(), crate::resources::cpu_topology(&info)));
-            if last.elapsed() >= DISCOVERY_INTERVAL {
-                *last = Instant::now();
-                *previous = crate::resources::cpu_topology(&info);
-            }
-            sample.cpu_cores = *previous;
-            sample.cpu_frequency_ghz = crate::resources::cpu_frequency(&info);
-            sample.cpu_temperature_celsius = self.cpu_temperature.read(
-                Path::new("/sys/class/hwmon"),
-                &[
-                    "coretemp",
-                    "k10temp",
-                    "zenpower",
-                    "cpu_thermal",
-                    "cpu-thermal",
-                ],
-                &["Package id", "Tdie", "Tctl"],
-            );
+        let info = fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
+        let (last, previous) = self
+            .topology
+            .get_or_insert_with(|| (Instant::now(), crate::resources::cpu_topology(&info)));
+        if last.elapsed() >= DISCOVERY_INTERVAL {
+            *last = Instant::now();
+            *previous = crate::resources::cpu_topology(&info);
         }
+        sample.cpu_cores = *previous;
+        sample.cpu_frequency_ghz = crate::resources::cpu_frequency(&info);
+        sample.cpu_temperature_celsius = self.cpu_temperature.read(
+            Path::new("/sys/class/hwmon"),
+            &[
+                "coretemp",
+                "k10temp",
+                "zenpower",
+                "cpu_thermal",
+                "cpu-thermal",
+            ],
+            &["Package id", "Tdie", "Tctl"],
+        );
         let (discovered, devices) = self.drm.get_or_insert_with(drm_gpus);
         if discovered.elapsed() >= DISCOVERY_INTERVAL
             || devices.iter().any(|gpu| !gpu.path.exists())
         {
             (*discovered, *devices) = drm_gpus();
         }
-        sample.gpus = devices.iter_mut().map(|gpu| gpu.sample(details)).collect();
-        if let Some(nvidia) = crate::nvml::gpus(details) {
+        sample.gpus = devices.iter_mut().map(DrmGpu::sample).collect();
+        if let Some(nvidia) = crate::nvml::gpus() {
             sample.gpus.extend(nvidia);
         }
         sample
@@ -378,26 +334,20 @@ struct DrmGpu {
 }
 
 impl DrmGpu {
-    fn sample(&mut self, details: bool) -> GpuSnapshot {
-        let mut result = GpuSnapshot {
+    fn sample(&mut self) -> GpuSnapshot {
+        GpuSnapshot {
             id: self.id.clone(),
             name: self.name.clone(),
             utilization_percent: read_number(self.path.join("gpu_busy_percent"))
                 .filter(|v| *v <= 100.0),
-            memory_used_bytes: None,
-            memory_total_bytes: None,
-            temperature_celsius: None,
-        };
-        if details {
-            result.memory_used_bytes = read_number(self.path.join("mem_info_vram_used"));
-            result.memory_total_bytes = read_number(self.path.join("mem_info_vram_total"));
-            result.temperature_celsius = self.temperature.read(
+            memory_used_bytes: read_number(self.path.join("mem_info_vram_used")),
+            memory_total_bytes: read_number(self.path.join("mem_info_vram_total")),
+            temperature_celsius: self.temperature.read(
                 &self.path.join("hwmon"),
                 &["amdgpu", "i915", "xe"],
                 &["edge", "gpu"],
-            );
+            ),
         }
-        result
     }
 }
 

@@ -66,9 +66,10 @@ impl History {
         {
             self.points.pop_front();
         }
+        self.populate(time, details);
     }
 
-    pub(crate) fn populate(&self, time: Instant, details: &mut ResourceDetails) {
+    fn populate(&self, time: Instant, details: &mut ResourceDetails) {
         let mut bins = [[(0.0, 0u32); BARS]; 4];
         for point in &self.points {
             let age = time.duration_since(point.time).as_millis();
@@ -338,7 +339,7 @@ mod tests {
     }
 
     #[test]
-    fn gpu_history_skips_ticks_that_reuse_the_last_sensor_reading() {
+    fn snapshots_include_cached_history_without_repeating_gpu_reads() {
         let time = Instant::now();
         let mut history = History::default();
         let mut snapshot = crate::metrics::Sampler::default().sample().unwrap().1;
@@ -350,11 +351,14 @@ mod tests {
             memory_total_bytes: None,
             temperature_celsius: None,
         });
+        snapshot.cpu_percent = Some(42.0);
         history.record(time, &mut snapshot, true);
         let later = time + Duration::from_secs(5);
+        snapshot.cpu_percent = Some(12.0);
         history.record(later, &mut snapshot, false);
-        let details = snapshot.resources.as_mut().unwrap();
-        history.populate(later, details);
+        let details = snapshot.resources.as_ref().unwrap();
+        assert_eq!(details.cpu_history[BARS - 2], Some(42.0));
+        assert_eq!(details.cpu_history[BARS - 1], Some(12.0));
         assert_eq!(details.gpu_history[BARS - 2], Some(50.0));
         assert_eq!(details.gpu_history[BARS - 1], None);
     }
@@ -391,12 +395,10 @@ mod tests {
         snapshot.cpu_percent = None;
         let almost_expired = time + Duration::from_secs(59);
         history.record(almost_expired, &mut snapshot, false);
-        history.populate(almost_expired, snapshot.resources.as_mut().unwrap());
         let values = &snapshot.resources.as_ref().unwrap().cpu_history;
         assert_eq!(values[0], Some(42.0));
         assert!(values[1..].iter().all(Option::is_none));
         history.record(time + WINDOW, &mut snapshot, false);
-        history.populate(time + WINDOW, snapshot.resources.as_mut().unwrap());
         assert!(
             snapshot
                 .resources

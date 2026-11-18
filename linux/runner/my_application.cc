@@ -27,7 +27,7 @@ struct _MyApplication {
   FlMethodCall* avatar_call;
   GDBusConnection* shortcut_bus;
   guint shortcut_subscription;
-  guint scale_restart;
+  guint output_restart;
   RestartBar restart_bar;
   gpointer restart_data;
 };
@@ -67,7 +67,7 @@ static void set_bar_bottom(GtkWindow* window, bool bottom) {
   gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_BOTTOM, bottom);
 }
 
-static void schedule_scale_restart(MyApplication* self);
+static void schedule_output_restart(MyApplication* self);
 
 static FlView* settings_view(MyApplication* self) {
   return self->settings_window == nullptr ? nullptr :
@@ -311,7 +311,7 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   g_signal_connect_object(monitor, "notify::scale-factor",
       G_CALLBACK(+[](GdkMonitor*, GParamSpec*, GtkWindow* window) {
         auto* app = gtk_window_get_application(window);
-        if (app != nullptr) schedule_scale_restart(MY_APPLICATION(app));
+        if (app != nullptr) schedule_output_restart(MY_APPLICATION(app));
       }), window, G_CONNECT_DEFAULT);
   g_signal_connect(window, "destroy", G_CALLBACK(+[](GtkWindow* window, MyApplication* self) {
     auto* view = FL_VIEW(gtk_bin_get_child(GTK_BIN(window)));
@@ -329,26 +329,34 @@ static void create_bar_window(MyApplication* self, GdkMonitor* monitor) {
   gtk_widget_show_all(GTK_WIDGET(window));
 }
 
-static void schedule_scale_restart(MyApplication* self) {
-  g_clear_handle_id(&self->scale_restart, g_source_remove);
-  // Retain graphics context recovery when an existing output changes scale.
-  self->scale_restart = g_timeout_add(250, +[](gpointer data) -> gboolean {
+static void schedule_output_restart(MyApplication* self) {
+  g_clear_handle_id(&self->output_restart, g_source_remove);
+  // Wait for Wayland's topology and scale announcements to settle first.
+  self->output_restart = g_timeout_add(250, +[](gpointer data) -> gboolean {
     auto* self = MY_APPLICATION(data);
-    self->scale_restart = 0;
-    self->restart_bar("Display scale changed", self->restart_data);
+    self->output_restart = 0;
+    if (gdk_display_get_n_monitors(gdk_display_get_default()) > 0) {
+      self->restart_bar("Display topology or scale changed", self->restart_data);
+      g_application_activate(G_APPLICATION(self));
+    }
     return G_SOURCE_REMOVE;
   }, self);
 }
 
 static void monitor_added(GdkDisplay*, GdkMonitor* monitor, MyApplication* self) {
-  if (self->engine != nullptr) create_bar_window(self, monitor);
+  if (self->engine != nullptr && !g_hash_table_contains(self->bar_windows, monitor)) {
+    schedule_output_restart(self);
+  }
 }
 
 static void monitor_removed(GdkDisplay*, GdkMonitor* monitor,
                             MyApplication* self) {
   auto* window = GTK_WIDGET(g_hash_table_lookup(self->bar_windows, monitor));
   bar_popup_monitor_removed(monitor);
-  if (window != nullptr) gtk_widget_destroy(window);
+  if (window != nullptr) {
+    gtk_widget_destroy(window);
+    schedule_output_restart(self);
+  }
 }
 
 static void create_app_engine(MyApplication* self) {
@@ -474,7 +482,7 @@ static void my_application_startup(GApplication* application) {
 // Implements GApplication::shutdown.
 static void my_application_shutdown(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
-  g_clear_handle_id(&self->scale_restart, g_source_remove);
+  g_clear_handle_id(&self->output_restart, g_source_remove);
   g_signal_handlers_disconnect_by_data(gdk_display_get_default(), self);
   if (self->shortcut_bus != nullptr) {
     g_dbus_connection_signal_unsubscribe(self->shortcut_bus, self->shortcut_subscription);

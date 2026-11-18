@@ -4,7 +4,7 @@
 #include "../linux/runner/bar_popup_keyboard.cc"
 
 static guint released_bars = 0;
-static guint scale_restart_requests = 0;
+static guint output_restart_requests = 0;
 static constexpr int kInitialTooltipHeight = 80;
 
 static void check_view_role(MyApplication* self, FlView* view, const char* role) {
@@ -133,6 +133,7 @@ static gboolean check_monitor_lifecycle(gpointer data) {
   g_assert_cmpint(count, >, 0);
   static gint64 release_deadline = 0;
   static int64_t previous_view_id = 0;
+  static bool checked_recovery = false;
 
   if (release_deadline == 0) {
     g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, count);
@@ -148,7 +149,7 @@ static gboolean check_monitor_lifecycle(gpointer data) {
       g_signal_emit_by_name(display, "monitor-added", monitor);
     }
     g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, count);
-    g_assert_cmpuint(self->scale_restart, ==, 0);
+    g_assert_cmpuint(self->output_restart, ==, 0);
     for (int index = 0; index < count; index++) {
       GdkMonitor* monitor = gdk_display_get_monitor(display, index);
       auto* window = GTK_BIN(g_hash_table_lookup(self->bar_windows, monitor));
@@ -166,20 +167,27 @@ static gboolean check_monitor_lifecycle(gpointer data) {
     g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, 0);
     g_autoptr(FlValue) snapshot = self->views->snapshot();
     g_assert_cmpuint(fl_value_get_length(fl_value_lookup_string(snapshot, "views")), ==, 0);
+    g_assert_cmpuint(self->output_restart, !=, 0);
+    for (int index = 0; index < count; index++) {
+      g_signal_emit_by_name(display, "monitor-added", gdk_display_get_monitor(display, index));
+    }
+    g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, 0);
+    g_assert_cmpuint(output_restart_requests, ==, 0);
     release_deadline = g_get_monotonic_time() + 10 * G_TIME_SPAN_SECOND;
     return G_SOURCE_CONTINUE;
   }
 
-  if (released_bars < static_cast<guint>(count)) {
+  if (released_bars < static_cast<guint>(count) || output_restart_requests == 0) {
     g_assert_cmpint(g_get_monotonic_time(), <, release_deadline);
     return G_SOURCE_CONTINUE;
   }
   g_assert_true(gtk_widget_get_realized(self->engine_host));
   g_assert_false(gtk_widget_get_mapped(self->engine_host));
-  if (g_hash_table_size(self->bar_windows) == 0) {
+  if (!checked_recovery) {
+    checked_recovery = true;
+    g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, count);
     for (int index = 0; index < count; index++) {
       GdkMonitor* monitor = gdk_display_get_monitor(display, index);
-      g_signal_emit_by_name(display, "monitor-added", monitor);
       auto* window = GTK_BIN(g_hash_table_lookup(self->bar_windows, monitor));
       auto* view = FL_VIEW(gtk_bin_get_child(window));
       g_assert_true(fl_view_get_engine(view) == self->engine);
@@ -189,14 +197,14 @@ static gboolean check_monitor_lifecycle(gpointer data) {
     g_application_activate(G_APPLICATION(self));
     g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, count);
     g_assert_cmpuint(g_list_length(gtk_application_get_windows(GTK_APPLICATION(self))), ==, count);
-    g_assert_cmpuint(scale_restart_requests, ==, 0);
+    g_assert_cmpuint(output_restart_requests, ==, 1);
     GdkMonitor* monitor = gdk_display_get_monitor(display, 0);
     g_object_notify(G_OBJECT(monitor), "scale-factor");
     g_object_notify(G_OBJECT(monitor), "scale-factor");
-    g_print("PASS: all bar views released and reconnected with the same engine\n");
+    g_print("PASS: hotplug requests one graphics restart and recreates views if exec returns\n");
     return G_SOURCE_CONTINUE;
   }
-  g_assert_cmpuint(scale_restart_requests, ==, 1);
+  g_assert_cmpuint(output_restart_requests, ==, 2);
   g_print("PASS: scale recovery remains debounced\n");
   g_application_quit(G_APPLICATION(self));
   return G_SOURCE_REMOVE;
@@ -269,8 +277,8 @@ int main(int argc, char** argv) {
   g_autoptr(MyApplication) app = nullptr;
   app = my_application_new(
       [](const char* reason, gpointer) {
-        g_assert_cmpstr(reason, ==, "Display scale changed");
-        ++scale_restart_requests;
+        g_assert_cmpstr(reason, ==, "Display topology or scale changed");
+        ++output_restart_requests;
       }, nullptr);
   g_timeout_add(500, check_monitor_lifecycle, app);
   int status = g_application_run(G_APPLICATION(app), argc, argv);

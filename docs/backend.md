@@ -98,10 +98,11 @@ notification image paths are rechecked every 30 seconds while referenced.
 
 Fullscreen clients on the active or open special workspace hide only their
 output's bar, close its popups and release its exclusive zone. Leaving fullscreen
-restores the same Flutter view and 40-pixel reservation. No connected outputs is
-a supported state. Output additions and removals add or remove explicit views
-on the same engine. Wake and monitor-scale changes retain re-exec recovery and
-reload Core preferences and saved notification history.
+restores the same Flutter view and 40-pixel reservation. Output removal releases
+that view immediately. After the topology or scale settles, Bar re-execs with
+one engine and fresh graphics contexts. With zero outputs it waits for a
+display to return. Wake also re-execs. Each re-exec reloads Core preferences and
+saved notification history.
 
 ## Popup transport
 
@@ -233,12 +234,10 @@ live time and opens system settings through the public opener.
 Battery and resource samples are shared across views. Only system batteries count.
 Low charge takes precedence over energy-saver color. Battery policy comes from Core.
 
-CPU, memory and network counters are sampled once per second. The resource pill
-updates every three seconds. Its card reads the latest sample and 60-second
-history when open. A separate blocking worker samples CPU frequency,
-temperature and GPU details while a resource card is visible. A visible pill
-with GPU enabled requests utilization
-at five-second intervals. Without those consumers the worker stays idle.
+CPU, memory and network counters are sampled once per second. Each sample also
+requests CPU frequency, temperature and GPU readings from a separate blocking
+worker. All views share the readings and 60-second history, including while the
+resource card is closed. The resource pill updates every three seconds.
 GPU history only records measured utilization and shows gaps for unsampled
 intervals. CPU topology, GPU identity and sensor paths are cached with periodic
 rediscovery. NVIDIA uses one shared NVML library. Missing sensors remain unknown

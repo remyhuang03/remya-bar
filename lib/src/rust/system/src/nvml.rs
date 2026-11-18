@@ -72,9 +72,9 @@ struct State {
 }
 
 /// Call only from a blocking worker. A loaded driver stays resident for the process.
-pub(crate) fn gpus(details: bool) -> Option<Vec<GpuSnapshot>> {
+pub(crate) fn gpus() -> Option<Vec<GpuSnapshot>> {
     static NVML: OnceLock<Option<Nvml>> = OnceLock::new();
-    NVML.get_or_init(Nvml::load).as_ref()?.sample(details)
+    NVML.get_or_init(Nvml::load).as_ref()?.sample()
 }
 
 impl Nvml {
@@ -102,7 +102,7 @@ impl Nvml {
         }
     }
 
-    fn sample(&self, details: bool) -> Option<Vec<GpuSnapshot>> {
+    fn sample(&self) -> Option<Vec<GpuSnapshot>> {
         let mut state = self.state.lock().ok()?;
         // SAFETY: The symbols are from the retained NVML library, and all
         // pointers refer to writable values of the corresponding C types.
@@ -131,7 +131,7 @@ impl Nvml {
         (0..count)
             .map(|index| {
                 let identity = &mut state.identities[index as usize];
-                let snapshot = self.sample_device(index, details, identity);
+                let snapshot = self.sample_device(index, identity);
                 if snapshot.is_none() {
                     *identity = None;
                 }
@@ -143,7 +143,6 @@ impl Nvml {
     fn sample_device(
         &self,
         index: c_uint,
-        details: bool,
         identity: &mut Option<(usize, String, String)>,
     ) -> Option<GpuSnapshot> {
         let mut device = ptr::null_mut();
@@ -165,9 +164,7 @@ impl Nvml {
             }
             let (_, id, name) = identity.as_ref()?;
             let utilization = read_metric(|out| (self.utilization)(device, out))?;
-            let memory = if !details {
-                None
-            } else if let Some(query) = self.memory_v2 {
+            let memory = if let Some(query) = self.memory_v2 {
                 // Derive application VRAM usage independently of the driver's used field.
                 read_metric(|out| query(device, out))?.map(|m| {
                     let used = m
@@ -179,11 +176,7 @@ impl Nvml {
             } else {
                 read_metric(|out| (self.memory)(device, out))?.map(|m| (Some(m.used), m.total))
             };
-            let temperature = if details {
-                read_metric(|out| (self.temperature)(device, TEMPERATURE_GPU, out))?
-            } else {
-                None
-            };
+            let temperature = read_metric(|out| (self.temperature)(device, TEMPERATURE_GPU, out))?;
             let (used, total) = memory
                 .filter(|&(_, total)| total > 0 && total != c_ulonglong::MAX)
                 .map_or((None, None), |(used, total)| (used, Some(total)));

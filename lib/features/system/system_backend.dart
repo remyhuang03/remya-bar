@@ -59,26 +59,8 @@ class SystemBackend extends ChangeNotifier {
   final _hardware = ValueNotifier<api.SystemSnapshot?>(null);
   final _resourcePill = ValueNotifier<api.SystemSnapshot?>(null);
   Timer? _resourcePillTimer;
-  final _resourceCards = <Object>{};
-  final _resourcesVisible = <Object>{};
 
   ValueListenable<api.SystemSnapshot?> get resourcePill => _resourcePill;
-
-  void setResourceCardVisible(Object owner, bool visible) {
-    if (visible) {
-      _resourceCards.add(owner);
-    } else {
-      _resourceCards.remove(owner);
-    }
-  }
-
-  void setResourcesVisible(Object owner, bool visible) {
-    if (visible) {
-      _resourcesVisible.add(owner);
-    } else {
-      _resourcesVisible.remove(owner);
-    }
-  }
 
   ValueListenable<api.SystemSnapshot?> get hardware => _hardware;
   api.SystemSnapshot? get resourceSnapshot => _hardware.value;
@@ -162,13 +144,7 @@ class SystemBackend extends ChangeNotifier {
     if (_disposed || _refreshing) return;
     _refreshing = true;
     try {
-      final next = await api.hardwareSnapshot(
-        details: _resourceCards.isNotEmpty,
-        gpuPill:
-            _resourcesVisible.isNotEmpty &&
-            layout.groups.any((group) => group.contains('resources')) &&
-            layout.resources.contains('gpu'),
-      );
+      final next = await api.hardwareSnapshot();
       if (_disposed) return;
       resourceSnapshot = next;
     } catch (failure) {

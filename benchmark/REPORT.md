@@ -9,6 +9,8 @@ The baseline is the previously installed release, identified by executable and
 AOT hashes. The final release was built from application commit `305c342`
 against Core checkout `c85db17`. The settings probe also tested the initial
 single-engine build at `1e1e931` to check the effect of the follow-up changes.
+Later fixes restored graphics context recovery on hotplug and continuous 1 Hz
+CPU and GPU sampling. The measurements below predate those fixes.
 
 ## S03 · Live process resources
 
