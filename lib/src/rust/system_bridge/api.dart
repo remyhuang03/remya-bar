@@ -60,9 +60,14 @@ Future<void> trayMenuAction({
   entry: entry,
 );
 
-/// All output engines share one sample and one set of CPU/network baselines.
-Future<SystemSnapshot> hardwareSnapshot() =>
-    SystemRustLib.instance.api.crateApiHardwareSnapshot();
+/// All views share one sample and one set of CPU/network baselines.
+Future<SystemSnapshot> hardwareSnapshot({
+  required bool details,
+  required bool gpuPill,
+}) => SystemRustLib.instance.api.crateApiHardwareSnapshot(
+  details: details,
+  gpuPill: gpuPill,
+);
 
 Future<void> sidebarSessionAction({required String action}) =>
     SystemRustLib.instance.api.crateApiSidebarSessionAction(action: action);

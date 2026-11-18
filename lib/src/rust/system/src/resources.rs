@@ -4,7 +4,7 @@ use crate::metrics::read_number;
 use chrono::{Datelike, NaiveDateTime, Timelike};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 const BARS: usize = 18;
@@ -23,7 +23,12 @@ struct Point {
 }
 
 impl History {
-    pub(crate) fn record(&mut self, time: Instant, snapshot: &mut SystemSnapshot) {
+    pub(crate) fn record(
+        &mut self,
+        time: Instant,
+        snapshot: &mut SystemSnapshot,
+        gpu_measured: bool,
+    ) {
         let Some(details) = snapshot.resources.as_mut() else {
             return;
         };
@@ -38,7 +43,9 @@ impl History {
                     .find(|gpu| Some(&gpu.id) == self.gpu_id.as_ref())
             })
             .or_else(|| gpus.first());
-        self.gpu_id = gpu.map(|gpu| gpu.id.clone());
+        if gpu_measured {
+            self.gpu_id = gpu.map(|gpu| gpu.id.clone());
+        }
         details.gpu_id = self.gpu_id.clone();
         let network = snapshot.network_overview.as_ref();
         self.points.push_back(Point {
@@ -46,7 +53,8 @@ impl History {
             gpu_id: self.gpu_id.clone(),
             values: [
                 snapshot.cpu_percent,
-                gpu.and_then(|gpu| gpu.utilization_percent),
+                gpu.filter(|_| gpu_measured)
+                    .and_then(|gpu| gpu.utilization_percent),
                 network.and_then(|network| network.download_bytes_per_second),
                 network.and_then(|network| network.upload_bytes_per_second),
             ],
@@ -58,7 +66,9 @@ impl History {
         {
             self.points.pop_front();
         }
+    }
 
+    pub(crate) fn populate(&self, time: Instant, details: &mut ResourceDetails) {
         let mut bins = [[(0.0, 0u32); BARS]; 4];
         for point in &self.points {
             let age = time.duration_since(point.time).as_millis();
@@ -151,21 +161,7 @@ impl DailyTraffic {
 
 pub(crate) fn hardware_details(memory: &HashMap<String, u64>) -> ResourceDetails {
     let (cached, free) = memory_breakdown(memory).unzip();
-    let (cores, frequency) = cpu_topology();
     ResourceDetails {
-        cpu_cores: cores,
-        cpu_frequency_ghz: frequency,
-        cpu_temperature_celsius: hwmon_temperature(
-            Path::new("/sys/class/hwmon"),
-            &[
-                "coretemp",
-                "k10temp",
-                "zenpower",
-                "cpu_thermal",
-                "cpu-thermal",
-            ],
-            &["Package id", "Tdie", "Tctl"],
-        ),
         memory_cached_bytes: cached.map(|bytes| bytes as f64),
         memory_free_bytes: free.map(|bytes| bytes as f64),
         ..Default::default()
@@ -183,12 +179,10 @@ fn memory_breakdown(memory: &HashMap<String, u64>) -> Option<(u64, u64)> {
     Some((cache, available - cache))
 }
 
-fn cpu_topology() -> (Option<u32>, Option<f64>) {
-    let info = fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
+pub(crate) fn cpu_topology(info: &str) -> Option<u32> {
     let mut physical = HashSet::new();
     let mut logical = 0;
     let mut mapped = 0;
-    let (mut mhz, mut count) = (0.0, 0);
     for cpu in info.split("\n\n") {
         let mut socket = None;
         let mut core = None;
@@ -198,15 +192,6 @@ fn cpu_topology() -> (Option<u32>, Option<f64>) {
                 "physical id" => socket = value.parse::<u32>().ok(),
                 "core id" => core = value.parse::<u32>().ok(),
                 "processor" if value.parse::<u32>().is_ok() => logical += 1,
-                "cpu MHz" => {
-                    if let Ok(value) = value.parse::<f64>()
-                        && value.is_finite()
-                        && value > 0.0
-                    {
-                        mhz += value;
-                        count += 1;
-                    }
-                }
                 _ => {}
             }
         }
@@ -216,15 +201,62 @@ fn cpu_topology() -> (Option<u32>, Option<f64>) {
         }
     }
     // A core count is only reported when the kernel publishes the topology.
-    let cores = (logical > 0 && mapped == logical).then_some(physical.len() as u32);
-    let frequency = (count > 0).then(|| mhz / f64::from(count) / 1000.0);
-    (cores, frequency)
+    (logical > 0 && mapped == logical).then_some(physical.len() as u32)
 }
 
-pub(crate) fn hwmon_temperature(root: &Path, drivers: &[&str], labels: &[&str]) -> Option<f64> {
-    let mut preferred = None::<f64>;
-    let mut fallback = None::<f64>;
-    for device in fs::read_dir(root).ok()?.flatten() {
+pub(crate) fn cpu_frequency(info: &str) -> Option<f64> {
+    let mut sum = 0.0;
+    let mut count = 0;
+    for (key, value) in info.lines().filter_map(|line| line.split_once(':')) {
+        if key.trim() == "cpu MHz"
+            && let Ok(value) = value.trim().parse::<f64>()
+            && value.is_finite()
+            && value > 0.0
+        {
+            sum += value;
+            count += 1;
+        }
+    }
+    (count > 0).then(|| sum / f64::from(count) / 1000.0)
+}
+
+#[derive(Default)]
+pub(crate) struct TemperatureSensors {
+    discovered: Option<Instant>,
+    paths: Vec<(PathBuf, bool)>,
+}
+
+impl TemperatureSensors {
+    pub(crate) fn read(&mut self, root: &Path, drivers: &[&str], labels: &[&str]) -> Option<f64> {
+        if self.discovered.is_none_or(|time| time.elapsed() >= WINDOW) {
+            self.discovered = Some(Instant::now());
+            self.paths = temperature_paths(root, drivers, labels);
+        }
+        let mut preferred = None::<f64>;
+        let mut fallback = None::<f64>;
+        for (path, is_preferred) in &self.paths {
+            let Some(value) = read_number(path).map(|value| value / 1000.0) else {
+                // A removed or failing sensor needs discovery again on the next read.
+                self.discovered = None;
+                continue;
+            };
+            let target = if *is_preferred {
+                &mut preferred
+            } else {
+                &mut fallback
+            };
+            *target = Some(target.map_or(value, |old| old.max(value)));
+        }
+        preferred.or(fallback)
+    }
+}
+
+fn temperature_paths(root: &Path, drivers: &[&str], labels: &[&str]) -> Vec<(PathBuf, bool)> {
+    let mut result = vec![];
+    let Ok(entries) = fs::read_dir(root) else {
+        return result;
+    };
+    for device in entries.flatten() {
         let path = device.path();
         let name = fs::read_to_string(path.join("name")).unwrap_or_default();
         if !drivers.contains(&name.trim()) {
@@ -242,19 +274,14 @@ pub(crate) fn hwmon_temperature(root: &Path, drivers: &[&str], labels: &[&str]) 
             else {
                 continue;
             };
-            let Some(value) = read_number(sensor.path()).map(|value| value / 1000.0) else {
-                continue;
-            };
             let label = fs::read_to_string(path.join(format!("{id}_label"))).unwrap_or_default();
-            let target = if labels.iter().any(|prefix| label.starts_with(prefix)) {
-                &mut preferred
-            } else {
-                &mut fallback
-            };
-            *target = Some(target.map_or(value, |old| old.max(value)));
+            result.push((
+                sensor.path(),
+                labels.iter().any(|prefix| label.starts_with(prefix)),
+            ));
         }
     }
-    preferred.or(fallback)
+    result
 }
 
 #[cfg(test)]
@@ -311,6 +338,47 @@ mod tests {
     }
 
     #[test]
+    fn gpu_history_skips_ticks_that_reuse_the_last_sensor_reading() {
+        let time = Instant::now();
+        let mut history = History::default();
+        let mut snapshot = crate::metrics::Sampler::default().sample().unwrap().1;
+        snapshot.gpus.push(crate::api::GpuSnapshot {
+            id: "gpu".into(),
+            name: "GPU".into(),
+            utilization_percent: Some(50.0),
+            memory_used_bytes: None,
+            memory_total_bytes: None,
+            temperature_celsius: None,
+        });
+        history.record(time, &mut snapshot, true);
+        let later = time + Duration::from_secs(5);
+        history.record(later, &mut snapshot, false);
+        let details = snapshot.resources.as_mut().unwrap();
+        history.populate(later, details);
+        assert_eq!(details.gpu_history[BARS - 2], Some(50.0));
+        assert_eq!(details.gpu_history[BARS - 1], None);
+    }
+
+    #[test]
+    fn temperature_paths_are_reused_until_a_sensor_disappears() {
+        let root = tempfile::tempdir().unwrap();
+        let device = root.path().join("hwmon0");
+        fs::create_dir(&device).unwrap();
+        fs::write(device.join("name"), "coretemp").unwrap();
+        let first = device.join("temp1_input");
+        fs::write(&first, "65000").unwrap();
+        let mut sensors = TemperatureSensors::default();
+        let read = |sensors: &mut TemperatureSensors| sensors.read(root.path(), &["coretemp"], &[]);
+        assert_eq!(read(&mut sensors), Some(65.0));
+        fs::write(&first, "70000").unwrap();
+        assert_eq!(read(&mut sensors), Some(70.0));
+        fs::remove_file(&first).unwrap();
+        fs::write(device.join("temp2_input"), "72000").unwrap();
+        assert_eq!(read(&mut sensors), None);
+        assert_eq!(read(&mut sensors), Some(72.0));
+    }
+
+    #[test]
     fn history_keeps_missing_bins_and_expires_after_sixty_seconds() {
         let time = Instant::now();
         let mut history = History::default();
@@ -321,11 +389,14 @@ mod tests {
         });
         let mut snapshot = crate::metrics::Sampler::default().sample().unwrap().1;
         snapshot.cpu_percent = None;
-        history.record(time + Duration::from_secs(59), &mut snapshot);
+        let almost_expired = time + Duration::from_secs(59);
+        history.record(almost_expired, &mut snapshot, false);
+        history.populate(almost_expired, snapshot.resources.as_mut().unwrap());
         let values = &snapshot.resources.as_ref().unwrap().cpu_history;
         assert_eq!(values[0], Some(42.0));
         assert!(values[1..].iter().all(Option::is_none));
-        history.record(time + WINDOW, &mut snapshot);
+        history.record(time + WINDOW, &mut snapshot, false);
+        history.populate(time + WINDOW, snapshot.resources.as_mut().unwrap());
         assert!(
             snapshot
                 .resources

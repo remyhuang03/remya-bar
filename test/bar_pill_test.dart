@@ -7,11 +7,14 @@ import 'package:remya_bar/widgets/bar_hover_card.dart';
 import 'package:remya_bar/widgets/bar_pill.dart';
 import 'package:remya_ui/remya_ui.dart';
 
+late BarPopup _popup;
+
 Widget _host(
   Widget child, {
   bool disableAnimations = false,
   RemyaTheme theme = const RemyaTheme(),
 }) => BarPopupScope(
+  popup: _popup,
   theme: theme,
   child: MaterialApp(
     home: MediaQuery(
@@ -29,15 +32,15 @@ Finder _surface() => find
     .first;
 
 void main() {
+  setUp(() => _popup = BarPopup.forView(1));
+  tearDown(() => _popup.dispose());
   setUp(() {
-    BarPopup.openCard.value = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(BarPopup.channel, (_) async => null);
+        .setMockMethodCallHandler(_popup.channel, (_) async => null);
   });
   tearDown(() {
-    BarPopup.openCard.value = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(BarPopup.channel, null);
+        .setMockMethodCallHandler(_popup.channel, null);
   });
 
   testWidgets(
@@ -64,7 +67,7 @@ void main() {
         seed,
         RemyaTheme().styleVariant,
       );
-      BarPopup.openCard.value = 'media';
+      _popup.openCard.value = 'media';
       await tester.pumpAndSettle();
       final surface = tester.widget<AnimatedContainer>(_surface());
       expect(tester.getSize(_surface()).height, 40);
@@ -82,7 +85,7 @@ void main() {
         ),
         findsNothing,
       );
-      BarPopup.openCard.value = 'battery';
+      _popup.openCard.value = 'battery';
       await tester.pumpAndSettle();
       expect(tester.getSize(_surface()).height, 32);
       expect(
@@ -91,7 +94,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      BarPopup.openCard.value = null;
+      _popup.openCard.value = null;
       await tester.pumpWidget(const SizedBox());
     },
   );
@@ -101,7 +104,7 @@ void main() {
   ) async {
     final calls = <MethodCall>[];
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      BarPopup.channel,
+      _popup.channel,
       (call) async {
         calls.add(call);
         return null;
@@ -128,7 +131,7 @@ void main() {
     await tester.pumpWidget(card(2));
     await tester.pump();
     expect(calls.where((call) => call.method == 'update'), isEmpty);
-    BarPopup.openCard.value = 'battery';
+    _popup.openCard.value = 'battery';
     await tester.pumpWidget(card(2));
     await tester.pump();
     expect(calls.where((call) => call.method == 'update'), hasLength(1));
@@ -140,7 +143,7 @@ void main() {
     );
     await tester.pump();
     expect(calls.where((call) => call.method == 'update'), hasLength(2));
-    BarPopup.openCard.value = null;
+    _popup.openCard.value = null;
     await tester.pumpWidget(card(3));
     await tester.pump();
     expect(calls.where((call) => call.method == 'update'), hasLength(2));
@@ -152,7 +155,7 @@ void main() {
     (tester) async {
       final calls = <MethodCall>[];
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        BarPopup.channel,
+        _popup.channel,
         (call) async {
           calls.add(call);
           return null;
@@ -162,6 +165,7 @@ void main() {
       addTearDown(controller.dispose);
       await tester.pumpWidget(
         BarPopupScope(
+          popup: _popup,
           theme: const RemyaTheme(),
           child: MaterialApp(
             home: Center(
@@ -203,9 +207,9 @@ void main() {
       await tester.tap(find.text('Battery'));
       await tester.pump();
       // Switching from another card reports it closed before this one opens.
-      BarPopup.openCard.value = 'resources';
-      BarPopup.openCard.value = null;
-      BarPopup.openCard.value = 'battery';
+      _popup.openCard.value = 'resources';
+      _popup.openCard.value = null;
+      _popup.openCard.value = 'battery';
       await tester.pump();
       controller.jumpTo(40);
       await tester.pump();
@@ -224,7 +228,7 @@ void main() {
       controller.jumpTo(180);
       await tester.pump();
       expect(calls.last.method, 'hide');
-      BarPopup.openCard.value = null;
+      _popup.openCard.value = null;
       await tester.pumpWidget(const SizedBox());
     },
   );

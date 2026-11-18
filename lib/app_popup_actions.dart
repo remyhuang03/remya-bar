@@ -3,6 +3,7 @@ part of 'app.dart';
 /// Requests from popup views, dispatched to the bar's backends.
 extension _PopupActions on _RemyaBarAppState {
   Future<Object?> _popupAction(MethodCall call) async {
+    if (!mounted) throw StateError('Bar view is closed');
     if (call.method != 'action') throw MissingPluginException();
     final args = call.arguments;
     if (args is! Map) throw const FormatException('Invalid popup action');
@@ -22,12 +23,12 @@ extension _PopupActions on _RemyaBarAppState {
         throw const FormatException('Invalid card state');
       }
       if (open) {
-        BarPopup.openCard.value = kind;
-      } else if (BarPopup.openCard.value == kind) {
-        BarPopup.openCard.value = null;
+        _popup.openCard.value = kind;
+      } else if (_popup.openCard.value == kind) {
+        _popup.openCard.value = null;
       }
     } else if (action == 'keyboard.visibility' && args['open'] is bool) {
-      BarPopup.keyboardOpen.value = args['open'] as bool;
+      BarPopup.setKeyboardVisibility(args['open'] as bool);
     } else if (action == 'sidebar.closed') {
       _sidebarOpen = false;
       _sidebar?.close();
@@ -42,13 +43,14 @@ extension _PopupActions on _RemyaBarAppState {
         _ => throw const FormatException('Invalid capture target'),
       };
       await widget.onLaunchScreenCapture(arguments);
-      await BarPopup.hide(kind: 'sidebar');
+      if (!mounted) return null;
+      await _popup.hide(kind: 'sidebar');
       _sidebarOpen = false;
       _sidebar?.close();
     } else if (action == 'sidebar.keyboard' && args['value'] is bool) {
       if (!_sidebarOpen) throw StateError('Sidebar is closed');
       if (args['value'] == false) {
-        await BarPopup.hide(kind: keyboardKind);
+        await _popup.hide(kind: keyboardKind);
         _updateSidebar();
       } else {
         final backend = widget.hyprland;
@@ -56,14 +58,14 @@ extension _PopupActions on _RemyaBarAppState {
         final device = await _keyboardDevice.read(backend);
         if (!mounted || !_sidebarOpen) return null;
         final focus = _sidebarFocus;
-        await BarPopup.show(
+        await _popup.show(
           kind: keyboardKind,
           anchor: _RemyaBarAppState._popupAnchor,
           size: keyboardSize,
           data: {'device': device},
           theme: widget.preferences.theme,
         );
-        if (focus != null) {
+        if (mounted && focus != null) {
           try {
             await backend.request(
               'dispatch hl.dsp.focus({ window = "address:$focus" })',
@@ -99,7 +101,7 @@ extension _PopupActions on _RemyaBarAppState {
         await (widget.onOpenSettingsPage ??
             (page) => openRemyaSettings(page: page))(page);
       }
-      await BarPopup.hide(kind: 'sidebar');
+      await _popup.hide(kind: 'sidebar');
     } else if (action is String && action.startsWith('sidebar.')) {
       final sidebar = _sidebar;
       if (!_sidebarOpen || sidebar == null) {
@@ -112,7 +114,7 @@ extension _PopupActions on _RemyaBarAppState {
           !await backend.switchWorkspace(args['id'] as int)) {
         throw StateError('Workspace unavailable');
       }
-      await BarPopup.hide(kind: workspaceOverviewKind);
+      await _popup.hide(kind: workspaceOverviewKind);
     } else if (action == 'media.volume' &&
         args['output'] is String &&
         args['percent'] is num) {
@@ -146,21 +148,21 @@ extension _PopupActions on _RemyaBarAppState {
     } else if (action is String && action.startsWith('tray.')) {
       await _tray.currentState?.popupAction(args);
     } else if (action == 'ai-usage.refresh' &&
-        BarPopup.openCard.value == aiUsageKind) {
+        _popup.openCard.value == aiUsageKind) {
       await widget.aiUsage?.refresh();
     } else if (action == 'resources.monitor') {
       await openSystemMonitor();
-      await BarPopup.hide(kind: 'resources');
+      await _popup.hide(kind: 'resources');
     } else if (action == 'settings') {
       await widget.onOpenSettings();
     } else if (action == 'datetime.settings') {
       const page = 'date-time';
       await (widget.onOpenSettingsPage ??
           (page) => openRemyaSettings(page: page))(page);
-      await BarPopup.hide(kind: 'datetime');
+      await _popup.hide(kind: 'datetime');
     } else if (action == 'battery.settings') {
       await widget.onOpenPowerSettings();
-      await BarPopup.hide(kind: 'battery');
+      await _popup.hide(kind: 'battery');
     } else if (action == 'battery.profile' || action == 'battery.autoSaver') {
       final system = widget.system;
       if (system == null) throw StateError('Power controls unavailable');

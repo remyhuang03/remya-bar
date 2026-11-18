@@ -73,7 +73,7 @@ def own_bars(layers, pid, output):
             for layer in entries if layer['pid'] == pid]
 
 
-def check_bars(process, baseline, hidden=None):
+def check_bars(process, baseline, hidden=None, fullscreen_baseline=None):
     monitors = hyprctl('monitors')
     layers = hyprctl('layers')
     assert {monitor['name'] for monitor in monitors} == set(baseline), 'Outputs changed during test'
@@ -83,6 +83,7 @@ def check_bars(process, baseline, hidden=None):
         expected = list(baseline[name])
         if name == hidden:
             assert not bars, ('Fullscreen output bar remains mapped', name, bars)
+            expected = fullscreen_baseline[name]
         else:
             assert len(bars) == 1, (name, bars)
             level, bar = bars[0]
@@ -100,6 +101,21 @@ def check_baseline(baseline, pid):
     assert {monitor['name'] for monitor in monitors} == set(baseline), 'Outputs changed during test'
     assert all(monitor['reserved'] == baseline[monitor['name']] for monitor in monitors)
     assert all(not own_bars(layers, pid, monitor['name']) for monitor in monitors)
+
+
+def reserved_without_resident_bar(monitors, layers):
+    reservations = {}
+    for monitor in monitors:
+        name = monitor['name']
+        expected = list(monitor['reserved'])
+        height = monitor['width'] if monitor['transform'] % 2 else monitor['height']
+        center = monitor['y'] + height / monitor['scale'] / 2
+        for layer in layers[name]['levels'].get('2', []):
+            if layer['namespace'] == 'top.remya.bar' and layer['h'] == 40:
+                edge = 1 if layer['y'] < center else 3
+                expected[edge] -= layer['h']
+        reservations[name] = expected
+    return reservations
 
 
 def stop(process):
@@ -131,6 +147,7 @@ def main():
     baseline = {monitor['name']: monitor['reserved'] for monitor in monitors}
     assert baseline, 'No connected outputs'
     assert not fullscreen_outputs(monitors, hyprctl('clients')), 'Run this check without existing visible fullscreen windows'
+    fullscreen_baseline = reserved_without_resident_bar(monitors, hyprctl('layers'))
     GLib.set_prgname('top.remya.bar.fullscreen-smoke')
     title = f'Remya fullscreen smoke {os.getpid()}'
     window = Gtk.Window(title=title)
@@ -161,7 +178,7 @@ def main():
                 if startup:
                     process = subprocess.Popen([str(binary)], stdout=log, stderr=log)
                     last_pid = process.pid
-                wait_for(lambda: check_bars(process, baseline, output), process, log)
+                wait_for(lambda: check_bars(process, baseline, output, fullscreen_baseline), process, log)
                 window.unfullscreen()
 
                 def restored():

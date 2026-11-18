@@ -76,13 +76,14 @@ class _BarPillState extends State<BarPill> {
   @override
   Widget build(BuildContext context) {
     final card = widget.card;
+    final popup = card == null ? null : BarPopup.maybeOf(context);
     return Center(
       widthFactor: 1,
       heightFactor: 1,
-      child: card == null
+      child: card == null || popup == null
           ? _buildPill(context, widget.onTap)
           : ValueListenableBuilder<String?>(
-              valueListenable: BarPopup.openCard,
+              valueListenable: popup.openCard,
               builder: (context, _, _) => BarHoverCard(
                 kind: card.kind,
                 size: card.size,
@@ -99,7 +100,8 @@ class _BarPillState extends State<BarPill> {
   Widget _buildPill(BuildContext context, VoidCallback? onTap) {
     final scheme = widget.scheme ?? Theme.of(context).colorScheme;
     final attached =
-        widget.card != null && BarPopup.openCard.value == widget.card!.kind;
+        widget.card != null &&
+        BarPopup.maybeOf(context)?.openCard.value == widget.card!.kind;
     final cardScheme = widget.card == null
         ? scheme
         : BarCardSurface.colors(

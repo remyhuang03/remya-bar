@@ -13,6 +13,8 @@ import 'package:remya_bar/features/popups/bar_detail_card.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
 import 'package:remya_ui/remya_ui.dart';
 
+late BarPopup _popup;
+
 const _codex = {'id': 'codex', 'name': 'Codex'};
 
 Map<String, Object?> _usage(DateTime now, {num used = 86}) => {
@@ -42,6 +44,8 @@ Map<String, Object?> _usage(DateTime now, {num used = 86}) => {
 };
 
 void main() {
+  setUp(() => _popup = BarPopup.forView(1));
+  tearDown(() => _popup.dispose());
   final now = DateTime.utc(2026, 11, 9, 9);
 
   setUpAll(loadAiIdentity);
@@ -226,7 +230,7 @@ void main() {
     (tester) async {
       final calls = <MethodCall>[];
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        BarPopup.channel,
+        _popup.channel,
         (call) async {
           calls.add(call);
           return null;
@@ -234,7 +238,7 @@ void main() {
       );
       addTearDown(
         () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-          BarPopup.channel,
+          _popup.channel,
           null,
         ),
       );
@@ -249,6 +253,7 @@ void main() {
       addTearDown(backend.dispose);
       await tester.pumpWidget(
         BarPopupScope(
+          popup: _popup,
           theme: const RemyaTheme(),
           child: MaterialApp(
             home: Center(
@@ -413,6 +418,7 @@ void main() {
       addTearDown(backend.dispose);
       await tester.pumpWidget(
         BarPopupScope(
+          popup: _popup,
           theme: const RemyaTheme(),
           child: MaterialApp(
             home: Center(
@@ -423,8 +429,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('70%', findRichText: true), findsOneWidget);
-      BarPopup.openCard.value = aiUsageKind;
-      addTearDown(() => BarPopup.openCard.value = null);
+      _popup.openCard.value = aiUsageKind;
       await tester.pumpAndSettle();
       expect(find.textContaining('AGY'), findsOneWidget);
       expect(find.textContaining('ANTIGRAVITY'), findsNothing);
@@ -438,7 +443,7 @@ void main() {
       expect(inner?.percentValue(showUsed: true), 70);
       expect(inner?.used, 70);
       expect(inner?.expectedUsedFraction, .68);
-      BarPopup.openCard.value = null;
+      _popup.openCard.value = null;
       await tester.pumpWidget(const SizedBox());
     },
   );

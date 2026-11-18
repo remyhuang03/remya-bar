@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "bar_popup_state.h"
-#include "flutter/generated_plugin_registrant.h"
 #include "virtual_keyboard.h"
 
 namespace bar_popup_internal {
@@ -167,7 +166,7 @@ void popup_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
     }
     fl_method_call_respond_success(call, nullptr, nullptr);
   } else if (g_strcmp0(method, "enter") == 0 || g_strcmp0(method, "leave") == 0) {
-    // Bar and popup engines report pointer moves in any order; hide only
+    // Bar and popup views report pointer moves in any order; hide only
     // once the pointer has left both.
     state->popup_hovered = g_strcmp0(method, "enter") == 0;
     if (state->popup_hovered || state->owner_hovered) state->enter();
@@ -200,15 +199,24 @@ void popup_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
       g_application_quit(G_APPLICATION(gtk_window_get_application(owner)));
       return;
     }
+    struct ForwardedAction {
+      GPtrArray* pending;
+      FlMethodCall* call;
+    };
+    if (state->pending_actions == nullptr) state->pending_actions = g_ptr_array_new();
+    g_ptr_array_add(state->pending_actions, call);
     fl_method_channel_invoke_method(state->owner_channel, "action", args, nullptr,
         [](GObject* channel, GAsyncResult* result, gpointer data) {
-          g_autoptr(FlMethodCall) call = FL_METHOD_CALL(data);
+          std::unique_ptr<ForwardedAction> action(static_cast<ForwardedAction*>(data));
+          g_autoptr(GPtrArray) pending = action->pending;
+          g_autoptr(FlMethodCall) call = action->call;
+          if (!g_ptr_array_remove_fast(pending, call)) return;
           g_autoptr(GError) error = nullptr;
           g_autoptr(FlMethodResponse) response = fl_method_channel_invoke_method_finish(
               FL_METHOD_CHANNEL(channel), result, &error);
           if (response != nullptr) fl_method_call_respond(call, response, nullptr);
           else fl_method_call_respond_error(call, "action-failed", error->message, nullptr, nullptr);
-        }, g_object_ref(call));
+        }, new ForwardedAction{g_ptr_array_ref(state->pending_actions), FL_METHOD_CALL(g_object_ref(call))});
   } else {
     fl_method_call_respond_not_implemented(call, nullptr);
   }
@@ -280,7 +288,8 @@ void create_popup(BarPopup* state, bool sidebar, bool tray, bool tooltip, bool t
   GdkVisual* visual = gdk_screen_get_rgba_visual(gtk_window_get_screen(window));
   if (visual != nullptr) gtk_widget_set_visual(GTK_WIDGET(window), visual);
 
-  state->view = fl_view_new_for_engine(state->engine);
+  auto* engine = fl_view_get_engine(state->owner);
+  state->view = fl_view_new_for_engine(engine);
   const GdkRGBA transparent = {0, 0, 0, 0};
   fl_view_set_background_color(state->view, &transparent);
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(state->view));
@@ -288,8 +297,9 @@ void create_popup(BarPopup* state, bool sidebar, bool tray, bool tooltip, bool t
   state->view_id = fl_view_get_id(state->view);
   g_autofree gchar* channel_name = popup_channel_name(state->view_id);
   state->channel = fl_method_channel_new(
-      fl_engine_get_binary_messenger(state->engine), channel_name, FL_METHOD_CODEC(codec));
+      fl_engine_get_binary_messenger(engine), channel_name, FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(state->channel, popup_method, state, nullptr);
+  state->views->add(state->view, "popup");
 }
 
 bool int_at(FlValue* list, size_t index, int64_t minimum, int64_t maximum, int* output) {
@@ -344,7 +354,7 @@ void watch_outside(BarPopup* state) {
 
 BarPopup* child_popup(BarPopup* root, BarPopup*& child) {
   if (child == nullptr) {
-    child = new BarPopup{root->owner, root->engine};
+    child = new BarPopup{root->owner, root->views};
     child->owner_channel = FL_METHOD_CHANNEL(g_object_ref(root->owner_channel));
   }
   return child;
@@ -638,34 +648,23 @@ void bar_popup_monitor_removed(GdkMonitor* monitor) {
   }
 }
 
-GtkWidget* create_bar_popup_engine() {
-  g_autoptr(FlDartProject) project = fl_dart_project_new();
-  gchar popup_argument[] = "--remya-popup";
-  gchar* arguments[] = {popup_argument, nullptr};
-  fl_dart_project_set_dart_entrypoint_arguments(project, arguments);
-
-  // GTK realization starts the Linux engine. Keep its implicit view realized
-  // and unmapped so it owns a GL context without putting a window on screen.
-  auto* window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-  g_object_ref_sink(window);
-  gtk_window_set_default_size(GTK_WINDOW(window), 1, 1);
-  auto* view = fl_view_new(project);
-  gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
-  fl_register_plugins(FL_PLUGIN_REGISTRY(view));
-  gtk_widget_realize(window);
-  gtk_widget_realize(GTK_WIDGET(view));
-  return window;
-}
-
-void register_bar_popup(FlView* owner, FlEngine* popup_engine) {
-  auto* state = new BarPopup{owner, popup_engine};
+void register_bar_popup(FlView* owner, BarViews* views) {
+  auto* state = new BarPopup{owner, views};
   g_object_set_data_full(G_OBJECT(owner), "remya-popup", state,
                          [](gpointer data) { delete static_cast<BarPopup*>(data); });
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  g_autofree gchar* name = bar_channel_name(owner, "popup");
   state->owner_channel = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(owner)),
-      "top.remya.bar/popup", FL_METHOD_CODEC(codec));
+      name, FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(state->owner_channel, owner_method, state, nullptr);
+}
+
+void unregister_bar_popup(FlView* owner) {
+  g_autofree gchar* name = bar_channel_name(owner, "popup");
+  fl_binary_messenger_set_message_handler_on_channel(
+      fl_engine_get_binary_messenger(fl_view_get_engine(owner)), name, nullptr, nullptr, nullptr);
+  g_object_set_data(G_OBJECT(owner), "remya-popup", nullptr);
 }
 
 bool close_bar_sidebar(FlView* owner) {

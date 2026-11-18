@@ -11,6 +11,8 @@ import 'package:remya_bar/features/resources/resource_style.dart';
 import 'package:remya_bar/features/system/system_backend.dart';
 import 'package:remya_ui/remya_ui.dart';
 
+late BarPopup _popup;
+
 const _snapshot = SystemSnapshot(
   batteries: [],
   cpuPercent: 91,
@@ -21,6 +23,8 @@ const _snapshot = SystemSnapshot(
 );
 
 void main() {
+  setUp(() => _popup = BarPopup.forView(1));
+  tearDown(() => _popup.dispose());
   test('rates round to two significant figures and keep zero distinct from missing', () {
     expect(resourceRate(2400000, compact: true), '2.4M');
     expect(resourceRate(86400, compact: true), '86K');
@@ -38,16 +42,15 @@ void main() {
   ) async {
     final calls = <MethodCall>[];
     final messenger = tester.binding.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(BarPopup.channel, (call) async {
+    messenger.setMockMethodCallHandler(_popup.channel, (call) async {
       calls.add(call);
       return null;
     });
-    addTearDown(
-      () => messenger.setMockMethodCallHandler(BarPopup.channel, null),
-    );
+    addTearDown(() => messenger.setMockMethodCallHandler(_popup.channel, null));
     await tester.pumpWidget(
-      const MaterialApp(
+      MaterialApp(
         home: BarPopupScope(
+          popup: _popup,
           theme: RemyaTheme(),
           child: Center(
             child: BarResources(snapshot: _snapshot, cardSnapshot: _snapshot),
@@ -95,7 +98,8 @@ void main() {
       final preferences = SettingsThemeController(
         () => File('/nonexistent/theme.toml'),
       );
-      Widget app() => RemyaBarApp(preferences: preferences, system: system);
+      Widget app() =>
+          RemyaBarApp(popup: _popup, preferences: preferences, system: system);
       BarResources pill() => tester.widget(find.byType(BarResources));
       await tester.pumpWidget(app());
       final materialApp = tester.widget(find.byType(MaterialApp));
@@ -113,6 +117,8 @@ void main() {
       expect(pill().snapshot?.cpuPercent, 42);
       expect(tester.widget(find.byType(MaterialApp)), same(materialApp));
       await tester.pumpWidget(const SizedBox.shrink());
+      system.dispose();
+      preferences.dispose();
     },
   );
 }

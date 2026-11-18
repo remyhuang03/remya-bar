@@ -18,183 +18,137 @@ export '../../src/rust/hyprland_bridge/api.dart'
         HyprlandWorkspaceSlot,
         HyprlandWindow;
 
-class HyprlandBackend extends ChangeNotifier {
-  HyprlandBackend({
-    this.outputName,
-    int? outputX,
-    int? outputY,
-    this.readSnapshot = hyprlandSnapshot,
-    this.activateWorkspace = hyprlandSwitchWorkspace,
-    this.scrollWorkspace = hyprlandScrollWorkspace,
-    this.toggleSpecialWorkspace = hyprlandToggleSpecial,
-  }) : _position = (outputX, outputY);
+const _eventWindow = Duration(milliseconds: 80);
 
-  final String? outputName;
+/// Owns the compositor subscription, refresh queue and icon paths for all views.
+class HyprlandStore extends ChangeNotifier {
+  HyprlandStore({
+    this.readSnapshot = hyprlandSnapshot,
+    this.watch = subscribeHyprland,
+  });
+
   final Future<HyprlandSnapshot> Function({required int slotCount})
   readSnapshot;
-  final Future<void> Function({
-    required String outputName,
-    required int workspaceId,
-    required int slotCount,
-  })
-  activateWorkspace;
-  final Future<void> Function({
-    required String outputName,
-    required int direction,
-    required int slotCount,
-  })
-  scrollWorkspace;
-  final Future<void> Function({
-    required String outputName,
-    required int slotCount,
-  })
-  toggleSpecialWorkspace;
-  int _workspaceCount = 8;
-  int? _snapshotWorkspaceCount;
+  final Stream<HyprlandUpdate> Function() watch;
   late final _icons = BarIconCache<String>(
     lookup: lookupBarIconPaths,
     onChanged: notifyListeners,
   );
-  (int?, int?) _position;
   StreamSubscription<HyprlandUpdate>? _subscription;
   Timer? _reconcile;
   Timer? _eventRefresh;
   Future<void>? _refreshing;
   bool _pendingRefresh = false;
   bool _disposed = false;
+  bool _started = false;
+  bool _connected = false;
+  bool _superHeld = false;
+  String? _error;
+  int _workspaceCount = 8;
+  int? _snapshotWorkspaceCount;
   HyprlandSnapshot? _snapshot;
   String? _focusedOutput;
   Future<String?>? _focusRequest;
   int _focusRevision = 0;
-  String? error;
-  HyprlandUpdate? latest;
-  bool connected = false;
-  bool superHeld = false;
-
-  List<HyprlandMonitor> get monitors => _snapshot?.monitors ?? [];
-
-  Future<String?> focusedOutput() async {
-    if (_focusedOutput case final name?) return name;
-    return _focusRequest ??= _readFocusedOutput().whenComplete(
-      () => _focusRequest = null,
-    );
-  }
-
-  Future<String?> _readFocusedOutput() async {
-    final revision = _focusRevision;
-    final workspace = jsonDecode(await request('j/activeworkspace'));
-    if (revision == _focusRevision && workspace is Map) {
-      final name = workspace['monitor'];
-      if (name is String) _focusedOutput = name;
-    }
-    return _focusedOutput;
-  }
-
-  HyprlandMonitor? get output {
-    final matches = (_snapshot?.monitors ?? <HyprlandMonitor>[]).where(
-      (monitor) => outputName != null
-          ? monitor.name == outputName
-          : monitor.x == _position.$1 && monitor.y == _position.$2,
-    );
-    return matches.length == 1 ? matches.single : null;
-  }
-
-  List<HyprlandWorkspace> get workspaces => [
-    for (final workspace in _snapshot?.workspaces ?? <HyprlandWorkspace>[])
-      if (workspace.monitorName == output?.name) workspace,
-  ];
-
-  List<HyprlandWorkspace> get allWorkspaces => _snapshot?.workspaces ?? [];
-  List<HyprlandWorkspaceSlot> get workspaceSlots =>
-      output?.workspaceSlots ?? [];
-  String? iconPath(String appId) => _icons[appId];
-
-  HyprlandWindow? get currentWindow => output?.currentWindow;
-
-  /// Updates the workspace count for reads and actions on this output.
-  Future<void> setWorkspaceCount(int count) {
-    if (_disposed || count < 1 || count > 10) return Future.value();
-    if (count == _workspaceCount) {
-      if (_refreshing case final refresh?) return refresh;
-      if (count == _snapshotWorkspaceCount && error == null) {
-        return Future.value();
-      }
-    }
-    _workspaceCount = count;
-    return refresh();
-  }
-
-  void updateOutput({required int x, required int y}) {
-    if (_disposed || _position == (x, y)) return;
-    _position = (x, y);
-    notifyListeners();
-    unawaited(refresh());
-  }
-
-  static Future<void> initialize() => HyprlandRustLib.init(
-    externalLibrary: ExternalLibrary.open(
-      '${File(Platform.resolvedExecutable).parent.path}/lib/libremya_bar_hyprland.so',
-    ),
-  );
+  int _connectionRevision = 0;
+  int snapshotReads = 0;
+  int snapshotRevision = 0;
+  DateTime? capturedAt;
 
   void start() {
-    if (_subscription != null || _disposed) return;
-    _subscription = subscribeHyprland().listen(
-      (update) {
-        if (update.kind == 'heartbeat') return;
-        if (update.kind == 'modifier' && update.name == 'super') {
-          final held = update.data == 'true';
-          if (held != superHeld) {
-            superHeld = held;
-            notifyListeners();
-          }
-          return;
-        }
-        latest = update;
-        if (update.kind == 'event' && update.name == 'focusedmon') {
-          _focusRevision++;
-          _focusedOutput = update.data.split(',').firstOrNull;
-        } else if (const {
-          'connected',
-          'disconnected',
-          'resync',
-        }.contains(update.kind)) {
-          _focusRevision++;
-          _focusedOutput = null;
-        }
-        if (update.kind == 'connected') connected = true;
-        if (update.kind == 'disconnected') connected = false;
-        if (update.kind != 'event') {
-          debugPrint('Hyprland IPC: ${update.kind}');
-        }
-        if (update.kind == 'connected' ||
-            update.kind == 'resync' ||
-            update.kind == 'event' && _affectsWorkspaces(update.name)) {
-          _eventRefresh ??= Timer(const Duration(milliseconds: 80), () {
-            _eventRefresh = null;
-            unawaited(refresh());
-          });
-        }
-        if (update.kind == 'disconnected') {
-          superHeld = false;
-          error = 'Hyprland unavailable';
-          notifyListeners();
-        }
-      },
+    _started = true;
+    _startWatching();
+  }
+
+  void _attach(VoidCallback listener) {
+    addListener(listener);
+    _startWatching();
+  }
+
+  void _detach(VoidCallback listener) {
+    removeListener(listener);
+    if (_disposed || hasListeners || _subscription == null) return;
+    unawaited(_subscription?.cancel());
+    _subscription = null;
+    _reconcile?.cancel();
+    _reconcile = null;
+    _snapshot = null;
+    _snapshotWorkspaceCount = null;
+    _disconnect();
+  }
+
+  void _startWatching() {
+    if (!_started || _disposed || !hasListeners || _subscription != null) {
+      return;
+    }
+    _subscription = watch().listen(
+      _onUpdate,
       onError: (Object error, StackTrace stack) {
-        _focusRevision++;
-        _focusedOutput = null;
-        connected = false;
-        this.error = 'Hyprland unavailable';
         debugPrint('Hyprland IPC: $error');
-        notifyListeners();
+        _disconnect();
       },
+      onDone: _disconnect,
     );
     _reconcile = Timer.periodic(
-      const Duration(seconds: 2),
+      const Duration(seconds: 30),
       (_) => unawaited(refresh()),
     );
     unawaited(refresh());
+  }
+
+  void _onUpdate(HyprlandUpdate update) {
+    switch (update.kind) {
+      case 'modifier' when update.name == 'super':
+        _setSuperHeld(update.data == 'true');
+      case 'disconnected':
+        _disconnect();
+      case 'connected' || 'resync':
+        _connectionRevision++;
+        _focusRevision++;
+        _focusedOutput = null;
+        _scheduleRefresh();
+      case 'event':
+        if (update.name == 'focusedmon') {
+          _focusRevision++;
+          final name = update.data.split(',').firstOrNull;
+          if (name != null && name.isNotEmpty && _focusedOutput != name) {
+            _focusedOutput = name;
+            notifyListeners();
+          }
+        }
+        if (_affectsWorkspaces(update.name)) _scheduleRefresh();
+    }
+  }
+
+  void _disconnect() {
+    if (_disposed) return;
+    _connectionRevision++;
+    _focusRevision++;
+    _focusedOutput = null;
+    _eventRefresh?.cancel();
+    _eventRefresh = null;
+    _pendingRefresh = false;
+    _connected = false;
+    _superHeld = false;
+    _error = 'Hyprland unavailable';
+    notifyListeners();
+  }
+
+  void _setSuperHeld(bool held) {
+    if (_superHeld == held) return;
+    _superHeld = held;
+    notifyListeners();
+  }
+
+  void _scheduleRefresh() {
+    if (_refreshing != null) {
+      _pendingRefresh = true;
+      return;
+    }
+    _eventRefresh ??= Timer(_eventWindow, () {
+      _eventRefresh = null;
+      unawaited(refresh());
+    });
   }
 
   bool _affectsWorkspaces(String name) => const [
@@ -220,8 +174,45 @@ class HyprlandBackend extends ChangeNotifier {
     'configreloaded',
   ].any(name.startsWith);
 
+  Future<String?> focusedOutput() async {
+    if (_focusedOutput case final name?) return name;
+    return _focusRequest ??= _readFocusedOutput().whenComplete(
+      () => _focusRequest = null,
+    );
+  }
+
+  Future<String?> _readFocusedOutput() async {
+    final revision = _focusRevision;
+    final workspace = jsonDecode(
+      await hyprlandRequest(command: 'j/activeworkspace'),
+    );
+    if (revision == _focusRevision && workspace is Map) {
+      final name = workspace['monitor'];
+      if (!_disposed && name is String && name != _focusedOutput) {
+        _focusRevision++;
+        _focusedOutput = name;
+        notifyListeners();
+      }
+    }
+    return _focusedOutput;
+  }
+
+  Future<void> setWorkspaceCount(int count) {
+    if (_disposed || count < 1 || count > 10) return Future.value();
+    if (count == _workspaceCount) {
+      if (_refreshing case final refresh?) return refresh;
+      if (count == _snapshotWorkspaceCount && _error == null) {
+        return Future.value();
+      }
+    }
+    _workspaceCount = count;
+    return refresh();
+  }
+
   Future<void> refresh() {
     if (_disposed) return Future.value();
+    _eventRefresh?.cancel();
+    _eventRefresh = null;
     _pendingRefresh = true;
     if (_refreshing case final active?) return active;
     final completion = Completer<void>();
@@ -235,30 +226,189 @@ class HyprlandBackend extends ChangeNotifier {
       while (_pendingRefresh && !_disposed) {
         _pendingRefresh = false;
         final count = _workspaceCount;
+        final revision = _connectionRevision;
+        final focusRevision = _focusRevision;
         try {
+          snapshotReads++;
           final snapshot = await readSnapshot(slotCount: count);
           if (_disposed) return;
-          if (count != _workspaceCount) continue;
-          _snapshot = snapshot;
-          _snapshotWorkspaceCount = count;
-          connected = true;
-          error = output == null ? 'Output unavailable' : null;
+          if (count == _workspaceCount && revision == _connectionRevision) {
+            _snapshot = snapshot;
+            _snapshotWorkspaceCount = count;
+            if (focusRevision == _focusRevision &&
+                snapshot.focusedOutput != null &&
+                snapshot.focusedOutput != _focusedOutput) {
+              _focusRevision++;
+              _focusedOutput = snapshot.focusedOutput;
+            }
+            snapshotRevision++;
+            capturedAt = DateTime.now();
+            _connected = true;
+            _error = null;
+            _icons.resolve({
+              for (final monitor in snapshot.monitors)
+                for (final slot in monitor.workspaceSlots)
+                  for (final app in slot.apps)
+                    if (app.isNotEmpty) app,
+            });
+            notifyListeners();
+          }
         } catch (failure) {
           if (_disposed) return;
-          if (count != _workspaceCount) continue;
-          error = 'Hyprland unavailable';
-          debugPrint('Hyprland workspace refresh: $failure');
+          if (count == _workspaceCount && revision == _connectionRevision) {
+            _error = 'Hyprland unavailable';
+            debugPrint('Hyprland workspace refresh: $failure');
+            notifyListeners();
+          }
         }
-        notifyListeners();
-        _resolveIcons();
-        if (_pendingRefresh) {
-          await Future<void>.delayed(const Duration(milliseconds: 80));
-        }
+        if (_pendingRefresh) await Future<void>.delayed(_eventWindow);
       }
     } finally {
       _refreshing = null;
     }
   }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _reconcile?.cancel();
+    _eventRefresh?.cancel();
+    unawaited(_subscription?.cancel());
+    _icons.dispose();
+    super.dispose();
+  }
+}
+
+/// Projects shared desktop state into an output's workspace, window and bar.
+class HyprlandBackend extends ChangeNotifier {
+  HyprlandBackend({
+    this.outputName,
+    int? outputX,
+    int? outputY,
+    HyprlandStore? store,
+    Future<HyprlandSnapshot> Function({required int slotCount}) readSnapshot =
+        hyprlandSnapshot,
+    this.activateWorkspace = hyprlandSwitchWorkspace,
+    this.scrollWorkspace = hyprlandScrollWorkspace,
+    this.toggleSpecialWorkspace = hyprlandToggleSpecial,
+  }) : _position = (outputX, outputY),
+       _store = store ?? HyprlandStore(readSnapshot: readSnapshot),
+       _ownsStore = store == null {
+    _store._attach(_project);
+    _project();
+  }
+
+  final String? outputName;
+  final HyprlandStore _store;
+  final bool _ownsStore;
+  final Future<void> Function({
+    required String outputName,
+    required int workspaceId,
+    required int slotCount,
+  })
+  activateWorkspace;
+  final Future<void> Function({
+    required String outputName,
+    required int direction,
+    required int slotCount,
+  })
+  scrollWorkspace;
+  final Future<void> Function({
+    required String outputName,
+    required int slotCount,
+  })
+  toggleSpecialWorkspace;
+  (int?, int?) _position;
+  bool _disposed = false;
+  bool connected = false;
+  bool get isFocused => _isFocused;
+  bool _isFocused = false;
+  bool get superHeld => _superHeld;
+  @visibleForTesting
+  set superHeld(bool held) => _store._setSuperHeld(held);
+  bool _superHeld = false;
+  String? error;
+  HyprlandMonitor? output;
+  String? _activeWorkspaceName;
+  List<(String, int)> _outputLabels = const [];
+  Map<String, String?> _visibleIcons = const {};
+
+  List<HyprlandMonitor> get monitors => _store._snapshot?.monitors ?? [];
+  List<HyprlandWorkspace> get workspaces => [
+    for (final workspace in allWorkspaces)
+      if (workspace.monitorName == output?.name) workspace,
+  ];
+  List<HyprlandWorkspace> get allWorkspaces =>
+      _store._snapshot?.workspaces ?? [];
+  List<HyprlandWorkspaceSlot> get workspaceSlots =>
+      output?.workspaceSlots ?? [];
+  HyprlandWindow? get currentWindow => output?.currentWindow;
+
+  String? iconPath(String appId) => _store._icons[appId];
+
+  void _project() {
+    final matches = monitors.where(
+      (monitor) => outputName != null
+          ? monitor.name == outputName
+          : monitor.x == _position.$1 && monitor.y == _position.$2,
+    );
+    final next = matches.length == 1 ? matches.single : null;
+    final nextFocused = next != null && next.name == _store._focusedOutput;
+    final nextError =
+        _store._error ??
+        (_store._snapshot != null && next == null
+            ? 'Output unavailable'
+            : null);
+    final nextName = next != null && next.activeWorkspaceId < 0
+        ? allWorkspaces
+              .where((workspace) => workspace.id == next.activeWorkspaceId)
+              .firstOrNull
+              ?.name
+        : null;
+    final nextLabels = [
+      for (final monitor in monitors) (monitor.name, monitor.outputNumber),
+    ];
+    final nextIcons = {
+      for (final slot in next?.workspaceSlots ?? <HyprlandWorkspaceSlot>[])
+        for (final app in slot.apps) app: iconPath(app),
+    };
+    final changed =
+        !_sameOutput(output, next) ||
+        connected != _store._connected ||
+        _isFocused != nextFocused ||
+        superHeld != _store._superHeld ||
+        error != nextError ||
+        _activeWorkspaceName != nextName ||
+        !listEquals(_outputLabels, nextLabels) ||
+        !mapEquals(_visibleIcons, nextIcons);
+    output = next;
+    connected = _store._connected;
+    _isFocused = nextFocused;
+    _superHeld = _store._superHeld;
+    error = nextError;
+    _activeWorkspaceName = nextName;
+    _outputLabels = nextLabels;
+    _visibleIcons = nextIcons;
+    if (changed) notifyListeners();
+  }
+
+  Future<String?> focusedOutput() => _store.focusedOutput();
+  Future<void> setWorkspaceCount(int count) => _store.setWorkspaceCount(count);
+  Future<void> refresh() => _store.refresh();
+  void start() => _store.start();
+
+  void updateOutput({required int x, required int y}) {
+    if (_disposed || outputName != null || _position == (x, y)) return;
+    _position = (x, y);
+    _project();
+    _store._scheduleRefresh();
+  }
+
+  static Future<void> initialize() => HyprlandRustLib.init(
+    externalLibrary: ExternalLibrary.open(
+      '${File(Platform.resolvedExecutable).parent.path}/lib/libremya_bar_hyprland.so',
+    ),
+  );
 
   Future<bool> switchWorkspace(int id) async {
     if (id == 0 ||
@@ -297,7 +447,7 @@ class HyprlandBackend extends ChangeNotifier {
     Future<void> Function(String output, int slotCount) action,
   ) async {
     final monitor = output;
-    final count = _snapshotWorkspaceCount;
+    final count = _store._snapshotWorkspaceCount;
     if (_disposed ||
         !connected ||
         error != null ||
@@ -315,27 +465,47 @@ class HyprlandBackend extends ChangeNotifier {
     }
   }
 
-  void _resolveIcons() {
-    _icons.resolve({
-      for (final monitor in _snapshot?.monitors ?? <HyprlandMonitor>[])
-        for (final slot in monitor.workspaceSlots)
-          for (final app in slot.apps)
-            if (app.isNotEmpty) app,
-    });
-  }
-
-  Future<bool> isOutputFullscreen(int x, int y) =>
-      hyprlandOutputFullscreen(x: x, y: y);
-
   Future<String> request(String command) => hyprlandRequest(command: command);
 
   @override
   void dispose() {
     _disposed = true;
-    _reconcile?.cancel();
-    _eventRefresh?.cancel();
-    _subscription?.cancel();
-    _icons.dispose();
+    _store._detach(_project);
+    if (_ownsStore) _store.dispose();
     super.dispose();
   }
+}
+
+bool _sameOutput(HyprlandMonitor? first, HyprlandMonitor? second) {
+  if (identical(first, second)) return true;
+  if (first == null || second == null) return false;
+  Object metadata(HyprlandMonitor monitor) => (
+    monitor.name,
+    monitor.outputNumber,
+    monitor.activeWorkspaceId,
+    monitor.specialWorkspaceId,
+    monitor.specialWorkspaceName,
+    monitor.currentWindow,
+    monitor.fullscreen,
+  );
+  if (metadata(first) != metadata(second)) return false;
+  final a = first.workspaceSlots;
+  final b = second.workspaceSlots;
+  Object slotFields(HyprlandWorkspaceSlot slot) => (
+    slot.id,
+    slot.name,
+    slot.active,
+    slot.occupied,
+    slot.windowCount,
+    slot.owner,
+    slot.urgent,
+  );
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (slotFields(a[i]) != slotFields(b[i]) ||
+        !listEquals(a[i].apps, b[i].apps)) {
+      return false;
+    }
+  }
+  return true;
 }

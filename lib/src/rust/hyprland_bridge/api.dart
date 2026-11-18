@@ -7,7 +7,7 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `dispatch_workspace_command`, `new`, `output_fullscreen`, `publish_super`, `read_super`, `subscribe`, `super_update`, `watch_super`
+// These functions are ignored because they are not marked as `pub`: `dispatch_workspace_command`, `new`, `publish_super`, `read_super`, `subscribe`, `super_update`, `watch_super`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Hub`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
@@ -49,9 +49,6 @@ Future<String> hyprlandRequest({required String command}) =>
 Stream<HyprlandUpdate> subscribeHyprland() =>
     HyprlandRustLib.instance.api.crateApiSubscribeHyprland();
 
-Future<bool> hyprlandOutputFullscreen({required int x, required int y}) =>
-    HyprlandRustLib.instance.api.crateApiHyprlandOutputFullscreen(x: x, y: y);
-
 class HyprlandMonitor {
   final String name;
   final int outputNumber;
@@ -60,6 +57,7 @@ class HyprlandMonitor {
   final int activeWorkspaceId;
   final int? specialWorkspaceId;
   final String? specialWorkspaceName;
+  final bool fullscreen;
   final HyprlandWindow? currentWindow;
   final List<HyprlandWorkspaceSlot> workspaceSlots;
 
@@ -71,6 +69,7 @@ class HyprlandMonitor {
     required this.activeWorkspaceId,
     this.specialWorkspaceId,
     this.specialWorkspaceName,
+    required this.fullscreen,
     this.currentWindow,
     required this.workspaceSlots,
   });
@@ -84,6 +83,7 @@ class HyprlandMonitor {
       activeWorkspaceId.hashCode ^
       specialWorkspaceId.hashCode ^
       specialWorkspaceName.hashCode ^
+      fullscreen.hashCode ^
       currentWindow.hashCode ^
       workspaceSlots.hashCode;
 
@@ -99,6 +99,7 @@ class HyprlandMonitor {
           activeWorkspaceId == other.activeWorkspaceId &&
           specialWorkspaceId == other.specialWorkspaceId &&
           specialWorkspaceName == other.specialWorkspaceName &&
+          fullscreen == other.fullscreen &&
           currentWindow == other.currentWindow &&
           workspaceSlots == other.workspaceSlots;
 }
@@ -106,11 +107,17 @@ class HyprlandMonitor {
 class HyprlandSnapshot {
   final List<HyprlandMonitor> monitors;
   final List<HyprlandWorkspace> workspaces;
+  final String? focusedOutput;
 
-  const HyprlandSnapshot({required this.monitors, required this.workspaces});
+  const HyprlandSnapshot({
+    required this.monitors,
+    required this.workspaces,
+    this.focusedOutput,
+  });
 
   @override
-  int get hashCode => monitors.hashCode ^ workspaces.hashCode;
+  int get hashCode =>
+      monitors.hashCode ^ workspaces.hashCode ^ focusedOutput.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -118,7 +125,8 @@ class HyprlandSnapshot {
       other is HyprlandSnapshot &&
           runtimeType == other.runtimeType &&
           monitors == other.monitors &&
-          workspaces == other.workspaces;
+          workspaces == other.workspaces &&
+          focusedOutput == other.focusedOutput;
 }
 
 class HyprlandUpdate {

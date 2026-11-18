@@ -44,7 +44,7 @@ const barSettingsPages = [
   ),
 ];
 
-/// The Remya Bar settings window hosted on the popup engine. [request]
+/// The Remya Bar settings window. [request]
 /// changes on every `open`, so reopening the same page navigates again.
 class BarSettingsEntry extends StatefulWidget {
   const BarSettingsEntry({
@@ -120,11 +120,16 @@ class _BarSettingsEntryState extends State<BarSettingsEntry> {
               title: _title,
               dragArea: (child) => GestureDetector(
                 behavior: .opaque,
-                onPanStart: (_) =>
-                    barSettingsChannel.invokeMethod<void>('startMove'),
+                onPanStart: (_) => barSettingsChannel.invokeMethod<void>(
+                  'startMove',
+                  View.of(context).viewId,
+                ),
                 child: child,
               ),
-              onClose: () => barSettingsChannel.invokeMethod<void>('close'),
+              onClose: () => barSettingsChannel.invokeMethod<void>(
+                'close',
+                View.of(context).viewId,
+              ),
             ),
             Expanded(
               child: RemyaSettingsScaffold(
@@ -147,8 +152,13 @@ class _BarSettingsEntryState extends State<BarSettingsEntry> {
                     title: 'Account',
                     icon: Icons.person_outline_rounded,
                     category: .privacy,
-                    builder: (_) =>
-                        RemyaAvatarEditor(client: _controller.client),
+                    builder: (context) => RemyaAvatarEditor(
+                      client: _controller.client,
+                      pickImage: () => barSettingsChannel.invokeMethod<String>(
+                        'pickAvatar',
+                        View.of(context).viewId,
+                      ),
+                    ),
                   ),
                 ],
                 footerPages: [

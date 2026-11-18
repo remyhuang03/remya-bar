@@ -17,6 +17,8 @@ struct Monitor {
     name: String,
     x: i32,
     y: i32,
+    #[serde(default)]
+    focused: bool,
     active_workspace: WorkspaceRef,
     special_workspace: WorkspaceRef,
 }
@@ -41,6 +43,8 @@ struct Client {
     monitor: i32,
     mapped: bool,
     hidden: bool,
+    #[serde(default)]
+    fullscreen: serde_json::Value,
     #[serde(rename = "focusHistoryID")]
     focus_history: i32,
     #[serde(default)]
@@ -90,7 +94,10 @@ pub fn parse(
             .map(|monitor| monitor.name.clone())
             .unwrap_or_default(),
     };
+    let mut focused = monitors.iter().filter(|monitor| monitor.focused);
+    let focused_output = focused.next().filter(|_| focused.next().is_none());
     Ok(HyprlandSnapshot {
+        focused_output: focused_output.map(|monitor| monitor.name.clone()),
         monitors: monitors
             .iter()
             .enumerate()
@@ -130,6 +137,10 @@ pub fn parse(
                         .name
                         .clone()
                         .filter(|name| !name.is_empty()),
+                    fullscreen: clients
+                        .iter()
+                        .filter(visible)
+                        .any(|client| client.fullscreen.as_u64().is_some_and(|mode| mode & 2 != 0)),
                     current_window: current_window.map(window),
                     workspace_slots: slots(active_id, slot_count, &workspaces, &clients, urgent),
                 }
@@ -374,6 +385,42 @@ mod tests {
                 .collect::<Vec<_>>(),
             [("top-left", 1), ("top-right", 2), ("lower-left", 3)]
         );
+    }
+
+    #[test]
+    fn fullscreen_is_scoped_to_mapped_visible_clients_and_full_mode() {
+        let monitors = json!([
+            {"id": 0, "name": "DP-1", "x": 0, "y": 0, "focused": true,
+             "activeWorkspace": {"id": 1}, "specialWorkspace": {}},
+            {"id": 1, "name": "DP-2", "x": 1920, "y": 0,
+             "activeWorkspace": {"id": 2}, "specialWorkspace": {"id": -99}}
+        ]);
+        for (workspace, mapped, hidden, mode, expected) in [
+            (-99, true, false, 2, true),
+            (2, true, false, 3, true),
+            (2, true, false, 1, false),
+            (3, true, false, 2, false),
+            (2, false, false, 2, false),
+            (2, true, true, 2, false),
+        ] {
+            let clients = json!([{
+                "address": "0xa", "title": "App", "class": "app",
+                "workspace": {"id": workspace}, "monitor": 1, "mapped": mapped,
+                "hidden": hidden, "fullscreen": mode, "focusHistoryID": 0
+            }]);
+            let state = parse(
+                &monitors.to_string(),
+                "[]",
+                &clients.to_string(),
+                "{}",
+                &HashSet::new(),
+                8,
+            )
+            .unwrap();
+            assert_eq!(state.focused_output.as_deref(), Some("DP-1"));
+            assert!(!state.monitors[0].fullscreen);
+            assert_eq!(state.monitors[1].fullscreen, expected);
+        }
     }
 
     #[test]

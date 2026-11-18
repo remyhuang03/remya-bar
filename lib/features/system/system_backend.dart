@@ -57,12 +57,45 @@ class SystemBackend extends ChangeNotifier {
   bool isPowerSaver = false;
   api.BatterySnapshot? get battery => resourceSnapshot?.batteries.firstOrNull;
   final _hardware = ValueNotifier<api.SystemSnapshot?>(null);
+  final _resourcePill = ValueNotifier<api.SystemSnapshot?>(null);
+  Timer? _resourcePillTimer;
+  final _resourceCards = <Object>{};
+  final _resourcesVisible = <Object>{};
+
+  ValueListenable<api.SystemSnapshot?> get resourcePill => _resourcePill;
+
+  void setResourceCardVisible(Object owner, bool visible) {
+    if (visible) {
+      _resourceCards.add(owner);
+    } else {
+      _resourceCards.remove(owner);
+    }
+  }
+
+  void setResourcesVisible(Object owner, bool visible) {
+    if (visible) {
+      _resourcesVisible.add(owner);
+    } else {
+      _resourcesVisible.remove(owner);
+    }
+  }
+
   ValueListenable<api.SystemSnapshot?> get hardware => _hardware;
   api.SystemSnapshot? get resourceSnapshot => _hardware.value;
   set resourceSnapshot(api.SystemSnapshot? value) {
     final hadBattery = battery?.percent?.isFinite == true;
     _hardware.value = value;
+    if (_resourcePillTimer == null) _publishResourcePill();
     if (hadBattery != (battery?.percent?.isFinite == true)) notifyListeners();
+  }
+
+  void _publishResourcePill() {
+    if (_resourcePill.value == _hardware.value) return;
+    _resourcePillTimer = Timer(const Duration(seconds: 3), () {
+      _resourcePillTimer = null;
+      _publishResourcePill();
+    });
+    _resourcePill.value = _hardware.value;
   }
 
   static Future<void>? _initializing;
@@ -129,7 +162,13 @@ class SystemBackend extends ChangeNotifier {
     if (_disposed || _refreshing) return;
     _refreshing = true;
     try {
-      final next = await api.hardwareSnapshot();
+      final next = await api.hardwareSnapshot(
+        details: _resourceCards.isNotEmpty,
+        gpuPill:
+            _resourcesVisible.isNotEmpty &&
+            layout.groups.any((group) => group.contains('resources')) &&
+            layout.resources.contains('gpu'),
+      );
       if (_disposed) return;
       resourceSnapshot = next;
     } catch (failure) {
@@ -525,12 +564,14 @@ class SystemBackend extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    _resourcePillTimer?.cancel();
     _mediaRetry?.cancel();
     _playbackExpiry?.cancel();
     unawaited(_mediaSubscription?.cancel());
     unawaited(_settingsChanges?.cancel());
     unawaited(_settings.close());
     _hardware.dispose();
+    _resourcePill.dispose();
     super.dispose();
   }
 }

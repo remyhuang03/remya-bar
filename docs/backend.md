@@ -32,9 +32,11 @@ cards, tooltips, menus, panels, toasts and the OSD follow that edge, and the
 attached pill corners and card neck flip with it. Changes apply live.
 
 `remya_bar --settings [page]` forwards to the resident GApplication. The primary
-creates a normal GTK toplevel on the warm popup engine with
+creates a normal GTK toplevel on the application engine with
 `fl_view_new_for_engine`. `top.remya.bar/settings` carries `open({viewId, page})`,
-`closed(viewId)` and Dart's `ready` handshake; bar engines request `open(page)`.
+`closed(viewId)` and Dart's `ready` handshake. Bar views request `open(page)`.
+`close`, `startMove` and `pickAvatar` require the current settings view ID.
+The avatar chooser is modal to that window and cancels if the view closes.
 Repeated opens reuse the window and deliver a new request serial; an unknown or
 empty page keeps the current page. Closing destroys only its view. The desktop
 settings action uses `--settings`, accepting Core's OpenApp handoff.
@@ -49,7 +51,7 @@ entry exists in an absolute XDG data root, rechecked at most every five seconds.
 Release uses `SettingsThemeController.service`. Debug theme priority is Bar's
 `config/config.local.toml`, Core's `config/shared/theme.toml`, then installed shared
 theme. The runner supplies an absolute repository root independently of cwd,
-including on the popup engine through `top.remya.paths`. Invalid themes retain
+through the application-wide `top.remya.paths` channel. Invalid themes retain
 the last valid theme. The installer checks system Inter (`inter-font` on Arch).
 
 ## Hyprland IPC and output lifetime
@@ -63,38 +65,43 @@ Following the [Hyprland IPC protocol](https://wiki.hypr.land/IPC/):
 
 - Request sockets open per request and close on completion, failure or a two-second
   timeout. Replies must be UTF-8 and at most 8 MiB; idle connections are never retained.
-- One process-wide event worker serves all output engines, reconnecting after one
+- One process-wide event worker serves the app, reconnecting after one
   second. Newline framing preserves raw event data. Invalid or over-64-KiB frames
   fail the connection. The 256-update queue emits `resync` for lagging consumers.
-- Updates carry `kind`, `name`, `data`; late engines receive current connection
-  status. A one-second heartbeat releases closed subscriptions and is hidden by Dart.
+- Updates carry `kind`, `name`, `data`; the subscriber receives current connection
+  status on startup. A one-second heartbeat releases closed subscriptions and is hidden by Dart.
 - Paths require absolute XDG_RUNTIME_DIR and a single-component instance signature.
   There is no `/tmp/hypr` fallback. Transport uses Tokio; the GPL `hyprland` crate
   is incompatible with the dependency policy.
 
 GTK maintains one bar per GDK monitor. Dart matches logical geometry against
 Hyprland snapshots; ambiguous mirrored geometry is unavailable. Connector names
-identify workspace ownership, never monitor indices. Coalesced event reads and
-a two-second reconciliation recover missed workspace updates. Failed reads keep
-valid state but hide the pill until recovery. Each output passes its workspace
-count to snapshot and action requests. Workspace actions target the owning
+identify workspace ownership, never monitor indices. The app store coalesces
+workspace, monitor, window and fullscreen events into one snapshot request
+sequence, with one refresh in flight and an 80 ms event window. Its 30-second
+reconciliation covers missed events. Results from an obsolete connection
+generation are discarded. Each output projects its own active window, workspace
+slots and fullscreen state. Fullscreen requires a mapped, visible client in
+the active workspace or current special workspace with the fullscreen mode
+bit set. Failed reads keep the last valid snapshot but hide the workspace pill
+until recovery. Bar's shared workspace count drives the snapshot and actions.
+Workspace actions target the owning
 output; wheel uses monitor-relative `r±1`, Back toggles the special workspace,
 and right click opens the overview. When at least one output subscribes, one
 shared worker checks Super every 100 ms while connected. There are no Super
 queries without a subscriber or a compositor connection.
 
-Workspace and notification icon lookups use bounded LRUs with a 15-second
-retry delay for misses. GTK icon theme changes invalidate cached lookups.
-Each output's notification icon byte cache is limited to 16 MiB. Absolute
+Workspace and notification icon lookups share application-wide bounded LRUs
+with a 15-second retry delay for misses. GTK icon theme changes invalidate
+cached lookups. The notification icon byte cache is limited to 16 MiB. Absolute
 notification image paths are rechecked every 30 seconds while referenced.
 
 Fullscreen clients on the active or open special workspace hide only their
 output's bar, close its popups and release its exclusive zone. Leaving fullscreen
 restores the same Flutter view and 40-pixel reservation. No connected outputs is
-a supported state. Wake, output additions/removals and monitor-scale changes
-trigger a debounced re-exec before destroying a disconnected engine: its EGL
-display is shared with other views. Re-exec reloads Core preferences and saved
-notification history.
+a supported state. Output additions and removals add or remove explicit views
+on the same engine. Wake and monitor-scale changes retain re-exec recovery and
+reload Core preferences and saved notification history.
 
 ## Popup transport
 
@@ -104,11 +111,16 @@ component data and the Core theme; `BarPopupApp` renders content. GTK owns only
 placement, focus policy, visibility and lifetime. Popup surfaces have zero
 exclusive space and monitor-clamped bounds. gtk-layer-shell stays dynamically linked.
 
-One shared popup engine starts with a realized, unmapped implicit GTK view.
-`--remya-popup` runs a `ViewCollection` of explicit views, each with a channel
-named by view ID. Native forwards actions to the owning bar view, which supplies
-its theme. The engine stays warm after views close and runs no bar Rust event
-subscription or Core controller; the settings window owns its own controllers.
+One application engine starts with a realized, unmapped implicit GTK view.
+Native publishes complete revisioned view snapshots on `top.remya.bar/views`.
+Dart requests `list` and receives `changed` with `{revision, views}`, where
+`views` maps decimal Flutter view IDs to `bar`, `popup` or `settings`. The
+`ViewCollection` mounts a view when both its descriptor and Flutter metrics are
+available. IDs increase within the engine lifetime. Bar windows and popup owners
+use `top.remya.bar/bar/<id>/window` and `top.remya.bar/bar/<id>/popup`. Popup views
+use `top.remya.bar/popup/<id>`. Closing a view clears its route and cancels
+pending popup actions. Native forwards actions to the owning bar view, which
+supplies its theme. App services stay alive when the last output is removed.
 
 Detail cards share one per-output slot. Native injects `data.pill: [x, width]`
 in popup coordinates. Flutter draws the neck and animated shape while resize
@@ -146,7 +158,7 @@ History and the next ID commit transactionally to
 `$XDG_STATE_HOME/remya/bar/notifications.sqlite3` with absolute HOME fallback.
 Transient entries stay in memory. Restored entries never replay popups, sounds
 or actions belonging to the old daemon. Tests use isolated state roots and buses.
-The warm popup engine applies Core's notification preferences to Rust in order.
+The application applies Core's notification preferences to Rust in order.
 All outputs observe the same applied Do Not Disturb setting. Rust checks schedules
 every 30 seconds. Critical, priority-call and priority-app
 notifications bypass suppression. Sound uses `canberra-gtk-play` unless disabled
@@ -207,18 +219,23 @@ pauses while the keyboard is visible. Core owns output-device volume writes.
 
 ## Local observations and keyboard
 
-The clock reads wall time on aligned second boundaries and releases its timer
-with its output view. The datetime card browses months independently of live time;
-its Settings action uses the public opener. Seconds visibility is a Bar preference.
-Battery/resource samples are shared across engines; only system batteries count.
+One wall-clock timer serves visible bar clocks. It aligns to the second while
+any clock displays seconds, otherwise to the minute. Fullscreen and removed
+views release their demand. The datetime card browses months independently of
+live time and opens system settings through the public opener.
+Battery and resource samples are shared across views. Only system batteries count.
 Low charge takes precedence over energy-saver color. Battery policy comes from Core.
 
-Resources sample CPU, memory, GPU and network each second; the pill updates every
-three seconds and the card retains 60 seconds of history. Missing sensors remain
-unknown. Network totals mark partial daily coverage. NVIDIA uses one shared NVML
-library on a blocking worker and omits unavailable samples. Core-backed quick
-status follows Changed signals; account alone has a one-minute fallback for edits
-made outside Core.
+CPU, memory and network counters are sampled once per second. The resource pill
+updates every three seconds and the card shows a 60-second history. A separate
+blocking worker samples CPU frequency, temperature and GPU details while a
+resource card is visible. A visible pill with GPU enabled requests utilization
+at five-second intervals. Without those consumers the worker stays idle.
+GPU history only records measured utilization and shows gaps for unsampled
+intervals. CPU topology, GPU identity and sensor paths are cached with periodic
+rediscovery. NVIDIA uses one shared NVML library. Missing sensors remain unknown
+and network totals mark partial daily coverage. Core-backed quick status follows
+Changed signals. Account has a one-minute fallback for edits made outside Core.
 
 The keyboard uses a non-focusable virtual-keyboard overlay, following Hyprland's
 layout group and Caps Lock. Native compiles XKB and sends evdev events through

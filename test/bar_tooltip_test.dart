@@ -17,7 +17,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final calls = <MethodCall>[];
-    const channel = MethodChannel('top.remya.bar/popup');
+    final popup = BarPopup.forView(1);
+    final channel = popup.channel;
+    addTearDown(popup.dispose);
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
       call,
     ) async {
@@ -32,6 +34,7 @@ void main() {
     );
     const sharedTheme = RemyaTheme(styleVariant: .expressive, contrast: .high);
     Widget app(String message) => BarPopupScope(
+      popup: popup,
       theme: sharedTheme,
       child: MaterialApp(
         theme: sharedTheme.theme(.light),

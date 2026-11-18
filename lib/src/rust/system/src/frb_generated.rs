@@ -184,11 +184,14 @@ fn wire__crate__api__hardware_snapshot_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_details = <bool>::sse_decode(&mut deserializer);
+            let api_gpu_pill = <bool>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, String>(
                     (move || async move {
-                        let output_ok = crate::api::hardware_snapshot().await?;
+                        let output_ok =
+                            crate::api::hardware_snapshot(api_details, api_gpu_pill).await?;
                         std::result::Result::Ok(output_ok)
                     })()
                     .await,

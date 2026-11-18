@@ -17,8 +17,7 @@ import 'ai_usage_poll.dart';
 const _workerName = 'top.remya.bar/ai-usage';
 ReceivePort? _workerInbox;
 
-/// Per-output view of the process-wide sample. Revisit it for countdowns and
-/// to pick up a refresh initiated on another monitor.
+/// Shares one process-wide sample and refresh state with every bar view.
 class AiUsageBackend extends ChangeNotifier {
   AiUsageBackend({SettingsClient? settings})
     : _settings = settings ?? SettingsClient(),
@@ -151,10 +150,10 @@ class AiUsageBackend extends ChangeNotifier {
   }
 }
 
-/// Lives in the warm popup engine, which survives monitor removal.
+/// Lives in the application engine, which survives monitor removal.
 void startAiUsageWorker() {
   if (_workerInbox != null) return;
-  // The sole warm engine owns this name, including after an engine restart.
+  // Replace stale registrations after an engine restart.
   IsolateNameServer.removePortNameMapping(_workerName);
   final inbox = ReceivePort();
   if (!IsolateNameServer.registerPortWithName(inbox.sendPort, _workerName)) {

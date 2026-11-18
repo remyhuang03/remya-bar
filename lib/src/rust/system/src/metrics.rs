@@ -1,8 +1,8 @@
 use crate::api::*;
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
-use std::time::Instant;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Debug)]
 pub(crate) struct NetworkSnapshot {
@@ -66,10 +66,6 @@ impl Sampler {
         );
         self.networks = current;
         self.sampled = Some(now);
-        let mut gpus = drm_gpus();
-        if let Some(nvidia) = crate::nvml::gpus() {
-            gpus.extend(nvidia);
-        }
         Ok((
             now,
             SystemSnapshot {
@@ -87,7 +83,7 @@ impl Sampler {
                     .and_then(|(total, free)| total.checked_sub(*free))
                     .map(|v| v as f64),
                 swap_total_bytes: memory.get("SwapTotal").map(|v| *v as f64),
-                gpus,
+                gpus: vec![],
                 network_overview: Some(overview),
                 resources: Some(resources),
             },
@@ -221,47 +217,222 @@ pub(crate) fn read_number(path: impl AsRef<Path>) -> Option<f64> {
     (number.is_finite() && number >= 0.0).then_some(number)
 }
 
-fn drm_gpus() -> Vec<GpuSnapshot> {
-    let Ok(entries) = fs::read_dir("/sys/class/drm") else {
-        return vec![];
-    };
-    let mut gpus = vec![];
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if !name
-            .strip_prefix("card")
-            .is_some_and(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()))
-        {
-            continue;
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SensorDemand {
+    Pill,
+    Card,
+}
+
+impl SensorDemand {
+    fn interval(self) -> Duration {
+        match self {
+            Self::Pill => Duration::from_secs(5),
+            Self::Card => Duration::from_secs(1),
         }
-        let device = entry.path().join("device");
-        let vendor = fs::read_to_string(device.join("vendor")).unwrap_or_default();
-        let vendor = vendor.trim();
-        if vendor == "0x10de" {
-            continue;
+    }
+}
+
+/// Slow driver queries never delay CPU/network collection or overlap each other.
+#[derive(Default)]
+pub(crate) struct SensorWorker {
+    sensors: Option<Sensors>,
+    running: Option<tokio::task::JoinHandle<(Sensors, Instant, SensorDemand, SensorSample)>>,
+    last_started: Option<(Instant, SensorDemand)>,
+    last_sample: Option<(Instant, SensorDemand, SensorSample)>,
+    last_published: Option<Instant>,
+}
+
+impl SensorWorker {
+    pub(crate) async fn poll(&mut self) {
+        if self.running.as_ref().is_some_and(|job| job.is_finished()) {
+            self.last_sample =
+                self.running
+                    .take()
+                    .unwrap()
+                    .await
+                    .ok()
+                    .map(|(sensors, time, demand, sample)| {
+                        self.sensors = Some(sensors);
+                        (time, demand, sample)
+                    });
         }
-        let product = fs::read_to_string(device.join("device")).unwrap_or_default();
-        let vendor_name = match vendor {
-            "0x1002" => "AMD",
-            "0x8086" => "Intel",
-            _ => "GPU",
+    }
+
+    pub(crate) fn request(&mut self, demand: Option<SensorDemand>) {
+        let Some(demand) = demand else {
+            self.last_started = None;
+            self.last_sample = None;
+            return;
         };
-        gpus.push(GpuSnapshot {
-            id: format!("drm:{name}"),
-            name: format!("{vendor_name} {} ({name})", product.trim()),
-            utilization_percent: read_number(device.join("gpu_busy_percent"))
+        if self.running.is_some()
+            || self.last_started.is_some_and(|(time, previous)| {
+                (demand == previous || demand == SensorDemand::Pill)
+                    && time.elapsed() < demand.interval()
+            })
+        {
+            return;
+        }
+        self.last_started = Some((Instant::now(), demand));
+        let mut sensors = self.sensors.take().unwrap_or_default();
+        self.running = Some(tokio::task::spawn_blocking(move || {
+            let sample = sensors.sample(demand == SensorDemand::Card);
+            (sensors, Instant::now(), demand, sample)
+        }));
+    }
+
+    pub(crate) fn apply(
+        &mut self,
+        demand: Option<SensorDemand>,
+        snapshot: &mut SystemSnapshot,
+    ) -> bool {
+        let Some((time, mode, sensors)) = self.last_sample.as_ref() else {
+            return false;
+        };
+        let Some(demand) = demand else {
+            return false;
+        };
+        if time.elapsed() >= demand.interval() + Duration::from_secs(2) {
+            return false;
+        }
+        snapshot.gpus.clone_from(&sensors.gpus);
+        if demand == SensorDemand::Card && *mode == SensorDemand::Card {
+            if let Some(details) = snapshot.resources.as_mut() {
+                details.cpu_cores = sensors.cpu_cores;
+                details.cpu_frequency_ghz = sensors.cpu_frequency_ghz;
+                details.cpu_temperature_celsius = sensors.cpu_temperature_celsius;
+            }
+        } else {
+            for gpu in &mut snapshot.gpus {
+                gpu.temperature_celsius = None;
+                gpu.memory_used_bytes = None;
+                gpu.memory_total_bytes = None;
+            }
+        }
+        self.last_published.replace(*time) != Some(*time)
+    }
+}
+
+const DISCOVERY_INTERVAL: Duration = Duration::from_secs(60);
+
+#[derive(Default)]
+struct Sensors {
+    topology: Option<(Instant, Option<u32>)>,
+    cpu_temperature: crate::resources::TemperatureSensors,
+    drm: Option<(Instant, Vec<DrmGpu>)>,
+}
+
+#[derive(Default)]
+struct SensorSample {
+    cpu_cores: Option<u32>,
+    cpu_frequency_ghz: Option<f64>,
+    cpu_temperature_celsius: Option<f64>,
+    gpus: Vec<GpuSnapshot>,
+}
+
+impl Sensors {
+    fn sample(&mut self, details: bool) -> SensorSample {
+        let mut sample = SensorSample::default();
+        if details {
+            let info = fs::read_to_string("/proc/cpuinfo").unwrap_or_default();
+            let (last, previous) = self
+                .topology
+                .get_or_insert_with(|| (Instant::now(), crate::resources::cpu_topology(&info)));
+            if last.elapsed() >= DISCOVERY_INTERVAL {
+                *last = Instant::now();
+                *previous = crate::resources::cpu_topology(&info);
+            }
+            sample.cpu_cores = *previous;
+            sample.cpu_frequency_ghz = crate::resources::cpu_frequency(&info);
+            sample.cpu_temperature_celsius = self.cpu_temperature.read(
+                Path::new("/sys/class/hwmon"),
+                &[
+                    "coretemp",
+                    "k10temp",
+                    "zenpower",
+                    "cpu_thermal",
+                    "cpu-thermal",
+                ],
+                &["Package id", "Tdie", "Tctl"],
+            );
+        }
+        let (discovered, devices) = self.drm.get_or_insert_with(drm_gpus);
+        if discovered.elapsed() >= DISCOVERY_INTERVAL
+            || devices.iter().any(|gpu| !gpu.path.exists())
+        {
+            (*discovered, *devices) = drm_gpus();
+        }
+        sample.gpus = devices.iter_mut().map(|gpu| gpu.sample(details)).collect();
+        if let Some(nvidia) = crate::nvml::gpus(details) {
+            sample.gpus.extend(nvidia);
+        }
+        sample
+    }
+}
+
+struct DrmGpu {
+    id: String,
+    name: String,
+    path: PathBuf,
+    temperature: crate::resources::TemperatureSensors,
+}
+
+impl DrmGpu {
+    fn sample(&mut self, details: bool) -> GpuSnapshot {
+        let mut result = GpuSnapshot {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            utilization_percent: read_number(self.path.join("gpu_busy_percent"))
                 .filter(|v| *v <= 100.0),
-            memory_used_bytes: read_number(device.join("mem_info_vram_used")),
-            memory_total_bytes: read_number(device.join("mem_info_vram_total")),
-            temperature_celsius: crate::resources::hwmon_temperature(
-                &device.join("hwmon"),
+            memory_used_bytes: None,
+            memory_total_bytes: None,
+            temperature_celsius: None,
+        };
+        if details {
+            result.memory_used_bytes = read_number(self.path.join("mem_info_vram_used"));
+            result.memory_total_bytes = read_number(self.path.join("mem_info_vram_total"));
+            result.temperature_celsius = self.temperature.read(
+                &self.path.join("hwmon"),
                 &["amdgpu", "i915", "xe"],
                 &["edge", "gpu"],
-            ),
-        });
+            );
+        }
+        result
+    }
+}
+
+fn drm_gpus() -> (Instant, Vec<DrmGpu>) {
+    let mut gpus = vec![];
+    if let Ok(entries) = fs::read_dir("/sys/class/drm") {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name
+                .strip_prefix("card")
+                .is_some_and(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()))
+            {
+                continue;
+            }
+            let device = entry.path().join("device");
+            let vendor = fs::read_to_string(device.join("vendor")).unwrap_or_default();
+            let vendor = vendor.trim();
+            if vendor == "0x10de" {
+                continue;
+            }
+            let product = fs::read_to_string(device.join("device")).unwrap_or_default();
+            let vendor_name = match vendor {
+                "0x1002" => "AMD",
+                "0x8086" => "Intel",
+                _ => "GPU",
+            };
+            gpus.push(DrmGpu {
+                id: format!("drm:{name}"),
+                name: format!("{vendor_name} {} ({name})", product.trim()),
+                path: device,
+                temperature: Default::default(),
+            });
+        }
     }
     gpus.sort_by(|a, b| a.id.cmp(&b.id));
-    gpus
+    (Instant::now(), gpus)
 }
 
 #[cfg(test)]

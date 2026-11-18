@@ -32,6 +32,7 @@ add_executable(${BINARY_NAME}
   "bar_popup.cc"
   "bar_popup_keyboard.cc"
   "bar_icons.cc"
+  "bar_views.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 
@@ -56,6 +57,7 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 # Build explicitly after the app bundle; the executable needs its Flutter assets.
 add_executable(bar_lifecycle_test EXCLUDE_FROM_ALL
   "../../test/bar_lifecycle_test.cc"
+  "bar_views.cc"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 apply_standard_settings(bar_lifecycle_test)

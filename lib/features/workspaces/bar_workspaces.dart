@@ -41,6 +41,8 @@ class _BarWorkspacesState extends State<BarWorkspaces> {
   bool _hovered = false;
 
   Future<void> _overview(HyprlandBackend backend) async {
+    final popup = BarPopup.maybeOf(context);
+    if (popup == null) return;
     final box = context.findRenderObject() as RenderBox;
     final slots = backend.workspaceSlots;
     final workspaces = {
@@ -64,7 +66,7 @@ class _BarWorkspacesState extends State<BarWorkspaces> {
     };
     final ids = workspaces.keys.toList()..sort();
     try {
-      await BarPopup.show(
+      await popup.show(
         kind: workspaceOverviewKind,
         anchor: box.localToGlobal(Offset.zero) & box.size,
         size: const Size(320, 392),

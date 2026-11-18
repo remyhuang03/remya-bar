@@ -98,7 +98,10 @@ abstract class SystemRustLibApi extends BaseApi {
 
   Future<int?> crateApiCodexbarServerPort({required String token});
 
-  Future<SystemSnapshot> crateApiHardwareSnapshot();
+  Future<SystemSnapshot> crateApiHardwareSnapshot({
+    required bool details,
+    required bool gpuPill,
+  });
 
   Future<void> crateApiMediaAction({
     required String busName,
@@ -273,11 +276,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   );
 
   @override
-  Future<SystemSnapshot> crateApiHardwareSnapshot() {
+  Future<SystemSnapshot> crateApiHardwareSnapshot({
+    required bool details,
+    required bool gpuPill,
+  }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_bool(details, serializer);
+          sse_encode_bool(gpuPill, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -290,14 +298,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiHardwareSnapshotConstMeta,
-        argValues: [],
+        argValues: [details, gpuPill],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiHardwareSnapshotConstMeta =>
-      const TaskConstMeta(debugName: "hardware_snapshot", argNames: []);
+  TaskConstMeta get kCrateApiHardwareSnapshotConstMeta => const TaskConstMeta(
+    debugName: "hardware_snapshot",
+    argNames: ["details", "gpuPill"],
+  );
 
   @override
   Future<void> crateApiMediaAction({

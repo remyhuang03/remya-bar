@@ -12,6 +12,8 @@ import 'package:remya_bar/features/workspaces/bar_workspaces.dart';
 import 'package:remya_client/remya_client.dart';
 import 'package:remya_ui/remya_ui.dart';
 
+late BarPopup _popup;
+
 const _window = HyprlandWindow(
   address: '0xa',
   title: 'Report',
@@ -100,6 +102,7 @@ const _slots = [
 const _snapshot = HyprlandSnapshot(
   monitors: [
     HyprlandMonitor(
+      fullscreen: false,
       name: 'DP-1',
       outputNumber: 1,
       x: 1920,
@@ -109,6 +112,7 @@ const _snapshot = HyprlandSnapshot(
       workspaceSlots: _slots,
     ),
     HyprlandMonitor(
+      fullscreen: false,
       name: 'DP-2',
       outputNumber: 2,
       x: 0,
@@ -150,6 +154,8 @@ const _snapshot = HyprlandSnapshot(
 );
 
 void main() {
+  setUp(() => _popup = BarPopup.forView(1));
+  tearDown(() => _popup.dispose());
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
   const icons = MethodChannel('top.remya.bar/icons');
   setUp(
@@ -160,6 +166,131 @@ void main() {
   );
   tearDown(
     () => binding.defaultBinaryMessenger.setMockMethodCallHandler(icons, null),
+  );
+
+  test(
+    'shared Hyprland events refresh once and notify only the changed output',
+    () async {
+      final events = StreamController<HyprlandUpdate>(sync: true);
+      final secondRead = Completer<void>();
+      final changed = Completer<HyprlandSnapshot>();
+      var subscriptions = 0;
+      var reads = 0;
+      final store = HyprlandStore(
+        watch: () {
+          subscriptions++;
+          return events.stream;
+        },
+        readSnapshot: ({required slotCount}) async {
+          if (++reads == 1) return _snapshot;
+          secondRead.complete();
+          return changed.future;
+        },
+      );
+      final first = HyprlandBackend(outputName: 'DP-1', store: store);
+      final second = HyprlandBackend(outputName: 'DP-2', store: store);
+      addTearDown(() async {
+        first.dispose();
+        expect(events.hasListener, isTrue);
+        second.dispose();
+        expect(events.hasListener, isFalse);
+        store.dispose();
+        await events.close();
+      });
+      first.start();
+      second.start();
+      await store.setWorkspaceCount(8);
+      expect(subscriptions, 1);
+      expect(reads, 1);
+      expect(first.output?.name, 'DP-1');
+      expect(second.output?.name, 'DP-2');
+
+      var firstChanges = 0;
+      var secondChanges = 0;
+      first.addListener(() => firstChanges++);
+      second.addListener(() => secondChanges++);
+      for (var i = 0; i < 20; i++) {
+        events.add(
+          const HyprlandUpdate(kind: 'event', name: 'fullscreen', data: '1'),
+        );
+      }
+      await secondRead.future;
+      changed.complete(
+        HyprlandSnapshot(
+          monitors: [
+            for (final output in _snapshot.monitors)
+              HyprlandMonitor(
+                fullscreen: output.name == 'DP-2',
+                name: output.name,
+                outputNumber: output.outputNumber,
+                x: output.x,
+                y: output.y,
+                activeWorkspaceId: output.activeWorkspaceId,
+                specialWorkspaceId: output.specialWorkspaceId,
+                specialWorkspaceName: output.specialWorkspaceName,
+                currentWindow: output.currentWindow,
+                workspaceSlots: [
+                  for (final slot in output.workspaceSlots)
+                    HyprlandWorkspaceSlot(
+                      id: slot.id,
+                      name: slot.name,
+                      active: slot.active,
+                      occupied: slot.occupied,
+                      windowCount: slot.windowCount,
+                      owner: slot.owner,
+                      urgent: slot.urgent,
+                      apps: [...slot.apps],
+                    ),
+                ],
+              ),
+          ],
+          workspaces: _snapshot.workspaces,
+        ),
+      );
+      await store.setWorkspaceCount(8);
+      expect(reads, 2);
+      expect(firstChanges, 0);
+      expect(secondChanges, 1);
+      expect(second.output?.fullscreen, isTrue);
+      expect(store.snapshotReads, 2);
+      expect(store.snapshotRevision, 2);
+      expect(store.capturedAt, isNotNull);
+
+      events.add(
+        const HyprlandUpdate(kind: 'event', name: 'focusedmon', data: 'DP-2,2'),
+      );
+      expect(first.isFocused, isFalse);
+      expect(second.isFocused, isTrue);
+      expect(firstChanges, 0);
+      expect(secondChanges, 2);
+    },
+  );
+
+  test(
+    'a snapshot from a disconnected Hyprland generation is discarded',
+    () async {
+      final events = StreamController<HyprlandUpdate>(sync: true);
+      final completion = Completer<HyprlandSnapshot>();
+      final store = HyprlandStore(
+        watch: () => events.stream,
+        readSnapshot: ({required slotCount}) => completion.future,
+      )..start();
+      final output = HyprlandBackend(outputName: 'DP-1', store: store);
+      addTearDown(() async {
+        output.dispose();
+        store.dispose();
+        await events.close();
+      });
+
+      events.add(
+        const HyprlandUpdate(kind: 'disconnected', name: '', data: ''),
+      );
+      completion.complete(_snapshot);
+      await store.setWorkspaceCount(8);
+      expect(output.connected, isFalse);
+      expect(output.output, isNull);
+      expect(output.error, 'Hyprland unavailable');
+    },
   );
 
   test('workspace count retries after a failed snapshot', () async {
@@ -235,6 +366,7 @@ void main() {
       readSnapshot: ({required slotCount}) async => const HyprlandSnapshot(
         monitors: [
           HyprlandMonitor(
+            fullscreen: false,
             name: 'DP-1',
             outputNumber: 1,
             x: 0,
@@ -243,6 +375,7 @@ void main() {
             workspaceSlots: [],
           ),
           HyprlandMonitor(
+            fullscreen: false,
             name: 'DP-2',
             outputNumber: 2,
             x: 0,
@@ -393,16 +526,15 @@ void main() {
     'hover shows the workspace tooltip and right click opens the overview',
     (tester) async {
       final calls = <MethodCall>[];
-      binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        BarPopup.channel,
-        (call) async {
-          calls.add(call);
-          return null;
-        },
-      );
+      binding.defaultBinaryMessenger.setMockMethodCallHandler(_popup.channel, (
+        call,
+      ) async {
+        calls.add(call);
+        return null;
+      });
       addTearDown(
         () => binding.defaultBinaryMessenger.setMockMethodCallHandler(
-          BarPopup.channel,
+          _popup.channel,
           null,
         ),
       );
@@ -414,6 +546,7 @@ void main() {
       await backend.refresh();
       await tester.pumpWidget(
         BarPopupScope(
+          popup: _popup,
           theme: RemyaTheme.fromConfig(const ThemeConfig()),
           child: MaterialApp(
             theme: barTheme(ThemeData()),
@@ -578,6 +711,7 @@ void main() {
       snapshot = HyprlandSnapshot(
         monitors: [
           HyprlandMonitor(
+            fullscreen: false,
             name: 'DP-1',
             outputNumber: 1,
             x: 1920,
@@ -625,6 +759,7 @@ void main() {
         readSnapshot: ({required slotCount}) async => HyprlandSnapshot(
           monitors: [
             HyprlandMonitor(
+              fullscreen: false,
               name: 'DP-1',
               outputNumber: 1,
               x: 1920,

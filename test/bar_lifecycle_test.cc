@@ -3,10 +3,18 @@
 #include "../linux/runner/bar_popup.cc"
 #include "../linux/runner/bar_popup_keyboard.cc"
 
-static guint released_engines = 0;
-static guint restart_requests = 0;
-static guint output_restart_requests = 0;
+static guint released_bars = 0;
+static guint scale_restart_requests = 0;
 static constexpr int kInitialTooltipHeight = 80;
+
+static void check_view_role(MyApplication* self, FlView* view, const char* role) {
+  g_autoptr(FlValue) snapshot = self->views->snapshot();
+  auto* views = fl_value_lookup_string(snapshot, "views");
+  g_autofree gchar* id = g_strdup_printf("%" G_GINT64_FORMAT, fl_view_get_id(view));
+  auto* value = fl_value_lookup_string(views, id);
+  if (role == nullptr) g_assert_null(value);
+  else g_assert_cmpstr(fl_value_get_string(value), ==, role);
+}
 
 static void show_test_tooltip(BarPopup* popup, const char* message) {
   create_popup(popup, false, false, true, false);
@@ -29,10 +37,13 @@ static void show_test_tooltip(BarPopup* popup, const char* message) {
 
 static bool check_popup_views(MyApplication* app, FlView* owner) {
   auto* root = static_cast<BarPopup*>(g_object_get_data(G_OBJECT(owner), "remya-popup"));
-  auto* engine_window = app->popup_engine_window;
+  auto* engine_window = app->engine_host;
   g_assert_false(gtk_widget_get_mapped(engine_window));
   auto* implicit_view = FL_VIEW(gtk_bin_get_child(GTK_BIN(engine_window)));
   auto* engine = fl_view_get_engine(implicit_view);
+  g_assert_true(fl_view_get_engine(owner) == engine);
+  check_view_role(app, implicit_view, nullptr);
+  check_view_role(app, owner, "bar");
   auto* tooltip = child_popup(root, root->tooltip_popup);
   static gint64 deadline = 0;
   if (deadline == 0) {
@@ -40,6 +51,8 @@ static bool check_popup_views(MyApplication* app, FlView* owner) {
     show_test_tooltip(tooltip, "Second view");
     g_assert_true(fl_view_get_engine(root->view) == engine);
     g_assert_true(fl_view_get_engine(tooltip->view) == engine);
+    check_view_role(app, root->view, "popup");
+    check_view_role(app, tooltip->view, "popup");
     g_assert_cmpint(fl_view_get_id(root->view), !=, fl_view_get_id(tooltip->view));
     deadline = g_get_monotonic_time() + 10 * G_TIME_SPAN_SECOND;
     return false;
@@ -85,12 +98,11 @@ static bool check_popup_views(MyApplication* app, FlView* owner) {
 }
 
 static void check_settings_window(MyApplication* self) {
-  auto* implicit = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->popup_engine_window)));
-  auto* engine = fl_view_get_engine(implicit);
   open_settings(self, "layout");
   auto* first = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->settings_window)));
   const auto first_id = fl_view_get_id(first);
-  g_assert_true(fl_view_get_engine(first) == engine);
+  g_assert_true(fl_view_get_engine(first) == self->engine);
+  check_view_role(self, first, "settings");
   g_assert_false(gtk_layer_is_layer_window(GTK_WINDOW(self->settings_window)));
   g_assert_cmpstr(gtk_window_get_title(GTK_WINDOW(self->settings_window)), ==, "Remy'a Bar Settings");
   open_settings(self, "notifications");
@@ -99,11 +111,11 @@ static void check_settings_window(MyApplication* self) {
   g_assert_null(self->settings_page);
   gtk_widget_destroy(self->settings_window);
   g_assert_null(self->settings_window);
-  g_assert_true(gtk_widget_get_realized(self->popup_engine_window));
+  g_assert_true(gtk_widget_get_realized(self->engine_host));
   open_settings(self, "ai-ring");
   auto* reopened = FL_VIEW(gtk_bin_get_child(GTK_BIN(self->settings_window)));
   g_assert_cmpint(fl_view_get_id(reopened), >, first_id);
-  g_assert_true(fl_view_get_engine(reopened) == engine);
+  g_assert_true(fl_view_get_engine(reopened) == self->engine);
   gtk_widget_destroy(self->settings_window);
   g_assert_null(self->settings_window);
   g_assert_true(valid_settings_page("quiet-schedule"));
@@ -120,6 +132,7 @@ static gboolean check_monitor_lifecycle(gpointer data) {
   const int count = gdk_display_get_n_monitors(display);
   g_assert_cmpint(count, >, 0);
   static gint64 release_deadline = 0;
+  static int64_t previous_view_id = 0;
 
   if (release_deadline == 0) {
     g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, count);
@@ -135,49 +148,56 @@ static gboolean check_monitor_lifecycle(gpointer data) {
       g_signal_emit_by_name(display, "monitor-added", monitor);
     }
     g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, count);
-    g_assert_cmpuint(self->output_restart, ==, 0);
+    g_assert_cmpuint(self->scale_restart, ==, 0);
     for (int index = 0; index < count; index++) {
       GdkMonitor* monitor = gdk_display_get_monitor(display, index);
       auto* window = GTK_BIN(g_hash_table_lookup(self->bar_windows, monitor));
       auto* view = FL_VIEW(gtk_bin_get_child(window));
+      g_assert_true(fl_view_get_engine(view) == self->engine);
+      check_view_role(self, view, "bar");
+      previous_view_id = MAX(previous_view_id, fl_view_get_id(view));
       g_object_weak_ref(
-          G_OBJECT(fl_view_get_engine(view)),
+          G_OBJECT(view),
           [](gpointer data, GObject* object) { ++*static_cast<guint*>(data); },
-          &released_engines);
+          &released_bars);
       g_signal_emit_by_name(display, "monitor-removed", monitor);
       g_signal_emit_by_name(display, "monitor-removed", monitor);
     }
-    g_assert_cmpuint(restart_requests, ==, count);
     g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, 0);
+    g_autoptr(FlValue) snapshot = self->views->snapshot();
+    g_assert_cmpuint(fl_value_get_length(fl_value_lookup_string(snapshot, "views")), ==, 0);
     release_deadline = g_get_monotonic_time() + 10 * G_TIME_SPAN_SECOND;
     return G_SOURCE_CONTINUE;
   }
 
-  if (released_engines < count) {
+  if (released_bars < static_cast<guint>(count)) {
     g_assert_cmpint(g_get_monotonic_time(), <, release_deadline);
     return G_SOURCE_CONTINUE;
   }
-  g_assert_true(gtk_widget_get_realized(self->popup_engine_window));
-  g_assert_false(gtk_widget_get_mapped(self->popup_engine_window));
-  if (output_restart_requests == 0) {
-    if (self->output_restart == 0) {
-      g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, 0);
-      for (int index = 0; index < count; index++) {
-        g_signal_emit_by_name(display, "monitor-added",
-                              gdk_display_get_monitor(display, index));
-      }
+  g_assert_true(gtk_widget_get_realized(self->engine_host));
+  g_assert_false(gtk_widget_get_mapped(self->engine_host));
+  if (g_hash_table_size(self->bar_windows) == 0) {
+    for (int index = 0; index < count; index++) {
+      GdkMonitor* monitor = gdk_display_get_monitor(display, index);
+      g_signal_emit_by_name(display, "monitor-added", monitor);
+      auto* window = GTK_BIN(g_hash_table_lookup(self->bar_windows, monitor));
+      auto* view = FL_VIEW(gtk_bin_get_child(window));
+      g_assert_true(fl_view_get_engine(view) == self->engine);
+      g_assert_cmpint(fl_view_get_id(view), >, previous_view_id);
+      check_view_role(self, view, "bar");
     }
+    g_application_activate(G_APPLICATION(self));
+    g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, count);
+    g_assert_cmpuint(g_list_length(gtk_application_get_windows(GTK_APPLICATION(self))), ==, count);
+    g_assert_cmpuint(scale_restart_requests, ==, 0);
+    GdkMonitor* monitor = gdk_display_get_monitor(display, 0);
+    g_object_notify(G_OBJECT(monitor), "scale-factor");
+    g_object_notify(G_OBJECT(monitor), "scale-factor");
+    g_print("PASS: all bar views released and reconnected with the same engine\n");
     return G_SOURCE_CONTINUE;
   }
-  g_assert_cmpuint(output_restart_requests, ==, 1);
-  g_application_activate(G_APPLICATION(self));
-  g_assert_cmpuint(g_hash_table_size(self->bar_windows), ==, count);
-  g_assert_cmpuint(
-      g_list_length(gtk_application_get_windows(GTK_APPLICATION(self))), ==,
-      count);
-  g_print(
-      "PASS: duplicate add/remove, all outputs removed, reconnect, and "
-      "reactivation\n");
+  g_assert_cmpuint(scale_restart_requests, ==, 1);
+  g_print("PASS: scale recovery remains debounced\n");
   g_application_quit(G_APPLICATION(self));
   return G_SOURCE_REMOVE;
 }
@@ -248,21 +268,10 @@ int main(int argc, char** argv) {
   g_assert_cmpstr(app_id.c_str(), ==, "com.example.app");
   g_autoptr(MyApplication) app = nullptr;
   app = my_application_new(
-      [](const char* reason, gpointer data) {
-        if (g_strcmp0(reason, "Display connected or scale changed") == 0) {
-          ++output_restart_requests;
-          return;
-        }
-        auto* self = *static_cast<MyApplication**>(data);
-        GdkMonitor* monitor =
-            gdk_display_get_monitor(gdk_display_get_default(), restart_requests);
-        auto* window = GTK_WIDGET(g_hash_table_lookup(self->bar_windows, monitor));
-        g_assert_cmpstr(reason, ==, "Display disconnected");
-        g_assert_nonnull(window);
-        g_assert_true(gtk_widget_get_realized(window));
-        ++restart_requests;
-      },
-      &app);
+      [](const char* reason, gpointer) {
+        g_assert_cmpstr(reason, ==, "Display scale changed");
+        ++scale_restart_requests;
+      }, nullptr);
   g_timeout_add(500, check_monitor_lifecycle, app);
   int status = g_application_run(G_APPLICATION(app), argc, argv);
   g_assert_cmpuint(g_hash_table_size(app->bar_windows), ==, 0);

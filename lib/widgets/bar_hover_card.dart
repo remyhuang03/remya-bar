@@ -41,13 +41,15 @@ class _BarHoverCardState extends State<BarHoverCard> {
   bool _tracking = false;
   Map<String, Object?>? _lastContent;
   Rect? _lastAnchor;
+  BarPopup? _popup;
 
   void _send(Future<void> request) {
     request.catchError((Object error) => debugPrint('Bar card: $error'));
   }
 
   void _show({bool update = false, bool activated = false}) {
-    if (update && BarPopup.openCard.value != widget.kind) return;
+    final popup = _popup;
+    if (popup == null || update && popup.openCard.value != widget.kind) return;
     final box = context.findRenderObject() as RenderBox?;
     if ((!update && !activated && !_hovered) || box == null || !box.hasSize) {
       return;
@@ -62,7 +64,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
       if (update) {
         _shown = false;
         _lastAnchor = null;
-        _send(BarPopup.hide(kind: widget.kind));
+        _send(popup.hide(kind: widget.kind));
       }
       return;
     }
@@ -85,7 +87,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
     if (update && !anchorChanged && !contentChanged) return;
     _lastAnchor = anchor;
     _lastContent = content;
-    final request = update ? BarPopup.update : BarPopup.show;
+    final request = update ? popup.update : popup.show;
     _shown = true;
     _send(
       request(
@@ -111,7 +113,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
   // Only the reported state counts: switching cards briefly reports none
   // open, which must not end tracking of the card that is opening.
   void _trackAnchor(Duration _) {
-    if (!mounted || BarPopup.openCard.value != widget.kind) {
+    if (!mounted || _popup?.openCard.value != widget.kind) {
       _tracking = false;
       return;
     }
@@ -120,22 +122,29 @@ class _BarHoverCardState extends State<BarHoverCard> {
   }
 
   void _onOpenCard() {
-    if (BarPopup.openCard.value != widget.kind || _tracking) return;
+    if (_popup?.openCard.value != widget.kind || _tracking) return;
     _tracking = true;
     WidgetsBinding.instance.addPostFrameCallback(_trackAnchor);
   }
 
   @override
-  void initState() {
-    super.initState();
-    BarPopup.openCard.addListener(_onOpenCard);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final popup = BarPopup.maybeOf(context);
+    if (_popup == popup) return;
+    _popup?.openCard.removeListener(_onOpenCard);
+    _popup = popup;
+    _popup?.openCard.addListener(_onOpenCard);
+    _onOpenCard();
   }
 
   @override
   void dispose() {
-    BarPopup.openCard.removeListener(_onOpenCard);
+    _popup?.openCard.removeListener(_onOpenCard);
     _timer?.cancel();
-    if (_shown) _send(BarPopup.hide(kind: widget.kind));
+    if (_popup case final popup? when _shown) {
+      _send(popup.hide(kind: widget.kind));
+    }
     super.dispose();
   }
 
@@ -143,14 +152,16 @@ class _BarHoverCardState extends State<BarHoverCard> {
   Widget build(BuildContext context) => MouseRegion(
     onEnter: (_) {
       _hovered = true;
-      _send(BarPopup.enter(kind: widget.kind));
+      if (_popup case final popup?) _send(popup.enter(kind: widget.kind));
       _timer?.cancel();
       _timer = Timer(const Duration(milliseconds: 300), _show);
     },
     onExit: (_) {
       _hovered = false;
       _timer?.cancel();
-      if (_shown) _send(BarPopup.leave(kind: widget.kind));
+      if (_popup case final popup? when _shown) {
+        _send(popup.leave(kind: widget.kind));
+      }
     },
     child: widget.builder != null
         ? widget.builder!(context, widget.openOnTap ? _activate : widget.onTap)

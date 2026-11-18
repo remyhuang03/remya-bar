@@ -25,8 +25,11 @@ class _BarTooltipState extends State<BarTooltip> {
   Timer? _timer;
   bool _hovered = false;
   bool _shown = false;
+  BarPopup? _popup;
 
   void _show() {
+    final popup = _popup;
+    if (popup == null) return;
     final box = context.findRenderObject() as RenderBox?;
     if (!_hovered || box == null || !box.hasSize || widget.message.isEmpty) {
       return;
@@ -49,7 +52,7 @@ class _BarTooltipState extends State<BarTooltip> {
     painter.dispose();
     _shown = true;
     _send(
-      BarPopup.show(
+      popup.show(
         kind: 'tooltip',
         anchor: box.localToGlobal(Offset(0, tray ? 2 : 0)) & box.size,
         size: size,
@@ -69,7 +72,9 @@ class _BarTooltipState extends State<BarTooltip> {
 
   void _hide() {
     _timer?.cancel();
-    if (_shown) _send(BarPopup.hide(kind: 'tooltip'));
+    if (_popup case final popup? when _shown) {
+      _send(popup.hide(kind: 'tooltip'));
+    }
     _shown = false;
   }
 
@@ -95,6 +100,7 @@ class _BarTooltipState extends State<BarTooltip> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _popup = BarPopup.maybeOf(context);
     _refresh();
   }
 

@@ -4,6 +4,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/features/keyboard/keyboard_panel.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
 
+final _channel = BarPopup.viewChannel(1);
+
 void main() {
   testWidgets('hover paints its final color on the first frame', (
     tester,
@@ -45,15 +47,14 @@ void main() {
     tester,
   ) async {
     final strokes = <List<Object?>>[];
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      BarPopup.channel,
-      (call) async {
-        if (call.arguments['action'] == 'keyboard.press') {
-          strokes.add(List<Object?>.from(call.arguments['value'] as List));
-        }
-        return null;
-      },
-    );
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(_channel, (
+      call,
+    ) async {
+      if (call.arguments['action'] == 'keyboard.press') {
+        strokes.add(List<Object?>.from(call.arguments['value'] as List));
+      }
+      return null;
+    });
     await tester.pumpWidget(_keyboard());
     Future<void> tap(String label, {bool first = false}) async {
       final finder = find.text(label);
@@ -95,7 +96,7 @@ Widget _keyboard() {
   );
   return MaterialApp(
     home: KeyboardPanel(
-      channel: BarPopup.channel,
+      channel: _channel,
       data: {
         'device': {
           'config': {'group': 0, 'layout': 'us'},

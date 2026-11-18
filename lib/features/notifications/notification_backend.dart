@@ -8,7 +8,7 @@ import 'package:remya_bar/features/settings/bar_preferences.dart';
 import '../../src/rust/system_bridge/api.dart' as api;
 import '../../widgets/bar_icon_cache.dart';
 
-/// Mirrors the process-wide Rust notification server for one output.
+/// Mirrors the process-wide Rust notification server for the application.
 class NotificationBackend extends ChangeNotifier {
   NotificationBackend({SettingsClient? settings})
     : _settings = settings ?? SettingsClient(),
@@ -30,7 +30,10 @@ class NotificationBackend extends ChangeNotifier {
     null || '' => null,
     final reason => reason,
   };
-  String? _output;
+  final _fullscreenOutputs = <Object, String>{};
+  Future<void> _fullscreenWrites = Future.value();
+  Object? _popupHost;
+  Object? get popupHost => _popupHost;
   late final _iconBytes = BarIconCache<Uint8List>(
     lookup: _lookupIconBytes,
     onChanged: notifyListeners,
@@ -65,6 +68,7 @@ class NotificationBackend extends ChangeNotifier {
       (next) {
         if (_disposed) return;
         center = next;
+        if (!next.notifications.any((item) => item.popup)) _popupHost = null;
         notifyListeners();
         _resolveIcons(next.notifications);
       },
@@ -80,17 +84,60 @@ class NotificationBackend extends ChangeNotifier {
     await _preferences.setDoNotDisturb(enabled);
   }
 
-  /// Reports this output's full screen state for automatic Do Not Disturb.
-  Future<void> setFullscreen(String output, bool fullscreen) {
-    _output = output;
-    return api.notificationsFullscreen(output: output, fullscreen: fullscreen);
+  /// Keeps fullscreen contributions tied to a view's lifetime.
+  void setFullscreen(Object owner, String output, bool fullscreen) {
+    final previous = _fullscreenOutputs[owner];
+    final next = fullscreen ? output : null;
+    if (previous == next) return;
+    if (previous != null) {
+      _fullscreenOutputs.remove(owner);
+      if (!_fullscreenOutputs.containsValue(previous)) {
+        _writeFullscreen(previous, false);
+      }
+    }
+    if (next != null) {
+      if (!_fullscreenOutputs.containsValue(next)) _writeFullscreen(next, true);
+      _fullscreenOutputs[owner] = next;
+    }
+  }
+
+  void _writeFullscreen(String output, bool fullscreen) {
+    _fullscreenWrites = _fullscreenWrites
+        .then(
+          (_) => api.notificationsFullscreen(
+            output: output,
+            fullscreen: fullscreen,
+          ),
+        )
+        .catchError(
+          (Object error) => debugPrint('Notification fullscreen: $error'),
+        );
+  }
+
+  void releaseOutput(Object owner) {
+    if (_fullscreenOutputs[owner] case final output?) {
+      setFullscreen(owner, output, false);
+    }
+    if (_popupHost == owner) {
+      _popupHost = null;
+      unawaited(
+        hover(false).catchError(
+          (Object error) => debugPrint('Notification hover reset: $error'),
+        ),
+      );
+      scheduleMicrotask(() {
+        if (!_disposed) notifyListeners();
+      });
+    }
+  }
+
+  void claimPopups(Object owner) {
+    if (_popupHost == null && popups.isNotEmpty) _popupHost = owner;
   }
 
   Future<void> dismiss(int? id) => api.notificationDismiss(id: id);
   Future<void> invoke(int id, String action) =>
       api.notificationInvoke(id: id, action: action);
-  Future<bool> claimPopups(String output) =>
-      api.notificationsClaimPopups(output: output);
   Future<void> hover(bool hovered) => api.notificationsHover(hovered: hovered);
 
   /// Resolves app icons and image paths to PNG bytes or files the popup
@@ -156,8 +203,8 @@ class NotificationBackend extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    if (_output case final output?) {
-      unawaited(api.notificationsFullscreen(output: output, fullscreen: false));
+    for (final output in _fullscreenOutputs.values.toSet()) {
+      _writeFullscreen(output, false);
     }
     _retry?.cancel();
     unawaited(_subscription?.cancel());

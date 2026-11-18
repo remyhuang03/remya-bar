@@ -10,9 +10,11 @@ class BarPopupScope extends InheritedWidget {
     super.key,
     required this.theme,
     this.bottom = false,
+    this.popup,
     required super.child,
   });
   final RemyaTheme theme;
+  final BarPopup? popup;
 
   /// Whether the bar is on the bottom edge, so cards open upwards.
   final bool bottom;
@@ -26,19 +28,44 @@ class BarPopupScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(BarPopupScope oldWidget) =>
-      theme != oldWidget.theme || bottom != oldWidget.bottom;
+      theme != oldWidget.theme ||
+      bottom != oldWidget.bottom ||
+      popup != oldWidget.popup;
 }
 
-abstract final class BarPopup {
-  static final openCard = ValueNotifier<String?>(null);
-  static final keyboardOpen = ValueNotifier(false);
+/// Routes popup requests and card state for a single bar view.
+final class BarPopup {
+  BarPopup(this.channel);
 
-  static const channel = MethodChannel('top.remya.bar/popup');
+  BarPopup.forView(int viewId)
+    : this(MethodChannel('top.remya.bar/bar/$viewId/popup'));
+
+  final MethodChannel channel;
+  final openCard = ValueNotifier<String?>(null);
+  static final keyboardOpen = ValueNotifier(false);
+  static int _keyboardRevision = 0;
+  bool _disposed = false;
+
+  static BarPopup? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<BarPopupScope>()?.popup;
 
   static MethodChannel viewChannel(int viewId) =>
-      MethodChannel('${channel.name}/$viewId');
+      MethodChannel('top.remya.bar/popup/$viewId');
 
-  static Future<void> show({
+  static void setKeyboardVisibility(bool open) {
+    _keyboardRevision++;
+    keyboardOpen.value = open;
+  }
+
+  Future<void> syncKeyboardVisibility() async {
+    final revision = _keyboardRevision;
+    final open = await channel.invokeMethod<bool>('keyboardVisible');
+    if (!_disposed && revision == _keyboardRevision) {
+      keyboardOpen.value = open ?? false;
+    }
+  }
+
+  Future<void> show({
     required String kind,
     required Rect anchor,
     required Size size,
@@ -53,7 +80,7 @@ abstract final class BarPopup {
     theme: theme,
   );
 
-  static Future<void> update({
+  Future<void> update({
     required String kind,
     required Rect anchor,
     required Size size,
@@ -68,14 +95,14 @@ abstract final class BarPopup {
     theme: theme,
   );
 
-  static Future<void> _send(
+  Future<void> _send(
     String method, {
     required String kind,
     required Rect anchor,
     required Size size,
     required Map<String, Object?> data,
     required RemyaTheme theme,
-  }) => channel.invokeMethod<void>(method, {
+  }) => _invoke(method, {
     'kind': kind,
     'opening': method == 'show',
     'anchor': [
@@ -94,11 +121,24 @@ abstract final class BarPopup {
     ).toMap(),
   });
 
-  static Future<void> hide({String? kind}) =>
-      channel.invokeMethod<void>('hide', kind == null ? null : {'kind': kind});
+  Future<void> _invoke(String method, [Object? arguments]) => _disposed
+      ? Future.value()
+      : channel.invokeMethod<void>(method, arguments);
 
-  static Future<void> enter({String? kind}) =>
-      channel.invokeMethod<void>('enter', kind == null ? null : {'kind': kind});
-  static Future<void> leave({String? kind}) =>
-      channel.invokeMethod<void>('leave', kind == null ? null : {'kind': kind});
+  Future<void> hide({String? kind}) =>
+      _invoke('hide', kind == null ? null : {'kind': kind});
+
+  Future<void> enter({String? kind}) =>
+      _invoke('enter', kind == null ? null : {'kind': kind});
+
+  Future<void> leave({String? kind}) =>
+      _invoke('leave', kind == null ? null : {'kind': kind});
+
+  Future<void> watchTrayOutside(bool enabled) =>
+      _invoke('watchTrayOutside', enabled);
+
+  void dispose() {
+    _disposed = true;
+    openCard.dispose();
+  }
 }

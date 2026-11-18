@@ -73,7 +73,7 @@ class HyprlandRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1869353342;
+  int get rustContentHash => 1426645919;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -85,11 +85,6 @@ class HyprlandRustLib
 }
 
 abstract class HyprlandRustLibApi extends BaseApi {
-  Future<bool> crateApiHyprlandOutputFullscreen({
-    required int x,
-    required int y,
-  });
-
   Future<String> crateApiHyprlandRequest({required String command});
 
   Future<void> crateApiHyprlandScrollWorkspace({
@@ -124,41 +119,6 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   });
 
   @override
-  Future<bool> crateApiHyprlandOutputFullscreen({
-    required int x,
-    required int y,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_i_32(x, serializer);
-          sse_encode_i_32(y, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 1,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_bool,
-          decodeErrorData: sse_decode_String,
-        ),
-        constMeta: kCrateApiHyprlandOutputFullscreenConstMeta,
-        argValues: [x, y],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiHyprlandOutputFullscreenConstMeta =>
-      const TaskConstMeta(
-        debugName: "hyprland_output_fullscreen",
-        argNames: ["x", "y"],
-      );
-
-  @override
   Future<String> crateApiHyprlandRequest({required String command}) {
     return handler.executeNormal(
       NormalTask(
@@ -168,7 +128,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 2,
+            funcId: 1,
             port: port_,
           );
         },
@@ -202,7 +162,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 3,
+            funcId: 2,
             port: port_,
           );
         },
@@ -233,7 +193,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 3,
             port: port_,
           );
         },
@@ -269,7 +229,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 4,
             port: port_,
           );
         },
@@ -304,7 +264,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 5,
             port: port_,
           );
         },
@@ -337,7 +297,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 7,
+              funcId: 6,
               port: port_,
             );
           },
@@ -399,8 +359,8 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   HyprlandMonitor dco_decode_hyprland_monitor(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return HyprlandMonitor(
       name: dco_decode_String(arr[0]),
       outputNumber: dco_decode_u_32(arr[1]),
@@ -409,8 +369,9 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
       activeWorkspaceId: dco_decode_i_32(arr[4]),
       specialWorkspaceId: dco_decode_opt_box_autoadd_i_32(arr[5]),
       specialWorkspaceName: dco_decode_opt_String(arr[6]),
-      currentWindow: dco_decode_opt_box_autoadd_hyprland_window(arr[7]),
-      workspaceSlots: dco_decode_list_hyprland_workspace_slot(arr[8]),
+      fullscreen: dco_decode_bool(arr[7]),
+      currentWindow: dco_decode_opt_box_autoadd_hyprland_window(arr[8]),
+      workspaceSlots: dco_decode_list_hyprland_workspace_slot(arr[9]),
     );
   }
 
@@ -418,11 +379,12 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
   HyprlandSnapshot dco_decode_hyprland_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return HyprlandSnapshot(
       monitors: dco_decode_list_hyprland_monitor(arr[0]),
       workspaces: dco_decode_list_hyprland_workspace(arr[1]),
+      focusedOutput: dco_decode_opt_String(arr[2]),
     );
   }
 
@@ -621,6 +583,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
     var var_activeWorkspaceId = sse_decode_i_32(deserializer);
     var var_specialWorkspaceId = sse_decode_opt_box_autoadd_i_32(deserializer);
     var var_specialWorkspaceName = sse_decode_opt_String(deserializer);
+    var var_fullscreen = sse_decode_bool(deserializer);
     var var_currentWindow = sse_decode_opt_box_autoadd_hyprland_window(
       deserializer,
     );
@@ -635,6 +598,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
       activeWorkspaceId: var_activeWorkspaceId,
       specialWorkspaceId: var_specialWorkspaceId,
       specialWorkspaceName: var_specialWorkspaceName,
+      fullscreen: var_fullscreen,
       currentWindow: var_currentWindow,
       workspaceSlots: var_workspaceSlots,
     );
@@ -645,7 +609,12 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_monitors = sse_decode_list_hyprland_monitor(deserializer);
     var var_workspaces = sse_decode_list_hyprland_workspace(deserializer);
-    return HyprlandSnapshot(monitors: var_monitors, workspaces: var_workspaces);
+    var var_focusedOutput = sse_decode_opt_String(deserializer);
+    return HyprlandSnapshot(
+      monitors: var_monitors,
+      workspaces: var_workspaces,
+      focusedOutput: var_focusedOutput,
+    );
   }
 
   @protected
@@ -917,6 +886,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
     sse_encode_i_32(self.activeWorkspaceId, serializer);
     sse_encode_opt_box_autoadd_i_32(self.specialWorkspaceId, serializer);
     sse_encode_opt_String(self.specialWorkspaceName, serializer);
+    sse_encode_bool(self.fullscreen, serializer);
     sse_encode_opt_box_autoadd_hyprland_window(self.currentWindow, serializer);
     sse_encode_list_hyprland_workspace_slot(self.workspaceSlots, serializer);
   }
@@ -929,6 +899,7 @@ class HyprlandRustLibApiImpl extends HyprlandRustLibApiImplPlatform
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_hyprland_monitor(self.monitors, serializer);
     sse_encode_list_hyprland_workspace(self.workspaces, serializer);
+    sse_encode_opt_String(self.focusedOutput, serializer);
   }
 
   @protected

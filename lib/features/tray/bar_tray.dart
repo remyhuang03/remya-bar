@@ -19,7 +19,9 @@ const _motion = Duration(milliseconds: 240);
 const _iconsChannel = MethodChannel('top.remya.bar/icons');
 
 class BarTray extends StatefulWidget {
-  const BarTray({super.key});
+  const BarTray({super.key, required this.popup});
+
+  final BarPopup popup;
 
   @override
   State<BarTray> createState() => BarTrayState();
@@ -145,7 +147,7 @@ class BarTrayState extends State<BarTray> {
   void _setExpanded(bool expanded) {
     if (_expanded == expanded) return;
     setState(() => _expanded = expanded);
-    _send(BarPopup.channel.invokeMethod<void>('watchTrayOutside', expanded));
+    _send(widget.popup.watchTrayOutside(expanded));
   }
 
   void _send(Future<void> request) {
@@ -158,7 +160,7 @@ class BarTrayState extends State<BarTray> {
       ++_menuToken;
       _menuItem = null;
     });
-    _send(BarPopup.hide(kind: _menuKind));
+    _send(widget.popup.hide(kind: _menuKind));
   }
 
   Future<void> _openMenu(BuildContext context, api.TrayItem item) async {
@@ -238,7 +240,7 @@ class BarTrayState extends State<BarTray> {
       (200 * _textScale).clamp(200, 420),
       ((entries?.length ?? 2) * 36.0 + 98).clamp(64, 720),
     );
-    await (first ? BarPopup.show : BarPopup.update)(
+    await (first ? widget.popup.show : widget.popup.update)(
       kind: _menuKind,
       anchor: _menuAnchor!,
       size: size,
@@ -315,9 +317,9 @@ class BarTrayState extends State<BarTray> {
     _timer.cancel();
     unawaited(_changes.cancel().whenComplete(_settings.close));
     if (_expanded) {
-      _send(BarPopup.channel.invokeMethod<void>('watchTrayOutside', false));
+      _send(widget.popup.watchTrayOutside(false));
     }
-    if (_menuItem != null) _send(BarPopup.hide(kind: _menuKind));
+    if (_menuItem != null) _send(widget.popup.hide(kind: _menuKind));
     super.dispose();
   }
 

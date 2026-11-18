@@ -18,11 +18,13 @@ import 'package:remya_bar/features/workspaces/bar_workspaces.dart';
 import 'package:remya_bar/features/settings/bar_preferences.dart';
 import 'package:remya_ui/remya_ui.dart';
 
+late BarPopup _popup;
+
 Future<void> _openSettings(WidgetTester tester) async {
   const codec = StandardMethodCodec();
   final reply = await tester.binding.defaultBinaryMessenger
       .handlePlatformMessage(
-        BarPopup.channel.name,
+        _popup.channel.name,
         codec.encodeMethodCall(
           const MethodCall('action', {'action': 'settings'}),
         ),
@@ -32,22 +34,24 @@ Future<void> _openSettings(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() => _popup = BarPopup.forView(1));
+  tearDown(() => _popup.dispose());
   testWidgets('card state validates payloads and ignores stale close actions', (
     tester,
   ) async {
     await tester.pumpWidget(
       RemyaBarApp(
+        popup: _popup,
         preferences: SettingsThemeController(
           () => File('/nonexistent/theme.toml'),
         ),
       ),
     );
-    addTearDown(() => BarPopup.openCard.value = null);
     Future<void> state(Map<String, Object?> data) async {
       const codec = StandardMethodCodec();
       final reply = await tester.binding.defaultBinaryMessenger
           .handlePlatformMessage(
-            BarPopup.channel.name,
+            _popup.channel.name,
             codec.encodeMethodCall(
               MethodCall('action', {'action': 'card.state', ...data}),
             ),
@@ -58,12 +62,12 @@ void main() {
     }
 
     await state({'kind': 'media', 'open': true});
-    expect(BarPopup.openCard.value, 'media');
+    expect(_popup.openCard.value, 'media');
     await state({'kind': 'battery', 'open': true});
     await state({'kind': 'media', 'open': false});
-    expect(BarPopup.openCard.value, 'battery');
+    expect(_popup.openCard.value, 'battery');
     await state({'kind': 'battery', 'open': false});
-    expect(BarPopup.openCard.value, isNull);
+    expect(_popup.openCard.value, isNull);
     for (final data in [
       {'kind': 'tooltip', 'open': true},
       {'kind': 'media', 'open': 1},
@@ -87,6 +91,7 @@ void main() {
       var opened = 0;
       await tester.pumpWidget(
         RemyaBarApp(
+          popup: _popup,
           preferences: preferences,
           onOpenSettings: () async {
             opened++;
@@ -115,6 +120,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       RemyaBarApp(
+        popup: _popup,
         preferences: SettingsThemeController(
           () => File('/nonexistent/theme.toml'),
         ),
@@ -153,6 +159,7 @@ void main() {
     var attempts = 0;
     await tester.pumpWidget(
       RemyaBarApp(
+        popup: _popup,
         preferences: preferences,
         onOpenSettings: () async {
           if (attempts++ == 0) throw const ProcessException('settings', []);
@@ -177,7 +184,11 @@ void main() {
     for (final width in [1.0, 39.0, 40.0, 59.0, 60.0, 1920.0]) {
       tester.view.physicalSize = Size(width, 40);
       await tester.pumpWidget(
-        RemyaBarApp(preferences: preferences, onOpenSettings: () async {}),
+        RemyaBarApp(
+          popup: _popup,
+          preferences: preferences,
+          onOpenSettings: () async {},
+        ),
       );
       expect(tester.takeException(), isNull, reason: 'width $width');
       expect(
@@ -196,6 +207,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
       RemyaBarApp(
+        popup: _popup,
         preferences: SettingsThemeController(
           () => File('/nonexistent/theme.toml'),
         ),
@@ -259,6 +271,7 @@ void main() {
       readSnapshot: ({required slotCount}) async => const HyprlandSnapshot(
         monitors: [
           HyprlandMonitor(
+            fullscreen: false,
             name: 'DP-1',
             outputNumber: 1,
             x: 0,
@@ -303,6 +316,7 @@ void main() {
         tester.view.physicalSize = Size(width, 40);
         await tester.pumpWidget(
           RemyaBarApp(
+            popup: _popup,
             preferences: preferences,
             system: system,
             hyprland: hyprland,
@@ -369,6 +383,9 @@ void main() {
       }
     }
     await tester.pumpWidget(const SizedBox.shrink());
+    system.dispose();
+    hyprland.dispose();
+    preferences.dispose();
   });
 
   testWidgets('Settings layout orders, hides and configures pills', (
@@ -396,6 +413,7 @@ void main() {
       );
     await tester.pumpWidget(
       RemyaBarApp(
+        popup: _popup,
         preferences: SettingsThemeController(
           () => File('/nonexistent/theme.toml'),
         ),
@@ -415,6 +433,7 @@ void main() {
       'cpu',
     ]);
     await tester.pumpWidget(const SizedBox.shrink());
+    system.dispose();
   });
 
   testWidgets('a centered group stays centered with its own sides', (
@@ -430,6 +449,7 @@ void main() {
       readSnapshot: ({required slotCount}) async => HyprlandSnapshot(
         monitors: [
           HyprlandMonitor(
+            fullscreen: false,
             name: 'DP-1',
             outputNumber: 1,
             x: 0,
@@ -463,6 +483,7 @@ void main() {
       );
     await tester.pumpWidget(
       RemyaBarApp(
+        popup: _popup,
         preferences: SettingsThemeController(
           () => File('/nonexistent/theme.toml'),
         ),
@@ -490,6 +511,8 @@ void main() {
     expect(find.byType(BarActiveWindow), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
+    system.dispose();
+    hyprland.dispose();
   });
 
   test('atomic theme updates apply and malformed files retain the last valid theme', () async {
@@ -524,7 +547,7 @@ void main() {
   ) async {
     final calls = <MethodCall>[];
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      BarPopup.channel,
+      _popup.channel,
       (call) async {
         calls.add(call);
         return null;
@@ -532,13 +555,14 @@ void main() {
     );
     addTearDown(
       () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        BarPopup.channel,
+        _popup.channel,
         null,
       ),
     );
     final launched = <List<String>>[];
     await tester.pumpWidget(
       RemyaBarApp(
+        popup: _popup,
         preferences: SettingsThemeController(
           () => File('/nonexistent/theme.toml'),
         ),
@@ -549,7 +573,7 @@ void main() {
     for (final target in ['screenshot', 'record', 'picker']) {
       final reply = await tester.binding.defaultBinaryMessenger
           .handlePlatformMessage(
-            BarPopup.channel.name,
+            _popup.channel.name,
             codec.encodeMethodCall(
               MethodCall('action', {
                 'action': 'sidebar.capture',

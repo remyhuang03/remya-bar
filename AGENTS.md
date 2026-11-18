@@ -26,7 +26,7 @@
 - Install the registration at `$XDG_DATA_HOME/remya/apps/remya-bar.json`. Core persists its values at `$XDG_CONFIG_HOME/remya/bar/settings.toml`; system settings live in `remya/system/`, shared theme in `remya/shared/theme.toml`. Ignore relative XDG roots and use absolute HOME fallbacks. Do not create unused cache/state directories.
 - Use revision-checked `Replace` for tray read-modify-write and sidebar editors; surface Core conflicts without retrying or overwriting another view.
 - Debug theme priority is Bar `config/config.local.toml`, sibling Core `config/shared/theme.toml`, then installed `remya/shared/theme.toml`. The native runner supplies the absolute repository root independently of launch cwd. Release uses the service theme controller from `remya_ui`.
-- Use the public `openRemyaSettings` opener for system pages. Bar preference entry points use Bar's own `--settings [page]` window, forwarded through GApplication to the resident instance. Its desktop file provides `[Desktop Action settings]`. Settings views are ordinary GTK toplevels on the warm popup engine; closing one destroys only its view.
+- Use the public `openRemyaSettings` opener for system pages. Bar preference entry points use Bar's own `--settings [page]` window, forwarded through GApplication to the resident instance. Its desktop file provides `[Desktop Action settings]`. Bar, popup, and settings views share the application engine. Settings views are ordinary GTK toplevels, and closing one destroys only its view.
 - Read `docs/backend.md` and Core's linked public API, XDG and app-preferences documents before changing contracts; update documentation with contract changes. Do not add compatibility aliases, removed-interface fallbacks or automatic migration.
 - Preserve the last valid theme on invalid configuration/service errors. Keep the bar surface transparent outside its capsule shape without changing its exclusive zone or focus policy.
 - Render tooltips and floating content with Flutter through `BarPopup`/`BarPopupApp`. GTK owns surface placement, visibility, focus policy and lifetime only. Use `BarTooltip` for concise hints with the owning Remya theme.
@@ -70,7 +70,7 @@
   cargo test --workspace
   git diff --check
   ```
-- Run `fvm flutter pub get` after dependency changes. Use `fvm flutter run -d linux --no-start-paused` for interactive verification so all per-output engines render. Run release builds when release behavior changes.
+- Run `fvm flutter pub get` after dependency changes. Use `fvm flutter run -d linux --no-start-paused` for interactive verification. Run release builds when release behavior changes.
 - After development and verification, stop all bar instances started for the task and confirm their layer surfaces and reserved space are released. Do not leave development bars running or stop unrelated desktop bars.
 - Keep durable tests for non-trivial logic and regressions. Before committing, remove obsolete, duplicate, and temporary test files, including UI control inspection tests whose verification is complete.
 - Keep debug and release builds/tests sequential within this repository because Flutter shares ephemeral native engine files between modes.

@@ -24,7 +24,6 @@ import 'features/hyprland/hyprland_backend.dart';
 import 'features/keyboard/keyboard_device.dart';
 import 'features/keyboard/keyboard_panel.dart';
 import 'features/popups/bar_popup.dart';
-import 'features/resources/bar_resources.dart';
 import 'features/resources/resource_data.dart';
 import 'features/tray/bar_tray.dart';
 import 'features/workspaces/bar_workspaces.dart';
@@ -39,6 +38,8 @@ class RemyaBarApp extends StatefulWidget {
   const RemyaBarApp({
     super.key,
     required this.preferences,
+    required this.popup,
+    this.window,
     this.hyprland,
     this.system,
     this.account,
@@ -53,6 +54,8 @@ class RemyaBarApp extends StatefulWidget {
   });
 
   final SettingsThemeController preferences;
+  final BarPopup popup;
+  final MethodChannel? window;
   final HyprlandBackend? hyprland;
   final SystemBackend? system;
   final AccountProfileController? account;
@@ -70,8 +73,8 @@ class RemyaBarApp extends StatefulWidget {
 }
 
 class _RemyaBarAppState extends State<RemyaBarApp> {
-  final _pillSnapshot = ValueNotifier<SystemSnapshot?>(null);
-  Timer? _pillRefresh;
+  BarPopup get _popup => widget.popup;
+  MethodChannel? get _window => widget.window;
   final _tray = GlobalKey<BarTrayState>();
   SidebarBackend? _sidebar;
   final _keyboardDevice = KeyboardDevice();
@@ -98,42 +101,65 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   int _panelRequest = 0;
 
   bool _fullscreen = false;
-  bool? _reportedFullscreen;
-  bool _checkingFullscreen = false;
-  Timer? _fullscreenCheck;
-  Timer? _fullscreenReconcile;
+  bool _focused = false;
+  int _outputRevision = 0;
+  String? _outputName;
 
-  void _scheduleFullscreenCheck() {
-    _fullscreenCheck ??= Timer(const Duration(milliseconds: 50), () {
-      _fullscreenCheck = null;
-      unawaited(_checkFullscreen());
-    });
-  }
-
-  Future<void> _checkFullscreen() async {
-    if (_checkingFullscreen || !mounted) return;
-    _checkingFullscreen = true;
+  Future<void> _loadOutput() async {
+    final revision = _outputRevision;
     try {
-      final geometry = await _window.invokeMapMethod<String, int>('output');
-      if (geometry == null || !mounted) return;
-      final hidden = await widget.hyprland!.isOutputFullscreen(
-        geometry['x']!,
-        geometry['y']!,
-      );
-      if (mounted && hidden != _fullscreen) {
-        await _window.invokeMethod<void>('setFullscreen', hidden);
-        _fullscreen = hidden;
-      }
-      final output = widget.hyprland!.output?.name;
-      if (output != null && hidden != _reportedFullscreen) {
-        _reportedFullscreen = hidden;
-        await widget.notifications?.setFullscreen(output, hidden);
+      final geometry = await _window?.invokeMapMethod<String, int>('output');
+      if (mounted && revision == _outputRevision) {
+        _updateOutput(geometry);
       }
     } catch (error) {
-      debugPrint('Bar fullscreen state: $error');
-    } finally {
-      _checkingFullscreen = false;
+      if (mounted) debugPrint('Bar output: $error');
     }
+  }
+
+  void _updateOutput(Object? geometry) {
+    if (geometry is Map && geometry['x'] is int && geometry['y'] is int) {
+      widget.hyprland?.updateOutput(
+        x: geometry['x'] as int,
+        y: geometry['y'] as int,
+      );
+    }
+  }
+
+  void _onOutputState() {
+    final hyprland = widget.hyprland;
+    final output = hyprland?.output;
+    if (output == null) return;
+    final outputChanged = _outputName != output.name;
+    final fullscreenChanged = output.fullscreen != _fullscreen;
+    final focusedChanged = _focused != hyprland!.isFocused;
+    _outputName = output.name;
+    _focused = hyprland.isFocused;
+    widget.osd?.updateOutput(output.name);
+    widget.notifications?.setFullscreen(this, output.name, output.fullscreen);
+    if (fullscreenChanged) {
+      setState(() => _fullscreen = output.fullscreen);
+      unawaited(
+        _window
+            ?.invokeMethod<void>('setFullscreen', _fullscreen)
+            .catchError(
+              (Object error) => debugPrint('Bar fullscreen state: $error'),
+            ),
+      );
+      _updateResourceDemand();
+      unawaited(_syncOsd());
+    }
+    if (outputChanged || fullscreenChanged || focusedChanged) {
+      unawaited(_syncToasts());
+    }
+  }
+
+  void _updateResourceDemand() {
+    widget.system?.setResourcesVisible(this, !_fullscreen);
+    widget.system?.setResourceCardVisible(
+      this,
+      !_fullscreen && _popup.openCard.value == 'resources',
+    );
   }
 
   String? _sidebarOutput;
@@ -158,7 +184,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     if (_sidebarOpen) {
       _sidebarOpen = false;
       _sidebar?.close();
-      await BarPopup.hide(kind: 'sidebar');
+      await _popup.hide(kind: 'sidebar');
       return;
     }
     _notificationsOpen = false;
@@ -179,7 +205,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         [_, final int top, _, final int bottom] => top + bottom,
         _ => null,
       };
-      await BarPopup.show(
+      await _popup.show(
         kind: 'sidebar',
         anchor: anchor,
         size: sidebarSize,
@@ -203,8 +229,6 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     }
   }
 
-  static const _window = MethodChannel('top.remya.bar/window');
-
   Future<String?> _focusedWindow() async {
     final backend = widget.hyprland;
     if (backend == null) return null;
@@ -223,7 +247,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   Future<Map?> _sidebarMonitor() async {
     final hyprland = widget.hyprland;
     if (hyprland == null) return null;
-    final geometry = await _window.invokeMapMethod<String, int>('output');
+    final geometry = await _window?.invokeMapMethod<String, int>('output');
     final monitors = jsonDecode(await hyprland.request('j/monitors'));
     if (geometry == null || monitors is! List) return null;
     final matches = monitors.whereType<Map>().where(
@@ -253,7 +277,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     final request = ++_panelRequest;
     if (_notificationsOpen) {
       _notificationsOpen = false;
-      await BarPopup.hide(kind: 'notifications');
+      await _popup.hide(kind: 'notifications');
       unawaited(_syncToasts());
       return;
     }
@@ -270,7 +294,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         [_, final int top, _, final int bottom] => top + bottom,
         _ => null,
       };
-      await BarPopup.show(
+      await _popup.show(
         kind: 'notifications',
         anchor: anchor,
         size: const Size(420, 663),
@@ -292,18 +316,20 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   void _updateNotifications() {
     if (!_notificationsOpen) return;
     unawaited(
-      BarPopup.update(
-        kind: 'notifications',
-        anchor: _popupAnchor,
-        size: const Size(420, 663),
-        data: _notificationsData(
-          _notificationsScale,
-          reservedHeight: _notificationsReservedHeight,
-        ),
-        theme: widget.preferences.theme,
-      ).catchError(
-        (Object error) => debugPrint('Notifications update: $error'),
-      ),
+      _popup
+          .update(
+            kind: 'notifications',
+            anchor: _popupAnchor,
+            size: const Size(420, 663),
+            data: _notificationsData(
+              _notificationsScale,
+              reservedHeight: _notificationsReservedHeight,
+            ),
+            theme: widget.preferences.theme,
+          )
+          .catchError(
+            (Object error) => debugPrint('Notifications update: $error'),
+          ),
     );
   }
 
@@ -315,13 +341,15 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   void _updateSidebar() {
     if (!_sidebarOpen) return;
     unawaited(
-      BarPopup.update(
-        kind: 'sidebar',
-        anchor: const Rect.fromLTWH(0, 0, 1, 1),
-        size: sidebarSize,
-        data: _sidebarData,
-        theme: widget.preferences.theme,
-      ).catchError((Object error) => debugPrint('Sidebar update: $error')),
+      _popup
+          .update(
+            kind: 'sidebar',
+            anchor: const Rect.fromLTWH(0, 0, 1, 1),
+            size: sidebarSize,
+            data: _sidebarData,
+            theme: widget.preferences.theme,
+          )
+          .catchError((Object error) => debugPrint('Sidebar update: $error')),
     );
   }
 
@@ -330,13 +358,15 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     _updateNotifications();
     if (_showingOsd) unawaited(_syncOsd());
     unawaited(
-      BarPopup.update(
-        kind: keyboardKind,
-        anchor: _popupAnchor,
-        size: keyboardSize,
-        data: const {},
-        theme: widget.preferences.theme,
-      ).catchError((Object error) => debugPrint('Keyboard theme: $error')),
+      _popup
+          .update(
+            kind: keyboardKind,
+            anchor: _popupAnchor,
+            size: keyboardSize,
+            data: const {},
+            theme: widget.preferences.theme,
+          )
+          .catchError((Object error) => debugPrint('Keyboard theme: $error')),
     );
   }
 
@@ -344,33 +374,25 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   void initState() {
     super.initState();
     if (widget.system case final system?) {
-      _pillSnapshot.value = system.resourceSnapshot;
-      system.hardware.addListener(_showFirstResourceSample);
       system.addListener(_applyWorkspaceCount);
       system.addListener(_applyEdge);
       _applyWorkspaceCount();
       _applyEdge();
-      _pillRefresh = Timer.periodic(const Duration(seconds: 3), (_) {
-        _pillSnapshot.value = system.resourceSnapshot;
-      });
+      _popup.openCard.addListener(_updateResourceDemand);
+      _updateResourceDemand();
     }
     if (widget.hyprland case final hyprland?) {
-      hyprland.addListener(_scheduleFullscreenCheck);
-      hyprland.addListener(_syncOsdOutput);
-      _fullscreenReconcile = Timer.periodic(
-        const Duration(seconds: 2),
-        (_) => _checkFullscreen(),
-      );
-      _scheduleFullscreenCheck();
+      hyprland.addListener(_onOutputState);
+      _onOutputState();
     }
     widget.account?.addListener(_updateSidebar);
     widget.notifications?.addListener(_onNotificationsChanged);
     widget.osd?.addListener(_syncOsd);
     widget.preferences.addListener(_updatePopupThemes);
-    _window.setMethodCallHandler((call) async {
+    _window?.setMethodCallHandler((call) async {
       if (call.method == 'outputChanged') {
-        final geometry = Map<String, int>.from(call.arguments as Map);
-        widget.hyprland?.updateOutput(x: geometry['x']!, y: geometry['y']!);
+        _outputRevision++;
+        _updateOutput(call.arguments);
         return;
       }
       if (call.method == 'osdShortcut') {
@@ -390,16 +412,17 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       if (call.method != 'toggleSidebar') throw MissingPluginException();
       final hyprland = widget.hyprland;
       if (hyprland == null) return;
-      final active = jsonDecode(await hyprland.request('j/activeworkspace'));
-      if (mounted && active is Map && active['monitor'] is String) {
+      final output = await hyprland.focusedOutput();
+      if (mounted && output != null) {
         await _toggleSidebar(
           const Rect.fromLTWH(0, 0, 1, 1),
           MediaQueryData.fromView(View.of(context)).textScaler.scale(1),
-          focusedOutput: active['monitor'] as String,
+          focusedOutput: output,
         );
       }
     });
-    BarPopup.channel.setMethodCallHandler(_popupAction);
+    _popup.channel.setMethodCallHandler(_popupAction);
+    if (widget.hyprland != null) unawaited(_loadOutput());
   }
 
   bool _showingToasts = false;
@@ -408,10 +431,6 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   bool _showingOsd = false;
   bool _syncingOsd = false;
   bool _osdDirty = false;
-
-  void _syncOsdOutput() {
-    widget.osd?.updateOutput(widget.hyprland?.output?.name);
-  }
 
   Future<void> _syncOsd() async {
     final osd = widget.osd;
@@ -424,13 +443,17 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     _syncingOsd = true;
     try {
       final current = osd.state;
-      var visible = current != null;
-      if (current != null &&
-          current.type != .brightness &&
-          widget.hyprland != null) {
-        final output = widget.hyprland!.output?.name;
+      var visible = current != null && !_fullscreen;
+      final hyprland = widget.hyprland;
+      if (visible && current.type != .brightness && hyprland != null) {
+        final output = hyprland.output?.name;
         if (output != null) {
-          visible = await widget.hyprland!.focusedOutput() == output;
+          final focused = await hyprland.focusedOutput();
+          if (!mounted) return;
+          visible =
+              !_fullscreen &&
+              focused == output &&
+              hyprland.output?.name == output;
         } else {
           visible = false;
         }
@@ -438,12 +461,12 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       if (!visible) {
         if (_showingOsd) {
           _showingOsd = false;
-          await BarPopup.hide(kind: osdKind);
+          await _popup.hide(kind: osdKind);
         }
         return;
       }
       if (!mounted) return;
-      final request = _showingOsd ? BarPopup.update : BarPopup.show;
+      final request = _showingOsd ? _popup.update : _popup.show;
       _showingOsd = true;
       await request(
         kind: osdKind,
@@ -477,29 +500,32 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     }
     _syncingToasts = true;
     try {
-      final popups = backend.popups.take(4).toList();
-      var host = backend.center?.popupHost;
-      if (popups.isNotEmpty && host == null && output != null) {
-        final active = jsonDecode(
-          await widget.hyprland!.request('j/activeworkspace'),
-        );
-        if (active is Map &&
-            active['monitor'] == output &&
-            await backend.claimPopups(output)) {
-          host = output;
+      if (backend.popups.isNotEmpty &&
+          backend.popupHost == null &&
+          output != null &&
+          !_fullscreen) {
+        final focused = await widget.hyprland!.focusedOutput();
+        if (!mounted) return;
+        if (!_fullscreen && focused == widget.hyprland?.output?.name) {
+          backend.claimPopups(this);
         }
       }
+      final popups = backend.popups.take(4).toList();
       final visible =
-          popups.isNotEmpty && host == output && !_notificationsOpen;
+          popups.isNotEmpty &&
+          backend.popupHost == this &&
+          !_notificationsOpen &&
+          !_fullscreen;
       if (!visible) {
         if (_showingToasts) {
           _showingToasts = false;
-          await BarPopup.hide(kind: notificationToastsKind);
+          await _popup.hide(kind: notificationToastsKind);
+          if (mounted && backend.popupHost == this) await backend.hover(false);
         }
         return;
       }
       if (!mounted) return;
-      final request = _showingToasts ? BarPopup.update : BarPopup.show;
+      final request = _showingToasts ? _popup.update : _popup.show;
       _showingToasts = true;
       await request(
         kind: notificationToastsKind,
@@ -538,7 +564,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     if (bottom == _appliedBottom) return;
     _appliedBottom = bottom;
     unawaited(
-      _window.invokeMethod<void>('setBottom', bottom).catchError((
+      _window?.invokeMethod<void>('setBottom', bottom).catchError((
         Object error,
       ) {
         debugPrint('Bar position: $error');
@@ -546,40 +572,23 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     );
   }
 
-  void _showFirstResourceSample() {
-    final next = widget.system?.resourceSnapshot;
-    if (!BarResources.hasData(_pillSnapshot.value) &&
-        BarResources.hasData(next)) {
-      _pillSnapshot.value = next;
-    }
-  }
-
   @override
   void dispose() {
     widget.notifications?.removeListener(_onNotificationsChanged);
     widget.osd?.removeListener(_syncOsd);
-    widget.notifications?.dispose();
-    widget.osd?.dispose();
-    _fullscreenCheck?.cancel();
-    _fullscreenReconcile?.cancel();
-    widget.hyprland?.removeListener(_scheduleFullscreenCheck);
-    widget.hyprland?.removeListener(_syncOsdOutput);
-    _pillRefresh?.cancel();
+    widget.notifications?.releaseOutput(this);
+    widget.hyprland?.removeListener(_onOutputState);
     _sidebar?.dispose();
     unawaited(_keyboardDevice.close());
     widget.account?.removeListener(_updateSidebar);
-    widget.account?.dispose();
     widget.preferences.removeListener(_updatePopupThemes);
-    _window.setMethodCallHandler(null);
-    widget.system?.hardware.removeListener(_showFirstResourceSample);
+    _window?.setMethodCallHandler(null);
     widget.system?.removeListener(_applyWorkspaceCount);
     widget.system?.removeListener(_applyEdge);
-    BarPopup.channel.setMethodCallHandler(null);
-    widget.preferences.dispose();
-    _pillSnapshot.dispose();
-    widget.hyprland?.dispose();
-    widget.system?.dispose();
-    widget.aiUsage?.dispose();
+    widget.system?.setResourcesVisible(this, false);
+    widget.system?.setResourceCardVisible(this, false);
+    _popup.openCard.removeListener(_updateResourceDemand);
+    _popup.channel.setMethodCallHandler(null);
     super.dispose();
   }
 
@@ -593,7 +602,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         theme: barTheme(widget.preferences.theme.theme(.light)),
         darkTheme: barTheme(widget.preferences.theme.theme(.dark)),
         themeMode: widget.preferences.theme.mode,
-        home: child,
+        home: TickerMode(enabled: !_fullscreen, child: child!),
       ),
       child: ClipRRect(
         borderRadius: .circular(20),
@@ -605,21 +614,24 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
               widget.system,
               widget.notifications,
               widget.aiUsage,
-              _pillSnapshot,
+              widget.system?.resourcePill,
             ]),
             builder: (context, _) => BarPopupScope(
               theme: widget.preferences.theme,
               bottom: widget.system?.bottom ?? false,
+              popup: _popup,
               child: BarContent(
                 error: widget.preferences.error,
                 hyprland: widget.hyprland,
                 system: widget.system,
                 notifications: widget.notifications,
                 aiUsage: widget.aiUsage,
-                pillSnapshot: _pillSnapshot.value,
+                pillSnapshot: widget.system?.resourcePill.value,
                 sidebarOpen: _sidebarOpen,
                 notificationsOpen: _notificationsOpen,
-                tray: widget.showTray ? BarTray(key: _tray) : null,
+                tray: widget.showTray
+                    ? BarTray(key: _tray, popup: _popup)
+                    : null,
                 onToggleSidebar: _toggleSidebar,
                 onToggleNotifications: _toggleNotifications,
               ),

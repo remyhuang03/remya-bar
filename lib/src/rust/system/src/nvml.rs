@@ -3,6 +3,7 @@ use libloading::os::unix::Library;
 use std::ffi::{CStr, c_char, c_int, c_uint, c_ulonglong, c_void};
 use std::ptr;
 use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 const SUCCESS: c_int = 0;
 const UNINITIALIZED: c_int = 1;
@@ -51,7 +52,7 @@ impl Default for MemoryV2 {
 
 struct Nvml {
     _library: Library,
-    initialized: Mutex<bool>,
+    state: Mutex<State>,
     init: unsafe extern "C" fn() -> c_int,
     count: unsafe extern "C" fn(*mut c_uint) -> c_int,
     handle: unsafe extern "C" fn(c_uint, *mut Device) -> c_int,
@@ -63,10 +64,17 @@ struct Nvml {
     temperature: unsafe extern "C" fn(Device, c_uint, *mut c_uint) -> c_int,
 }
 
+#[derive(Default)]
+struct State {
+    initialized: bool,
+    discovered: Option<Instant>,
+    identities: Vec<Option<(String, String)>>,
+}
+
 /// Call only from a blocking worker. A loaded driver stays resident for the process.
-pub(crate) fn gpus() -> Option<Vec<GpuSnapshot>> {
+pub(crate) fn gpus(details: bool) -> Option<Vec<GpuSnapshot>> {
     static NVML: OnceLock<Option<Nvml>> = OnceLock::new();
-    NVML.get_or_init(Nvml::load).as_ref()?.sample()
+    NVML.get_or_init(Nvml::load).as_ref()?.sample(details)
 }
 
 impl Nvml {
@@ -76,7 +84,7 @@ impl Nvml {
         unsafe {
             let library = Library::new("libnvidia-ml.so.1").ok()?;
             Some(Self {
-                initialized: Mutex::new(false),
+                state: Mutex::default(),
                 init: *library.get(b"nvmlInit_v2\0").ok()?,
                 count: *library.get(b"nvmlDeviceGetCount_v2\0").ok()?,
                 handle: *library.get(b"nvmlDeviceGetHandleByIndex_v2\0").ok()?,
@@ -94,28 +102,50 @@ impl Nvml {
         }
     }
 
-    fn sample(&self) -> Option<Vec<GpuSnapshot>> {
-        let mut initialized = self.initialized.lock().ok()?;
+    fn sample(&self, details: bool) -> Option<Vec<GpuSnapshot>> {
+        let mut state = self.state.lock().ok()?;
         // SAFETY: The symbols are from the retained NVML library, and all
         // pointers refer to writable values of the corresponding C types.
-        if !*initialized {
-            *initialized = unsafe { (self.init)() } == SUCCESS;
-            if !*initialized {
+        if !state.initialized {
+            state.initialized = unsafe { (self.init)() } == SUCCESS;
+            if !state.initialized {
                 return None;
             }
         }
         let mut count = 0;
         let status = unsafe { (self.count)(&mut count) };
         if status == UNINITIALIZED {
-            *initialized = false;
+            *state = State::default();
         }
         if status != SUCCESS {
             return None;
         }
-        (0..count).map(|index| self.sample_device(index)).collect()
+        if state.identities.len() != count as usize
+            || state
+                .discovered
+                .is_none_or(|time| time.elapsed() >= Duration::from_secs(60))
+        {
+            state.identities = vec![None; count as usize];
+            state.discovered = Some(Instant::now());
+        }
+        (0..count)
+            .map(|index| {
+                let identity = &mut state.identities[index as usize];
+                let snapshot = self.sample_device(index, details, identity);
+                if snapshot.is_none() {
+                    *identity = None;
+                }
+                snapshot
+            })
+            .collect()
     }
 
-    fn sample_device(&self, index: c_uint) -> Option<GpuSnapshot> {
+    fn sample_device(
+        &self,
+        index: c_uint,
+        details: bool,
+        identity: &mut Option<(String, String)>,
+    ) -> Option<GpuSnapshot> {
         let mut device = ptr::null_mut();
         // SAFETY: Each output points to an initialized, writable C value.
         // All metric calls use a device returned by the initialized library.
@@ -123,10 +153,16 @@ impl Nvml {
             if (self.handle)(index, &mut device) != SUCCESS || device.is_null() {
                 return None;
             }
-            let id = read_text(self.uuid, device)?;
-            let name = read_text(self.name, device)?;
+            let (id, name) = match identity {
+                Some(identity) => identity,
+                None => {
+                    identity.insert((read_text(self.uuid, device)?, read_text(self.name, device)?))
+                }
+            };
             let utilization = read_metric(|out| (self.utilization)(device, out))?;
-            let memory = if let Some(query) = self.memory_v2 {
+            let memory = if !details {
+                None
+            } else if let Some(query) = self.memory_v2 {
                 // Derive application VRAM usage independently of the driver's used field.
                 read_metric(|out| query(device, out))?.map(|m| {
                     let used = m
@@ -138,13 +174,17 @@ impl Nvml {
             } else {
                 read_metric(|out| (self.memory)(device, out))?.map(|m| (Some(m.used), m.total))
             };
-            let temperature = read_metric(|out| (self.temperature)(device, TEMPERATURE_GPU, out))?;
+            let temperature = if details {
+                read_metric(|out| (self.temperature)(device, TEMPERATURE_GPU, out))?
+            } else {
+                None
+            };
             let (used, total) = memory
                 .filter(|&(_, total)| total > 0 && total != c_ulonglong::MAX)
                 .map_or((None, None), |(used, total)| (used, Some(total)));
             Some(GpuSnapshot {
-                id,
-                name,
+                id: id.clone(),
+                name: name.clone(),
                 utilization_percent: utilization.filter(|v| v.gpu <= 100).map(|v| v.gpu.into()),
                 memory_used_bytes: used
                     .zip(total)

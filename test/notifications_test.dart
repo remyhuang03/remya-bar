@@ -163,7 +163,6 @@ void main() {
   testWidgets('bar button toggles notifications panel without hover card', (
     tester,
   ) async {
-    BarPopup.openCard.value = null;
     final calls = <(Rect, double)>[];
     await tester.pumpWidget(
       BarPopupScope(

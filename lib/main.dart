@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -7,42 +8,30 @@ import 'package:remya_client/remya_client.dart';
 import 'package:remya_ui/remya_ui.dart';
 
 import 'app.dart';
+import 'bar_view_host.dart';
 import 'features/account/account_profile_controller.dart';
 import 'features/ai_usage/ai_usage_backend.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/notifications/notification_backend.dart';
 import 'features/notifications/notification_settings.dart';
 import 'features/osd/osd_controller.dart';
-import 'features/settings/bar_theme_controller.dart';
-import 'features/popups/popup_app.dart';
 import 'features/popups/bar_popup.dart';
+import 'features/settings/bar_theme_controller.dart';
 import 'features/sidebar/sidebar_screen_capture.dart';
 import 'features/system/system_backend.dart';
 
-Future<void> main(List<String> arguments) async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Unknown providers fall back to initials if the manifest cannot load.
-  await loadAiIdentity().catchError(
-    (Object error) => debugPrint('AI provider identity unavailable: $error'),
-  );
   final root = await barRepositoryRoot();
   final preferences = barThemeController(root);
-  await preferences.start();
-  if (arguments.contains('--remya-popup')) {
-    runWidget(BarPopupHost(preferences: preferences));
-    startAiUsageWorker();
-    NotificationSettings().start();
-    return;
-  }
-  await HyprlandBackend.initialize();
-  await SystemBackend.initialize();
-  final output = await const MethodChannel('top.remya.bar/window')
-      .invokeMapMethod<String, int>('output');
-  BarPopup.keyboardOpen.value =
-      await BarPopup.channel.invokeMethod<bool>('keyboardVisible') ?? false;
-  final hyprland = HyprlandBackend(outputX: output?['x'], outputY: output?['y'])
-    ..start();
-  final system = SystemBackend()..start();
+  final identity = loadAiIdentity().catchError(
+    (Object error) => debugPrint('AI provider identity unavailable: $error'),
+  );
+  await Future.wait([
+    preferences.start(),
+    HyprlandBackend.initialize(),
+    SystemBackend.initialize(),
+  ]);
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks([
       "Remy'a Bar",
@@ -51,35 +40,138 @@ Future<void> main(List<String> arguments) async {
       'Rust backend dependencies',
     ], await rootBundle.loadString('assets/licenses/rust-dependencies.txt'));
   });
-  final debugSettings = root == null
-      ? null
-      : File(
-          '${Directory(root).parent.path}/remya-settings/build/linux/x64/debug/bundle/remya_settings',
-        );
-  final debugScreenCapture = root == null
-      ? null
-      : File(
-          '${Directory(root).parent.path}/remya-screen-capture/build/linux/x64/debug/bundle/remya_screen_capture',
-        );
-  runApp(
-    RemyaBarApp(
-      preferences: preferences,
-      hyprland: hyprland,
-      system: system,
-      aiUsage: AiUsageBackend()..start(),
-      account: AccountProfileController()..start(),
-      notifications: NotificationBackend()..start(),
-      osd: OsdController()..start(output: hyprland.output?.name),
+  runWidget(_BarApplication(preferences: preferences, repositoryRoot: root));
+  unawaited(identity);
+}
+
+class _BarApplication extends StatefulWidget {
+  const _BarApplication({required this.preferences, this.repositoryRoot});
+
+  final SettingsThemeController preferences;
+  final String? repositoryRoot;
+
+  @override
+  State<_BarApplication> createState() => _BarApplicationState();
+}
+
+class _BarApplicationState extends State<_BarApplication> {
+  final _hyprland = HyprlandStore();
+  final _system = SystemBackend();
+  final _aiUsage = AiUsageBackend();
+  final _account = AccountProfileController();
+  final _notifications = NotificationBackend();
+  final _notificationSettings = NotificationSettings();
+  final _osdSettings = SettingsClient();
+  late final _debugSettings = _debugExecutable(
+    'remya-settings',
+    'remya_settings',
+  );
+  late final _debugScreenCapture = _debugExecutable(
+    'remya-screen-capture',
+    'remya_screen_capture',
+  );
+
+  File? _debugExecutable(String repository, String executable) {
+    final root = widget.repositoryRoot;
+    return root == null
+        ? null
+        : File(
+            '${Directory(root).parent.path}/$repository/build/linux/x64/debug/bundle/$executable',
+          );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _hyprland.start();
+    _system.start();
+    startAiUsageWorker();
+    _aiUsage.start();
+    _account.start();
+    _notifications.start();
+    _notificationSettings.start();
+  }
+
+  @override
+  void dispose() {
+    unawaited(_notificationSettings.close());
+    unawaited(_osdSettings.close());
+    _notifications.dispose();
+    _account.dispose();
+    _aiUsage.dispose();
+    _system.dispose();
+    _hyprland.dispose();
+    widget.preferences.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => BarViewHost(
+    preferences: widget.preferences,
+    buildBar: (viewId) => _BarOutput(viewId: viewId, app: this),
+  );
+}
+
+class _BarOutput extends StatefulWidget {
+  const _BarOutput({required this.viewId, required this.app});
+
+  final int viewId;
+  final _BarApplicationState app;
+
+  @override
+  State<_BarOutput> createState() => _BarOutputState();
+}
+
+class _BarOutputState extends State<_BarOutput> {
+  late final _popup = BarPopup.forView(widget.viewId);
+  late final _window = MethodChannel(
+    'top.remya.bar/bar/${widget.viewId}/window',
+  );
+  late final _hyprland = HyprlandBackend(store: widget.app._hyprland);
+  late final _osd = OsdController(settings: widget.app._osdSettings)..start();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(
+      _popup.syncKeyboardVisibility().catchError((Object error) {
+        if (mounted) debugPrint('Bar keyboard visibility: $error');
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    _osd.dispose();
+    _hyprland.dispose();
+    _popup.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final app = widget.app;
+    return RemyaBarApp(
+      preferences: app.widget.preferences,
+      popup: _popup,
+      window: _window,
+      hyprland: _hyprland,
+      system: app._system,
+      aiUsage: app._aiUsage,
+      account: app._account,
+      notifications: app._notifications,
+      osd: _osd,
       onOpenSettingsPage: (page) =>
-          openRemyaSettings(debugExecutable: debugSettings, page: page),
+          openRemyaSettings(debugExecutable: app._debugSettings, page: page),
       showTray: true,
-      onOpenSettings: () => openRemyaSettings(debugExecutable: debugSettings),
+      onOpenSettings: () =>
+          openRemyaSettings(debugExecutable: app._debugSettings),
       onOpenPowerSettings: () =>
-          openRemyaSettings(debugExecutable: debugSettings, page: 'power'),
+          openRemyaSettings(debugExecutable: app._debugSettings, page: 'power'),
       onLaunchScreenCapture: (arguments) => openRemyaScreenCapture(
-        debugExecutable: debugScreenCapture,
+        debugExecutable: app._debugScreenCapture,
         arguments: arguments,
       ),
-    ),
-  );
+    );
+  }
 }

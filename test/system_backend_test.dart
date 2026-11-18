@@ -113,8 +113,10 @@ class _MediaApi implements SystemRustLibApi {
   }) => this.action?.future ?? Future.value();
 
   @override
-  Future<SystemSnapshot> crateApiHardwareSnapshot() async =>
-      const SystemSnapshot(batteries: [], gpus: []);
+  Future<SystemSnapshot> crateApiHardwareSnapshot({
+    required bool details,
+    required bool gpuPill,
+  }) async => const SystemSnapshot(batteries: [], gpus: []);
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

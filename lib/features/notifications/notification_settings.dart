@@ -8,8 +8,7 @@ import '../../src/rust/system_bridge/api.dart' as api;
 import '../settings/bar_preferences.dart';
 import '../system/system_backend.dart' show SystemBackend;
 
-/// The warm popup engine is the only writer of process-wide notification
-/// preferences. Each output observes the applied settings through Rust.
+/// Applies Core preferences to the process-wide Rust notification server.
 class NotificationSettings {
   NotificationSettings({
     SettingsClient? client,

@@ -8,6 +8,7 @@
 #include <memory>
 #include <vector>
 
+#include "bar_views.h"
 #include "virtual_keyboard.h"
 
 namespace bar_popup_internal {
@@ -27,12 +28,13 @@ gchar* popup_channel_name(int64_t view_id);
 
 struct BarPopup {
   FlView* owner;
-  FlEngine* engine = nullptr;
+  BarViews* views = nullptr;
   GtkWidget* window = nullptr;
   FlView* view = nullptr;
   int64_t view_id = -1;
   FlMethodChannel* channel = nullptr;
   FlMethodChannel* owner_channel = nullptr;
+  GPtrArray* pending_actions = nullptr;
   FlValue* content = nullptr;
   BarPopup* sidebar_popup = nullptr;
   BarPopup* notifications_popup = nullptr;
@@ -141,13 +143,22 @@ struct BarPopup {
     cancel_hide();
     cancel_dismiss();
     clear_dismiss_windows();
+    if (pending_actions != nullptr) {
+      for (guint index = 0; index < pending_actions->len; ++index) {
+        auto* call = FL_METHOD_CALL(pending_actions->pdata[index]);
+        fl_method_call_respond_error(call, "view-closed", "Popup closed", nullptr, nullptr);
+      }
+      g_ptr_array_set_size(pending_actions, 0);
+      g_clear_pointer(&pending_actions, g_ptr_array_unref);
+    }
     if (channel != nullptr) {
       g_autofree gchar* name = popup_channel_name(view_id);
       fl_binary_messenger_set_message_handler_on_channel(
-          fl_engine_get_binary_messenger(engine), name, nullptr, nullptr, nullptr);
+          fl_engine_get_binary_messenger(fl_view_get_engine(owner)), name, nullptr, nullptr, nullptr);
       g_clear_object(&channel);
     }
     if (window != nullptr) {
+      views->remove(view);
       gtk_widget_destroy(window);
       g_object_unref(window);
     }

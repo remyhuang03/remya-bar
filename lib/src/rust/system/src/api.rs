@@ -247,17 +247,26 @@ pub struct NetworkOverview {
     pub upload_bytes_per_second: Option<f64>,
 }
 
-/// All output engines share one sample and one set of CPU/network baselines.
-pub async fn hardware_snapshot() -> Result<SystemSnapshot, String> {
+/// All views share one sample and one set of CPU/network baselines.
+pub async fn hardware_snapshot(details: bool, gpu_pill: bool) -> Result<SystemSnapshot, String> {
+    use crate::metrics::SensorDemand;
+    let demand = if details {
+        Some(SensorDemand::Card)
+    } else {
+        gpu_pill.then_some(SensorDemand::Pill)
+    };
     #[derive(Default)]
     struct Cache {
         updated: Option<Instant>,
         snapshot: Option<SystemSnapshot>,
         resources: crate::resources::History,
+        sensors: crate::metrics::SensorWorker,
     }
     static CACHE: OnceLock<tokio::sync::Mutex<Cache>> = OnceLock::new();
     static SAMPLER: OnceLock<std::sync::Mutex<crate::metrics::Sampler>> = OnceLock::new();
     let mut cache = CACHE.get_or_init(Default::default).lock().await;
+    cache.sensors.poll().await;
+    cache.sensors.request(demand);
     if cache
         .updated
         .is_some_and(|time| time.elapsed() < Duration::from_millis(900))
@@ -273,7 +282,15 @@ pub async fn hardware_snapshot() -> Result<SystemSnapshot, String> {
     })
     .await
     .map_err(|error| error.to_string())??;
-    cache.resources.record(sampled_at, &mut snapshot);
+    cache.sensors.poll().await;
+    let gpu_measured = cache.sensors.apply(demand, &mut snapshot);
+    cache
+        .resources
+        .record(sampled_at, &mut snapshot, gpu_measured);
+    if details && let Some(resource_details) = snapshot.resources.as_mut() {
+        cache.resources.populate(sampled_at, resource_details);
+    }
+
     cache.updated = Some(Instant::now());
     cache.snapshot = Some(snapshot.clone());
     Ok(snapshot)
