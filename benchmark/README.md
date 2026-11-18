@@ -4,6 +4,7 @@
 Use the release bundle and keep the same features, display modes, power
 profile and workload across repeats. Record changes in the trial notes.
 Keep raw readings and summaries together in the ignored `runs/` directory.
+The [workstation report](REPORT.md) records the completed release comparisons.
 
 ## S03 · Live three-display resource use
 
