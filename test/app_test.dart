@@ -9,6 +9,8 @@ import 'package:remya_bar/features/battery/bar_battery.dart';
 import 'package:remya_bar/features/clock/bar_clock.dart';
 import 'package:remya_bar/features/hyprland/hyprland_backend.dart';
 import 'package:remya_bar/features/media/bar_media.dart';
+import 'package:remya_bar/features/osd/osd_controller.dart';
+import 'package:remya_bar/features/osd/osd_slider.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
 import 'package:remya_bar/features/resources/bar_resources.dart';
 import 'package:remya_bar/features/sidebar/right_sidebar.dart';
@@ -16,9 +18,18 @@ import 'package:remya_bar/features/system/system_backend.dart';
 import 'package:remya_bar/features/window/bar_active_window.dart';
 import 'package:remya_bar/features/workspaces/bar_workspaces.dart';
 import 'package:remya_bar/features/settings/bar_preferences.dart';
+import 'package:remya_client/remya_client.dart';
 import 'package:remya_ui/remya_ui.dart';
 
 late BarPopup _popup;
+
+class _OsdSettings extends SettingsClient {
+  @override
+  Future<Map<String, dynamic>> call(
+    String method, [
+    List<String> arguments = const [],
+  ]) async => {};
+}
 
 Future<void> _openSettings(WidgetTester tester) async {
   const codec = StandardMethodCodec();
@@ -37,7 +48,7 @@ void main() {
   setUp(() => _popup = BarPopup.forView(1));
   tearDown(() => _popup.dispose());
   testWidgets(
-    'fullscreen retries a failed native transition without a new snapshot',
+    'fullscreen retries a failed native transition and allows the OSD',
     (tester) async {
       const channel = MethodChannel('test/bar/window');
       final transitions = <bool>[];
@@ -49,12 +60,27 @@ void main() {
         return null;
       });
       addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      final popupCalls = <String>[];
+      messenger.setMockMethodCallHandler(_popup.channel, (call) async {
+        if ((call.arguments as Map?)?['kind'] == osdKind) {
+          popupCalls.add(call.method);
+        }
+        return null;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(_popup.channel, null),
+      );
+      final settings = _OsdSettings();
+      addTearDown(settings.close);
+      final osd = OsdController(settings: settings);
+      addTearDown(osd.dispose);
       final preferences = SettingsThemeController(
         () => File('/nonexistent/theme.toml'),
       );
       final output = HyprlandBackend(
         outputName: 'DP-1',
         readSnapshot: ({required slotCount}) async => const HyprlandSnapshot(
+          focusedOutput: 'DP-1',
           monitors: [
             HyprlandMonitor(
               fullscreen: true,
@@ -77,6 +103,7 @@ void main() {
           popup: _popup,
           preferences: preferences,
           hyprland: output,
+          osd: osd,
           window: channel,
         ),
       );
@@ -85,6 +112,13 @@ void main() {
       expect(transitions, [true, true]);
       await tester.pump(const Duration(seconds: 2));
       expect(transitions, [true, true]);
+      osd.state = const OsdState(type: .volume, value: 40);
+      osd.notifyListeners();
+      await tester.pump();
+      expect(popupCalls, ['show']);
+      osd.dismiss();
+      await tester.pump();
+      expect(popupCalls, ['show', 'hide']);
       await tester.pumpWidget(const SizedBox());
     },
   );

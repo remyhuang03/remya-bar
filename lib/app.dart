@@ -463,17 +463,14 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     _syncingOsd = true;
     try {
       final current = osd.state;
-      var visible = current != null && !_fullscreen;
+      var visible = current != null;
       final hyprland = widget.hyprland;
       if (visible && current.type != .brightness && hyprland != null) {
         final output = hyprland.output?.name;
         if (output != null) {
           final focused = await hyprland.focusedOutput();
           if (!mounted) return;
-          visible =
-              !_fullscreen &&
-              focused == output &&
-              hyprland.output?.name == output;
+          visible = focused == output && hyprland.output?.name == output;
         } else {
           visible = false;
         }
