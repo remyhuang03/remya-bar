@@ -34,8 +34,6 @@
 
 ## 🚀 インストール
 
-`remya-bar` は、共有テーマトークンと設定の永続化を管理するために **Remya Core**（`remya-core` / `remyad`）が提供する `top.remya.Core1` D-Bus サービスに依存しています。**Remy'a Bar** をインストールする前に、まず **Remya Core** をインストールして有効化してください（`top.remya.bar.service` は `top.remya.core.service` の後に起動するよう自動構成されます。**Remya Settings** はオプションのシステム設定フロントエンドです）。
-
 ### 1a. AUR からインストール（推奨）
 
 お好みの AUR ヘルパーを使用して `remya-bar` をインストールします：
@@ -53,16 +51,16 @@ paru -S remya-bar || yay -S remya-bar
 sha256sum -c SHA256SUMS --ignore-missing
 
 # 展開してインストール
-tar --zstd -xf remya_bar-<version>-linux-x86_64.tar.zst
-cd remya_bar-<version>-linux-x86_64
+tar --zstd -xf remya_bar-0.2.0-linux-x86_64.tar.zst
+cd remya_bar-0.2.0-linux-x86_64
 python tool/install.py
 ```
 
-インストーラーはファイルを `~/.local/bin` と `XDG_DATA_HOME` にコピーし、`top.remya.bar.service` systemd ユーザーユニットを書き込んで有効化し、`graphical-session.target` とともにバーが起動するよう設定します（ユーザーマネージャー環境に `uwsm` などから提供される `WAYLAND_DISPLAY` と `HYPRLAND_INSTANCE_SIGNATURE` が必要です）。再インストール時はユニットを自動停止し、バンドルを置き換えてサービスを再起動します。自動起動を無効にするには `systemctl --user disable --now top.remya.bar.service` を実行してください。
+インストーラーはファイルを `~/.local/bin` と `XDG_DATA_HOME` にコピーし、`top.remya.bar.service` systemd ユーザーユニットを書き込んで有効化し、`graphical-session.target` とともにバーが起動するよう設定します。再インストール時はユニットを自動停止し、バンドルを置き換えてサービスを再起動します。自動起動を無効にするには `systemctl --user disable --now top.remya.bar.service` を実行してください。
 
 ### 2. Hyprland の設定
 
-Hyprland の Lua 設定（例：`~/.config/hypr/hyprland.lua`）に以下のキーバインドを追加してください（既存のバインドがある場合は先に `hl.unbind(...)` で解除できます）：
+Hyprland の Lua 設定（例：`~/.config/hypr/hyprland.lua`）に以下のキーバインドを追加してください：
 
 ```lua
 local barShortcutSignal = 'gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.'

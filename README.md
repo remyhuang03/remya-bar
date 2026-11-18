@@ -34,8 +34,6 @@ A modern, fluid desktop status bar for **Linux Hyprland**, built with **Flutter*
 
 ## 🚀 Installation
 
-`remya-bar` depends on the `top.remya.Core1` D-Bus service provided by **Remya Core** (`remya-core` / `remyad`) to manage shared theme tokens and configuration persistence. Please install and enable **Remya Core** before installing **Remy'a Bar** (`top.remya.bar.service` is automatically ordered to start after `top.remya.core.service`; **Remya Settings** is an optional system settings frontend).
-
 ### 1a. Install via AUR (Recommended)
 
 Install `remya-bar` using your preferred AUR helper:
@@ -53,16 +51,16 @@ After downloading the Linux x86_64 release archive from [Releases](https://githu
 sha256sum -c SHA256SUMS --ignore-missing
 
 # Extract and install
-tar --zstd -xf remya_bar-<version>-linux-x86_64.tar.zst
-cd remya_bar-<version>-linux-x86_64
+tar --zstd -xf remya_bar-0.2.0-linux-x86_64.tar.zst
+cd remya_bar-0.2.0-linux-x86_64
 python tool/install.py
 ```
 
-The installer copies files into `~/.local/bin` and `XDG_DATA_HOME`, writes and enables the `top.remya.bar.service` systemd user unit, and configures the bar to start with `graphical-session.target` (requiring `WAYLAND_DISPLAY` and `HYPRLAND_INSTANCE_SIGNATURE` in the user manager environment, e.g., provided by `uwsm`). Reinstalling automatically stops the unit, replaces the bundle, and restarts the service. Run `systemctl --user disable --now top.remya.bar.service` to disable autostart.
+The installer copies files into `~/.local/bin` and `XDG_DATA_HOME`, writes and enables the `top.remya.bar.service` systemd user unit, and configures the bar to start with `graphical-session.target`. Reinstalling automatically stops the unit, replaces the bundle, and restarts the service. Run `systemctl --user disable --now top.remya.bar.service` to disable autostart.
 
 ### 2. Hyprland Configuration
 
-Add the following keybindings to your Hyprland Lua configuration (e.g., `~/.config/hypr/hyprland.lua`) (if you already have existing bindings, you can remove them first with `hl.unbind(...)`):
+Add the following keybindings to your Hyprland Lua configuration (e.g., `~/.config/hypr/hyprland.lua`):
 
 ```lua
 local barShortcutSignal = 'gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.'
@@ -241,14 +239,14 @@ hl.bind(
 - **Remya Core** installed and enabled at runtime (providing `dbus-1/services/top.remya.Core1.service` and `top.remya.core.service`)
 - Arch Linux runtime and native build dependencies:
 
-| Dependency | Purpose |
-| :--- | :--- |
+| Dependency                                                        | Purpose                                                             |
+|:----------------------------------------------------------------- |:------------------------------------------------------------------- |
 | `gtk-layer-shell`, `wayland`, `libxkbcommon`, `wayland-protocols` | Wayland layer-shell surfaces, input handling, and `wayland-scanner` |
-| `sqlite` | Persistent notification history |
-| `inter-font`, `noto-fonts-cjk` | System typography and CJK fallback |
-| `networkmanager`, `bluez` | Network and Bluetooth Quick Settings toggles |
-| `nvidia-utils` *(optional)* | Provides `libnvidia-ml.so.1` for NVIDIA GPU metrics |
-| `codexbar-cli` *(optional)* | Provides `codexbar` executable for AI quota |
+| `sqlite`                                                          | Persistent notification history                                     |
+| `inter-font`, `noto-fonts-cjk`                                    | System typography and CJK fallback                                  |
+| `networkmanager`, `bluez`                                         | Network and Bluetooth Quick Settings toggles                        |
+| `nvidia-utils` *(optional)*                                       | Provides `libnvidia-ml.so.1` for NVIDIA GPU metrics                 |
+| `codexbar-cli` *(optional)*                                       | Provides `codexbar` executable for AI quota                         |
 
 ```bash
 fvm install

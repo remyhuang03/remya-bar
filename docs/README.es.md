@@ -34,8 +34,6 @@ Una barra de estado de escritorio moderna y fluida para **Linux Hyprland**, crea
 
 ## 🚀 Instalación
 
-`remya-bar` depende del servicio D-Bus `top.remya.Core1` proporcionado por **Remya Core** (`remya-core` / `remyad`) para gestionar los tokens de tema compartidos y la persistencia de la configuración. Instala y habilita primero **Remya Core** antes de instalar **Remy'a Bar** (`top.remya.bar.service` se ordena automáticamente para iniciarse después de `top.remya.core.service`; **Remya Settings** es un frontend opcional de ajustes del sistema).
-
 ### 1a. Instalar mediante AUR (Recomendado)
 
 Instala `remya-bar` con tu asistente de AUR preferido:
@@ -53,16 +51,16 @@ Tras descargar el archivo de lanzamiento para Linux x86_64 desde [Releases](http
 sha256sum -c SHA256SUMS --ignore-missing
 
 # Extraer e instalar
-tar --zstd -xf remya_bar-<version>-linux-x86_64.tar.zst
-cd remya_bar-<version>-linux-x86_64
+tar --zstd -xf remya_bar-0.2.0-linux-x86_64.tar.zst
+cd remya_bar-0.2.0-linux-x86_64
 python tool/install.py
 ```
 
-El instalador copia los archivos en `~/.local/bin` y `XDG_DATA_HOME`, crea y habilita la unidad de usuario systemd `top.remya.bar.service` y configura la barra para iniciarse junto con `graphical-session.target` (requiere `WAYLAND_DISPLAY` y `HYPRLAND_INSTANCE_SIGNATURE` en el entorno del gestor de usuario, por ejemplo proporcionados por `uwsm`). Al reinstalar, detiene automáticamente la unidad, reemplaza el paquete y reinicia el servicio. Ejecuta `systemctl --user disable --now top.remya.bar.service` para desactivar el inicio automático.
+El instalador copia los archivos en `~/.local/bin` y `XDG_DATA_HOME`, crea y habilita la unidad de usuario systemd `top.remya.bar.service` y configura la barra para iniciarse junto con `graphical-session.target`. Al reinstalar, detiene automáticamente la unidad, reemplaza el paquete y reinicia el servicio. Ejecuta `systemctl --user disable --now top.remya.bar.service` para desactivar el inicio automático.
 
 ### 2. Configuración de Hyprland
 
-Añade los siguientes atajos de teclado en tu configuración Lua de Hyprland (por ejemplo, `~/.config/hypr/hyprland.lua`) (si ya tenías atajos previos, puedes eliminarlos primero con `hl.unbind(...)`):
+Añade los siguientes atajos de teclado en tu configuración Lua de Hyprland (por ejemplo, `~/.config/hypr/hyprland.lua`):
 
 ```lua
 local barShortcutSignal = 'gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.'

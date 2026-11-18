@@ -34,8 +34,6 @@
 
 ## 🚀 安装
 
-`remya-bar` 依赖 **Remya Core**（`remya-core` / `remyad`）提供的 `top.remya.Core1` D-Bus 服务来管理共享主题令牌与配置持久化，请先安装并启用 **Remya Core**，再安装 **Remy'a Bar**（`top.remya.bar.service` 会自动编排在 `top.remya.core.service` 之后启动；**Remya Settings** 为可选的系统级设置前端）。
-
 ### 1a. 通过 AUR 安装（推荐）
 
 使用您偏好的 AUR 助手安装 `remya-bar`：
@@ -53,16 +51,16 @@ paru -S remya-bar || yay -S remya-bar
 sha256sum -c SHA256SUMS --ignore-missing
 
 # 解压并安装
-tar --zstd -xf remya_bar-<version>-linux-x86_64.tar.zst
-cd remya_bar-<version>-linux-x86_64
+tar --zstd -xf remya_bar-0.2.0-linux-x86_64.tar.zst
+cd remya_bar-0.2.0-linux-x86_64
 python tool/install.py
 ```
 
-安装程序会将文件复制到 `~/.local/bin` 与 `XDG_DATA_HOME`，写入并启用 `top.remya.bar.service` systemd 用户单元，并配置状态栏随 `graphical-session.target` 启动（需要用户管理器环境中存在 `WAYLAND_DISPLAY` 和 `HYPRLAND_INSTANCE_SIGNATURE`，例如由 `uwsm` 提供）。重新安装时会自动停止该单元、替换程序包并重启服务。运行 `systemctl --user disable --now top.remya.bar.service` 即可关闭开机自启。
+安装程序会将文件复制到 `~/.local/bin` 与 `XDG_DATA_HOME`，写入并启用 `top.remya.bar.service` systemd 用户单元，并配置状态栏随 `graphical-session.target` 启动。重新安装时会自动停止该单元、替换程序包并重启服务。运行 `systemctl --user disable --now top.remya.bar.service` 即可关闭开机自启。
 
 ### 2. Hyprland 配置
 
-在您的 Hyprland Lua 配置（如 `~/.config/hypr/hyprland.lua`）中添加以下快捷键绑定（若此前已有绑定可先用 `hl.unbind(...)` 解除）：
+在您的 Hyprland Lua 配置（如 `~/.config/hypr/hyprland.lua`）中添加以下快捷键绑定：
 
 ```lua
 local barShortcutSignal = 'gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.'

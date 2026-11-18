@@ -34,8 +34,6 @@ Eine moderne, flüssige Desktop-Statusleiste für **Linux Hyprland**, entwickelt
 
 ## 🚀 Installation
 
-`remya-bar` hängt vom D-Bus-Dienst `top.remya.Core1` ab, der von **Remya Core** (`remya-core` / `remyad`) bereitgestellt wird, um gemeinsame Theme-Tokens und die Konfigurationspersistenz zu verwalten. Bitte installiere und aktiviere zuerst **Remya Core**, bevor du **Remy'a Bar** installierst (`top.remya.bar.service` wird automatisch so geordnet, dass es nach `top.remya.core.service` startet; **Remya Settings** ist ein optionales Frontend für Systemeinstellungen).
-
 ### 1a. Installation über AUR (Empfohlen)
 
 Installiere `remya-bar` mit deinem bevorzugten AUR-Helper:
@@ -53,16 +51,16 @@ Nach dem Herunterladen des Linux-x86_64-Release-Archivs von [Releases](https://g
 sha256sum -c SHA256SUMS --ignore-missing
 
 # Entpacken und installieren
-tar --zstd -xf remya_bar-<version>-linux-x86_64.tar.zst
-cd remya_bar-<version>-linux-x86_64
+tar --zstd -xf remya_bar-0.2.0-linux-x86_64.tar.zst
+cd remya_bar-0.2.0-linux-x86_64
 python tool/install.py
 ```
 
-Das Installationsskript kopiert die Dateien nach `~/.local/bin` und `XDG_DATA_HOME`, schreibt und aktiviert die systemd-Benutzereinheit `top.remya.bar.service` und konfiguriert die Leiste für den Start mit `graphical-session.target` (erfordert `WAYLAND_DISPLAY` und `HYPRLAND_INSTANCE_SIGNATURE` in der Umgebung des Benutzermanagers, z. B. durch `uwsm` bereitgestellt). Bei einer Neuinstallation wird die Einheit automatisch gestoppt, das Paket ersetzt und der Dienst neu gestartet. Führe `systemctl --user disable --now top.remya.bar.service` aus, um den Autostart zu deaktivieren.
+Das Installationsskript kopiert die Dateien nach `~/.local/bin` und `XDG_DATA_HOME`, schreibt und aktiviert die systemd-Benutzereinheit `top.remya.bar.service` und konfiguriert die Leiste für den Start mit `graphical-session.target`. Bei einer Neuinstallation wird die Einheit automatisch gestoppt, das Paket ersetzt und der Dienst neu gestartet. Führe `systemctl --user disable --now top.remya.bar.service` aus, um den Autostart zu deaktivieren.
 
 ### 2. Hyprland-Konfiguration
 
-Füge folgende Tastenkürzel in deine Hyprland-Lua-Konfiguration (z. B. `~/.config/hypr/hyprland.lua`) ein (falls bereits Belegungen vorhanden sind, kannst du sie zuvor mit `hl.unbind(...)` aufheben):
+Füge folgende Tastenkürzel in deine Hyprland-Lua-Konfiguration (z. B. `~/.config/hypr/hyprland.lua`) ein:
 
 ```lua
 local barShortcutSignal = 'gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.'

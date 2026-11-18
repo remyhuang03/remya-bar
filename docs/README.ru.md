@@ -34,8 +34,6 @@
 
 ## 🚀 Установка
 
-`remya-bar` зависит от D-Bus-сервиса `top.remya.Core1`, предоставляемого **Remya Core** (`remya-core` / `remyad`), для управления общими токенами тем и сохранения конфигурации. Сначала установите и включите **Remya Core**, а затем установите **Remy'a Bar** (`top.remya.bar.service` автоматически настроен на запуск после `top.remya.core.service`; **Remya Settings** — необязательный графический интерфейс системных настроек).
-
 ### 1a. Установка через AUR (рекомендуется)
 
 Установите `remya-bar` с помощью вашего любимого AUR-помощника:
@@ -53,16 +51,16 @@ paru -S remya-bar || yay -S remya-bar
 sha256sum -c SHA256SUMS --ignore-missing
 
 # Распаковка и установка
-tar --zstd -xf remya_bar-<version>-linux-x86_64.tar.zst
-cd remya_bar-<version>-linux-x86_64
+tar --zstd -xf remya_bar-0.2.0-linux-x86_64.tar.zst
+cd remya_bar-0.2.0-linux-x86_64
 python tool/install.py
 ```
 
-Установщик копирует файлы в `~/.local/bin` и `XDG_DATA_HOME`, создаёт и включает пользовательский юнит systemd `top.remya.bar.service` и настраивает запуск панели вместе с `graphical-session.target` (требуются переменные `WAYLAND_DISPLAY` и `HYPRLAND_INSTANCE_SIGNATURE` в окружении пользовательского менеджера, например предоставляемые `uwsm`). При повторной установке юнит автоматически останавливается, пакет обновляется, а сервис перезапускается. Выполните `systemctl --user disable --now top.remya.bar.service`, чтобы отключить автозапуск.
+Установщик копирует файлы в `~/.local/bin` и `XDG_DATA_HOME`, создаёт и включает пользовательский юнит systemd `top.remya.bar.service` и настраивает запуск панели вместе с `graphical-session.target`. При повторной установке юнит автоматически останавливается, пакет обновляется, а сервис перезапускается. Выполните `systemctl --user disable --now top.remya.bar.service`, чтобы отключить автозапуск.
 
 ### 2. Настройка Hyprland
 
-Добавьте следующие комбинации клавиш в конфигурацию Hyprland на Lua (например, `~/.config/hypr/hyprland.lua`) (если привязки уже существовали ранее, их можно предварительно снять с помощью `hl.unbind(...)`):
+Добавьте следующие комбинации клавиш в конфигурацию Hyprland на Lua (например, `~/.config/hypr/hyprland.lua`):
 
 ```lua
 local barShortcutSignal = 'gdbus emit --session --object-path /top/remya/bar --signal top.remya.bar.Shortcuts.'
