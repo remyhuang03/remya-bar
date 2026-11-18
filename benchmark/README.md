@@ -59,6 +59,22 @@ scheduling are included. Native view lifecycle events, when available,
 carry monotonic timestamps and cumulative live view counts. These are
 separate from compositor presentation and hardware input latency.
 
+## S09 · Notification burst
+
+With Python D-Bus and PyGObject installed, run the fixture against an explicit
+release bundle.
+
+```sh
+python benchmark/notification_burst.py --run-id candidate-notify-01 \
+    --bundle-dir build/linux/x64/release/bundle
+```
+
+The private bus receives 200 calls at 20 per second, including replacements,
+one transient expiry and one explicit close. The probe checks returned IDs,
+closure reasons and the retained history after 60 seconds. It samples resource
+use and observes toast surfaces at checkpoints. It uses temporary history and
+sends no notifications to the installed session bus.
+
 ## Verification
 
 ```sh

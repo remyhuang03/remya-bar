@@ -3,6 +3,7 @@
 
 import argparse
 from datetime import datetime
+import errno
 import hashlib
 import json
 import os
@@ -10,6 +11,7 @@ from pathlib import Path
 import platform
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -69,11 +71,20 @@ def hardware():
         'architecture': platform.machine(),
         'display_devices': [
             block.strip() for block in re.split(r'\n(?=\S)', command('lspci', '-Dnnk'))
-            if re.search(r'\[(0300|0302|0380)\]', block.splitlines()[0])
+            if block and re.search(r'\[(0300|0302|0380)\]', block.splitlines()[0])
         ] if shutil.which('lspci') else None,
-        'ac_online': {path.parent.name: path.read_text().strip()
-                      for path in Path('/sys/class/power_supply').glob('*/online')},
+        'ac_online': ac_online(),
     }
+
+
+def ac_online():
+    statuses = [
+        (supply / 'online').read_text().strip() == '1'
+        for supply in Path('/sys/class/power_supply').glob('*')
+        if (supply / 'online').is_file()
+        and (supply / 'type').read_text().strip() == 'Mains'
+    ]
+    return any(statuses) if statuses else None
 
 
 def preference_hashes():
@@ -121,6 +132,17 @@ def verify_summary(summary, measure):
         raise RuntimeError("Insufficient Bar CPU coverage")
     if bar["memory"]["pss_mib"]["sample_count"] < int(measure / 10):
         raise RuntimeError("Insufficient Bar PSS samples")
+
+
+def discard_trial(trial):
+    try:
+        shutil.rmtree(trial)
+    except OSError as error:
+        if error.errno != errno.ENOTEMPTY:
+            raise
+        # A mounted filesystem can briefly retain an unlinked collector file.
+        time.sleep(0.1)
+        shutil.rmtree(trial)
 
 
 def main():
@@ -175,12 +197,13 @@ def main():
                 "--output", str(summary_path))
         verify_summary(json.loads(summary_path.read_text()), options.measure_seconds)
     except BaseException:
-        shutil.rmtree(trial)
+        discard_trial(trial)
         raise
     print(trial)
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
     try:
         main()
     except KeyboardInterrupt:

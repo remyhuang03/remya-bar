@@ -1,15 +1,30 @@
 """Shared read-only helpers for the Hyprland desktop benchmarks."""
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
+import tempfile
+import time
 
 from proc_sampler import NAME_PATTERN, parse_pid_stat
 
 RUNS = Path(__file__).resolve().parent / "runs"
+
+BUS_CONFIG = """<busconfig>
+  <type>session</type>
+  <listen>unix:tmpdir=/tmp</listen>
+  <policy context="default">
+    <allow own="*"/>
+    <allow send_destination="*"/>
+    <allow receive_sender="*"/>
+  </policy>
+</busconfig>
+"""
 
 
 def run_id(value):
@@ -77,3 +92,51 @@ def write_json(path, value):
     with path.open("x", encoding="utf-8") as stream:
         json.dump(value, stream, indent=2)
         stream.write("\n")
+
+
+def stop(process):
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+
+
+@contextmanager
+def isolated_bar(bundle, log, *, trace=False):
+    with tempfile.TemporaryDirectory(prefix="remya-bar-benchmark-") as directory:
+        scratch = Path(directory)
+        config = scratch / "bus.conf"
+        config.write_text(BUS_CONFIG, encoding="utf-8")
+        with subprocess.Popen(
+            ["dbus-daemon", f"--config-file={config}", "--nofork", "--print-address=1"],
+            stdout=subprocess.PIPE, text=True,
+        ) as bus:
+            try:
+                address = bus.stdout.readline().strip()
+                if not address:
+                    raise RuntimeError("Private session bus did not start")
+                env = {**os.environ, "DBUS_SESSION_BUS_ADDRESS": address,
+                       "XDG_STATE_HOME": str(scratch / "state"),
+                       "REMYA_BAR_BENCHMARK": "1" if trace else "0"}
+                with subprocess.Popen([bundle / "remya_bar"], env=env, stdout=log, stderr=log) as process:
+                    try:
+                        yield process, env
+                    finally:
+                        stop(process)
+            finally:
+                stop(bus)
+
+
+def wait_for(process, check, interval):
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(f"Bar exited with code {process.returncode}")
+        result = check()
+        if result:
+            return result
+        time.sleep(interval)
+    raise RuntimeError("Timed out waiting for the test window")

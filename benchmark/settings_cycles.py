@@ -2,7 +2,6 @@
 """Compare Settings window mapping and closing using isolated release instances."""
 
 import argparse
-import os
 from pathlib import Path
 import re
 import subprocess
@@ -10,21 +9,12 @@ import sys
 import tempfile
 import time
 
-from desktop import RUNS, bundle_hashes, command, hyprland, process_start, run_id, topology, verify_bundle, write_json
+from desktop import (
+    RUNS, bundle_hashes, command, hyprland, isolated_bar, process_start, run_id,
+    topology, verify_bundle, wait_for, write_json,
+)
 from proc_sampler import PidScope, positive_float
 from summarize import describe
-
-BUS_CONFIG = """<busconfig>
-  <type>session</type>
-  <listen>unix:tmpdir=/tmp</listen>
-  <policy context="default">
-    <allow own="*"/>
-    <allow send_destination="*"/>
-    <allow receive_sender="*"/>
-  </policy>
-</busconfig>
-"""
-
 
 def own_settings(clients, pid):
     return next((client for client in clients if client.get("pid") == pid
@@ -33,46 +23,14 @@ def own_settings(clients, pid):
                  and client.get("mapped", True)), None)
 
 
-def wait_for(process, check, interval):
-    deadline = time.monotonic() + 20
-    while time.monotonic() < deadline:
-        if process.poll() is not None:
-            raise RuntimeError(f"Bar exited with code {process.returncode}")
-        result = check()
-        if result:
-            return result
-        time.sleep(interval)
-    raise RuntimeError("Timed out waiting for the test window")
-
-
 def measure(bundle, expected, outputs, options):
     binary = str(bundle / "remya_bar")
-    with tempfile.TemporaryDirectory(prefix="remya-bar-benchmark-") as directory:
-        scratch = Path(directory)
-        config = scratch / "bus.conf"
-        config.write_text(BUS_CONFIG)
-        with subprocess.Popen(["dbus-daemon", f"--config-file={config}", "--nofork", "--print-address=1"],
-                              stdout=subprocess.PIPE, text=True) as bus, tempfile.TemporaryFile(mode="w+t") as log:
-            try:
-                address = bus.stdout.readline().strip()
-                if not address:
-                    raise RuntimeError("Private session bus did not start")
-                env = {**os.environ, "DBUS_SESSION_BUS_ADDRESS": address,
-                       "XDG_STATE_HOME": str(scratch / "state"), "REMYA_BAR_BENCHMARK": "1"}
-                with subprocess.Popen([binary], env=env, stdout=log, stderr=log) as process:
-                    try:
-                        samples, checkpoints = run_cycles(process, binary, env, expected, outputs, options)
-                    finally:
-                        process.terminate()
-                        try:
-                            process.wait(timeout=5)
-                        except subprocess.TimeoutExpired:
-                            process.kill()
-            finally:
-                bus.terminate()
-            log.seek(0)
-            trace = [line.split("remya-bar-benchmark ", 1)[1].strip()
-                     for line in log if "remya-bar-benchmark " in line]
+    with tempfile.TemporaryFile(mode="w+t") as log:
+        with isolated_bar(bundle, log, trace=True) as (process, env):
+            samples, checkpoints = run_cycles(process, binary, env, expected, outputs, options)
+        log.seek(0)
+        trace = [line.split("remya-bar-benchmark ", 1)[1].strip()
+                 for line in log if "remya-bar-benchmark " in line]
     return {"sha256": expected, "first": samples[0], "warm": samples[1:],
             "warm_mapping_ms": describe([sample["mapping_ms"] for sample in samples[1:]]),
             "warm_close_ms": describe([sample["close_ms"] for sample in samples[1:]]),
