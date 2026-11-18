@@ -92,8 +92,14 @@ The installed bundle, command and desktop entry matched the tested release.
 Settings requests forwarded to the installed service and closing the window
 left that service running.
 
-Remaining release checks include physical hotplug and resume, IME and avatar
-dialog interaction, hardware input-to-photon latency, renderer and thread
-policy comparisons, five matched idle pairs, and an eight-hour soak.
+On 2026-11-18, the user confirmed the Bar stayed sharp after physically
+reconnecting an external display with `8fbc441` installed. The service
+journal recorded graphics context recovery, and Hyprland showed one 40 px
+Bar on each of the three outputs afterward.
+
+Remaining release checks include the broader hotplug matrix, physical
+resume, IME and avatar dialog interaction, hardware input-to-photon latency,
+renderer and thread policy comparisons, five matched idle pairs, and an
+eight-hour soak.
 Unprivileged RAPL counters were unavailable and this session used AC. GPU
 power and whole-system energy remain unmeasured.
