@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -56,6 +57,32 @@ def revision(directory):
         "head": command("git", "rev-parse", "HEAD", cwd=directory),
         "dirty": bool(command("git", "status", "--porcelain", cwd=directory)),
         "tracked_diff_sha256": hashlib.sha256(diff.encode()).hexdigest() if diff else None,
+    }
+
+
+def hardware():
+    cpu = Path('/proc/cpuinfo').read_text()
+    model = re.search(r'^model name\s*:\s*(.+)$', cpu, re.M)
+    return {
+        'cpu': model[1] if model else None,
+        'logical_cpus': os.cpu_count(),
+        'architecture': platform.machine(),
+        'display_devices': [
+            block.strip() for block in re.split(r'\n(?=\S)', command('lspci', '-Dnnk'))
+            if re.search(r'\[(0300|0302|0380)\]', block.splitlines()[0])
+        ] if shutil.which('lspci') else None,
+        'ac_online': {path.parent.name: path.read_text().strip()
+                      for path in Path('/sys/class/power_supply').glob('*/online')},
+    }
+
+
+def preference_hashes():
+    if not shutil.which("remya"):
+        return None
+    return {
+        key: hashlib.sha256(command("remya", "get", key).encode()).hexdigest()
+        for key in ("theme", "accent", "remya-bar.layout", "remya-bar.clock-seconds",
+                    "remya-bar.position", "remya-bar.ai-ring")
     }
 
 
@@ -108,10 +135,11 @@ def main():
 
     expected = bundle_hashes(options.bundle_dir.resolve())
     identity = desktop_identity()
-    verify_bundle(identity["bar"][0], expected)
+    mapping = verify_bundle(identity["bar"][0], expected)
     before = topology()
     if len(before) != 3 and options.scenario == "S03-live":
         parser.error("S03-live expects three displays; use a distinct scenario for other topologies")
+    preferences = preference_hashes()
     metadata = {
         "started_local": datetime.now().astimezone().isoformat(),
         "scenario": options.scenario,
@@ -124,6 +152,9 @@ def main():
         "measure_seconds": options.measure_seconds,
         "exploratory": (options.preheat_seconds, options.measure_seconds) != (300, 600),
         "outputs": before,
+        "hardware": hardware(),
+        "preference_sha256": preferences,
+        "locale": os.environ.get("LANG"),
         "kernel": platform.release(),
         "hyprland": command("hyprctl", "version").splitlines()[0],
     }
@@ -134,7 +165,10 @@ def main():
         duration = collect(trial / "raw.jsonl", identity, options)
         if topology() != before or desktop_identity() != identity:
             raise RuntimeError("Topology or process identity changed during sampling")
-        verify_bundle(identity["bar"][0], expected)
+        if preference_hashes() != preferences:
+            raise RuntimeError("Theme or Bar preferences changed during sampling")
+        if verify_bundle(identity["bar"][0], expected) != mapping:
+            raise RuntimeError("Bar re-executed during sampling")
         summary_path = trial / "summary.json"
         command(sys.executable, str(RUNS.parent / "summarize.py"), str(trial / "raw.jsonl"),
                 "--start", str(options.preheat_seconds), "--end", str(duration),

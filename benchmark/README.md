@@ -17,7 +17,8 @@ python benchmark/run_idle.py --run-id candidate-triple-01 \
 
 The runner verifies the installed executable and AOT bundle by SHA-256,
 records the Bar, Core and Hyprland process identities, and rejects trials
-with a changed output topology or insufficient Bar coverage. By default
+with changed output topology, theme, Bar preferences or insufficient Bar
+coverage. Preference values are hashed through the Core CLI. By default
 it warms up for five minutes and measures the next ten minutes. It writes
 `raw.jsonl`, `summary.json` and `metadata.json` in
 `benchmark/runs/<run-id>/`. Use `--preheat-seconds` and
@@ -50,7 +51,8 @@ the private session. The running installed Bar is left in place.
 
 The probe records the first Settings open separately and then runs 100
 warm cycles with two seconds open and two seconds closed. Use
-`--warm-cycles` and `--hold` for short functional runs. The probe measures
+`--warm-cycles` and `--hold` for short functional runs. Omit `--baseline`
+to repeat a candidate trial. The probe measures
 command invocation to the first observed Hyprland mapping, plus close
 command to observed removal. Polling, command startup and compositor
 scheduling are included. Native view lifecycle events, when available,

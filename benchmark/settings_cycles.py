@@ -93,7 +93,7 @@ def run_cycles(process, binary, env, expected, outputs, options):
         )
 
     wait_for(process, each_output_has_bar, options.interval)
-    verify_bundle(pid, expected)
+    mapping = verify_bundle(pid, expected)
     samples = []
     checkpoints = {}
     for index in range(options.warm_cycles + 1):
@@ -123,13 +123,15 @@ def run_cycles(process, binary, env, expected, outputs, options):
                                        ("pss_kib", "fd_count", "threads", "errors")}
     if topology() != outputs or process_start(pid) != identity:
         raise RuntimeError("Topology or test process changed during the trial")
+    if verify_bundle(pid, expected) != mapping:
+        raise RuntimeError("Bar re-executed during the trial")
     return samples, checkpoints
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", type=run_id, required=True)
-    parser.add_argument("--baseline", type=Path, required=True, help="Baseline release bundle directory")
+    parser.add_argument("--baseline", type=Path, help="Baseline release bundle directory for a paired trial")
     parser.add_argument("--candidate", type=Path, required=True, help="Candidate release bundle directory")
     parser.add_argument("--warm-cycles", type=int, default=100)
     parser.add_argument("--hold", type=positive_float, default=2, help="Seconds open and seconds closed")
@@ -143,9 +145,11 @@ def main():
     outputs = topology()
     if len(outputs) != 3:
         parser.error("Run on the benchmark workstation with all three displays enabled")
-    variants = [options.baseline.resolve(), options.candidate.resolve()]
-    hashes = [bundle_hashes(path) for path in variants]
-    if hashes[0] == hashes[1]:
+    variants = {"candidate": options.candidate.resolve()}
+    if options.baseline:
+        variants = {"baseline": options.baseline.resolve(), **variants}
+    hashes = {name: bundle_hashes(path) for name, path in variants.items()}
+    if hashes.get("baseline") == hashes["candidate"]:
         parser.error("Baseline and candidate bundles are identical")
     data = {
         "scenario": "S06-settings",
@@ -156,8 +160,8 @@ def main():
         "hold_s": options.hold,
         "warm_cycles": options.warm_cycles,
     }
-    for label, path, expected in zip(("baseline", "candidate"), variants, hashes):
-        data[label] = measure(path, expected, outputs, options)
+    for label, path in variants.items():
+        data[label] = measure(path, hashes[label], outputs, options)
     RUNS.mkdir(exist_ok=True)
     write_json(output, data)
     print(output)

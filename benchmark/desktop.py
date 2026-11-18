@@ -27,7 +27,8 @@ def hyprland(query):
 
 
 def topology():
-    fields = ("name", "width", "height", "refreshRate", "scale", "x", "y", "transform", "vrr")
+    fields = ("name", "width", "height", "refreshRate", "scale", "x", "y",
+              "transform", "vrr", "dpmsStatus")
     return sorted(
         ({key: monitor.get(key) for key in fields} for monitor in hyprland("monitors")),
         key=lambda monitor: monitor["name"],
@@ -57,17 +58,19 @@ def process_start(pid):
 def verify_bundle(pid, expected):
     proc = Path("/proc") / str(pid)
     live_exe = (proc / "exe").readlink()
-    loaded = sorted(set(
-        fields[5]
+    mapped = [
+        (fields[0], fields[5])
         for line in (proc / "maps").read_text().splitlines()
         if len(fields := line.split(maxsplit=5)) == 6
         and re.search(r"/libapp[.]so(?: \(deleted\))?$", fields[5])
-    ))
+    ]
+    loaded = {path for _, path in mapped}
     if (str(live_exe).endswith(" (deleted)")
-            or loaded != [str(live_exe.parent / "lib/libapp.so")]
+            or loaded != {str(live_exe.parent / "lib/libapp.so")}
             or sha256(proc / "exe") != expected["remya_bar"]
             or bundle_hashes(live_exe.parent) != expected):
         raise RuntimeError("The running process does not match the expected release bundle")
+    return tuple(region for region, _ in mapped)
 
 
 def write_json(path, value):
