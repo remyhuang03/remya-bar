@@ -39,7 +39,7 @@ Widget settingSwitch(
   control: Switch(value: value, onChanged: onChanged),
 );
 
-/// A dropdown of labelled choices for one setting value.
+/// A labelled choice control for one setting value.
 class SettingChoice<T extends Object> extends StatelessWidget {
   const SettingChoice({
     super.key,
@@ -53,22 +53,10 @@ class SettingChoice<T extends Object> extends StatelessWidget {
   final ValueChanged<T>? onSelected;
 
   @override
-  Widget build(BuildContext context) => DropdownMenu<T>(
-    key: ValueKey(selected),
-    width: 160,
-    enabled: onSelected != null,
-    initialSelection: selected,
-    dropdownMenuEntries: [
-      for (final MapEntry(:key, :value) in {
-        ...choices,
-        // A valid stored value outside the offered choices stays visible.
-        if (!choices.containsKey(selected)) selected: '$selected',
-      }.entries)
-        DropdownMenuEntry(value: key, label: value),
-    ],
-    onSelected: (value) {
-      if (value != null && value != selected) onSelected?.call(value);
-    },
+  Widget build(BuildContext context) => SettingsChoice<T>(
+    selected: selected,
+    choices: choices,
+    onSelected: onSelected,
   );
 }
 

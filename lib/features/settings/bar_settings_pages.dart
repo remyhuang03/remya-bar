@@ -90,16 +90,12 @@ class BarSettingsPage extends StatelessWidget {
             settingTile(
               'Position',
               detail: 'Screen edge the bar sits on',
-              control: SegmentedButton<String>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: 'top', label: Text('Top')),
-                  ButtonSegment(value: 'bottom', label: Text('Bottom')),
-                ],
-                selected: {position},
-                onSelectionChanged: controller.busy('position')
+              control: SettingChoice<String>(
+                selected: position,
+                choices: const {'top': 'Top', 'bottom': 'Bottom'},
+                onSelected: controller.busy('position')
                     ? null
-                    : (values) => controller.write('position', values.first),
+                    : (value) => controller.write('position', value),
               ),
             ),
           ],
@@ -466,36 +462,24 @@ class BarSettingsPage extends StatelessWidget {
           settingTile(
             'Quota metric',
             detail: 'Show remaining or used quota',
-            control: SegmentedButton<bool>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: false, label: Text('Remaining')),
-                ButtonSegment(value: true, label: Text('Used')),
-              ],
-              selected: {ring['show-used'] as bool},
-              onSelectionChanged: busy
+            control: SettingChoice<bool>(
+              selected: ring['show-used'] as bool,
+              choices: const {false: 'Remaining', true: 'Used'},
+              onSelected: busy
                   ? null
-                  : (values) =>
-                        controller.update('ai-ring', 'show-used', values.first),
+                  : (value) => controller.update('ai-ring', 'show-used', value),
             ),
           ),
           settingTile(
             'Quota rings',
             detail: 'Which window sits on the outer ring',
-            control: SegmentedButton<String>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: '5h-outer', label: Text('Outer 5h')),
-                ButtonSegment(value: '5h-inner', label: Text('Outer 1w')),
-              ],
-              selected: {ring['ring-order'] as String},
-              onSelectionChanged: busy
+            control: SettingChoice<String>(
+              selected: ring['ring-order'] as String,
+              choices: const {'5h-outer': 'Outer 5h', '5h-inner': 'Outer 1w'},
+              onSelected: busy
                   ? null
-                  : (values) => controller.update(
-                      'ai-ring',
-                      'ring-order',
-                      values.first,
-                    ),
+                  : (value) =>
+                        controller.update('ai-ring', 'ring-order', value),
             ),
           ),
         ],
