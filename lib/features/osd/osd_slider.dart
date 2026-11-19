@@ -273,14 +273,18 @@ class OsdCapsuleSlider extends StatelessWidget {
                         builder: (_) {
                           final style = TextStyle(
                             fontFamily: 'Inter',
-                            fontSize: 12,
+                            fontSize: 14,
                             fontWeight: .w500,
                             fontFeatures: const [FontFeature.tabularFigures()],
                             color: scheme.onSurface,
                           );
                           return isMuted
                               ? Text('Muted', style: style)
-                              : PercentText('$percent', style: style);
+                              : PercentText(
+                                  '$percent',
+                                  style: style,
+                                  unitFontSize: 11.6,
+                                );
                         },
                       ),
                     ),

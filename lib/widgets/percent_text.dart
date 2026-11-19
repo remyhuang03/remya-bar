@@ -7,6 +7,7 @@ class PercentText extends StatelessWidget {
     this.number, {
     super.key,
     this.style,
+    this.unitFontSize,
     this.prefix = '',
     this.suffix = '',
     this.textAlign,
@@ -16,6 +17,7 @@ class PercentText extends StatelessWidget {
 
   final String number;
   final TextStyle? style;
+  final double? unitFontSize;
   final String prefix;
   final String suffix;
   final TextAlign? textAlign;
@@ -27,6 +29,7 @@ class PercentText extends StatelessWidget {
     BuildContext context,
     String number, {
     TextStyle? style,
+    double? unitFontSize,
     String prefix = '',
     String suffix = '',
   }) {
@@ -34,7 +37,7 @@ class PercentText extends StatelessWidget {
     final baseSize = base.fontSize ?? 14;
     final color = base.color;
     final unitStyle = TextStyle(
-      fontSize: baseSize * 0.8,
+      fontSize: unitFontSize ?? baseSize * 0.8,
       color: color?.withValues(alpha: color.a * 0.7),
     );
     return TextSpan(
@@ -52,7 +55,14 @@ class PercentText extends StatelessWidget {
   Widget build(BuildContext context) {
     final resolved = DefaultTextStyle.of(context).style.merge(style);
     return Text.rich(
-      span(context, number, style: resolved, prefix: prefix, suffix: suffix),
+      span(
+        context,
+        number,
+        style: resolved,
+        unitFontSize: unitFontSize,
+        prefix: prefix,
+        suffix: suffix,
+      ),
       style: resolved,
       textAlign: textAlign,
       maxLines: maxLines,
