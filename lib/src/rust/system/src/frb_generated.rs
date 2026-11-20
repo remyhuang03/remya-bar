@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 446766373;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1129460226;
 
 // Section: executor
 
@@ -866,6 +866,83 @@ fn wire__crate__api__tray_menu_action_impl(
         },
     )
 }
+fn wire__crate__api__weather_refresh_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "weather_refresh",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_latitude = <f64>::sse_decode(&mut deserializer);
+            let api_longitude = <f64>::sse_decode(&mut deserializer);
+            let api_force = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::weather_refresh(api_latitude, api_longitude, api_force)
+                                .await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__weather_search_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "weather_search",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_query = <String>::sse_decode(&mut deserializer);
+            let api_language = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::weather_search(api_query, api_language).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 
 // Section: dart2rust
 
@@ -1119,6 +1196,42 @@ impl SseDecode for Vec<crate::api::TrayMenuEntry> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::TrayMenuEntry>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::WeatherDay> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::WeatherDay>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::WeatherHour> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::WeatherHour>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::WeatherLocation> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::WeatherLocation>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -1387,6 +1500,39 @@ impl SseDecode for Option<u32> {
     }
 }
 
+impl SseDecode for Option<crate::api::WeatherCondition> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::WeatherCondition>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::WeatherCurrent> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::WeatherCurrent>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::WeatherSnapshot> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::WeatherSnapshot>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for crate::api::ResourceDetails {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1525,6 +1671,146 @@ impl SseDecode for () {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {}
 }
 
+impl SseDecode for crate::api::WeatherCondition {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::WeatherCondition::Clear,
+            1 => crate::api::WeatherCondition::PartlyCloudy,
+            2 => crate::api::WeatherCondition::Cloudy,
+            3 => crate::api::WeatherCondition::Fog,
+            4 => crate::api::WeatherCondition::Rain,
+            5 => crate::api::WeatherCondition::Storm,
+            6 => crate::api::WeatherCondition::Snow,
+            7 => crate::api::WeatherCondition::ClearNight,
+            8 => crate::api::WeatherCondition::PartlyCloudyNight,
+            _ => unreachable!("Invalid variant for WeatherCondition: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::WeatherCurrent {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_validAt = <i64>::sse_decode(deserializer);
+        let mut var_temperatureC = <Option<f64>>::sse_decode(deserializer);
+        let mut var_feelsLikeC = <Option<f64>>::sse_decode(deserializer);
+        let mut var_condition = <Option<crate::api::WeatherCondition>>::sse_decode(deserializer);
+        let mut var_humidityPercent = <Option<f64>>::sse_decode(deserializer);
+        let mut var_windKmh = <Option<f64>>::sse_decode(deserializer);
+        let mut var_precipitationProbability = <Option<f64>>::sse_decode(deserializer);
+        return crate::api::WeatherCurrent {
+            valid_at: var_validAt,
+            temperature_c: var_temperatureC,
+            feels_like_c: var_feelsLikeC,
+            condition: var_condition,
+            humidity_percent: var_humidityPercent,
+            wind_kmh: var_windKmh,
+            precipitation_probability: var_precipitationProbability,
+        };
+    }
+}
+
+impl SseDecode for crate::api::WeatherDay {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_date = <String>::sse_decode(deserializer);
+        let mut var_lowC = <Option<f64>>::sse_decode(deserializer);
+        let mut var_highC = <Option<f64>>::sse_decode(deserializer);
+        let mut var_condition = <Option<crate::api::WeatherCondition>>::sse_decode(deserializer);
+        let mut var_precipitationProbability = <Option<f64>>::sse_decode(deserializer);
+        return crate::api::WeatherDay {
+            date: var_date,
+            low_c: var_lowC,
+            high_c: var_highC,
+            condition: var_condition,
+            precipitation_probability: var_precipitationProbability,
+        };
+    }
+}
+
+impl SseDecode for crate::api::WeatherHour {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_validAt = <i64>::sse_decode(deserializer);
+        let mut var_temperatureC = <Option<f64>>::sse_decode(deserializer);
+        let mut var_condition = <Option<crate::api::WeatherCondition>>::sse_decode(deserializer);
+        let mut var_precipitationProbability = <Option<f64>>::sse_decode(deserializer);
+        return crate::api::WeatherHour {
+            valid_at: var_validAt,
+            temperature_c: var_temperatureC,
+            condition: var_condition,
+            precipitation_probability: var_precipitationProbability,
+        };
+    }
+}
+
+impl SseDecode for crate::api::WeatherLocation {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <Option<i32>>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_region = <Option<String>>::sse_decode(deserializer);
+        let mut var_country = <Option<String>>::sse_decode(deserializer);
+        let mut var_latitude = <f64>::sse_decode(deserializer);
+        let mut var_longitude = <f64>::sse_decode(deserializer);
+        return crate::api::WeatherLocation {
+            id: var_id,
+            name: var_name,
+            region: var_region,
+            country: var_country,
+            latitude: var_latitude,
+            longitude: var_longitude,
+        };
+    }
+}
+
+impl SseDecode for crate::api::WeatherResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_status = <crate::api::WeatherStatus>::sse_decode(deserializer);
+        let mut var_snapshot = <Option<crate::api::WeatherSnapshot>>::sse_decode(deserializer);
+        let mut var_error = <Option<String>>::sse_decode(deserializer);
+        return crate::api::WeatherResult {
+            status: var_status,
+            snapshot: var_snapshot,
+            error: var_error,
+        };
+    }
+}
+
+impl SseDecode for crate::api::WeatherSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_fetchedAt = <i64>::sse_decode(deserializer);
+        let mut var_timezone = <String>::sse_decode(deserializer);
+        let mut var_current = <Option<crate::api::WeatherCurrent>>::sse_decode(deserializer);
+        let mut var_hourly = <Vec<crate::api::WeatherHour>>::sse_decode(deserializer);
+        let mut var_daily = <Vec<crate::api::WeatherDay>>::sse_decode(deserializer);
+        return crate::api::WeatherSnapshot {
+            fetched_at: var_fetchedAt,
+            timezone: var_timezone,
+            current: var_current,
+            hourly: var_hourly,
+            daily: var_daily,
+        };
+    }
+}
+
+impl SseDecode for crate::api::WeatherStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::WeatherStatus::Fresh,
+            1 => crate::api::WeatherStatus::Stale,
+            2 => crate::api::WeatherStatus::Unavailable,
+            _ => unreachable!("Invalid variant for WeatherStatus: {}", inner),
+        };
+    }
+}
+
 fn pde_ffi_dispatcher_primary_impl(
     func_id: i32,
     port: flutter_rust_bridge::for_generated::MessagePort,
@@ -1556,6 +1842,8 @@ fn pde_ffi_dispatcher_primary_impl(
         20 => wire__crate__api__tray_items_impl(port, ptr, rust_vec_len, data_len),
         21 => wire__crate__api__tray_menu_impl(port, ptr, rust_vec_len, data_len),
         22 => wire__crate__api__tray_menu_action_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__weather_refresh_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__weather_search_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1926,6 +2214,166 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::TrayMenuEntry> for crate::api
         self
     }
 }
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::WeatherCondition {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Clear => 0.into_dart(),
+            Self::PartlyCloudy => 1.into_dart(),
+            Self::Cloudy => 2.into_dart(),
+            Self::Fog => 3.into_dart(),
+            Self::Rain => 4.into_dart(),
+            Self::Storm => 5.into_dart(),
+            Self::Snow => 6.into_dart(),
+            Self::ClearNight => 7.into_dart(),
+            Self::PartlyCloudyNight => 8.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::WeatherCondition {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::WeatherCondition>
+    for crate::api::WeatherCondition
+{
+    fn into_into_dart(self) -> crate::api::WeatherCondition {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::WeatherCurrent {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.valid_at.into_into_dart().into_dart(),
+            self.temperature_c.into_into_dart().into_dart(),
+            self.feels_like_c.into_into_dart().into_dart(),
+            self.condition.into_into_dart().into_dart(),
+            self.humidity_percent.into_into_dart().into_dart(),
+            self.wind_kmh.into_into_dart().into_dart(),
+            self.precipitation_probability.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::WeatherCurrent {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::WeatherCurrent> for crate::api::WeatherCurrent {
+    fn into_into_dart(self) -> crate::api::WeatherCurrent {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::WeatherDay {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.date.into_into_dart().into_dart(),
+            self.low_c.into_into_dart().into_dart(),
+            self.high_c.into_into_dart().into_dart(),
+            self.condition.into_into_dart().into_dart(),
+            self.precipitation_probability.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::WeatherDay {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::WeatherDay> for crate::api::WeatherDay {
+    fn into_into_dart(self) -> crate::api::WeatherDay {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::WeatherHour {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.valid_at.into_into_dart().into_dart(),
+            self.temperature_c.into_into_dart().into_dart(),
+            self.condition.into_into_dart().into_dart(),
+            self.precipitation_probability.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::WeatherHour {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::WeatherHour> for crate::api::WeatherHour {
+    fn into_into_dart(self) -> crate::api::WeatherHour {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::WeatherLocation {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.region.into_into_dart().into_dart(),
+            self.country.into_into_dart().into_dart(),
+            self.latitude.into_into_dart().into_dart(),
+            self.longitude.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::WeatherLocation {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::WeatherLocation>
+    for crate::api::WeatherLocation
+{
+    fn into_into_dart(self) -> crate::api::WeatherLocation {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::WeatherResult {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.status.into_into_dart().into_dart(),
+            self.snapshot.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::WeatherResult {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::WeatherResult> for crate::api::WeatherResult {
+    fn into_into_dart(self) -> crate::api::WeatherResult {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::WeatherSnapshot {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.fetched_at.into_into_dart().into_dart(),
+            self.timezone.into_into_dart().into_dart(),
+            self.current.into_into_dart().into_dart(),
+            self.hourly.into_into_dart().into_dart(),
+            self.daily.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::WeatherSnapshot {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::WeatherSnapshot>
+    for crate::api::WeatherSnapshot
+{
+    fn into_into_dart(self) -> crate::api::WeatherSnapshot {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::WeatherStatus {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Fresh => 0.into_dart(),
+            Self::Stale => 1.into_dart(),
+            Self::Unavailable => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::WeatherStatus {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::WeatherStatus> for crate::api::WeatherStatus {
+    fn into_into_dart(self) -> crate::api::WeatherStatus {
+        self
+    }
+}
 
 impl SseEncode for flutter_rust_bridge::for_generated::anyhow::Error {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2135,6 +2583,36 @@ impl SseEncode for Vec<crate::api::TrayMenuEntry> {
     }
 }
 
+impl SseEncode for Vec<crate::api::WeatherDay> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::WeatherDay>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::WeatherHour> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::WeatherHour>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::WeatherLocation> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::WeatherLocation>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for crate::api::MediaPlayerSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2313,6 +2791,36 @@ impl SseEncode for Option<u32> {
     }
 }
 
+impl SseEncode for Option<crate::api::WeatherCondition> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::WeatherCondition>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::WeatherCurrent> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::WeatherCurrent>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::WeatherSnapshot> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::WeatherSnapshot>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for crate::api::ResourceDetails {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2397,6 +2905,112 @@ impl SseEncode for u8 {
 impl SseEncode for () {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {}
+}
+
+impl SseEncode for crate::api::WeatherCondition {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::WeatherCondition::Clear => 0,
+                crate::api::WeatherCondition::PartlyCloudy => 1,
+                crate::api::WeatherCondition::Cloudy => 2,
+                crate::api::WeatherCondition::Fog => 3,
+                crate::api::WeatherCondition::Rain => 4,
+                crate::api::WeatherCondition::Storm => 5,
+                crate::api::WeatherCondition::Snow => 6,
+                crate::api::WeatherCondition::ClearNight => 7,
+                crate::api::WeatherCondition::PartlyCloudyNight => 8,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::WeatherCurrent {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i64>::sse_encode(self.valid_at, serializer);
+        <Option<f64>>::sse_encode(self.temperature_c, serializer);
+        <Option<f64>>::sse_encode(self.feels_like_c, serializer);
+        <Option<crate::api::WeatherCondition>>::sse_encode(self.condition, serializer);
+        <Option<f64>>::sse_encode(self.humidity_percent, serializer);
+        <Option<f64>>::sse_encode(self.wind_kmh, serializer);
+        <Option<f64>>::sse_encode(self.precipitation_probability, serializer);
+    }
+}
+
+impl SseEncode for crate::api::WeatherDay {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.date, serializer);
+        <Option<f64>>::sse_encode(self.low_c, serializer);
+        <Option<f64>>::sse_encode(self.high_c, serializer);
+        <Option<crate::api::WeatherCondition>>::sse_encode(self.condition, serializer);
+        <Option<f64>>::sse_encode(self.precipitation_probability, serializer);
+    }
+}
+
+impl SseEncode for crate::api::WeatherHour {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i64>::sse_encode(self.valid_at, serializer);
+        <Option<f64>>::sse_encode(self.temperature_c, serializer);
+        <Option<crate::api::WeatherCondition>>::sse_encode(self.condition, serializer);
+        <Option<f64>>::sse_encode(self.precipitation_probability, serializer);
+    }
+}
+
+impl SseEncode for crate::api::WeatherLocation {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<i32>>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <Option<String>>::sse_encode(self.region, serializer);
+        <Option<String>>::sse_encode(self.country, serializer);
+        <f64>::sse_encode(self.latitude, serializer);
+        <f64>::sse_encode(self.longitude, serializer);
+    }
+}
+
+impl SseEncode for crate::api::WeatherResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::WeatherStatus>::sse_encode(self.status, serializer);
+        <Option<crate::api::WeatherSnapshot>>::sse_encode(self.snapshot, serializer);
+        <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
+impl SseEncode for crate::api::WeatherSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i64>::sse_encode(self.fetched_at, serializer);
+        <String>::sse_encode(self.timezone, serializer);
+        <Option<crate::api::WeatherCurrent>>::sse_encode(self.current, serializer);
+        <Vec<crate::api::WeatherHour>>::sse_encode(self.hourly, serializer);
+        <Vec<crate::api::WeatherDay>>::sse_encode(self.daily, serializer);
+    }
+}
+
+impl SseEncode for crate::api::WeatherStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::WeatherStatus::Fresh => 0,
+                crate::api::WeatherStatus::Stale => 1,
+                crate::api::WeatherStatus::Unavailable => 2,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
 }
 
 #[cfg(not(target_family = "wasm"))]

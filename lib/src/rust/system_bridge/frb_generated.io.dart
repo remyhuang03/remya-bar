@@ -66,6 +66,15 @@ abstract class SystemRustLibApiImplPlatform
   int dco_decode_box_autoadd_u_32(dynamic raw);
 
   @protected
+  WeatherCondition dco_decode_box_autoadd_weather_condition(dynamic raw);
+
+  @protected
+  WeatherCurrent dco_decode_box_autoadd_weather_current(dynamic raw);
+
+  @protected
+  WeatherSnapshot dco_decode_box_autoadd_weather_snapshot(dynamic raw);
+
+  @protected
   double dco_decode_f_64(dynamic raw);
 
   @protected
@@ -116,6 +125,15 @@ abstract class SystemRustLibApiImplPlatform
   List<TrayMenuEntry> dco_decode_list_tray_menu_entry(dynamic raw);
 
   @protected
+  List<WeatherDay> dco_decode_list_weather_day(dynamic raw);
+
+  @protected
+  List<WeatherHour> dco_decode_list_weather_hour(dynamic raw);
+
+  @protected
+  List<WeatherLocation> dco_decode_list_weather_location(dynamic raw);
+
+  @protected
   MediaPlayerSnapshot dco_decode_media_player_snapshot(dynamic raw);
 
   @protected
@@ -161,6 +179,15 @@ abstract class SystemRustLibApiImplPlatform
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
 
   @protected
+  WeatherCondition? dco_decode_opt_box_autoadd_weather_condition(dynamic raw);
+
+  @protected
+  WeatherCurrent? dco_decode_opt_box_autoadd_weather_current(dynamic raw);
+
+  @protected
+  WeatherSnapshot? dco_decode_opt_box_autoadd_weather_snapshot(dynamic raw);
+
+  @protected
   ResourceDetails dco_decode_resource_details(dynamic raw);
 
   @protected
@@ -180,6 +207,30 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   void dco_decode_unit(dynamic raw);
+
+  @protected
+  WeatherCondition dco_decode_weather_condition(dynamic raw);
+
+  @protected
+  WeatherCurrent dco_decode_weather_current(dynamic raw);
+
+  @protected
+  WeatherDay dco_decode_weather_day(dynamic raw);
+
+  @protected
+  WeatherHour dco_decode_weather_hour(dynamic raw);
+
+  @protected
+  WeatherLocation dco_decode_weather_location(dynamic raw);
+
+  @protected
+  WeatherResult dco_decode_weather_result(dynamic raw);
+
+  @protected
+  WeatherSnapshot dco_decode_weather_snapshot(dynamic raw);
+
+  @protected
+  WeatherStatus dco_decode_weather_status(dynamic raw);
 
   @protected
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
@@ -229,6 +280,21 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
+  WeatherCondition sse_decode_box_autoadd_weather_condition(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  WeatherCurrent sse_decode_box_autoadd_weather_current(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  WeatherSnapshot sse_decode_box_autoadd_weather_snapshot(
+    SseDeserializer deserializer,
+  );
 
   @protected
   double sse_decode_f_64(SseDeserializer deserializer);
@@ -295,6 +361,17 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  List<WeatherDay> sse_decode_list_weather_day(SseDeserializer deserializer);
+
+  @protected
+  List<WeatherHour> sse_decode_list_weather_hour(SseDeserializer deserializer);
+
+  @protected
+  List<WeatherLocation> sse_decode_list_weather_location(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   MediaPlayerSnapshot sse_decode_media_player_snapshot(
     SseDeserializer deserializer,
   );
@@ -356,6 +433,21 @@ abstract class SystemRustLibApiImplPlatform
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
+  WeatherCondition? sse_decode_opt_box_autoadd_weather_condition(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  WeatherCurrent? sse_decode_opt_box_autoadd_weather_current(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  WeatherSnapshot? sse_decode_opt_box_autoadd_weather_snapshot(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ResourceDetails sse_decode_resource_details(SseDeserializer deserializer);
 
   @protected
@@ -375,6 +467,30 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
+
+  @protected
+  WeatherCondition sse_decode_weather_condition(SseDeserializer deserializer);
+
+  @protected
+  WeatherCurrent sse_decode_weather_current(SseDeserializer deserializer);
+
+  @protected
+  WeatherDay sse_decode_weather_day(SseDeserializer deserializer);
+
+  @protected
+  WeatherHour sse_decode_weather_hour(SseDeserializer deserializer);
+
+  @protected
+  WeatherLocation sse_decode_weather_location(SseDeserializer deserializer);
+
+  @protected
+  WeatherResult sse_decode_weather_result(SseDeserializer deserializer);
+
+  @protected
+  WeatherSnapshot sse_decode_weather_snapshot(SseDeserializer deserializer);
+
+  @protected
+  WeatherStatus sse_decode_weather_status(SseDeserializer deserializer);
 
   @protected
   void sse_encode_AnyhowException(
@@ -435,6 +551,24 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_weather_condition(
+    WeatherCondition self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_weather_current(
+    WeatherCurrent self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_weather_snapshot(
+    WeatherSnapshot self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_f_64(double self, SseSerializer serializer);
@@ -518,6 +652,24 @@ abstract class SystemRustLibApiImplPlatform
   );
 
   @protected
+  void sse_encode_list_weather_day(
+    List<WeatherDay> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_weather_hour(
+    List<WeatherHour> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_weather_location(
+    List<WeatherLocation> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_media_player_snapshot(
     MediaPlayerSnapshot self,
     SseSerializer serializer,
@@ -593,6 +745,24 @@ abstract class SystemRustLibApiImplPlatform
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_weather_condition(
+    WeatherCondition? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_weather_current(
+    WeatherCurrent? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_weather_snapshot(
+    WeatherSnapshot? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_resource_details(
     ResourceDetails self,
     SseSerializer serializer,
@@ -618,6 +788,42 @@ abstract class SystemRustLibApiImplPlatform
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_weather_condition(
+    WeatherCondition self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_weather_current(
+    WeatherCurrent self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_weather_day(WeatherDay self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_weather_hour(WeatherHour self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_weather_location(
+    WeatherLocation self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_weather_result(WeatherResult self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_weather_snapshot(
+    WeatherSnapshot self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_weather_status(WeatherStatus self, SseSerializer serializer);
 }
 
 // Section: wire_class

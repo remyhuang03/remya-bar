@@ -35,6 +35,29 @@ class RegistrationTest(unittest.TestCase):
                 with self.subTest(key=key, value=value):
                     self.assertFalse(validator.is_valid(value))
 
+    def test_weather_location_boundaries(self):
+        schema = self.registration['settings']['weather-location']['schema']
+        validator = Draft202012Validator(schema)
+        coordinates = {'latitude': -90, 'longitude': 180, 'name': 'Selected location'}
+        for value in (
+            coordinates,
+            {**coordinates, 'id': 1668341, 'region': 'Taipei City', 'country': 'Taiwan'},
+        ):
+            validator.validate(value)
+
+        for value in (
+            {'latitude': 0, 'longitude': 0},
+            {**coordinates, 'latitude': -90.01},
+            {**coordinates, 'longitude': 180.01},
+            {**coordinates, 'name': ''},
+            {**coordinates, 'country': 'a\n'},
+            {**coordinates, 'region': None},
+            {**coordinates, 'id': 0},
+            {**coordinates, 'unknown': 'value'},
+        ):
+            with self.subTest(value=value):
+                self.assertFalse(validator.is_valid(value))
+
 
 if __name__ == '__main__':
     unittest.main()

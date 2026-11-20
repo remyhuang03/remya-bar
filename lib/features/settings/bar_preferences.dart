@@ -9,6 +9,7 @@ export 'bar_preference_models.dart';
 
 const barPositionSettingId = 'remya-bar.position';
 const barClockSecondsSettingId = 'remya-bar.clock-seconds';
+const barWeatherLocationKey = 'weather-location';
 const barKeyboardPreviewSettingId = 'remya-bar.keyboard-preview';
 const barFoldedAppsSettingId = 'remya-bar.folded-apps';
 const barSidebarLayoutSettingId = 'remya-bar.sidebar-layout';
@@ -92,6 +93,13 @@ class BarPreferences {
 
   Future<BarLayout> readLayout() async =>
       BarLayout.fromJson(await read('layout'));
+
+  Future<({Map<String, Object> value, String revision})>
+  readWeatherLocationPreference() async {
+    const key = barWeatherLocationKey;
+    final value = _accept(key, await _store.get(key)) as Map<String, Object>;
+    return (value: value, revision: revision(key));
+  }
 
   /// Whether the bar sits on the bottom edge instead of the top.
   Future<bool> readBottom() async => await read('position') == 'bottom';
@@ -179,6 +187,23 @@ class BarPreferences {
         valid = value == 'top' || value == 'bottom';
       case 'clock-seconds' || 'keyboard-preview':
         valid = value is bool;
+      case barWeatherLocationKey:
+        valid =
+            value is Map &&
+            (value.isEmpty ||
+                (_object(
+                      value,
+                      {'latitude', 'longitude', 'name'},
+                      optional: {'id', 'region', 'country'},
+                    ) &&
+                    _coordinate(value['latitude'], 90) &&
+                    _coordinate(value['longitude'], 180) &&
+                    _text(value['name']) &&
+                    (!value.containsKey('id') ||
+                        _range(value['id'], 1, 2147483647)) &&
+                    (!value.containsKey('region') || _text(value['region'])) &&
+                    (!value.containsKey('country') ||
+                        _text(value['country']))));
       case 'folded-apps':
         valid = _strings(value, _text);
       case 'sidebar-layout':
@@ -298,6 +323,8 @@ bool _object(
     value.keys.every((key) => required.contains(key) || optional.contains(key));
 bool _range(Object? value, int min, int max) =>
     value is int && value >= min && value <= max;
+bool _coordinate(Object? value, int limit) =>
+    value is num && value >= -limit && value <= limit;
 bool _text(Object? value) =>
     value is String &&
     value.trim().isNotEmpty &&

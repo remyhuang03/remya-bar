@@ -174,6 +174,40 @@
         "type": "boolean"
       }
     },
+    "weather-location": {
+      "title": "Weather location",
+      "page": "layout",
+      "keywords": ["weather", "city", "coordinates"],
+      "default": {},
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$defs": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "\\S",
+            "not": {
+              "pattern": "[\\u0000-\\u001f\\u007f-\\u009f]"
+            }
+          }
+        },
+        "type": "object",
+        "properties": {
+          "latitude": {"type": "number", "minimum": -90, "maximum": 90},
+          "longitude": {"type": "number", "minimum": -180, "maximum": 180},
+          "name": {"$ref": "#/$defs/label"},
+          "id": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+          "region": {"$ref": "#/$defs/label"},
+          "country": {"$ref": "#/$defs/label"}
+        },
+        "additionalProperties": false,
+        "anyOf": [
+          {"maxProperties": 0},
+          {"required": ["latitude", "longitude", "name"]}
+        ]
+      }
+    },
     "keyboard-preview": {
       "title": "Keyboard preview",
       "page": "layout",

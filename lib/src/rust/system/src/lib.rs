@@ -11,3 +11,5 @@ mod nvml;
 mod resources;
 
 mod session;
+
+mod weather;

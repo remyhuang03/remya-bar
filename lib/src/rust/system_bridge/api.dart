@@ -8,7 +8,7 @@ import 'frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `batteries`, `percentage`, `read_number`, `remaining_seconds`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Future<List<MediaPlayerSnapshot>> mediaPlayers() =>
     SystemRustLib.instance.api.crateApiMediaPlayers();
@@ -124,6 +124,24 @@ Future<void> codexbarNotify({
   provider: provider,
   window: window,
   remaining: remaining,
+);
+
+Future<List<WeatherLocation>> weatherSearch({
+  required String query,
+  required String language,
+}) => SystemRustLib.instance.api.crateApiWeatherSearch(
+  query: query,
+  language: language,
+);
+
+Future<WeatherResult> weatherRefresh({
+  required double latitude,
+  required double longitude,
+  required bool force,
+}) => SystemRustLib.instance.api.crateApiWeatherRefresh(
+  latitude: latitude,
+  longitude: longitude,
+  force: force,
 );
 
 class BatterySnapshot {
@@ -816,3 +834,220 @@ class TrayMenuEntry {
           toggleType == other.toggleType &&
           toggleState == other.toggleState;
 }
+
+enum WeatherCondition {
+  clear,
+  partlyCloudy,
+  cloudy,
+  fog,
+  rain,
+  storm,
+  snow,
+  clearNight,
+  partlyCloudyNight,
+}
+
+class WeatherCurrent {
+  final PlatformInt64 validAt;
+  final double? temperatureC;
+  final double? feelsLikeC;
+  final WeatherCondition? condition;
+  final double? humidityPercent;
+  final double? windKmh;
+  final double? precipitationProbability;
+
+  const WeatherCurrent({
+    required this.validAt,
+    this.temperatureC,
+    this.feelsLikeC,
+    this.condition,
+    this.humidityPercent,
+    this.windKmh,
+    this.precipitationProbability,
+  });
+
+  @override
+  int get hashCode =>
+      validAt.hashCode ^
+      temperatureC.hashCode ^
+      feelsLikeC.hashCode ^
+      condition.hashCode ^
+      humidityPercent.hashCode ^
+      windKmh.hashCode ^
+      precipitationProbability.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WeatherCurrent &&
+          runtimeType == other.runtimeType &&
+          validAt == other.validAt &&
+          temperatureC == other.temperatureC &&
+          feelsLikeC == other.feelsLikeC &&
+          condition == other.condition &&
+          humidityPercent == other.humidityPercent &&
+          windKmh == other.windKmh &&
+          precipitationProbability == other.precipitationProbability;
+}
+
+class WeatherDay {
+  final String date;
+  final double? lowC;
+  final double? highC;
+  final WeatherCondition? condition;
+  final double? precipitationProbability;
+
+  const WeatherDay({
+    required this.date,
+    this.lowC,
+    this.highC,
+    this.condition,
+    this.precipitationProbability,
+  });
+
+  @override
+  int get hashCode =>
+      date.hashCode ^
+      lowC.hashCode ^
+      highC.hashCode ^
+      condition.hashCode ^
+      precipitationProbability.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WeatherDay &&
+          runtimeType == other.runtimeType &&
+          date == other.date &&
+          lowC == other.lowC &&
+          highC == other.highC &&
+          condition == other.condition &&
+          precipitationProbability == other.precipitationProbability;
+}
+
+class WeatherHour {
+  final PlatformInt64 validAt;
+  final double? temperatureC;
+  final WeatherCondition? condition;
+  final double? precipitationProbability;
+
+  const WeatherHour({
+    required this.validAt,
+    this.temperatureC,
+    this.condition,
+    this.precipitationProbability,
+  });
+
+  @override
+  int get hashCode =>
+      validAt.hashCode ^
+      temperatureC.hashCode ^
+      condition.hashCode ^
+      precipitationProbability.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WeatherHour &&
+          runtimeType == other.runtimeType &&
+          validAt == other.validAt &&
+          temperatureC == other.temperatureC &&
+          condition == other.condition &&
+          precipitationProbability == other.precipitationProbability;
+}
+
+class WeatherLocation {
+  final int? id;
+  final String name;
+  final String? region;
+  final String? country;
+  final double latitude;
+  final double longitude;
+
+  const WeatherLocation({
+    this.id,
+    required this.name,
+    this.region,
+    this.country,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      name.hashCode ^
+      region.hashCode ^
+      country.hashCode ^
+      latitude.hashCode ^
+      longitude.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WeatherLocation &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          region == other.region &&
+          country == other.country &&
+          latitude == other.latitude &&
+          longitude == other.longitude;
+}
+
+class WeatherResult {
+  final WeatherStatus status;
+  final WeatherSnapshot? snapshot;
+  final String? error;
+
+  const WeatherResult({required this.status, this.snapshot, this.error});
+
+  @override
+  int get hashCode => status.hashCode ^ snapshot.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WeatherResult &&
+          runtimeType == other.runtimeType &&
+          status == other.status &&
+          snapshot == other.snapshot &&
+          error == other.error;
+}
+
+class WeatherSnapshot {
+  final PlatformInt64 fetchedAt;
+  final String timezone;
+  final WeatherCurrent? current;
+  final List<WeatherHour> hourly;
+  final List<WeatherDay> daily;
+
+  const WeatherSnapshot({
+    required this.fetchedAt,
+    required this.timezone,
+    this.current,
+    required this.hourly,
+    required this.daily,
+  });
+
+  @override
+  int get hashCode =>
+      fetchedAt.hashCode ^
+      timezone.hashCode ^
+      current.hashCode ^
+      hourly.hashCode ^
+      daily.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WeatherSnapshot &&
+          runtimeType == other.runtimeType &&
+          fetchedAt == other.fetchedAt &&
+          timezone == other.timezone &&
+          current == other.current &&
+          hourly == other.hourly &&
+          daily == other.daily;
+}
+
+enum WeatherStatus { fresh, stale, unavailable }

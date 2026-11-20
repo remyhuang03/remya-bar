@@ -73,7 +73,7 @@ class SystemRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 446766373;
+  int get rustContentHash => 1129460226;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -160,6 +160,17 @@ abstract class SystemRustLibApi extends BaseApi {
     required String id,
     required int parent,
     required int entry,
+  });
+
+  Future<WeatherResult> crateApiWeatherRefresh({
+    required double latitude,
+    required double longitude,
+    required bool force,
+  });
+
+  Future<List<WeatherLocation>> crateApiWeatherSearch({
+    required String query,
+    required String language,
   });
 }
 
@@ -876,6 +887,76 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     argNames: ["id", "parent", "entry"],
   );
 
+  @override
+  Future<WeatherResult> crateApiWeatherRefresh({
+    required double latitude,
+    required double longitude,
+    required bool force,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_f_64(latitude, serializer);
+          sse_encode_f_64(longitude, serializer);
+          sse_encode_bool(force, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 23,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_weather_result,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiWeatherRefreshConstMeta,
+        argValues: [latitude, longitude, force],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWeatherRefreshConstMeta => const TaskConstMeta(
+    debugName: "weather_refresh",
+    argNames: ["latitude", "longitude", "force"],
+  );
+
+  @override
+  Future<List<WeatherLocation>> crateApiWeatherSearch({
+    required String query,
+    required String language,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(query, serializer);
+          sse_encode_String(language, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 24,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_weather_location,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiWeatherSearchConstMeta,
+        argValues: [query, language],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWeatherSearchConstMeta => const TaskConstMeta(
+    debugName: "weather_search",
+    argNames: ["query", "language"],
+  );
+
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -967,6 +1048,24 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   int dco_decode_box_autoadd_u_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
+  }
+
+  @protected
+  WeatherCondition dco_decode_box_autoadd_weather_condition(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_weather_condition(raw);
+  }
+
+  @protected
+  WeatherCurrent dco_decode_box_autoadd_weather_current(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_weather_current(raw);
+  }
+
+  @protected
+  WeatherSnapshot dco_decode_box_autoadd_weather_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_weather_snapshot(raw);
   }
 
   @protected
@@ -1083,6 +1182,24 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   List<TrayMenuEntry> dco_decode_list_tray_menu_entry(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_tray_menu_entry).toList();
+  }
+
+  @protected
+  List<WeatherDay> dco_decode_list_weather_day(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_weather_day).toList();
+  }
+
+  @protected
+  List<WeatherHour> dco_decode_list_weather_hour(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_weather_hour).toList();
+  }
+
+  @protected
+  List<WeatherLocation> dco_decode_list_weather_location(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_weather_location).toList();
   }
 
   @protected
@@ -1268,6 +1385,24 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  WeatherCondition? dco_decode_opt_box_autoadd_weather_condition(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_weather_condition(raw);
+  }
+
+  @protected
+  WeatherCurrent? dco_decode_opt_box_autoadd_weather_current(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_weather_current(raw);
+  }
+
+  @protected
+  WeatherSnapshot? dco_decode_opt_box_autoadd_weather_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_weather_snapshot(raw);
+  }
+
+  @protected
   ResourceDetails dco_decode_resource_details(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1366,6 +1501,108 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   void dco_decode_unit(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return;
+  }
+
+  @protected
+  WeatherCondition dco_decode_weather_condition(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return WeatherCondition.values[raw as int];
+  }
+
+  @protected
+  WeatherCurrent dco_decode_weather_current(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return WeatherCurrent(
+      validAt: dco_decode_i_64(arr[0]),
+      temperatureC: dco_decode_opt_box_autoadd_f_64(arr[1]),
+      feelsLikeC: dco_decode_opt_box_autoadd_f_64(arr[2]),
+      condition: dco_decode_opt_box_autoadd_weather_condition(arr[3]),
+      humidityPercent: dco_decode_opt_box_autoadd_f_64(arr[4]),
+      windKmh: dco_decode_opt_box_autoadd_f_64(arr[5]),
+      precipitationProbability: dco_decode_opt_box_autoadd_f_64(arr[6]),
+    );
+  }
+
+  @protected
+  WeatherDay dco_decode_weather_day(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return WeatherDay(
+      date: dco_decode_String(arr[0]),
+      lowC: dco_decode_opt_box_autoadd_f_64(arr[1]),
+      highC: dco_decode_opt_box_autoadd_f_64(arr[2]),
+      condition: dco_decode_opt_box_autoadd_weather_condition(arr[3]),
+      precipitationProbability: dco_decode_opt_box_autoadd_f_64(arr[4]),
+    );
+  }
+
+  @protected
+  WeatherHour dco_decode_weather_hour(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return WeatherHour(
+      validAt: dco_decode_i_64(arr[0]),
+      temperatureC: dco_decode_opt_box_autoadd_f_64(arr[1]),
+      condition: dco_decode_opt_box_autoadd_weather_condition(arr[2]),
+      precipitationProbability: dco_decode_opt_box_autoadd_f_64(arr[3]),
+    );
+  }
+
+  @protected
+  WeatherLocation dco_decode_weather_location(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return WeatherLocation(
+      id: dco_decode_opt_box_autoadd_i_32(arr[0]),
+      name: dco_decode_String(arr[1]),
+      region: dco_decode_opt_String(arr[2]),
+      country: dco_decode_opt_String(arr[3]),
+      latitude: dco_decode_f_64(arr[4]),
+      longitude: dco_decode_f_64(arr[5]),
+    );
+  }
+
+  @protected
+  WeatherResult dco_decode_weather_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return WeatherResult(
+      status: dco_decode_weather_status(arr[0]),
+      snapshot: dco_decode_opt_box_autoadd_weather_snapshot(arr[1]),
+      error: dco_decode_opt_String(arr[2]),
+    );
+  }
+
+  @protected
+  WeatherSnapshot dco_decode_weather_snapshot(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return WeatherSnapshot(
+      fetchedAt: dco_decode_i_64(arr[0]),
+      timezone: dco_decode_String(arr[1]),
+      current: dco_decode_opt_box_autoadd_weather_current(arr[2]),
+      hourly: dco_decode_list_weather_hour(arr[3]),
+      daily: dco_decode_list_weather_day(arr[4]),
+    );
+  }
+
+  @protected
+  WeatherStatus dco_decode_weather_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return WeatherStatus.values[raw as int];
   }
 
   @protected
@@ -1471,6 +1708,30 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_u_32(deserializer));
+  }
+
+  @protected
+  WeatherCondition sse_decode_box_autoadd_weather_condition(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_weather_condition(deserializer));
+  }
+
+  @protected
+  WeatherCurrent sse_decode_box_autoadd_weather_current(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_weather_current(deserializer));
+  }
+
+  @protected
+  WeatherSnapshot sse_decode_box_autoadd_weather_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_weather_snapshot(deserializer));
   }
 
   @protected
@@ -1656,6 +1917,44 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     var ans_ = <TrayMenuEntry>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_tray_menu_entry(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<WeatherDay> sse_decode_list_weather_day(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <WeatherDay>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_weather_day(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<WeatherHour> sse_decode_list_weather_hour(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <WeatherHour>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_weather_hour(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<WeatherLocation> sse_decode_list_weather_location(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <WeatherLocation>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_weather_location(deserializer));
     }
     return ans_;
   }
@@ -1930,6 +2229,45 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  WeatherCondition? sse_decode_opt_box_autoadd_weather_condition(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_weather_condition(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  WeatherCurrent? sse_decode_opt_box_autoadd_weather_current(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_weather_current(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  WeatherSnapshot? sse_decode_opt_box_autoadd_weather_snapshot(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_weather_snapshot(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   ResourceDetails sse_decode_resource_details(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_cpuCores = sse_decode_opt_box_autoadd_u_32(deserializer);
@@ -2073,6 +2411,136 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  WeatherCondition sse_decode_weather_condition(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return WeatherCondition.values[inner];
+  }
+
+  @protected
+  WeatherCurrent sse_decode_weather_current(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_validAt = sse_decode_i_64(deserializer);
+    var var_temperatureC = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_feelsLikeC = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_condition = sse_decode_opt_box_autoadd_weather_condition(
+      deserializer,
+    );
+    var var_humidityPercent = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_windKmh = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_precipitationProbability = sse_decode_opt_box_autoadd_f_64(
+      deserializer,
+    );
+    return WeatherCurrent(
+      validAt: var_validAt,
+      temperatureC: var_temperatureC,
+      feelsLikeC: var_feelsLikeC,
+      condition: var_condition,
+      humidityPercent: var_humidityPercent,
+      windKmh: var_windKmh,
+      precipitationProbability: var_precipitationProbability,
+    );
+  }
+
+  @protected
+  WeatherDay sse_decode_weather_day(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_date = sse_decode_String(deserializer);
+    var var_lowC = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_highC = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_condition = sse_decode_opt_box_autoadd_weather_condition(
+      deserializer,
+    );
+    var var_precipitationProbability = sse_decode_opt_box_autoadd_f_64(
+      deserializer,
+    );
+    return WeatherDay(
+      date: var_date,
+      lowC: var_lowC,
+      highC: var_highC,
+      condition: var_condition,
+      precipitationProbability: var_precipitationProbability,
+    );
+  }
+
+  @protected
+  WeatherHour sse_decode_weather_hour(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_validAt = sse_decode_i_64(deserializer);
+    var var_temperatureC = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_condition = sse_decode_opt_box_autoadd_weather_condition(
+      deserializer,
+    );
+    var var_precipitationProbability = sse_decode_opt_box_autoadd_f_64(
+      deserializer,
+    );
+    return WeatherHour(
+      validAt: var_validAt,
+      temperatureC: var_temperatureC,
+      condition: var_condition,
+      precipitationProbability: var_precipitationProbability,
+    );
+  }
+
+  @protected
+  WeatherLocation sse_decode_weather_location(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_opt_box_autoadd_i_32(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_region = sse_decode_opt_String(deserializer);
+    var var_country = sse_decode_opt_String(deserializer);
+    var var_latitude = sse_decode_f_64(deserializer);
+    var var_longitude = sse_decode_f_64(deserializer);
+    return WeatherLocation(
+      id: var_id,
+      name: var_name,
+      region: var_region,
+      country: var_country,
+      latitude: var_latitude,
+      longitude: var_longitude,
+    );
+  }
+
+  @protected
+  WeatherResult sse_decode_weather_result(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_status = sse_decode_weather_status(deserializer);
+    var var_snapshot = sse_decode_opt_box_autoadd_weather_snapshot(
+      deserializer,
+    );
+    var var_error = sse_decode_opt_String(deserializer);
+    return WeatherResult(
+      status: var_status,
+      snapshot: var_snapshot,
+      error: var_error,
+    );
+  }
+
+  @protected
+  WeatherSnapshot sse_decode_weather_snapshot(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_fetchedAt = sse_decode_i_64(deserializer);
+    var var_timezone = sse_decode_String(deserializer);
+    var var_current = sse_decode_opt_box_autoadd_weather_current(deserializer);
+    var var_hourly = sse_decode_list_weather_hour(deserializer);
+    var var_daily = sse_decode_list_weather_day(deserializer);
+    return WeatherSnapshot(
+      fetchedAt: var_fetchedAt,
+      timezone: var_timezone,
+      current: var_current,
+      hourly: var_hourly,
+      daily: var_daily,
+    );
+  }
+
+  @protected
+  WeatherStatus sse_decode_weather_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return WeatherStatus.values[inner];
+  }
+
+  @protected
   void sse_encode_AnyhowException(
     AnyhowException self,
     SseSerializer serializer,
@@ -2191,6 +2659,33 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_u_32(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_weather_condition(
+    WeatherCondition self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_weather_condition(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_weather_current(
+    WeatherCurrent self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_weather_current(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_weather_snapshot(
+    WeatherSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_weather_snapshot(self, serializer);
   }
 
   @protected
@@ -2359,6 +2854,42 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_tray_menu_entry(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_weather_day(
+    List<WeatherDay> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_weather_day(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_weather_hour(
+    List<WeatherHour> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_weather_hour(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_weather_location(
+    List<WeatherLocation> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_weather_location(item, serializer);
     }
   }
 
@@ -2563,6 +3094,45 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_weather_condition(
+    WeatherCondition? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_weather_condition(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_weather_current(
+    WeatherCurrent? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_weather_current(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_weather_snapshot(
+    WeatherSnapshot? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_weather_snapshot(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_resource_details(
     ResourceDetails self,
     SseSerializer serializer,
@@ -2652,5 +3222,89 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   @protected
   void sse_encode_unit(void self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+  }
+
+  @protected
+  void sse_encode_weather_condition(
+    WeatherCondition self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_weather_current(
+    WeatherCurrent self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_64(self.validAt, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.temperatureC, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.feelsLikeC, serializer);
+    sse_encode_opt_box_autoadd_weather_condition(self.condition, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.humidityPercent, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.windKmh, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.precipitationProbability, serializer);
+  }
+
+  @protected
+  void sse_encode_weather_day(WeatherDay self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.date, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.lowC, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.highC, serializer);
+    sse_encode_opt_box_autoadd_weather_condition(self.condition, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.precipitationProbability, serializer);
+  }
+
+  @protected
+  void sse_encode_weather_hour(WeatherHour self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_64(self.validAt, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.temperatureC, serializer);
+    sse_encode_opt_box_autoadd_weather_condition(self.condition, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.precipitationProbability, serializer);
+  }
+
+  @protected
+  void sse_encode_weather_location(
+    WeatherLocation self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_i_32(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_opt_String(self.region, serializer);
+    sse_encode_opt_String(self.country, serializer);
+    sse_encode_f_64(self.latitude, serializer);
+    sse_encode_f_64(self.longitude, serializer);
+  }
+
+  @protected
+  void sse_encode_weather_result(WeatherResult self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_weather_status(self.status, serializer);
+    sse_encode_opt_box_autoadd_weather_snapshot(self.snapshot, serializer);
+    sse_encode_opt_String(self.error, serializer);
+  }
+
+  @protected
+  void sse_encode_weather_snapshot(
+    WeatherSnapshot self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_64(self.fetchedAt, serializer);
+    sse_encode_String(self.timezone, serializer);
+    sse_encode_opt_box_autoadd_weather_current(self.current, serializer);
+    sse_encode_list_weather_hour(self.hourly, serializer);
+    sse_encode_list_weather_day(self.daily, serializer);
+  }
+
+  @protected
+  void sse_encode_weather_status(WeatherStatus self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
   }
 }

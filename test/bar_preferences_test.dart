@@ -139,6 +139,59 @@ void main() {
   });
 
   test(
+    'weather location replaces by revision and retains valid coordinates',
+    () async {
+      const key = barWeatherLocationKey;
+      const location = {
+        'latitude': 25.0478,
+        'longitude': 121.5319,
+        'name': '臺北',
+        'id': 1668341,
+        'region': 'Taipei City',
+        'country': 'Taiwan',
+      };
+      final client = _Client(_defaults());
+      addTearDown(client.close);
+      final prefs = BarPreferences(client: client);
+      final (value: empty, revision: initial) = await prefs
+          .readWeatherLocationPreference();
+      expect(empty, isEmpty);
+      expect(await prefs.replace(key, location, initial), location);
+      final saved = prefs.lastValid(key);
+      final revision = prefs.revision(key);
+      expect(client.writes.single.first, 'Replace');
+      expect(client.writes.single[3], initial);
+
+      for (final invalid in [
+        {'latitude': 0, 'longitude': 0},
+        {...location, 'latitude': double.nan},
+        {...location, 'longitude': double.infinity},
+        {...location, 'longitude': -9223372036854775808},
+        {...location, 'name': '  '},
+        {...location, 'id': 0},
+        {...location, 'region': null},
+        {...location, 'country': 'a\n'},
+        {...location, 'unknown': 'value'},
+      ]) {
+        client.values[key] = invalid;
+        await expectLater(prefs.read(key), throwsFormatException);
+        await expectLater(
+          prefs.replace(key, invalid, revision),
+          throwsFormatException,
+        );
+        expect(prefs.lastValid(key), same(saved));
+        expect(prefs.revision(key), revision);
+      }
+      expect(client.writes, hasLength(1));
+      client.conflict = true;
+      await expectLater(prefs.replace(key, {}, revision), throwsStateError);
+      expect(prefs.lastValid(key), same(saved));
+      client.conflict = false;
+      expect(await prefs.replace(key, {}, revision), isEmpty);
+    },
+  );
+
+  test(
     'sidebar revision conflicts surface the Core error without replacing state',
     () async {
       final client = _Client(_defaults());

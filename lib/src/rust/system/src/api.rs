@@ -432,3 +432,92 @@ pub async fn codexbar_json(kind: String, refresh: bool) -> Result<Option<String>
 pub async fn codexbar_notify(provider: String, window: String, remaining: i32) {
     crate::codexbar::notify(&provider, &window, remaining).await
 }
+
+#[derive(Clone, Debug)]
+pub struct WeatherLocation {
+    pub id: Option<i32>,
+    pub name: String,
+    pub region: Option<String>,
+    pub country: Option<String>,
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct WeatherSnapshot {
+    pub fetched_at: i64,
+    pub timezone: String,
+    pub current: Option<WeatherCurrent>,
+    pub hourly: Vec<WeatherHour>,
+    pub daily: Vec<WeatherDay>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct WeatherCurrent {
+    pub valid_at: i64,
+    pub temperature_c: Option<f64>,
+    pub feels_like_c: Option<f64>,
+    pub condition: Option<WeatherCondition>,
+    pub humidity_percent: Option<f64>,
+    pub wind_kmh: Option<f64>,
+    pub precipitation_probability: Option<f64>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct WeatherHour {
+    pub valid_at: i64,
+    pub temperature_c: Option<f64>,
+    pub condition: Option<WeatherCondition>,
+    pub precipitation_probability: Option<f64>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct WeatherDay {
+    pub date: String,
+    pub low_c: Option<f64>,
+    pub high_c: Option<f64>,
+    pub condition: Option<WeatherCondition>,
+    pub precipitation_probability: Option<f64>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum WeatherCondition {
+    Clear,
+    PartlyCloudy,
+    Cloudy,
+    Fog,
+    Rain,
+    Storm,
+    Snow,
+    ClearNight,
+    PartlyCloudyNight,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum WeatherStatus {
+    Fresh,
+    Stale,
+    Unavailable,
+}
+
+#[derive(Clone, Debug)]
+pub struct WeatherResult {
+    pub status: WeatherStatus,
+    pub snapshot: Option<WeatherSnapshot>,
+    pub error: Option<String>,
+}
+
+pub async fn weather_search(
+    query: String,
+    language: String,
+) -> Result<Vec<WeatherLocation>, String> {
+    crate::weather::search(&query, &language).await
+}
+
+pub async fn weather_refresh(
+    latitude: f64,
+    longitude: f64,
+    force: bool,
+) -> Result<WeatherResult, String> {
+    crate::weather::refresh(latitude, longitude, force).await
+}
