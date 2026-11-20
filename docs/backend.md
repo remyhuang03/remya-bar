@@ -229,35 +229,47 @@ isolate.
 
 ## Weather
 
-`lib/features/weather/weather_backend.dart` exposes location search and forecast
-through the system Rust bridge. Search sends a city or postal code to Open-Meteo
-and returns ranked matches with coordinates and available region and country.
-Callers can also supply coordinates and a label directly. The `weather-location`
-Bar preference stores the selection through Core with revision-checked Replace.
-An empty object means no location has been selected.
+The Weather pill, forecast card and sidebar summary use one controller per
+Flutter engine. Weather starts disabled. Open **System → Weather** in Bar
+Settings to enable it, choose a location and set display or update preferences.
+The location picker accepts a city, postal code or named coordinates. Search
+can take a language and country filter. The `weather-location` preference
+stores both the active location and saved locations in a revision-checked Core
+transaction. An empty object or an object with only `saved` has no active
+location. The `weather` preference stores the other controls separately.
 
-Forecasts include current conditions, up to 25 hourly entries, and seven days
-starting with the location's current day, subject to data availability. Current
-and hourly validity and fetch times are Unix seconds, with the location's time
-zone supplied separately. Daily rows carry local calendar dates. Values use
-Celsius, km/h and percentages. Missing measurements and unknown condition codes
-are absent. A failed forecast section does not discard the remaining usable data.
+Open-Meteo supplies model conditions, up to 25 hourly entries and seven local
+calendar days. The bridge supplies Unix seconds for hourly and current
+validity, retrieval, sunrise and sunset. Daily buckets retain the provider's
+local dates. The UI uses the forecast's IANA time zone for timestamps and
+formats metric source values into the selected display units. A change of
+display unit can update a cached forecast immediately. Precipitation probability
+stays a percentage. Missing fields degrade independently and unknown weather
+codes use the global theme.
 
-All callers share one Rust cache. A successful forecast stays fresh for 15
-minutes. A failed refresh can return the saved forecast for the same coordinates
-as stale for up to 24 hours, with an error explaining the refresh failure.
-Attempts for the same coordinates are coalesced within 30 seconds, including
-manual refresh. The latest successful forecast is atomically saved under
-`$XDG_CACHE_HOME/remya/bar/weather.json` with absolute HOME fallback. The
-`watch` stream checks once a minute while subscribed and retries after errors.
-Weather is dormant at app startup until requested.
+All views share one Rust cache. It coalesces attempts for the same coordinates
+within 30 seconds. The most recently retrieved forecast is saved atomically
+under `$XDG_CACHE_HOME/remya/bar/weather.json` with absolute HOME fallback.
+The cache-only bridge method reads it without a provider call. With background
+fetching off, opening a forecast can refresh the cache and closing the last
+forecast stops automatic requests. Refresh errors retain cached data for the
+same coordinates for up to 24 hours. The controller applies retry backoff and
+honors a provider Retry-After response. The UI distinguishes retrieval time
+from model validity.
 
-This backend uses Open-Meteo's non-commercial API. Search text and requested
-coordinates are sent to Open-Meteo. Rendered data needs adjacent Open-Meteo
-attribution, the CC BY 4.0 license link and any modification notice, and
-geocoding data credits GeoNames. See [terms](https://open-meteo.com/en/terms),
-[data license](https://open-meteo.com/en/licence), [forecast API](https://open-meteo.com/en/docs)
-and [geocoding API](https://open-meteo.com/en/docs/geocoding-api).
+Weather icons are the nine static fill SVGs from
+[Meteocons 3.0.0-next.10](https://registry.npmjs.org/@meteocons/svg-static/-/svg-static-3.0.0-next.10.tgz)
+by Bas Milius. The app bundles the original assets and their MIT notice. The
+icon-derived seed values recorded in the
+[Weather design spec](https://www.figma.com/design/86FHxWxh0HF55G8pGU45cf/Remya-Bar?node-id=323-1746)
+are reused at runtime, with the global scheme variant, brightness and contrast.
+
+Search text and forecast coordinates are sent to Open-Meteo's non-commercial
+API. Displayed values are rounded and localized by Remya. See
+[Open-Meteo terms](https://open-meteo.com/en/terms),
+[data license](https://open-meteo.com/en/licence),
+[forecast API](https://open-meteo.com/en/docs) and
+[GeoNames search attribution](https://open-meteo.com/en/docs/geocoding-api).
 
 ## Local observations and keyboard
 

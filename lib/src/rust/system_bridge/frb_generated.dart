@@ -73,7 +73,7 @@ class SystemRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1129460226;
+  int get rustContentHash => 564573110;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -162,6 +162,11 @@ abstract class SystemRustLibApi extends BaseApi {
     required int entry,
   });
 
+  Future<WeatherResult> crateApiWeatherCached({
+    required double latitude,
+    required double longitude,
+  });
+
   Future<WeatherResult> crateApiWeatherRefresh({
     required double latitude,
     required double longitude,
@@ -171,6 +176,7 @@ abstract class SystemRustLibApi extends BaseApi {
   Future<List<WeatherLocation>> crateApiWeatherSearch({
     required String query,
     required String language,
+    String? countryCode,
   });
 }
 
@@ -888,6 +894,40 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   );
 
   @override
+  Future<WeatherResult> crateApiWeatherCached({
+    required double latitude,
+    required double longitude,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_f_64(latitude, serializer);
+          sse_encode_f_64(longitude, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 23,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_weather_result,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiWeatherCachedConstMeta,
+        argValues: [latitude, longitude],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWeatherCachedConstMeta => const TaskConstMeta(
+    debugName: "weather_cached",
+    argNames: ["latitude", "longitude"],
+  );
+
+  @override
   Future<WeatherResult> crateApiWeatherRefresh({
     required double latitude,
     required double longitude,
@@ -903,7 +943,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 24,
             port: port_,
           );
         },
@@ -927,6 +967,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   Future<List<WeatherLocation>> crateApiWeatherSearch({
     required String query,
     required String language,
+    String? countryCode,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -934,10 +975,11 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(query, serializer);
           sse_encode_String(language, serializer);
+          sse_encode_opt_String(countryCode, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 25,
             port: port_,
           );
         },
@@ -946,7 +988,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiWeatherSearchConstMeta,
-        argValues: [query, language],
+        argValues: [query, language, countryCode],
         apiImpl: this,
       ),
     );
@@ -954,7 +996,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
 
   TaskConstMeta get kCrateApiWeatherSearchConstMeta => const TaskConstMeta(
     debugName: "weather_search",
-    argNames: ["query", "language"],
+    argNames: ["query", "language", "countryCode"],
   );
 
   @protected
@@ -1025,6 +1067,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_i_64(raw);
+  }
+
+  @protected
   NetworkOverview dco_decode_box_autoadd_network_overview(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_network_overview(raw);
@@ -1046,6 +1094,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
 
   @protected
   int dco_decode_box_autoadd_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
+  int dco_decode_box_autoadd_u_8(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
   }
@@ -1367,6 +1421,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_i_64(raw);
+  }
+
+  @protected
   NetworkOverview? dco_decode_opt_box_autoadd_network_overview(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_network_overview(raw);
@@ -1382,6 +1442,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_u_32(raw);
+  }
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_8(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_u_8(raw);
   }
 
   @protected
@@ -1513,16 +1579,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   WeatherCurrent dco_decode_weather_current(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return WeatherCurrent(
       validAt: dco_decode_i_64(arr[0]),
       temperatureC: dco_decode_opt_box_autoadd_f_64(arr[1]),
       feelsLikeC: dco_decode_opt_box_autoadd_f_64(arr[2]),
       condition: dco_decode_opt_box_autoadd_weather_condition(arr[3]),
-      humidityPercent: dco_decode_opt_box_autoadd_f_64(arr[4]),
-      windKmh: dco_decode_opt_box_autoadd_f_64(arr[5]),
-      precipitationProbability: dco_decode_opt_box_autoadd_f_64(arr[6]),
+      weatherCode: dco_decode_opt_box_autoadd_u_8(arr[4]),
+      humidityPercent: dco_decode_opt_box_autoadd_f_64(arr[5]),
+      windKmh: dco_decode_opt_box_autoadd_f_64(arr[6]),
+      windDirection: dco_decode_opt_box_autoadd_f_64(arr[7]),
+      precipitationProbability: dco_decode_opt_box_autoadd_f_64(arr[8]),
     );
   }
 
@@ -1530,14 +1598,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   WeatherDay dco_decode_weather_day(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return WeatherDay(
       date: dco_decode_String(arr[0]),
       lowC: dco_decode_opt_box_autoadd_f_64(arr[1]),
       highC: dco_decode_opt_box_autoadd_f_64(arr[2]),
-      condition: dco_decode_opt_box_autoadd_weather_condition(arr[3]),
-      precipitationProbability: dco_decode_opt_box_autoadd_f_64(arr[4]),
+      sunrise: dco_decode_opt_box_autoadd_i_64(arr[3]),
+      sunset: dco_decode_opt_box_autoadd_i_64(arr[4]),
+      condition: dco_decode_opt_box_autoadd_weather_condition(arr[5]),
+      weatherCode: dco_decode_opt_box_autoadd_u_8(arr[6]),
+      precipitationProbability: dco_decode_opt_box_autoadd_f_64(arr[7]),
+      precipitationMm: dco_decode_opt_box_autoadd_f_64(arr[8]),
     );
   }
 
@@ -1545,13 +1617,15 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   WeatherHour dco_decode_weather_hour(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return WeatherHour(
       validAt: dco_decode_i_64(arr[0]),
       temperatureC: dco_decode_opt_box_autoadd_f_64(arr[1]),
       condition: dco_decode_opt_box_autoadd_weather_condition(arr[2]),
-      precipitationProbability: dco_decode_opt_box_autoadd_f_64(arr[3]),
+      weatherCode: dco_decode_opt_box_autoadd_u_8(arr[3]),
+      precipitationProbability: dco_decode_opt_box_autoadd_f_64(arr[4]),
+      precipitationMm: dco_decode_opt_box_autoadd_f_64(arr[5]),
     );
   }
 
@@ -1559,15 +1633,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   WeatherLocation dco_decode_weather_location(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return WeatherLocation(
       id: dco_decode_opt_box_autoadd_i_32(arr[0]),
       name: dco_decode_String(arr[1]),
       region: dco_decode_opt_String(arr[2]),
       country: dco_decode_opt_String(arr[3]),
-      latitude: dco_decode_f_64(arr[4]),
-      longitude: dco_decode_f_64(arr[5]),
+      timezone: dco_decode_opt_String(arr[4]),
+      latitude: dco_decode_f_64(arr[5]),
+      longitude: dco_decode_f_64(arr[6]),
     );
   }
 
@@ -1681,6 +1756,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_i_64(deserializer));
+  }
+
+  @protected
   NetworkOverview sse_decode_box_autoadd_network_overview(
     SseDeserializer deserializer,
   ) {
@@ -1708,6 +1789,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_u_32(deserializer));
+  }
+
+  @protected
+  int sse_decode_box_autoadd_u_8(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_u_8(deserializer));
   }
 
   @protected
@@ -2192,6 +2279,17 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_i_64(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   NetworkOverview? sse_decode_opt_box_autoadd_network_overview(
     SseDeserializer deserializer,
   ) {
@@ -2223,6 +2321,17 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_u_32(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_8(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_u_8(deserializer));
     } else {
       return null;
     }
@@ -2426,8 +2535,10 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     var var_condition = sse_decode_opt_box_autoadd_weather_condition(
       deserializer,
     );
+    var var_weatherCode = sse_decode_opt_box_autoadd_u_8(deserializer);
     var var_humidityPercent = sse_decode_opt_box_autoadd_f_64(deserializer);
     var var_windKmh = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_windDirection = sse_decode_opt_box_autoadd_f_64(deserializer);
     var var_precipitationProbability = sse_decode_opt_box_autoadd_f_64(
       deserializer,
     );
@@ -2436,8 +2547,10 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       temperatureC: var_temperatureC,
       feelsLikeC: var_feelsLikeC,
       condition: var_condition,
+      weatherCode: var_weatherCode,
       humidityPercent: var_humidityPercent,
       windKmh: var_windKmh,
+      windDirection: var_windDirection,
       precipitationProbability: var_precipitationProbability,
     );
   }
@@ -2448,18 +2561,26 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     var var_date = sse_decode_String(deserializer);
     var var_lowC = sse_decode_opt_box_autoadd_f_64(deserializer);
     var var_highC = sse_decode_opt_box_autoadd_f_64(deserializer);
+    var var_sunrise = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_sunset = sse_decode_opt_box_autoadd_i_64(deserializer);
     var var_condition = sse_decode_opt_box_autoadd_weather_condition(
       deserializer,
     );
+    var var_weatherCode = sse_decode_opt_box_autoadd_u_8(deserializer);
     var var_precipitationProbability = sse_decode_opt_box_autoadd_f_64(
       deserializer,
     );
+    var var_precipitationMm = sse_decode_opt_box_autoadd_f_64(deserializer);
     return WeatherDay(
       date: var_date,
       lowC: var_lowC,
       highC: var_highC,
+      sunrise: var_sunrise,
+      sunset: var_sunset,
       condition: var_condition,
+      weatherCode: var_weatherCode,
       precipitationProbability: var_precipitationProbability,
+      precipitationMm: var_precipitationMm,
     );
   }
 
@@ -2471,14 +2592,18 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     var var_condition = sse_decode_opt_box_autoadd_weather_condition(
       deserializer,
     );
+    var var_weatherCode = sse_decode_opt_box_autoadd_u_8(deserializer);
     var var_precipitationProbability = sse_decode_opt_box_autoadd_f_64(
       deserializer,
     );
+    var var_precipitationMm = sse_decode_opt_box_autoadd_f_64(deserializer);
     return WeatherHour(
       validAt: var_validAt,
       temperatureC: var_temperatureC,
       condition: var_condition,
+      weatherCode: var_weatherCode,
       precipitationProbability: var_precipitationProbability,
+      precipitationMm: var_precipitationMm,
     );
   }
 
@@ -2489,6 +2614,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     var var_name = sse_decode_String(deserializer);
     var var_region = sse_decode_opt_String(deserializer);
     var var_country = sse_decode_opt_String(deserializer);
+    var var_timezone = sse_decode_opt_String(deserializer);
     var var_latitude = sse_decode_f_64(deserializer);
     var var_longitude = sse_decode_f_64(deserializer);
     return WeatherLocation(
@@ -2496,6 +2622,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       name: var_name,
       region: var_region,
       country: var_country,
+      timezone: var_timezone,
       latitude: var_latitude,
       longitude: var_longitude,
     );
@@ -2629,6 +2756,15 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_box_autoadd_i_64(
+    PlatformInt64 self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_64(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_network_overview(
     NetworkOverview self,
     SseSerializer serializer,
@@ -2659,6 +2795,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_u_32(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_u_8(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_8(self, serializer);
   }
 
   @protected
@@ -3058,6 +3200,19 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_i_64(
+    PlatformInt64? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_i_64(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_network_overview(
     NetworkOverview? self,
     SseSerializer serializer,
@@ -3090,6 +3245,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_u_32(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_8(int? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_u_8(self, serializer);
     }
   }
 
@@ -3243,8 +3408,10 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_opt_box_autoadd_f_64(self.temperatureC, serializer);
     sse_encode_opt_box_autoadd_f_64(self.feelsLikeC, serializer);
     sse_encode_opt_box_autoadd_weather_condition(self.condition, serializer);
+    sse_encode_opt_box_autoadd_u_8(self.weatherCode, serializer);
     sse_encode_opt_box_autoadd_f_64(self.humidityPercent, serializer);
     sse_encode_opt_box_autoadd_f_64(self.windKmh, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.windDirection, serializer);
     sse_encode_opt_box_autoadd_f_64(self.precipitationProbability, serializer);
   }
 
@@ -3254,8 +3421,12 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_String(self.date, serializer);
     sse_encode_opt_box_autoadd_f_64(self.lowC, serializer);
     sse_encode_opt_box_autoadd_f_64(self.highC, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.sunrise, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.sunset, serializer);
     sse_encode_opt_box_autoadd_weather_condition(self.condition, serializer);
+    sse_encode_opt_box_autoadd_u_8(self.weatherCode, serializer);
     sse_encode_opt_box_autoadd_f_64(self.precipitationProbability, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.precipitationMm, serializer);
   }
 
   @protected
@@ -3264,7 +3435,9 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_i_64(self.validAt, serializer);
     sse_encode_opt_box_autoadd_f_64(self.temperatureC, serializer);
     sse_encode_opt_box_autoadd_weather_condition(self.condition, serializer);
+    sse_encode_opt_box_autoadd_u_8(self.weatherCode, serializer);
     sse_encode_opt_box_autoadd_f_64(self.precipitationProbability, serializer);
+    sse_encode_opt_box_autoadd_f_64(self.precipitationMm, serializer);
   }
 
   @protected
@@ -3277,6 +3450,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_String(self.name, serializer);
     sse_encode_opt_String(self.region, serializer);
     sse_encode_opt_String(self.country, serializer);
+    sse_encode_opt_String(self.timezone, serializer);
     sse_encode_f_64(self.latitude, serializer);
     sse_encode_f_64(self.longitude, serializer);
   }

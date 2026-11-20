@@ -31,6 +31,12 @@ const barSettingsPages = [
     category: RemyaSettingsCategory.system,
   ),
   (
+    id: 'weather',
+    title: 'Weather',
+    icon: Icons.cloud_outlined,
+    category: RemyaSettingsCategory.system,
+  ),
+  (
     id: 'notifications',
     title: 'Notifications',
     icon: Icons.notifications_rounded,

@@ -13,6 +13,7 @@ class BarPillCard {
     this.dataChanges,
     this.seedColor,
     this.openOnTap = false,
+    this.hoverOpens = true,
   });
 
   final String kind;
@@ -22,6 +23,7 @@ class BarPillCard {
   final Listenable? dataChanges;
   final Color? seedColor;
   final bool openOnTap;
+  final bool hoverOpens;
 }
 
 class BarPillState {
@@ -96,6 +98,7 @@ class _BarPillState extends State<BarPill> {
                 dataChanges: card.dataChanges,
                 seedColor: card.seedColor,
                 openOnTap: card.openOnTap,
+                hoverOpens: card.hoverOpens,
                 onTap: widget.onTap,
                 builder: _buildPill,
               ),
@@ -114,6 +117,7 @@ class _BarPillState extends State<BarPill> {
             Theme.of(context),
             widget.card!.seedColor,
             BarPopupScope.themeOf(context).styleVariant,
+            contrastLevel: BarPopupScope.contrastOf(context),
           );
     final expanded = _hovered || _focused || _pressed || attached;
     final base = attached
@@ -160,12 +164,10 @@ class _BarPillState extends State<BarPill> {
           curve: Easing.emphasizedDecelerate,
           height: expanded ? 40 : 32,
           decoration: BoxDecoration(color: surface, borderRadius: radius),
-          foregroundDecoration: _focused
-              ? BoxDecoration(
-                  border: .all(color: scheme.primary, width: 2),
-                  borderRadius: radius,
-                )
-              : null,
+          foregroundDecoration: BoxDecoration(
+            border: _focused ? .all(color: scheme.primary, width: 2) : null,
+            borderRadius: radius,
+          ),
           clipBehavior: .antiAlias,
           child: Stack(
             children: [

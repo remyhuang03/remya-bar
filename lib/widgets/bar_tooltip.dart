@@ -11,11 +11,15 @@ class BarTooltip extends StatefulWidget {
     required this.message,
     required this.child,
     this.trayStyle = false,
+    this.showOnFocus = false,
+    this.suppressWhenCardOpen,
   });
 
   final String message;
   final Widget child;
   final bool trayStyle;
+  final bool showOnFocus;
+  final String? suppressWhenCardOpen;
 
   @override
   State<BarTooltip> createState() => _BarTooltipState();
@@ -24,14 +28,23 @@ class BarTooltip extends StatefulWidget {
 class _BarTooltipState extends State<BarTooltip> {
   Timer? _timer;
   bool _hovered = false;
+  bool _focused = false;
   bool _shown = false;
   BarPopup? _popup;
+
+  bool get _suppressed =>
+      widget.suppressWhenCardOpen != null &&
+      _popup?.openCard.value == widget.suppressWhenCardOpen;
 
   void _show() {
     final popup = _popup;
     if (popup == null) return;
     final box = context.findRenderObject() as RenderBox?;
-    if (!_hovered || box == null || !box.hasSize || widget.message.isEmpty) {
+    if ((!_hovered && !_focused) ||
+        _suppressed ||
+        box == null ||
+        !box.hasSize ||
+        widget.message.isEmpty) {
       return;
     }
     final theme = Theme.of(context);
@@ -86,6 +99,15 @@ class _BarTooltipState extends State<BarTooltip> {
     }
   }
 
+  void _schedule() {
+    _timer?.cancel();
+    if (_suppressed || (!_hovered && !_focused)) {
+      _hide();
+    } else if (!_shown) {
+      _timer = Timer(const Duration(milliseconds: 500), _show);
+    }
+  }
+
   @override
   void didUpdateWidget(BarTooltip oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -100,12 +122,20 @@ class _BarTooltipState extends State<BarTooltip> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _popup = BarPopup.maybeOf(context);
+    final popup = BarPopup.maybeOf(context);
+    if (popup != _popup) {
+      _popup?.openCard.removeListener(_schedule);
+      _popup = popup;
+      if (widget.suppressWhenCardOpen != null) {
+        _popup?.openCard.addListener(_schedule);
+      }
+    }
     _refresh();
   }
 
   @override
   void dispose() {
+    _popup?.openCard.removeListener(_schedule);
     _hide();
     super.dispose();
   }
@@ -116,13 +146,23 @@ class _BarTooltipState extends State<BarTooltip> {
     child: MouseRegion(
       onEnter: (_) {
         _hovered = true;
-        _timer = Timer(const Duration(milliseconds: 500), _show);
+        _schedule();
       },
       onExit: (_) {
         _hovered = false;
-        _hide();
+        _schedule();
       },
-      child: widget.child,
+      child: widget.showOnFocus
+          ? Focus(
+              canRequestFocus: false,
+              skipTraversal: true,
+              onFocusChange: (focused) {
+                _focused = focused;
+                _schedule();
+              },
+              child: widget.child,
+            )
+          : widget.child,
     ),
   );
 }

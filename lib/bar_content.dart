@@ -17,6 +17,8 @@ import 'features/clock/bar_clock.dart';
 import 'features/hyprland/hyprland_backend.dart';
 import 'features/resources/bar_resources.dart';
 import 'features/window/bar_active_window.dart';
+import 'features/weather/bar_weather.dart';
+import 'features/weather/weather_controller.dart';
 import 'features/workspaces/bar_workspaces.dart';
 import 'widgets/bar_groups_layout.dart';
 import 'widgets/bar_pill_slot.dart';
@@ -34,6 +36,7 @@ class BarContent extends StatelessWidget {
     required this.notificationsOpen,
     this.hyprland,
     this.system,
+    this.weather,
     this.notifications,
     this.aiUsage,
     this.tray,
@@ -43,6 +46,7 @@ class BarContent extends StatelessWidget {
   final SystemSnapshot? pillSnapshot;
   final HyprlandBackend? hyprland;
   final SystemBackend? system;
+  final WeatherController? weather;
   final NotificationBackend? notifications;
   final AiUsageBackend? aiUsage;
   final Widget? tray;
@@ -52,171 +56,182 @@ class BarContent extends StatelessWidget {
   final Future<void> Function(Rect, double) onToggleNotifications;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      // Layer-shell may configure a temporary 1-pixel width during startup.
-      final width = constraints.maxWidth;
-      if (width < 40) return const SizedBox.shrink();
-      final scaledWidth = width / MediaQuery.textScalerOf(context).scale(1);
-      final layout = system?.layout ?? BarLayout.defaults;
-      final clock = BarClock(showSeconds: system?.showClockSeconds ?? true);
-      final sidebar = Row(
-        mainAxisSize: .min,
-        children: [
-          if (error != null && width >= 60)
-            const Padding(
-              padding: .only(right: 8),
-              child: BarTooltip(
-                message: 'Theme unavailable',
-                child: Icon(Icons.warning_amber_rounded, size: 20),
-              ),
-            ),
-          BarSidebarButton(
-            onToggle: onToggleSidebar,
-            open: sidebarOpen,
-            wifi: system?.quickStatus.wifi,
-            bluetooth: system?.quickStatus.bluetooth,
-            volume: (system?.mediaOutput['percent'] as num?)?.toDouble(),
-            muted: system?.mediaOutput['muted'] as bool?,
-          ),
-        ],
-      );
-      if (scaledWidth < 700) {
-        return Stack(
-          fit: .expand,
-          children: [
-            if (width >= 200)
-              Positioned.fill(
-                left: 100,
-                right: 100,
-                child: Center(child: clock),
-              ),
-            // Transitional surfaces can be narrower than the toggle.
-            Align(
-              alignment: .centerRight,
-              child: FittedBox(fit: .scaleDown, child: sidebar),
-            ),
-          ],
+  Widget build(BuildContext context) => weather == null
+      ? _buildContent(context, false)
+      : ValueListenableBuilder(
+          valueListenable: weather!.visibility,
+          builder: (context, visible, _) => _buildContent(context, visible),
         );
-      }
-      final metrics = layout.resources;
-      final compactResources = scaledWidth < 1600;
-      Widget? pill(String id) => switch (id) {
-        // Keep title changes from resizing the pill; omit empty workspaces.
-        'window'
-            when hyprland?.currentWindow != null && hyprland!.error == null =>
-          SizedBox(
-            width: BarActiveWindow.width,
-            child: BarActiveWindow(
-              backend: hyprland,
-              showAppName: layout.windowAppName,
-            ),
-          ),
-        'resources' when BarResources.hasData(pillSnapshot, metrics: metrics) =>
-          SizedBox(
-            width: BarResources.widthFor(
-              context,
-              compact: compactResources,
-              snapshot: pillSnapshot,
-              metrics: metrics,
-            ),
-            child: BarResources(
-              snapshot: pillSnapshot,
-              cardSnapshot: system?.hardware,
-              compact: compactResources,
-              metrics: metrics,
-            ),
-          ),
-        'media' when system?.players.isNotEmpty == true => ConstrainedBox(
-          constraints: const .new(maxWidth: BarMedia.width),
-          // The title needs room; drop the pill rather than squeeze it.
-          child: LayoutBuilder(
-            builder: (context, constraints) => constraints.maxWidth < 112
-                ? const SizedBox.shrink()
-                : BarMedia(
-                    marquee: layout.mediaMarquee,
-                    players: system!.players,
-                    output: system!.mediaOutput,
-                    error: system!.mediaError,
-                    onAction: system!.mediaAction,
-                  ),
-          ),
-        ),
-        'workspaces'
-            when hyprland?.connected == true &&
-                hyprland?.error == null &&
-                hyprland!.workspaceSlots.isNotEmpty =>
-          BarWorkspaces(backend: hyprland),
-        'clock' => clock,
-        'notifications' when notifications != null => BarNotifications(
-          backend: notifications!,
-          onToggle: onToggleNotifications,
-          open: notificationsOpen,
-        ),
-        'tray' when tray != null => ConstrainedBox(
-          constraints: const .new(maxWidth: 290),
-          child: LayoutBuilder(
-            builder: (context, constraints) =>
-                constraints.maxWidth < 44 ? const SizedBox.shrink() : tray!,
-          ),
-        ),
-        aiUsageKind when aiUsage?.visible == true => BarAiQuota(
-          backend: aiUsage!,
-        ),
-        'battery' when system?.battery?.percent?.isFinite == true =>
-          ValueListenableBuilder(
-            valueListenable: system!.hardware,
-            builder: (context, sample, _) => BarBattery(
-              battery: sample?.batteries.firstOrNull,
-              isPowerSaver: system!.isPowerSaver,
-              power: system!.batteryPower,
-            ),
-          ),
-        'sidebar' => sidebar,
-        _ => null,
-      };
-      // Groups and slots stay mounted so hidden pills can animate out; a
-      // group's presence fades its spacing in step with its pills.
-      Widget group(List<String> ids) {
-        final pills = [...ids.map(pill)];
-        return TweenAnimationBuilder<double>(
-          tween: Tween(end: pills.any((p) => p != null) ? 1 : 0),
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : BarPillSlot.duration,
-          curve: BarPillSlot.curve,
-          builder: (context, presence, child) =>
-              BarGroupPresence(presence: presence, child: child!),
-          child: Row(
+
+  Widget _buildContent(BuildContext context, bool weatherVisible) =>
+      LayoutBuilder(
+        builder: (context, constraints) {
+          // Layer-shell may configure a temporary 1-pixel width during startup.
+          final width = constraints.maxWidth;
+          if (width < 40) return const SizedBox.shrink();
+          final scaledWidth = width / MediaQuery.textScalerOf(context).scale(1);
+          final layout = system?.layout ?? BarLayout.defaults;
+          final clock = BarClock(showSeconds: system?.showClockSeconds ?? true);
+          final sidebar = Row(
             mainAxisSize: .min,
             children: [
-              for (final (i, child) in pills.indexed)
-                BarPillSlot(
-                  key: ValueKey(ids[i]),
-                  leading: pills.take(i).any((p) => p != null),
-                  child: child,
+              if (error != null && width >= 60)
+                const Padding(
+                  padding: .only(right: 8),
+                  child: BarTooltip(
+                    message: 'Theme unavailable',
+                    child: Icon(Icons.warning_amber_rounded, size: 20),
+                  ),
                 ),
+              BarSidebarButton(
+                onToggle: onToggleSidebar,
+                open: sidebarOpen,
+                wifi: system?.quickStatus.wifi,
+                bluetooth: system?.quickStatus.bluetooth,
+                volume: (system?.mediaOutput['percent'] as num?)?.toDouble(),
+                muted: system?.mediaOutput['muted'] as bool?,
+              ),
             ],
-          ),
-        );
-      }
+          );
+          if (scaledWidth < 700) {
+            return Stack(
+              fit: .expand,
+              children: [
+                if (width >= 200)
+                  Positioned.fill(
+                    left: 100,
+                    right: 100,
+                    child: Center(child: clock),
+                  ),
+                // Transitional surfaces can be narrower than the toggle.
+                Align(
+                  alignment: .centerRight,
+                  child: FittedBox(fit: .scaleDown, child: sidebar),
+                ),
+              ],
+            );
+          }
+          final metrics = layout.resources;
+          final compactResources = scaledWidth < 1600;
+          Widget? pill(String id) => switch (id) {
+            // Keep title changes from resizing the pill; omit empty workspaces.
+            'window'
+                when hyprland?.currentWindow != null &&
+                    hyprland!.error == null =>
+              SizedBox(
+                width: BarActiveWindow.width,
+                child: BarActiveWindow(
+                  backend: hyprland,
+                  showAppName: layout.windowAppName,
+                ),
+              ),
+            'resources'
+                when BarResources.hasData(pillSnapshot, metrics: metrics) =>
+              SizedBox(
+                width: BarResources.widthFor(
+                  context,
+                  compact: compactResources,
+                  snapshot: pillSnapshot,
+                  metrics: metrics,
+                ),
+                child: BarResources(
+                  snapshot: pillSnapshot,
+                  cardSnapshot: system?.hardware,
+                  compact: compactResources,
+                  metrics: metrics,
+                ),
+              ),
+            'media' when system?.players.isNotEmpty == true => ConstrainedBox(
+              constraints: const .new(maxWidth: BarMedia.width),
+              // The title needs room; drop the pill rather than squeeze it.
+              child: LayoutBuilder(
+                builder: (context, constraints) => constraints.maxWidth < 112
+                    ? const SizedBox.shrink()
+                    : BarMedia(
+                        marquee: layout.mediaMarquee,
+                        players: system!.players,
+                        output: system!.mediaOutput,
+                        error: system!.mediaError,
+                        onAction: system!.mediaAction,
+                      ),
+              ),
+            ),
+            'workspaces'
+                when hyprland?.connected == true &&
+                    hyprland?.error == null &&
+                    hyprland!.workspaceSlots.isNotEmpty =>
+              BarWorkspaces(backend: hyprland),
+            'clock' => clock,
+            'weather' when weatherVisible => BarWeather(weather: weather!),
+            'notifications' when notifications != null => BarNotifications(
+              backend: notifications!,
+              onToggle: onToggleNotifications,
+              open: notificationsOpen,
+            ),
+            'tray' when tray != null => ConstrainedBox(
+              constraints: const .new(maxWidth: 290),
+              child: LayoutBuilder(
+                builder: (context, constraints) =>
+                    constraints.maxWidth < 44 ? const SizedBox.shrink() : tray!,
+              ),
+            ),
+            aiUsageKind when aiUsage?.visible == true => BarAiQuota(
+              backend: aiUsage!,
+            ),
+            'battery' when system?.battery?.percent?.isFinite == true =>
+              ValueListenableBuilder(
+                valueListenable: system!.hardware,
+                builder: (context, sample, _) => BarBattery(
+                  battery: sample?.batteries.firstOrNull,
+                  isPowerSaver: system!.isPowerSaver,
+                  power: system!.batteryPower,
+                ),
+              ),
+            'sidebar' => sidebar,
+            _ => null,
+          };
+          // Groups and slots stay mounted so hidden pills can animate out; a
+          // group's presence fades its spacing in step with its pills.
+          Widget group(List<String> ids) {
+            final pills = [...ids.map(pill)];
+            return TweenAnimationBuilder<double>(
+              tween: Tween(end: pills.any((p) => p != null) ? 1 : 0),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : BarPillSlot.duration,
+              curve: BarPillSlot.curve,
+              builder: (context, presence, child) =>
+                  BarGroupPresence(presence: presence, child: child!),
+              child: Row(
+                mainAxisSize: .min,
+                children: [
+                  for (final (i, child) in pills.indexed)
+                    BarPillSlot(
+                      key: ValueKey(ids[i]),
+                      leading: pills.take(i).any((p) => p != null),
+                      child: child,
+                    ),
+                ],
+              ),
+            );
+          }
 
-      final groups = [...layout.groups.map(group)];
-      final center = layout.center;
-      // Overlong content scrolls instead of squeezing or dropping pills.
-      return _WheelScroll(
-        builder: (controller) => SingleChildScrollView(
-          controller: controller,
-          scrollDirection: .horizontal,
-          padding: const .symmetric(horizontal: 24),
-          child: ConstrainedBox(
-            constraints: .new(minWidth: width - 48, maxHeight: 40),
-            child: BarGroupsLayout(center: center, children: groups),
-          ),
-        ),
+          final groups = [...layout.groups.map(group)];
+          final center = layout.center;
+          // Overlong content scrolls instead of squeezing or dropping pills.
+          return _WheelScroll(
+            builder: (controller) => SingleChildScrollView(
+              controller: controller,
+              scrollDirection: .horizontal,
+              padding: const .symmetric(horizontal: 24),
+              child: ConstrainedBox(
+                constraints: .new(minWidth: width - 48, maxHeight: 40),
+                child: BarGroupsLayout(center: center, children: groups),
+              ),
+            ),
+          );
+        },
       );
-    },
-  );
 }
 
 /// Maps vertical mouse wheel scrolling to the horizontal bar, unless a pill

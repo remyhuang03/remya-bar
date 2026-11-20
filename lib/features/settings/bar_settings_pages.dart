@@ -3,6 +3,7 @@ import 'package:remya_ui/settings_ui.dart';
 
 import '../ai_usage/ai_quota_ring.dart';
 import '../ai_usage/ai_usage_data.dart';
+import '../weather/weather_settings.dart';
 import 'bar_pill_layout.dart';
 import 'bar_preference_models.dart';
 import 'bar_priority_apps.dart';
@@ -48,7 +49,7 @@ class BarSettingsPage extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: .stretch,
     children: [
-      for (final key in _pageKeys[id]!)
+      for (final key in _pageKeys[id] ?? const <String>[])
         if (controller.error(key) case final message?)
           SettingsErrorCard(
             message: message,
@@ -60,6 +61,7 @@ class BarSettingsPage extends StatelessWidget {
       ...switch (id) {
         'layout' => _layout(context),
         'osd' => _osd(),
+        'weather' => const [WeatherSettings()],
         'notifications' => _notifications(context),
         _ => _aiRing(context),
       },

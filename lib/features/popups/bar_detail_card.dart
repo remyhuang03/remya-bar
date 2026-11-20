@@ -9,6 +9,7 @@ import '../clock/datetime_card.dart';
 import '../media/media_preview.dart';
 import '../notifications/notification_view.dart';
 import '../resources/resource_card.dart';
+import '../weather/weather_card.dart';
 import 'bar_card_surface.dart';
 
 typedef PopupAction = ValueChanged<Map<String, Object?>>;
@@ -56,6 +57,9 @@ class BarDetailCard extends StatelessWidget {
             aiUsageKind => AiUsageCard(
               data: data,
               onRefresh: () => onAction(const {'action': 'ai-usage.refresh'}),
+            ),
+            'weather' => WeatherCard(
+              onSettings: () => onAction(const {'action': 'weather.settings'}),
             ),
             'battery' => BatteryCard(data: data, onAction: onAction),
             'notifications' => NotificationCenterCard(

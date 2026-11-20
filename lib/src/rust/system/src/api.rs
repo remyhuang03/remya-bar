@@ -439,6 +439,7 @@ pub struct WeatherLocation {
     pub name: String,
     pub region: Option<String>,
     pub country: Option<String>,
+    pub timezone: Option<String>,
     pub latitude: f64,
     pub longitude: f64,
 }
@@ -458,8 +459,10 @@ pub struct WeatherCurrent {
     pub temperature_c: Option<f64>,
     pub feels_like_c: Option<f64>,
     pub condition: Option<WeatherCondition>,
+    pub weather_code: Option<u8>,
     pub humidity_percent: Option<f64>,
     pub wind_kmh: Option<f64>,
+    pub wind_direction: Option<f64>,
     pub precipitation_probability: Option<f64>,
 }
 
@@ -468,7 +471,9 @@ pub struct WeatherHour {
     pub valid_at: i64,
     pub temperature_c: Option<f64>,
     pub condition: Option<WeatherCondition>,
+    pub weather_code: Option<u8>,
     pub precipitation_probability: Option<f64>,
+    pub precipitation_mm: Option<f64>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -476,8 +481,12 @@ pub struct WeatherDay {
     pub date: String,
     pub low_c: Option<f64>,
     pub high_c: Option<f64>,
+    pub sunrise: Option<i64>,
+    pub sunset: Option<i64>,
     pub condition: Option<WeatherCondition>,
+    pub weather_code: Option<u8>,
     pub precipitation_probability: Option<f64>,
+    pub precipitation_mm: Option<f64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -510,8 +519,9 @@ pub struct WeatherResult {
 pub async fn weather_search(
     query: String,
     language: String,
+    country_code: Option<String>,
 ) -> Result<Vec<WeatherLocation>, String> {
-    crate::weather::search(&query, &language).await
+    crate::weather::search(&query, &language, country_code.as_deref()).await
 }
 
 pub async fn weather_refresh(
@@ -520,4 +530,8 @@ pub async fn weather_refresh(
     force: bool,
 ) -> Result<WeatherResult, String> {
     crate::weather::refresh(latitude, longitude, force).await
+}
+
+pub async fn weather_cached(latitude: f64, longitude: f64) -> Result<WeatherResult, String> {
+    crate::weather::cached(latitude, longitude).await
 }

@@ -70,7 +70,11 @@ static CACHE: Mutex<WeatherCache> = Mutex::const_new(WeatherCache {
     attempt: None,
 });
 
-pub(crate) async fn search(query: &str, language: &str) -> Result<Vec<WeatherLocation>, String> {
+pub(crate) async fn search(
+    query: &str,
+    language: &str,
+    country_code: Option<&str>,
+) -> Result<Vec<WeatherLocation>, String> {
     let query = query.trim();
     if query.len() > 256 || query.chars().any(char::is_control) {
         return Err("Invalid weather location search".into());
@@ -82,7 +86,12 @@ pub(crate) async fn search(query: &str, language: &str) -> Result<Vec<WeatherLoc
     if query.chars().take(2).count() < 2 {
         return Ok(Vec::new());
     }
-    provider::search(query, language).await
+    if country_code
+        .is_some_and(|code| code.len() != 2 || !code.bytes().all(|b| b.is_ascii_uppercase()))
+    {
+        return Err("Expected a two-letter weather search country code".into());
+    }
+    provider::search(query, language, country_code).await
 }
 
 pub(crate) async fn refresh(
@@ -90,19 +99,8 @@ pub(crate) async fn refresh(
     longitude: f64,
     force: bool,
 ) -> Result<WeatherResult, String> {
-    if !(-90.0..=90.0).contains(&latitude) || !(-180.0..=180.0).contains(&longitude) {
-        return Err("Invalid weather coordinates".into());
-    }
-    let point = Point::new(latitude, longitude);
-    let mut cache = CACHE.lock().await;
-    if !cache.loaded {
-        cache.entry = tokio::task::spawn_blocking(|| read_cache(&cache_path()?))
-            .await
-            .ok()
-            .flatten();
-        cache.loaded = true;
-    }
-
+    let point = checked_point(latitude, longitude)?;
+    let mut cache = loaded_cache().await;
     let now = Utc::now().timestamp();
     if let Some((previous, time, error)) = &cache.attempt
         && *previous == point
@@ -134,6 +132,32 @@ pub(crate) async fn refresh(
     };
     cache.attempt = Some((point, Instant::now(), error.clone()));
     Ok(cache.result(point, Utc::now().timestamp(), error))
+}
+
+pub(crate) async fn cached(latitude: f64, longitude: f64) -> Result<WeatherResult, String> {
+    let point = checked_point(latitude, longitude)?;
+    Ok(loaded_cache()
+        .await
+        .result(point, Utc::now().timestamp(), None))
+}
+
+fn checked_point(latitude: f64, longitude: f64) -> Result<Point, String> {
+    if !(-90.0..=90.0).contains(&latitude) || !(-180.0..=180.0).contains(&longitude) {
+        return Err("Invalid weather coordinates".into());
+    }
+    Ok(Point::new(latitude, longitude))
+}
+
+async fn loaded_cache() -> tokio::sync::MutexGuard<'static, WeatherCache> {
+    let mut cache = CACHE.lock().await;
+    if !cache.loaded {
+        cache.entry = tokio::task::spawn_blocking(|| read_cache(&cache_path()?))
+            .await
+            .ok()
+            .flatten();
+        cache.loaded = true;
+    }
+    cache
 }
 
 fn cache_path() -> Option<PathBuf> {
@@ -191,6 +215,10 @@ mod tests {
                 hourly: vec![],
                 daily: vec![crate::api::WeatherDay {
                     date: "2026-11-20".into(),
+                    sunrise: None,
+                    sunset: None,
+                    weather_code: None,
+                    precipitation_mm: None,
                     low_c: Some(16.0),
                     high_c: Some(25.0),
                     condition: None,
@@ -237,7 +265,7 @@ mod tests {
             .block_on(async {
                 assert!(refresh(f64::NAN, 0.0, false).await.is_err());
                 assert!(refresh(0.0, 180.1, false).await.is_err());
-                assert!(search("x", "en").await.unwrap().is_empty());
+                assert!(search("x", "en", None).await.unwrap().is_empty());
             });
     }
 }

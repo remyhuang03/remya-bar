@@ -10,6 +10,7 @@ import 'package:remya_ui/remya_ui.dart';
 import 'bar_content.dart';
 import 'bar_theme.dart';
 import 'features/settings/bar_settings_entry.dart';
+import 'features/weather/weather_controller.dart';
 import 'features/account/account_profile_controller.dart';
 import 'features/ai_usage/ai_usage_backend.dart';
 import 'features/ai_usage/ai_usage_data.dart';
@@ -44,6 +45,7 @@ class RemyaBarApp extends StatefulWidget {
     this.window,
     this.hyprland,
     this.system,
+    this.weather,
     this.account,
     this.aiUsage,
     this.notifications,
@@ -61,6 +63,7 @@ class RemyaBarApp extends StatefulWidget {
   final MethodChannel? window;
   final HyprlandBackend? hyprland;
   final SystemBackend? system;
+  final WeatherController? weather;
   final AccountProfileController? account;
   final AiUsageBackend? aiUsage;
   final NotificationBackend? notifications;
@@ -642,6 +645,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
                 error: widget.preferences.error,
                 hyprland: widget.hyprland,
                 system: widget.system,
+                weather: widget.weather,
                 notifications: widget.notifications,
                 aiUsage: widget.aiUsage,
                 pillSnapshot: widget.system?.resourcePill.value,

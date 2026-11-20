@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1129460226;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 564573110;
 
 // Section: executor
 
@@ -866,6 +866,44 @@ fn wire__crate__api__tray_menu_action_impl(
         },
     )
 }
+fn wire__crate__api__weather_cached_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "weather_cached",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_latitude = <f64>::sse_decode(&mut deserializer);
+            let api_longitude = <f64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::weather_cached(api_latitude, api_longitude).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__weather_refresh_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -930,11 +968,14 @@ fn wire__crate__api__weather_search_impl(
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_query = <String>::sse_decode(&mut deserializer);
             let api_language = <String>::sse_decode(&mut deserializer);
+            let api_country_code = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, String>(
                     (move || async move {
-                        let output_ok = crate::api::weather_search(api_query, api_language).await?;
+                        let output_ok =
+                            crate::api::weather_search(api_query, api_language, api_country_code)
+                                .await?;
                         std::result::Result::Ok(output_ok)
                     })()
                     .await,
@@ -1467,6 +1508,17 @@ impl SseDecode for Option<i32> {
     }
 }
 
+impl SseDecode for Option<i64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<i64>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::api::NetworkOverview> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1494,6 +1546,17 @@ impl SseDecode for Option<u32> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<u32>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<u8> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<u8>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -1697,16 +1760,20 @@ impl SseDecode for crate::api::WeatherCurrent {
         let mut var_temperatureC = <Option<f64>>::sse_decode(deserializer);
         let mut var_feelsLikeC = <Option<f64>>::sse_decode(deserializer);
         let mut var_condition = <Option<crate::api::WeatherCondition>>::sse_decode(deserializer);
+        let mut var_weatherCode = <Option<u8>>::sse_decode(deserializer);
         let mut var_humidityPercent = <Option<f64>>::sse_decode(deserializer);
         let mut var_windKmh = <Option<f64>>::sse_decode(deserializer);
+        let mut var_windDirection = <Option<f64>>::sse_decode(deserializer);
         let mut var_precipitationProbability = <Option<f64>>::sse_decode(deserializer);
         return crate::api::WeatherCurrent {
             valid_at: var_validAt,
             temperature_c: var_temperatureC,
             feels_like_c: var_feelsLikeC,
             condition: var_condition,
+            weather_code: var_weatherCode,
             humidity_percent: var_humidityPercent,
             wind_kmh: var_windKmh,
+            wind_direction: var_windDirection,
             precipitation_probability: var_precipitationProbability,
         };
     }
@@ -1718,14 +1785,22 @@ impl SseDecode for crate::api::WeatherDay {
         let mut var_date = <String>::sse_decode(deserializer);
         let mut var_lowC = <Option<f64>>::sse_decode(deserializer);
         let mut var_highC = <Option<f64>>::sse_decode(deserializer);
+        let mut var_sunrise = <Option<i64>>::sse_decode(deserializer);
+        let mut var_sunset = <Option<i64>>::sse_decode(deserializer);
         let mut var_condition = <Option<crate::api::WeatherCondition>>::sse_decode(deserializer);
+        let mut var_weatherCode = <Option<u8>>::sse_decode(deserializer);
         let mut var_precipitationProbability = <Option<f64>>::sse_decode(deserializer);
+        let mut var_precipitationMm = <Option<f64>>::sse_decode(deserializer);
         return crate::api::WeatherDay {
             date: var_date,
             low_c: var_lowC,
             high_c: var_highC,
+            sunrise: var_sunrise,
+            sunset: var_sunset,
             condition: var_condition,
+            weather_code: var_weatherCode,
             precipitation_probability: var_precipitationProbability,
+            precipitation_mm: var_precipitationMm,
         };
     }
 }
@@ -1736,12 +1811,16 @@ impl SseDecode for crate::api::WeatherHour {
         let mut var_validAt = <i64>::sse_decode(deserializer);
         let mut var_temperatureC = <Option<f64>>::sse_decode(deserializer);
         let mut var_condition = <Option<crate::api::WeatherCondition>>::sse_decode(deserializer);
+        let mut var_weatherCode = <Option<u8>>::sse_decode(deserializer);
         let mut var_precipitationProbability = <Option<f64>>::sse_decode(deserializer);
+        let mut var_precipitationMm = <Option<f64>>::sse_decode(deserializer);
         return crate::api::WeatherHour {
             valid_at: var_validAt,
             temperature_c: var_temperatureC,
             condition: var_condition,
+            weather_code: var_weatherCode,
             precipitation_probability: var_precipitationProbability,
+            precipitation_mm: var_precipitationMm,
         };
     }
 }
@@ -1753,6 +1832,7 @@ impl SseDecode for crate::api::WeatherLocation {
         let mut var_name = <String>::sse_decode(deserializer);
         let mut var_region = <Option<String>>::sse_decode(deserializer);
         let mut var_country = <Option<String>>::sse_decode(deserializer);
+        let mut var_timezone = <Option<String>>::sse_decode(deserializer);
         let mut var_latitude = <f64>::sse_decode(deserializer);
         let mut var_longitude = <f64>::sse_decode(deserializer);
         return crate::api::WeatherLocation {
@@ -1760,6 +1840,7 @@ impl SseDecode for crate::api::WeatherLocation {
             name: var_name,
             region: var_region,
             country: var_country,
+            timezone: var_timezone,
             latitude: var_latitude,
             longitude: var_longitude,
         };
@@ -1842,8 +1923,9 @@ fn pde_ffi_dispatcher_primary_impl(
         20 => wire__crate__api__tray_items_impl(port, ptr, rust_vec_len, data_len),
         21 => wire__crate__api__tray_menu_impl(port, ptr, rust_vec_len, data_len),
         22 => wire__crate__api__tray_menu_action_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__weather_refresh_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__weather_search_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__weather_cached_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__weather_refresh_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__weather_search_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2247,8 +2329,10 @@ impl flutter_rust_bridge::IntoDart for crate::api::WeatherCurrent {
             self.temperature_c.into_into_dart().into_dart(),
             self.feels_like_c.into_into_dart().into_dart(),
             self.condition.into_into_dart().into_dart(),
+            self.weather_code.into_into_dart().into_dart(),
             self.humidity_percent.into_into_dart().into_dart(),
             self.wind_kmh.into_into_dart().into_dart(),
+            self.wind_direction.into_into_dart().into_dart(),
             self.precipitation_probability.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -2267,8 +2351,12 @@ impl flutter_rust_bridge::IntoDart for crate::api::WeatherDay {
             self.date.into_into_dart().into_dart(),
             self.low_c.into_into_dart().into_dart(),
             self.high_c.into_into_dart().into_dart(),
+            self.sunrise.into_into_dart().into_dart(),
+            self.sunset.into_into_dart().into_dart(),
             self.condition.into_into_dart().into_dart(),
+            self.weather_code.into_into_dart().into_dart(),
             self.precipitation_probability.into_into_dart().into_dart(),
+            self.precipitation_mm.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2286,7 +2374,9 @@ impl flutter_rust_bridge::IntoDart for crate::api::WeatherHour {
             self.valid_at.into_into_dart().into_dart(),
             self.temperature_c.into_into_dart().into_dart(),
             self.condition.into_into_dart().into_dart(),
+            self.weather_code.into_into_dart().into_dart(),
             self.precipitation_probability.into_into_dart().into_dart(),
+            self.precipitation_mm.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -2305,6 +2395,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::WeatherLocation {
             self.name.into_into_dart().into_dart(),
             self.region.into_into_dart().into_dart(),
             self.country.into_into_dart().into_dart(),
+            self.timezone.into_into_dart().into_dart(),
             self.latitude.into_into_dart().into_dart(),
             self.longitude.into_into_dart().into_dart(),
         ]
@@ -2761,6 +2852,16 @@ impl SseEncode for Option<i32> {
     }
 }
 
+impl SseEncode for Option<i64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <i64>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::api::NetworkOverview> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2787,6 +2888,16 @@ impl SseEncode for Option<u32> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <u32>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<u8> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <u8>::sse_encode(value, serializer);
         }
     }
 }
@@ -2937,8 +3048,10 @@ impl SseEncode for crate::api::WeatherCurrent {
         <Option<f64>>::sse_encode(self.temperature_c, serializer);
         <Option<f64>>::sse_encode(self.feels_like_c, serializer);
         <Option<crate::api::WeatherCondition>>::sse_encode(self.condition, serializer);
+        <Option<u8>>::sse_encode(self.weather_code, serializer);
         <Option<f64>>::sse_encode(self.humidity_percent, serializer);
         <Option<f64>>::sse_encode(self.wind_kmh, serializer);
+        <Option<f64>>::sse_encode(self.wind_direction, serializer);
         <Option<f64>>::sse_encode(self.precipitation_probability, serializer);
     }
 }
@@ -2949,8 +3062,12 @@ impl SseEncode for crate::api::WeatherDay {
         <String>::sse_encode(self.date, serializer);
         <Option<f64>>::sse_encode(self.low_c, serializer);
         <Option<f64>>::sse_encode(self.high_c, serializer);
+        <Option<i64>>::sse_encode(self.sunrise, serializer);
+        <Option<i64>>::sse_encode(self.sunset, serializer);
         <Option<crate::api::WeatherCondition>>::sse_encode(self.condition, serializer);
+        <Option<u8>>::sse_encode(self.weather_code, serializer);
         <Option<f64>>::sse_encode(self.precipitation_probability, serializer);
+        <Option<f64>>::sse_encode(self.precipitation_mm, serializer);
     }
 }
 
@@ -2960,7 +3077,9 @@ impl SseEncode for crate::api::WeatherHour {
         <i64>::sse_encode(self.valid_at, serializer);
         <Option<f64>>::sse_encode(self.temperature_c, serializer);
         <Option<crate::api::WeatherCondition>>::sse_encode(self.condition, serializer);
+        <Option<u8>>::sse_encode(self.weather_code, serializer);
         <Option<f64>>::sse_encode(self.precipitation_probability, serializer);
+        <Option<f64>>::sse_encode(self.precipitation_mm, serializer);
     }
 }
 
@@ -2971,6 +3090,7 @@ impl SseEncode for crate::api::WeatherLocation {
         <String>::sse_encode(self.name, serializer);
         <Option<String>>::sse_encode(self.region, serializer);
         <Option<String>>::sse_encode(self.country, serializer);
+        <Option<String>>::sse_encode(self.timezone, serializer);
         <f64>::sse_encode(self.latitude, serializer);
         <f64>::sse_encode(self.longitude, serializer);
     }

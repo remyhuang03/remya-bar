@@ -20,6 +20,7 @@ class BarHoverCard extends StatefulWidget {
     this.builder,
     this.onTap,
     this.openOnTap = false,
+    this.hoverOpens = true,
     this.seedColor,
   }) : assert((child == null) != (builder == null));
 
@@ -32,6 +33,7 @@ class BarHoverCard extends StatefulWidget {
   final Widget Function(BuildContext context, VoidCallback? onTap)? builder;
   final VoidCallback? onTap;
   final bool openOnTap;
+  final bool hoverOpens;
   final Color? seedColor;
 
   @override
@@ -81,7 +83,12 @@ class _BarHoverCardState extends State<BarHoverCard> {
     final theme = BarPopupScope.themeOf(context);
     final content = {
       'data': data,
-      'theme': (theme.seedColor, theme.styleVariant, theme.mode),
+      'theme': (
+        theme.seedColor,
+        theme.styleVariant,
+        theme.mode,
+        theme.contrast,
+      ),
     };
     final anchorChanged = _lastAnchor != anchor;
     final contentChanged = !const DeepCollectionEquality().equals(
@@ -109,7 +116,12 @@ class _BarHoverCardState extends State<BarHoverCard> {
 
   void _activate() {
     _timer?.cancel();
-    _show(activated: true);
+    final popup = _popup;
+    if (!widget.hoverOpens && popup?.openCard.value == widget.kind) {
+      _send(popup!.hide(kind: widget.kind));
+    } else {
+      _show(activated: true);
+    }
   }
 
   // An anchor can move on a rendered frame without this widget rebuilding,
@@ -180,7 +192,9 @@ class _BarHoverCardState extends State<BarHoverCard> {
       _hovered = true;
       if (_popup case final popup?) _send(popup.enter(kind: widget.kind));
       _timer?.cancel();
-      _timer = Timer(const Duration(milliseconds: 300), _show);
+      if (widget.hoverOpens) {
+        _timer = Timer(const Duration(milliseconds: 300), _show);
+      }
     },
     onExit: (_) {
       _hovered = false;

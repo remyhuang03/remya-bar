@@ -16,6 +16,7 @@ extension _PopupActions on _RemyaBarAppState {
             'media',
             'battery',
             'datetime',
+            'weather',
             'resources',
             aiUsageKind,
           }.contains(kind) ||
@@ -166,6 +167,9 @@ extension _PopupActions on _RemyaBarAppState {
       await _popup.hide(kind: 'resources');
     } else if (action == 'settings') {
       await widget.onOpenSettings();
+    } else if (action == 'weather.settings') {
+      await _popup.hide(kind: 'weather');
+      await openBarSettings(page: 'weather');
     } else if (action == 'datetime.settings') {
       const page = 'date-time';
       await (widget.onOpenSettingsPage ??

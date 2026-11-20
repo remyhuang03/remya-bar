@@ -26,6 +26,14 @@ class BarPopupScope extends InheritedWidget {
       context.dependOnInheritedWidgetOfExactType<BarPopupScope>()?.bottom ??
       false;
 
+  static double contrastOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<BarPopupScope>()
+          ?.theme
+          .contrast
+          .level ??
+      0;
+
   @override
   bool updateShouldNotify(BarPopupScope oldWidget) =>
       theme != oldWidget.theme ||

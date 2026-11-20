@@ -119,19 +119,26 @@ class BarCardSurface extends StatelessWidget {
   static ColorScheme colors(
     ThemeData theme,
     Color? seed,
-    DynamicSchemeVariant variant,
-  ) => seed == null
+    DynamicSchemeVariant variant, {
+    double contrastLevel = 0,
+  }) => seed == null
       ? theme.colorScheme
       : ColorScheme.fromSeed(
           seedColor: seed,
           brightness: theme.brightness,
           dynamicSchemeVariant: variant,
+          contrastLevel: contrastLevel,
         );
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = colors(theme, seedColor, styleVariant);
+    final scheme = colors(
+      theme,
+      seedColor,
+      styleVariant,
+      contrastLevel: BarPopupScope.contrastOf(context),
+    );
     final bottom = BarPopupScope.bottomOf(context);
     return Theme(
       data: theme.copyWith(colorScheme: scheme),

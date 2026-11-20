@@ -41,10 +41,14 @@ const char* kind_of(FlValue* content) {
       ? fl_value_get_string(kind) : "";
 }
 
+bool is_weather_card(const char* kind) {
+  return g_strcmp0(kind, "weather") == 0;
+}
+
 bool is_card(const char* kind) {
   return g_strcmp0(kind, "media") == 0 || g_strcmp0(kind, "battery") == 0 ||
       g_strcmp0(kind, "datetime") == 0 || g_strcmp0(kind, "resources") == 0 ||
-      g_strcmp0(kind, "ai-usage") == 0;
+      g_strcmp0(kind, "ai-usage") == 0 || is_weather_card(kind);
 }
 
 FlValue* copy_map(FlValue* source) {
@@ -115,9 +119,10 @@ void send_content(BarPopup* state) {
 }
 
 void schedule_hide(BarPopup* state) {
-  // Notification popups and OSD close only when their own timers end.
+  // A deliberately opened weather card stays up until dismissed.
   if (state->is_panel() || state->tray || state->toast || state->osd ||
-      state->is_keyboard || state->dismissing) return;
+      state->is_keyboard || state->dismissing ||
+      is_weather_card(kind_of(state->content))) return;
   state->cancel_hide();
   state->hide_timer = g_timeout_add(180, [](gpointer data) -> gboolean {
     auto* state = static_cast<BarPopup*>(data);
@@ -339,7 +344,7 @@ void watch_outside(BarPopup* state) {
     gtk_widget_add_events(dismiss, GDK_BUTTON_PRESS_MASK);
     g_signal_connect(dismiss, "button-press-event", G_CALLBACK(+[](GtkWidget*, GdkEventButton*, gpointer data) -> gboolean {
       auto* state = static_cast<BarPopup*>(data);
-      if (!state->is_panel()) {
+      if (!state->is_panel() && !is_weather_card(kind_of(state->content))) {
         g_autoptr(FlValue) args = fl_value_new_map();
         fl_value_set_string_take(args, "action", fl_value_new_string("tray.outside"));
         fl_method_channel_invoke_method(state->owner_channel, "action", args, nullptr, nullptr, nullptr);
@@ -373,10 +378,16 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   const bool overview = g_strcmp0(kind, "workspace-overview") == 0;
   const bool tray = overview || g_strcmp0(kind, "tray-menu") == 0;
   const bool card = is_card(kind);
+  const bool weather = is_weather_card(kind);
   const bool tooltip = g_strcmp0(kind, "tooltip") == 0;
   const bool toast = g_strcmp0(kind, "notification-toasts") == 0;
   const bool osd = g_strcmp0(kind, "osd") == 0;
   const bool keyboard = g_strcmp0(kind, "keyboard") == 0;
+  const bool weather_open = root->visible && is_weather_card(kind_of(root->content));
+  if (show && card && !weather && weather_open) {
+    fl_method_call_respond_success(call, nullptr, nullptr);
+    return;
+  }
   if (g_strcmp0(method, "keyboardVisible") == 0) {
     g_autoptr(FlValue) visible = fl_value_new_bool(open_keyboard != nullptr);
     fl_method_call_respond_success(call, visible, nullptr);
@@ -550,7 +561,7 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   if (card && state->visible) state->hide();
   if (tray && state->visible && g_strcmp0(kind, kind_of(state->content)) != 0) state->hide();
   state->cancel_hide();
-  if (panel || tray) watch_outside(state);
+  if (panel || tray || weather) watch_outside(state);
   if (toast || osd) {
     // Notification toasts and OSD are independent of hover cards, menus and the sidebar.
     if (state->window == nullptr) create_popup(state, false, false, false, toast, false, osd);
@@ -580,7 +591,7 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   if (state->window == nullptr) create_popup(state, sidebar, tray, tooltip, false, false, false, notifications);
   // The bar may have moved edges since this popup was last shown.
   if (!tooltip) place_vertical(state, state->edge_margin());
-  if (panel || tray || tooltip) root->hide();
+  if (panel || tray || (tooltip && !weather_open)) root->hide();
   if (card && root->tray_overflow != nullptr && !root->tray_overflow->dismiss_windows.empty()) {
     g_autoptr(FlValue) args = fl_value_new_map();
     fl_value_set_string_take(args, "action", fl_value_new_string("tray.outside"));
@@ -628,9 +639,14 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   replace_content(state, args, true);
   state->visible = true;
   state->owner_hovered = true;  // Shown from a hover or tap on the anchor.
+  if (weather) {
+    gtk_window_set_focus_on_map(GTK_WINDOW(state->window), TRUE);
+    gtk_layer_set_keyboard_mode(GTK_WINDOW(state->window),
+                                GTK_LAYER_SHELL_KEYBOARD_MODE_EXCLUSIVE);
+  }
   gtk_widget_show_all(state->window);
   if (card) state->card_state(true);
-  if (tray) gtk_widget_grab_focus(GTK_WIDGET(state->view));
+  if (tray || weather) gtk_widget_grab_focus(GTK_WIDGET(state->view));
   send_content(state);
   fl_method_call_respond_success(call, nullptr, nullptr);
 }

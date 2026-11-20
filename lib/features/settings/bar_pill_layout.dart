@@ -10,6 +10,7 @@ const barPillNames = {
   'media': 'Media',
   'workspaces': 'Workspaces',
   'clock': 'Clock',
+  'weather': 'Weather',
   'tray': 'App tray',
   'ai-usage': 'AI Usage',
   'battery': 'Battery',
@@ -645,6 +646,7 @@ class BarPillSample extends StatelessWidget {
             ),
           ),
       ]),
+      'weather' => pill([const Icon(Icons.cloud_outlined), const Text('—°')]),
       'clock' => pill([
         Text.rich(
           TextSpan(

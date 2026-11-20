@@ -129,9 +129,11 @@ Future<void> codexbarNotify({
 Future<List<WeatherLocation>> weatherSearch({
   required String query,
   required String language,
+  String? countryCode,
 }) => SystemRustLib.instance.api.crateApiWeatherSearch(
   query: query,
   language: language,
+  countryCode: countryCode,
 );
 
 Future<WeatherResult> weatherRefresh({
@@ -142,6 +144,14 @@ Future<WeatherResult> weatherRefresh({
   latitude: latitude,
   longitude: longitude,
   force: force,
+);
+
+Future<WeatherResult> weatherCached({
+  required double latitude,
+  required double longitude,
+}) => SystemRustLib.instance.api.crateApiWeatherCached(
+  latitude: latitude,
+  longitude: longitude,
 );
 
 class BatterySnapshot {
@@ -852,8 +862,10 @@ class WeatherCurrent {
   final double? temperatureC;
   final double? feelsLikeC;
   final WeatherCondition? condition;
+  final int? weatherCode;
   final double? humidityPercent;
   final double? windKmh;
+  final double? windDirection;
   final double? precipitationProbability;
 
   const WeatherCurrent({
@@ -861,8 +873,10 @@ class WeatherCurrent {
     this.temperatureC,
     this.feelsLikeC,
     this.condition,
+    this.weatherCode,
     this.humidityPercent,
     this.windKmh,
+    this.windDirection,
     this.precipitationProbability,
   });
 
@@ -872,8 +886,10 @@ class WeatherCurrent {
       temperatureC.hashCode ^
       feelsLikeC.hashCode ^
       condition.hashCode ^
+      weatherCode.hashCode ^
       humidityPercent.hashCode ^
       windKmh.hashCode ^
+      windDirection.hashCode ^
       precipitationProbability.hashCode;
 
   @override
@@ -885,8 +901,10 @@ class WeatherCurrent {
           temperatureC == other.temperatureC &&
           feelsLikeC == other.feelsLikeC &&
           condition == other.condition &&
+          weatherCode == other.weatherCode &&
           humidityPercent == other.humidityPercent &&
           windKmh == other.windKmh &&
+          windDirection == other.windDirection &&
           precipitationProbability == other.precipitationProbability;
 }
 
@@ -894,15 +912,23 @@ class WeatherDay {
   final String date;
   final double? lowC;
   final double? highC;
+  final PlatformInt64? sunrise;
+  final PlatformInt64? sunset;
   final WeatherCondition? condition;
+  final int? weatherCode;
   final double? precipitationProbability;
+  final double? precipitationMm;
 
   const WeatherDay({
     required this.date,
     this.lowC,
     this.highC,
+    this.sunrise,
+    this.sunset,
     this.condition,
+    this.weatherCode,
     this.precipitationProbability,
+    this.precipitationMm,
   });
 
   @override
@@ -910,8 +936,12 @@ class WeatherDay {
       date.hashCode ^
       lowC.hashCode ^
       highC.hashCode ^
+      sunrise.hashCode ^
+      sunset.hashCode ^
       condition.hashCode ^
-      precipitationProbability.hashCode;
+      weatherCode.hashCode ^
+      precipitationProbability.hashCode ^
+      precipitationMm.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -921,21 +951,29 @@ class WeatherDay {
           date == other.date &&
           lowC == other.lowC &&
           highC == other.highC &&
+          sunrise == other.sunrise &&
+          sunset == other.sunset &&
           condition == other.condition &&
-          precipitationProbability == other.precipitationProbability;
+          weatherCode == other.weatherCode &&
+          precipitationProbability == other.precipitationProbability &&
+          precipitationMm == other.precipitationMm;
 }
 
 class WeatherHour {
   final PlatformInt64 validAt;
   final double? temperatureC;
   final WeatherCondition? condition;
+  final int? weatherCode;
   final double? precipitationProbability;
+  final double? precipitationMm;
 
   const WeatherHour({
     required this.validAt,
     this.temperatureC,
     this.condition,
+    this.weatherCode,
     this.precipitationProbability,
+    this.precipitationMm,
   });
 
   @override
@@ -943,7 +981,9 @@ class WeatherHour {
       validAt.hashCode ^
       temperatureC.hashCode ^
       condition.hashCode ^
-      precipitationProbability.hashCode;
+      weatherCode.hashCode ^
+      precipitationProbability.hashCode ^
+      precipitationMm.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -953,7 +993,9 @@ class WeatherHour {
           validAt == other.validAt &&
           temperatureC == other.temperatureC &&
           condition == other.condition &&
-          precipitationProbability == other.precipitationProbability;
+          weatherCode == other.weatherCode &&
+          precipitationProbability == other.precipitationProbability &&
+          precipitationMm == other.precipitationMm;
 }
 
 class WeatherLocation {
@@ -961,6 +1003,7 @@ class WeatherLocation {
   final String name;
   final String? region;
   final String? country;
+  final String? timezone;
   final double latitude;
   final double longitude;
 
@@ -969,6 +1012,7 @@ class WeatherLocation {
     required this.name,
     this.region,
     this.country,
+    this.timezone,
     required this.latitude,
     required this.longitude,
   });
@@ -979,6 +1023,7 @@ class WeatherLocation {
       name.hashCode ^
       region.hashCode ^
       country.hashCode ^
+      timezone.hashCode ^
       latitude.hashCode ^
       longitude.hashCode;
 
@@ -991,6 +1036,7 @@ class WeatherLocation {
           name == other.name &&
           region == other.region &&
           country == other.country &&
+          timezone == other.timezone &&
           latitude == other.latitude &&
           longitude == other.longitude;
 }

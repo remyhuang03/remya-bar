@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/percent_text.dart';
 import '../popups/bar_card_surface.dart';
+import '../popups/bar_popup.dart';
 import 'media_artwork.dart';
 
 class MediaPreview extends StatelessWidget {
@@ -37,7 +38,12 @@ class MediaPreview extends StatelessWidget {
       styleVariant: styleVariant,
       builder: (context, artwork, _) {
         final fallback = Theme.of(context);
-        final scheme = BarCardSurface.colors(fallback, seedColor, styleVariant);
+        final scheme = BarCardSurface.colors(
+          fallback,
+          seedColor,
+          styleVariant,
+          contrastLevel: BarPopupScope.contrastOf(context),
+        );
         final theme = fallback.copyWith(
           colorScheme: scheme,
           textTheme: fallback.textTheme.apply(

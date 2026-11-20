@@ -190,20 +190,20 @@ class BarPreferences {
       case barWeatherLocationKey:
         valid =
             value is Map &&
-            (value.isEmpty ||
-                (_object(
-                      value,
-                      {'latitude', 'longitude', 'name'},
-                      optional: {'id', 'region', 'country'},
-                    ) &&
-                    _coordinate(value['latitude'], 90) &&
-                    _coordinate(value['longitude'], 180) &&
-                    _text(value['name']) &&
-                    (!value.containsKey('id') ||
-                        _range(value['id'], 1, 2147483647)) &&
-                    (!value.containsKey('region') || _text(value['region'])) &&
-                    (!value.containsKey('country') ||
-                        _text(value['country']))));
+            (!value.containsKey('saved') ||
+                (value['saved'] is List &&
+                    (value['saved'] as List).length <= 50 &&
+                    (value['saved'] as List).every(_weatherLocation))) &&
+            (value.keys.every((key) => key == 'saved') ||
+                _weatherLocation(Map.of(value)..remove('saved')));
+      case 'weather':
+        valid =
+            _object(value, weatherDefaults.keys.toSet()) &&
+            weatherDefaults.entries.every((entry) {
+              final choice = (value as Map)[entry.key];
+              return weatherChoices[entry.key]?.contains(choice) ??
+                  choice is bool;
+            });
       case 'folded-apps':
         valid = _strings(value, _text);
       case 'sidebar-layout':
@@ -312,6 +312,46 @@ class BarPreferences {
     if (!valid) throw FormatException('Invalid Bar preference: $key');
   }
 }
+
+const weatherDefaults = <String, Object>{
+  'enabled': false,
+  'temperature': 'system',
+  'wind': 'km/h',
+  'precipitation': 'mm',
+  'pill': 'both',
+  'show-unit': false,
+  'forecast': 'hourly',
+  'interval': 15,
+  'background': true,
+  'appearance': 'weather',
+  'color-pill': true,
+};
+
+const weatherChoices = <String, Set<Object>>{
+  'temperature': {'system', 'c', 'f'},
+  'wind': {'km/h', 'm/s', 'mph', 'kn'},
+  'precipitation': {'mm', 'in'},
+  'pill': {'both', 'icon', 'temperature'},
+  'forecast': {'hourly', 'daily'},
+  'interval': {15, 30, 60},
+  'appearance': {'weather', 'app'},
+};
+
+bool _weatherLocation(Object? value) =>
+    _object(
+      value,
+      {'latitude', 'longitude', 'name'},
+      optional: {'id', 'region', 'country', 'timezone'},
+    ) &&
+    _coordinate((value as Map)['latitude'], 90) &&
+    _coordinate(value['longitude'], 180) &&
+    _text(value['name']) &&
+    (!value.containsKey('id') || _range(value['id'], 1, 2147483647)) &&
+    [
+      'region',
+      'country',
+      'timezone',
+    ].every((key) => !value.containsKey(key) || _text(value[key]));
 
 bool _object(
   Object? value,

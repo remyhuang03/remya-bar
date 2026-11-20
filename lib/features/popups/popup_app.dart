@@ -14,6 +14,7 @@ import '../tray/tray_menu_popup.dart';
 import '../workspaces/bar_workspaces.dart';
 import '../workspaces/workspace_overview.dart';
 import 'bar_card_surface.dart';
+import '../weather/weather_controller.dart';
 import 'bar_detail_card.dart';
 import 'bar_popup.dart';
 import 'popup_measure.dart';
@@ -37,6 +38,7 @@ class _BarPopupAppState extends State<BarPopupApp>
     'media',
     'battery',
     'datetime',
+    'weather',
     'resources',
     aiUsageKind,
   }.contains(_kind);
@@ -132,6 +134,7 @@ class _BarPopupAppState extends State<BarPopupApp>
             'media',
             'battery',
             'datetime',
+            'weather',
             'tray-menu',
             'notifications',
             aiUsageKind,
@@ -282,6 +285,7 @@ class _BarPopupAppState extends State<BarPopupApp>
                         onHeight: _resize,
                       )
                     : RightSidebar(
+                        weather: WeatherController.instance,
                         data: details,
                         onAction: (action) =>
                             widget.channel.invokeMethod<void>('action', action),

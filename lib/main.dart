@@ -20,6 +20,7 @@ import 'features/settings/bar_theme_controller.dart';
 import 'features/sidebar/sidebar_app_launcher.dart';
 import 'features/system/system_backend.dart';
 import 'features/tray/tray_backend.dart';
+import 'features/weather/weather_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +38,9 @@ Future<void> main() async {
     yield LicenseEntryWithLineBreaks([
       "Remy'a Bar",
     ], await rootBundle.loadString('LICENSE'));
+    yield LicenseEntryWithLineBreaks([
+      'Meteocons',
+    ], await rootBundle.loadString('assets/icons/weather/LICENSE'));
     yield LicenseEntryWithLineBreaks([
       'Rust backend dependencies',
     ], await rootBundle.loadString('assets/licenses/rust-dependencies.txt'));
@@ -154,6 +158,7 @@ class _BarOutputState extends State<_BarOutput> {
   Widget build(BuildContext context) {
     final app = widget.app;
     return RemyaBarApp(
+      weather: WeatherController.instance,
       preferences: app.widget.preferences,
       popup: _popup,
       window: _window,

@@ -1,3 +1,5 @@
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -5,6 +7,7 @@ import 'package:remya_bar/features/popups/bar_popup.dart';
 import 'package:remya_bar/features/popups/bar_card_surface.dart';
 import 'package:remya_bar/widgets/bar_hover_card.dart';
 import 'package:remya_bar/widgets/bar_pill.dart';
+import 'package:remya_bar/widgets/bar_tooltip.dart';
 import 'package:remya_ui/remya_ui.dart';
 
 late BarPopup _popup;
@@ -43,10 +46,78 @@ void main() {
         .setMockMethodCallHandler(_popup.channel, null);
   });
 
+  testWidgets('weather opens only on activation and toggles on another click', (
+    tester,
+  ) async {
+    final calls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      _popup.channel,
+      (call) async {
+        calls.add(call);
+        return null;
+      },
+    );
+    await tester.pumpWidget(
+      _host(
+        BarTooltip(
+          message: 'Taipei · Cloudy',
+          showOnFocus: true,
+          suppressWhenCardOpen: 'weather',
+          child: BarPill(
+            card: const BarPillCard(
+              kind: 'weather',
+              size: Size(420, 588),
+              hoverOpens: false,
+              openOnTap: true,
+            ),
+            builder: (_, _) => const Text('12°'),
+          ),
+        ),
+      ),
+    );
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: tester.getCenter(find.text('12°')));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(
+      calls.where((call) => call.method == 'show').single.arguments,
+      containsPair('kind', 'tooltip'),
+    );
+    await mouse.moveTo(const Offset(0, 0));
+    await tester.pumpAndSettle();
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(calls.last.arguments, containsPair('kind', 'tooltip'));
+    expect(calls.last.method, 'show');
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(calls.last.arguments, containsPair('kind', 'weather'));
+    expect(calls.last.method, 'show');
+    _popup.openCard.value = 'weather';
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(calls.last.arguments, containsPair('kind', 'tooltip'));
+    expect(calls.last.method, 'hide');
+    final beforeClose = calls.length;
+    await tester.tap(find.text('12°'));
+    await tester.pump();
+    expect(
+      calls
+          .skip(beforeClose)
+          .where((call) => call.method == 'hide')
+          .single
+          .arguments,
+      containsPair('kind', 'weather'),
+    );
+    _popup.openCard.value = null;
+    await mouse.removePointer();
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
     'card state attaches only the matching pill with the card surface color',
     (tester) async {
       const seed = Color(0xFFCA3821);
+      const theme = RemyaTheme(contrast: .high);
       await tester.pumpWidget(
         _host(
           BarPill(
@@ -59,13 +130,15 @@ void main() {
             background: const ColoredBox(color: Colors.red),
             builder: (_, _) => const Text('Media'),
           ),
+          theme: theme,
         ),
       );
       final context = tester.element(find.byType(BarPill));
       final expected = BarCardSurface.colors(
         Theme.of(context),
         seed,
-        RemyaTheme().styleVariant,
+        theme.styleVariant,
+        contrastLevel: theme.contrast.level,
       );
       _popup.openCard.value = 'media';
       await tester.pumpAndSettle();

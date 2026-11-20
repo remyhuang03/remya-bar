@@ -25,13 +25,21 @@ static CLIENT: LazyLock<Result<Client, reqwest::Error>> = LazyLock::new(|| {
         .build()
 });
 
-pub(super) async fn search(query: &str, language: &str) -> Result<Vec<WeatherLocation>, String> {
-    let data = get(
-        GEOCODING_URL,
-        &[("name", query), ("language", language), ("count", "10")],
-    )
-    .await?;
-    parse_locations(data)
+pub(super) async fn search(
+    query: &str,
+    language: &str,
+    country_code: Option<&str>,
+) -> Result<Vec<WeatherLocation>, String> {
+    let mut params = vec![
+        ("name", query),
+        ("count", "10"),
+        ("language", language),
+        ("format", "json"),
+    ];
+    if let Some(country) = country_code {
+        params.push(("countryCode", country));
+    }
+    parse_locations(get(GEOCODING_URL, &params).await?)
 }
 
 pub(super) async fn forecast(latitude: f64, longitude: f64) -> Result<WeatherSnapshot, String> {
@@ -41,17 +49,18 @@ pub(super) async fn forecast(latitude: f64, longitude: f64) -> Result<WeatherSna
             ("latitude", &latitude.to_string()),
             ("longitude", &longitude.to_string()),
             ("timezone", "auto"),
-            ("timeformat", "unixtime"),
             ("temperature_unit", "celsius"),
             ("wind_speed_unit", "kmh"),
+            ("precipitation_unit", "mm"),
+            ("timeformat", "unixtime"),
             ("forecast_hours", "25"),
             ("forecast_days", "7"),
             (
                 "current",
-                "temperature_2m,apparent_temperature,weather_code,is_day,relative_humidity_2m,wind_speed_10m",
+                "temperature_2m,apparent_temperature,weather_code,is_day,relative_humidity_2m,wind_speed_10m,wind_direction_10m",
             ),
-            ("hourly", "temperature_2m,weather_code,is_day,precipitation_probability"),
-            ("daily", "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"),
+            ("hourly", "temperature_2m,weather_code,is_day,precipitation_probability,precipitation"),
+            ("daily", "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset"),
         ],
     )
     .await?;
@@ -71,10 +80,23 @@ async fn get(url: &str, query: &[(&str, &str)]) -> Result<Value, String> {
     })?;
     let status = response.status();
     if !status.is_success() {
-        return Err(format!(
-            "Weather provider returned HTTP {}",
-            status.as_u16()
-        ));
+        let mut error = format!("Weather provider returned HTTP {}", status.as_u16());
+        if let Some(delay) = response
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| {
+                value.parse::<i64>().ok().or_else(|| {
+                    DateTime::parse_from_rfc2822(value)
+                        .ok()
+                        .map(|date| date.timestamp().saturating_sub(Utc::now().timestamp()))
+                })
+            })
+            .filter(|seconds| *seconds > 0)
+        {
+            error.push_str(&format!("; retry after {delay}"));
+        }
+        return Err(error);
     }
     let length = response.content_length().unwrap_or_default();
     if length > MAX_RESPONSE_BYTES as u64 {
@@ -103,6 +125,7 @@ struct Place {
     id: i32,
     name: String,
     admin1: Option<String>,
+    timezone: Option<String>,
     country: Option<String>,
     latitude: f64,
     longitude: f64,
@@ -130,6 +153,7 @@ fn parse_locations(mut data: Value) -> Result<Vec<WeatherLocation>, String> {
             name: place.name,
             region: place.admin1.filter(|value| valid_label(value)),
             country: place.country.filter(|value| valid_label(value)),
+            timezone: place.timezone.filter(|value| valid_label(value)),
             latitude: place.latitude,
             longitude: place.longitude,
         })
@@ -150,6 +174,7 @@ struct Current {
     is_day: Option<u8>,
     relative_humidity_2m: Option<f64>,
     wind_speed_10m: Option<f64>,
+    wind_direction_10m: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -159,6 +184,7 @@ struct Hourly {
     weather_code: Option<Vec<Option<u8>>>,
     is_day: Option<Vec<Option<u8>>>,
     precipitation_probability: Option<Vec<Option<f64>>>,
+    precipitation: Option<Vec<Option<f64>>>,
 }
 
 #[derive(Deserialize)]
@@ -168,6 +194,9 @@ struct Daily {
     temperature_2m_max: Option<Vec<Option<f64>>>,
     weather_code: Option<Vec<Option<u8>>>,
     precipitation_probability_max: Option<Vec<Option<f64>>>,
+    precipitation_sum: Option<Vec<Option<f64>>>,
+    sunrise: Option<Vec<Option<i64>>>,
+    sunset: Option<Vec<Option<i64>>>,
 }
 
 fn parse_forecast(mut data: Value, fetched_at: i64) -> Result<WeatherSnapshot, String> {
@@ -224,6 +253,10 @@ fn parse_current(raw: Current, hourly: &[WeatherHour]) -> Option<WeatherCurrent>
         temperature_c: raw.temperature_2m,
         feels_like_c: raw.apparent_temperature,
         condition: condition(raw.weather_code, raw.is_day),
+        weather_code: raw.weather_code,
+        wind_direction: raw
+            .wind_direction_10m
+            .filter(|value| (0.0..=360.0).contains(value)),
         humidity_percent: percent(raw.relative_humidity_2m),
         wind_kmh: raw.wind_speed_10m.filter(|wind| *wind >= 0.0),
         precipitation_probability,
@@ -249,15 +282,18 @@ fn parse_hours(raw: Hourly) -> Vec<WeatherHour> {
             let hour = WeatherHour {
                 valid_at,
                 temperature_c: at(&raw.temperature_2m, index, len),
+                weather_code: at(&raw.weather_code, index, len),
                 condition: condition(
                     at(&raw.weather_code, index, len),
                     at(&raw.is_day, index, len),
                 ),
                 precipitation_probability: percent(at(&raw.precipitation_probability, index, len)),
+                precipitation_mm: at(&raw.precipitation, index, len).filter(|value| *value >= 0.0),
             };
             (hour.temperature_c.is_some()
                 || hour.condition.is_some()
-                || hour.precipitation_probability.is_some())
+                || hour.precipitation_probability.is_some()
+                || hour.precipitation_mm.is_some())
             .then_some(hour)
         })
         .collect();
@@ -278,6 +314,11 @@ fn parse_days(raw: Daily, offset: FixedOffset) -> Vec<WeatherDay> {
             let date = DateTime::from_timestamp(local, 0)?.date_naive().to_string();
             let day = WeatherDay {
                 date,
+                precipitation_mm: at(&raw.precipitation_sum, index, len)
+                    .filter(|value| *value >= 0.0),
+                sunrise: at(&raw.sunrise, index, len),
+                sunset: at(&raw.sunset, index, len),
+                weather_code: at(&raw.weather_code, index, len),
                 low_c: at(&raw.temperature_2m_min, index, len),
                 high_c: at(&raw.temperature_2m_max, index, len),
                 condition: condition(at(&raw.weather_code, index, len), None),
@@ -290,7 +331,10 @@ fn parse_days(raw: Daily, offset: FixedOffset) -> Vec<WeatherDay> {
             (day.low_c.is_some()
                 || day.high_c.is_some()
                 || day.condition.is_some()
-                || day.precipitation_probability.is_some())
+                || day.precipitation_probability.is_some()
+                || day.precipitation_mm.is_some()
+                || day.sunrise.is_some()
+                || day.sunset.is_some())
             .then_some(day)
         })
         .collect();
