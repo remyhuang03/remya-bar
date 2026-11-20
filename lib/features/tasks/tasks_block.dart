@@ -869,7 +869,10 @@ class _TasksBlockState extends State<TasksBlock> {
           ],
         ),
         if (hasContent) ...[
-          if (!widget.compact && _view == .today && query.isEmpty)
+          if (!widget.compact &&
+              _view == .today &&
+              query.isEmpty &&
+              matching + matchingCompleted > 0)
             _TodaySummary(remaining: matching, completed: matchingCompleted),
           _ViewFilters(
             selected: _view,

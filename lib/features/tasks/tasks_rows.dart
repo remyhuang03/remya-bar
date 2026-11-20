@@ -218,7 +218,7 @@ class _TodaySummary extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final total = remaining + completed;
-    final progress = total == 0 ? 0.0 : completed / total;
+    final progress = completed / total;
     final percent = '${(progress * 100).round()}%';
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -260,26 +260,24 @@ class _TodaySummary extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (total > 0)
-                    Text(percent, style: const TextStyle(fontSize: 16)),
+                  Text(percent, style: const TextStyle(fontSize: 16)),
                 ],
               ),
-              if (total > 0)
-                LinearProgressIndicator(
-                  // The current Material appearance adds the track gap and stop.
-                  // ignore: deprecated_member_use
-                  year2023: false,
-                  value: progress,
-                  semanticsLabel: 'Today’s task progress',
-                  semanticsValue: percent,
-                  minHeight: 8,
-                  borderRadius: .circular(4),
-                  trackGap: 4,
-                  stopIndicatorRadius: 2,
-                  color: colors.primary,
-                  stopIndicatorColor: colors.primary,
-                  backgroundColor: colors.onPrimary,
-                ),
+              LinearProgressIndicator(
+                // The current Material appearance adds the track gap and stop.
+                // ignore: deprecated_member_use
+                year2023: false,
+                value: progress,
+                semanticsLabel: 'Today’s task progress',
+                semanticsValue: percent,
+                minHeight: 8,
+                borderRadius: .circular(4),
+                trackGap: 4,
+                stopIndicatorRadius: 2,
+                color: colors.primary,
+                stopIndicatorColor: colors.primary,
+                backgroundColor: colors.onPrimary,
+              ),
             ],
           ),
         ),

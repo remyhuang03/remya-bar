@@ -237,12 +237,15 @@ void main() {
       await tester.tap(find.text('View all'));
       await tester.pumpAndSettle();
 
-      expect(find.text('$total of $total done'), findsOneWidget);
       final indicator = find.byType(LinearProgressIndicator);
       if (total == 0) {
+        expect(find.text('left for today'), findsNothing);
+        expect(find.text('0 of 0 done'), findsNothing);
+        expect(find.text('No tasks for today'), findsWidgets);
         expect(indicator, findsNothing);
-        expect(find.text('0%'), findsNothing);
       } else {
+        expect(find.text('left for today'), findsOneWidget);
+        expect(find.text('1 of 1 done'), findsOneWidget);
         expect(tester.widget<LinearProgressIndicator>(indicator).value, 1);
         expect(find.text('100%'), findsOneWidget);
       }
