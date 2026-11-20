@@ -55,16 +55,9 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _TasksMenu extends StatelessWidget {
-  const _TasksMenu({
-    required this.tooltip,
-    required this.items,
-    this.icon = 'more',
-    this.style,
-  });
+  const _TasksMenu({required this.tooltip, required this.items});
 
   final String tooltip;
-  final String icon;
-  final ButtonStyle? style;
   final List<({String label, VoidCallback? action})> items;
 
   @override
@@ -83,188 +76,11 @@ class _TasksMenu extends StatelessWidget {
     ],
     builder: (context, controller, _) => IconButton(
       tooltip: tooltip,
-      style: style,
       onPressed: () =>
           controller.isOpen ? controller.close() : controller.open(),
-      icon: _TaskIcon(icon, 20),
+      icon: const _TaskIcon('more', 20),
     ),
   );
-}
-
-class _ListSelectMenu extends StatelessWidget {
-  const _ListSelectMenu({
-    required this.label,
-    required this.count,
-    required this.selectedId,
-    required this.lists,
-    required this.onSelected,
-  });
-
-  final String label;
-  final int count;
-  final String? selectedId;
-  final List<TaskList> lists;
-  final ValueChanged<String?> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget check(bool selected) => selected
-        ? const Icon(Icons.check_rounded, size: 18)
-        : const SizedBox.square(dimension: 18);
-    return MenuAnchor(
-      alignmentOffset: const Offset(0, 4),
-      style: const MenuStyle(
-        minimumSize: WidgetStatePropertyAll(Size(180, 0)),
-        maximumSize: WidgetStatePropertyAll(Size(264, 320)),
-      ),
-      menuChildren: [
-        MenuItemButton(
-          leadingIcon: check(selectedId == null),
-          onPressed: () => onSelected(null),
-          child: const Text('All lists'),
-        ),
-        for (final list in lists)
-          MenuItemButton(
-            leadingIcon: check(selectedId == list.id),
-            onPressed: () => onSelected(list.id),
-            child: Text(list.title, maxLines: 1, overflow: .ellipsis),
-          ),
-      ],
-      builder: (context, controller, _) => _ListChoiceButton(
-        label: label,
-        count: count,
-        maxLines: 1,
-        onPressed: () =>
-            controller.isOpen ? controller.close() : controller.open(),
-      ),
-    );
-  }
-}
-
-class _ListChoiceButton extends StatelessWidget {
-  const _ListChoiceButton({
-    required this.label,
-    required this.onPressed,
-    this.count,
-    this.icon = 'list',
-    this.maxLines = 2,
-  });
-
-  final String label;
-  final String icon;
-  final int? count;
-  final int maxLines;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    return FilledButton.tonal(
-      style: FilledButton.styleFrom(
-        backgroundColor: colors.surfaceContainerHighest,
-        foregroundColor: colors.onSurface,
-        textStyle: theme.textTheme.labelLarge?.copyWith(
-          fontSize: 14,
-          height: 20 / 14,
-        ),
-        minimumSize: const Size(0, 32),
-        visualDensity: .standard,
-        padding: const .fromLTRB(10, 4, 8, 4),
-        tapTargetSize: .shrinkWrap,
-        shape: const StadiumBorder(),
-      ),
-      onPressed: onPressed,
-      child: Row(
-        mainAxisSize: .min,
-        spacing: 6,
-        children: [
-          _TaskIcon(icon, 18),
-          Flexible(
-            child: Text(label, maxLines: maxLines, overflow: .ellipsis),
-          ),
-          if (count != null)
-            Semantics(
-              label: '$count incomplete tasks',
-              excludeSemantics: true,
-              child: _TaskSupporting('$count', color: colors.primary),
-            ),
-          const _TaskIcon('expand-small', 18),
-        ],
-      ),
-    );
-  }
-}
-
-class _ViewFilters extends StatelessWidget {
-  const _ViewFilters({required this.selected, required this.onSelected});
-
-  final _View selected;
-  final ValueChanged<_View> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    return SegmentedButton<_View>(
-      expandedInsets: .zero,
-      showSelectedIcon: false,
-      selected: {selected},
-      onSelectionChanged: (views) => onSelected(views.single),
-      style: SegmentedButton.styleFrom(
-        side: .none,
-        foregroundColor: colors.onSurfaceVariant,
-        selectedForegroundColor: colors.onPrimary,
-        backgroundColor: Colors.transparent,
-        selectedBackgroundColor: Colors.transparent,
-        textStyle: theme.textTheme.labelLarge?.copyWith(
-          fontSize: 13,
-          height: 18 / 13,
-          fontWeight: .w400,
-          letterSpacing: 0,
-        ),
-        shape: const StadiumBorder(),
-        padding: .zero,
-        visualDensity: .standard,
-        tapTargetSize: .shrinkWrap,
-      ),
-      segments: [
-        for (final view in _View.values)
-          ButtonSegment(
-            value: view,
-            label: Padding(
-              padding: .fromSTEB(
-                view == .today ? 0 : 1,
-                0,
-                view == .all ? 0 : 1,
-                0,
-              ),
-              child: Ink(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: selected == view
-                      ? colors.primary
-                      : colors.surfaceContainerHighest,
-                  borderRadius: BorderRadiusDirectional.horizontal(
-                    start: .circular(
-                      selected == view || view == .today ? 20 : 6,
-                    ),
-                    end: .circular(selected == view || view == .all ? 20 : 6),
-                  ),
-                ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 40),
-                  child: Padding(
-                    padding: const .symmetric(horizontal: 4, vertical: 8),
-                    child: Center(child: Text(view.label, textAlign: .center)),
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
 }
 
 class _TodaySummary extends StatelessWidget {
@@ -407,7 +223,7 @@ class _QuickAdd extends StatelessWidget {
     this.focusNode,
     required this.label,
     required this.saving,
-    this.showShortcut = false,
+    this.autofocus = false,
     required this.onSubmitted,
   });
 
@@ -415,13 +231,14 @@ class _QuickAdd extends StatelessWidget {
   final FocusNode? focusNode;
   final String label;
   final bool saving;
-  final bool showShortcut;
+  final bool autofocus;
   final VoidCallback onSubmitted;
 
   @override
   Widget build(BuildContext context) => TextField(
     controller: controller,
     focusNode: focusNode,
+    autofocus: autofocus,
     readOnly: saving,
     maxLength: 1024,
     buildCounter: _lengthCounter,
@@ -439,44 +256,14 @@ class _QuickAdd extends StatelessWidget {
         ),
       ),
       action: ListenableBuilder(
-        listenable: Listenable.merge([controller, focusNode]),
-        builder: (context, _) {
-          if (controller.text.trim().isNotEmpty) {
-            return IconButton(
-              tooltip: 'Add task',
-              onPressed: saving ? null : onSubmitted,
-              icon: const _TaskIcon('add', 20),
-            );
-          }
-          if (!showShortcut || focusNode?.hasFocus == true) {
-            return const SizedBox.shrink();
-          }
-          final colors = Theme.of(context).colorScheme;
-          return Center(
-            widthFactor: 1,
-            child: Semantics(
-              label: 'New task shortcut: N',
-              excludeSemantics: true,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHigh,
-                  borderRadius: .circular(8),
-                ),
-                child: Padding(
-                  padding: const .symmetric(horizontal: 8, vertical: 3),
-                  child: Text(
-                    'N',
-                    style: TextStyle(
-                      color: colors.onSurfaceVariant,
-                      fontSize: 12,
-                      height: 16 / 12,
-                    ),
-                  ),
-                ),
+        listenable: controller,
+        builder: (_, _) => controller.text.trim().isEmpty
+            ? const SizedBox.shrink()
+            : IconButton(
+                tooltip: 'Add task',
+                onPressed: saving ? null : onSubmitted,
+                icon: const _TaskIcon('add', 20),
               ),
-            ),
-          );
-        },
       ),
       radius: 24,
     ),
@@ -518,161 +305,6 @@ class _SearchField extends StatelessWidget {
     ),
     onChanged: (_) => onChanged(),
   );
-}
-
-class _TaskPrompt extends StatelessWidget {
-  const _TaskPrompt({
-    required this.icon,
-    required this.title,
-    this.message,
-    this.action,
-    this.onPressed,
-    this.loading = false,
-    this.inline = false,
-  });
-
-  final String icon;
-  final String title;
-  final String? message;
-  final String? action;
-  final VoidCallback? onPressed;
-  final bool loading;
-  final bool inline;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    if (inline) {
-      return Semantics(
-        liveRegion: true,
-        child: Card(
-          margin: .zero,
-          elevation: 0,
-          color: theme.colorScheme.surfaceContainerHigh,
-          shape: const RoundedRectangleBorder(
-            borderRadius: .all(.circular(20)),
-          ),
-          child: Padding(
-            padding: const .all(16),
-            child: Row(
-              spacing: 12,
-              children: [
-                _TaskIcon(icon, 40),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: .min,
-                    crossAxisAlignment: .start,
-                    spacing: 4,
-                    children: [
-                      Text(title, style: theme.textTheme.titleMedium),
-                      if (message != null) _TaskSupporting(message!),
-                      if (action != null)
-                        TextButton(onPressed: onPressed, child: Text(action!)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-    return Semantics(
-      liveRegion: true,
-      child: Padding(
-        padding: const .symmetric(vertical: 8),
-        child: Column(
-          crossAxisAlignment: .start,
-          spacing: 12,
-          mainAxisSize: .min,
-          children: [
-            _TaskIcon(icon, 40),
-            Text(
-              title,
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: .w600),
-            ),
-            if (message != null) Text(message!),
-            if (action != null)
-              FilledButton(onPressed: onPressed, child: Text(action!)),
-            if (loading)
-              for (final height in [40.0, 32.0, 40.0])
-                ExcludeSemantics(
-                  child: Container(
-                    width: double.infinity,
-                    height: height,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: .circular(12),
-                    ),
-                  ),
-                ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TaskBanner extends StatelessWidget {
-  const _TaskBanner({
-    this.icon,
-    required this.title,
-    this.detail,
-    required this.action,
-    required this.onPressed,
-  });
-
-  final String? icon;
-  final String title;
-  final String? detail;
-  final String action;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Semantics(
-      liveRegion: true,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.secondaryContainer,
-          borderRadius: .circular(16),
-        ),
-        child: Padding(
-          padding: const .fromLTRB(12, 4, 6, 4),
-          child: Row(
-            spacing: 8,
-            children: [
-              if (icon != null) _TaskIcon(icon!, 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: .start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(color: colors.onSecondaryContainer),
-                    ),
-                    if (detail != null)
-                      _TaskSupporting(
-                        detail!,
-                        color: colors.onSecondaryContainer,
-                      ),
-                  ],
-                ),
-              ),
-              TextButton(
-                onPressed: onPressed,
-                style: TextButton.styleFrom(
-                  foregroundColor: colors.onSecondaryContainer,
-                ),
-                child: Text(action),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 enum _TaskAction {

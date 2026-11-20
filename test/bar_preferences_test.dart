@@ -126,6 +126,19 @@ void main() {
     },
   );
 
+  test('Tasks accepts saved preferences from before automatic-only sync', () {
+    final defaults = _defaults()['tasks'] as Map<String, dynamic>;
+    expect(defaults, isNot(contains('automatic')));
+    expect(
+      () => BarPreferences.validate('tasks', {...defaults, 'automatic': false}),
+      returnsNormally,
+    );
+    expect(
+      () => BarPreferences.validate('tasks', {...defaults, 'automatic': 0}),
+      throwsFormatException,
+    );
+  });
+
   test('folded apps replace the fresh value with its revision and retain on conflict', () async {
     final client = _Client(_defaults());
     addTearDown(client.close);

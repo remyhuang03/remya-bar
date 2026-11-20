@@ -63,9 +63,10 @@ extension _TasksSync on TasksStore {
           continue;
         }
         final now = DateTime.now().toUtc();
-        final due =
-            _automatic && (_nextPull == null || !_nextPull!.isAfter(now));
-        if (!due && !_pull && data.cache.checkpoint != null) return;
+        if (_nextPull case final next?
+            when next.isAfter(now) && !_pull && data.cache.checkpoint != null) {
+          return;
+        }
         final full =
             _full ||
             data.fullRequired ||
@@ -82,9 +83,9 @@ extension _TasksSync on TasksStore {
           rethrow;
         }
         data.fullRequired = false;
-        _nextPull = _automatic
-            ? DateTime.now().toUtc().add(_pullInterval(data.cache.lists.length))
-            : null;
+        _nextPull = DateTime.now().toUtc().add(
+          _pullInterval(data.cache.lists.length),
+        );
         _clearBackoff();
         _publish();
       }
@@ -119,7 +120,7 @@ extension _TasksSync on TasksStore {
       }
     }
     if (status.tasks && (!same || !hadGrant || reconnect)) {
-      _pull |= reconnect || _automatic || _data?.cache.checkpoint == null;
+      _pull = true;
     }
     _clearBackoff();
     _publish();
@@ -132,7 +133,7 @@ extension _TasksSync on TasksStore {
         (_problem == .authRequired || _account?.pending == true)) {
       return;
     }
-    final time = _retryAt ?? (_automatic ? _nextPull : null);
+    final time = _retryAt ?? _nextPull;
     if (time == null) return;
     final delay = time.difference(DateTime.now().toUtc());
     _timer = Timer(delay.isNegative ? Duration.zero : delay, () {

@@ -14,7 +14,6 @@ class TasksPreferences {
     this.sidebar = true,
     this.notifications = false,
     this.previewRows = 3,
-    this.automatic = true,
   });
 
   factory TasksPreferences.fromJson(Map value, {String? accountId}) =>
@@ -39,7 +38,6 @@ class TasksPreferences {
         sidebar: value['sidebar'] as bool,
         notifications: value['notifications'] as bool,
         previewRows: value['preview-rows'] as int,
-        automatic: value['automatic'] as bool,
       );
 
   final String defaultList;
@@ -54,5 +52,4 @@ class TasksPreferences {
   final bool sidebar;
   final bool notifications;
   final int previewRows;
-  final bool automatic;
 }

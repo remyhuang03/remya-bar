@@ -1,30 +1,5 @@
 part of 'tasks_block.dart';
 
-const _googleTasksUrl = 'https://calendar.google.com/calendar/u/0/r/tasks';
-
-Uri? _httpsUrl(String? value) {
-  final uri = value == null ? null : Uri.tryParse(value);
-  return uri?.scheme == 'https' && uri!.host.isNotEmpty && uri.userInfo.isEmpty
-      ? uri
-      : null;
-}
-
-Future<void> _openLink(String? value) async {
-  final uri = _httpsUrl(value);
-  if (uri != null) {
-    try {
-      final result = await Process.run('xdg-open', [uri.toString()]);
-      if (result.exitCode == 0) return;
-    } on ProcessException {
-      // The opener may be absent on a minimal desktop.
-    }
-  }
-  throw const TasksEditException('Couldn’t open this link.');
-}
-
-Future<void> _openGoogleTasks([String? value]) =>
-    _openLink(_httpsUrl(value)?.toString() ?? _googleTasksUrl);
-
 TextStyle? _dialogTitle(BuildContext context) =>
     Theme.of(context).textTheme.headlineSmall
         ?.copyWith(fontWeight: .w700, height: 30 / 24);
@@ -202,7 +177,7 @@ class _TaskConfirmationState extends State<_TaskConfirmation> {
             TextButton(
               onPressed: () async {
                 try {
-                  await _openLink(widget.source);
+                  await openTaskLink(widget.source);
                 } on Object catch (error) {
                   if (mounted) setState(() => _error = _actionError(error));
                 }
@@ -753,10 +728,12 @@ class _TaskEditorState extends State<_TaskEditor> {
                                 }
                               case .external:
                                 await _run(
-                                  () => _openGoogleTasks(child.webViewLink),
+                                  () => openGoogleTasks(child.webViewLink),
                                 );
                               case .source:
-                                await _run(() => _openLink(child.sourceLink));
+                                await _run(
+                                  () => openTaskLink(child.sourceLink),
+                                );
                               case .issues:
                                 await showDialog<void>(
                                   context: context,
@@ -783,12 +760,12 @@ class _TaskEditorState extends State<_TaskEditor> {
                     saving: _busy,
                     onSubmitted: () => _addSubtask(current),
                   ),
-                if (_httpsUrl(current.sourceLink) != null)
+                if (taskHttpsUrl(current.sourceLink) != null)
                   Align(
                     alignment: .centerLeft,
                     child: TextButton.icon(
                       onPressed: () =>
-                          _run(() => _openLink(current.sourceLink)),
+                          _run(() => openTaskLink(current.sourceLink)),
                       icon: const _TaskIcon('external', 18),
                       label: const Text('Open source'),
                     ),
@@ -800,7 +777,7 @@ class _TaskEditorState extends State<_TaskEditor> {
                   alignment: .centerLeft,
                   child: TextButton.icon(
                     onPressed: () =>
-                        _run(() => _openGoogleTasks(current.webViewLink)),
+                        _run(() => openGoogleTasks(current.webViewLink)),
                     icon: const _TaskIcon('external', 18),
                     label: const Text('Open in Google Tasks'),
                   ),
@@ -1516,7 +1493,7 @@ class _SyncIssuesState extends State<_SyncIssues> {
                               ? null
                               : () => _run(
                                   () =>
-                                      _openGoogleTasks(issue.task?.webViewLink),
+                                      openGoogleTasks(issue.task?.webViewLink),
                                 ),
                           child: const Text('Open in Google Tasks'),
                         ),

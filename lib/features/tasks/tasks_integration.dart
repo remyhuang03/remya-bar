@@ -23,14 +23,10 @@ class TasksIntegration {
         : TasksPreferences.fromJson(value, accountId: store.account?.accountId);
   }
 
-  Future<void> start() async {
-    store.setAutomatic(false);
-    settings.addListener(_applyAutomatic);
-    await settings.start();
+  Future<void> start() {
     store.start();
+    return settings.start();
   }
-
-  void _applyAutomatic() => store.setAutomatic(preferences.automatic);
 
   void dispose() {
     settings.dispose();

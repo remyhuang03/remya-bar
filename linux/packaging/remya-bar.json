@@ -70,8 +70,7 @@
         "today-includes-unscheduled": false,
         "sidebar": true,
         "notifications": false,
-        "preview-rows": 3,
-        "automatic": true
+        "preview-rows": 3
       },
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -135,7 +134,9 @@
             ]
           },
           "automatic": {
-            "type": "boolean"
+            "type": "boolean",
+            "deprecated": true,
+            "description": "Ignored. Accepted for existing saved Tasks preferences."
           }
         },
         "required": [
@@ -150,8 +151,7 @@
           "today-includes-unscheduled",
           "sidebar",
           "notifications",
-          "preview-rows",
-          "automatic"
+          "preview-rows"
         ],
         "additionalProperties": false
       }

@@ -1,16 +1,18 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'tasks_links.dart';
 import 'tasks_preferences.dart';
 import 'tasks_store.dart';
 
+part 'tasks_card.dart';
 part 'tasks_dialogs.dart';
 part 'tasks_rows.dart';
+part 'tasks_status.dart';
 
 /// A task list without an outer surface, shared by both popup hosts.
 class TasksBlock extends StatefulWidget {
@@ -56,13 +58,13 @@ enum _Group {
   final String label;
 }
 
+enum _Section { completed }
+
 typedef _TaskKey = ({String list, String task});
 
 _TaskKey _key(GoogleTask task) => (list: task.listId, task: task.id);
 
 class _TasksBlockState extends State<TasksBlock> {
-  final _quickAdd = TextEditingController();
-  final _quickFocus = FocusNode();
   final _search = TextEditingController();
   final _searchFocus = FocusNode();
   final _opened = <_TaskKey>{};
@@ -76,7 +78,6 @@ class _TasksBlockState extends State<TasksBlock> {
   GoogleTask? _undo;
   String? _error;
   Timer? _noticeTimer;
-  bool _adding = false;
   bool _connecting = false;
   bool _showHidden = false;
   bool _showSearch = false;
@@ -130,8 +131,6 @@ class _TasksBlockState extends State<TasksBlock> {
     _store.removeListener(_onStoreChange);
     _viewPreferences.dispose();
     _noticeTimer?.cancel();
-    _quickAdd.dispose();
-    _quickFocus.dispose();
     _search.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -146,7 +145,6 @@ class _TasksBlockState extends State<TasksBlock> {
         _showHidden = false;
         _noticeTimer?.cancel();
         _opened.clear();
-        _quickAdd.clear();
         _search.clear();
         _showSearch = false;
         _undo = null;
@@ -191,21 +189,17 @@ class _TasksBlockState extends State<TasksBlock> {
 
   Future<void> _add() async {
     final list = _destination;
-    final title = _quickAdd.text.trim();
-    if (_adding || list == null || title.isEmpty) return;
-    setState(() => _adding = true);
-    try {
-      GoogleTask? added;
-      final saved = await _run(() async {
-        added = await _store.addTask(list.id, title);
-      });
-      if (saved) {
-        _quickAdd.clear();
-        _quickFocus.requestFocus();
-        _setNotice(added: added);
-      }
-    } finally {
-      if (mounted) setState(() => _adding = false);
+    if (list == null) return;
+    final account = _accountId;
+    final added = await showDialog<GoogleTask>(
+      context: context,
+      builder: (_) => _AccountGuard(
+        store: _store,
+        child: _AddTaskDialog(store: _store, list: list),
+      ),
+    );
+    if (mounted && account == _accountId && added != null) {
+      _setNotice(added: added);
     }
   }
 
@@ -253,7 +247,7 @@ class _TasksBlockState extends State<TasksBlock> {
     }
   }
 
-  KeyEventResult _quickAddShortcut(FocusNode node, KeyEvent event) {
+  KeyEventResult _addShortcut(FocusNode node, KeyEvent event) {
     final keyboard = HardwareKeyboard.instance;
     if (event is! KeyDownEvent ||
         event.logicalKey != LogicalKeyboardKey.keyN ||
@@ -261,14 +255,13 @@ class _TasksBlockState extends State<TasksBlock> {
         keyboard.isAltPressed ||
         keyboard.isMetaPressed ||
         keyboard.isShiftPressed ||
-        !_quickFocus.canRequestFocus ||
-        _quickFocus.context == null ||
+        _destination == null ||
         FocusManager.instance.primaryFocus?.context
                 ?.findAncestorWidgetOfExactType<EditableText>() !=
             null) {
       return .ignored;
     }
-    _quickFocus.requestFocus();
+    unawaited(_add());
     return .handled;
   }
 
@@ -284,13 +277,8 @@ class _TasksBlockState extends State<TasksBlock> {
           if (!list.pending) (id: list.id, label: list.title),
       ],
     );
-    if (id != null &&
-        mounted &&
-        account == _accountId &&
-        await _run(() => widget.onSetDefaultList(id))) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _quickFocus.requestFocus();
-      });
+    if (id != null && mounted && account == _accountId) {
+      await _run(() => widget.onSetDefaultList(id));
     }
   }
 
@@ -358,36 +346,6 @@ class _TasksBlockState extends State<TasksBlock> {
     builder: (_) => _SyncIssues(store: _store),
   );
 
-  Future<void> _bulkDelete(List<GoogleTask> tasks) async {
-    final account = _accountId;
-    final assigned = tasks.where((task) => task.assigned).length;
-    final confirmed = await _confirm(
-      context,
-      title: 'Delete ${tasks.length} completed tasks?',
-      message: [
-        'Each task will be deleted separately. Failed deletions remain visible.',
-        if (assigned > 0)
-          '$assigned assigned tasks will also be deleted from their sources.',
-      ].join(' '),
-      action: 'Delete completed tasks',
-      store: _store,
-    );
-    if (!confirmed || !mounted || account != _accountId) return;
-    var failures = 0;
-    final children = tasks.where((task) => task.parent != null);
-    final parents = tasks.where((task) => task.parent == null);
-    for (final task in [...children, ...parents]) {
-      if (account != _accountId || !mounted) break;
-      if (!await _run(() => _store.deleteTask(task))) failures++;
-    }
-    if (mounted && failures > 0 && account == _accountId) {
-      setState(
-        () =>
-            _error = 'Could not queue $failures of ${tasks.length} deletions.',
-      );
-    }
-  }
-
   Future<void> _rowAction(
     _TaskAction action,
     GoogleTask task,
@@ -416,9 +374,9 @@ class _TasksBlockState extends State<TasksBlock> {
       case .delete:
         await _deleteTask(context, _store, task, children.length, _run);
       case .source:
-        await _run(() => _openLink(task.sourceLink));
+        await _run(() => openTaskLink(task.sourceLink));
       case .external:
-        await _run(() => _openGoogleTasks(task.webViewLink));
+        await _run(() => openGoogleTasks(task.webViewLink));
       case .issues:
         await _reviewChanges();
     }
@@ -439,6 +397,11 @@ class _TasksBlockState extends State<TasksBlock> {
     );
   }
 
+  void _toggleArchived() => setState(() {
+    _showHidden = !_showHidden;
+    if (_showHidden) _showCompleted = true;
+  });
+
   bool _matchesDate(GoogleTask task, DateTime now) {
     final date = task.scheduled;
     return switch (_view) {
@@ -446,7 +409,7 @@ class _TasksBlockState extends State<TasksBlock> {
         date == null
             ? _preferences.todayIncludesUnscheduled
             : DateUtils.isSameDay(date, now),
-      .upcoming => date != null && _group(date, now) == .upcoming,
+      .upcoming => date != null && _taskGroup(date, now) == .upcoming,
       .all => true,
     };
   }
@@ -454,40 +417,6 @@ class _TasksBlockState extends State<TasksBlock> {
   bool _matchesSearch(GoogleTask task, String query) =>
       task.title.toLowerCase().contains(query) ||
       task.notes.toLowerCase().contains(query);
-
-  _Group _group(DateTime? date, DateTime now) {
-    if (date == null) return .unscheduled;
-    final day = DateUtils.dateOnly(date);
-    if (day == now) return .today;
-    return day.isBefore(now) ? .earlier : .upcoming;
-  }
-
-  List<Object> _rows(
-    List<GoogleTask> parents,
-    Map<_TaskKey, List<GoogleTask>> children,
-    DateTime now, {
-    required bool groupByDate,
-  }) {
-    final rows = <Object>[];
-    _Group? previous;
-    for (final task in parents) {
-      if (groupByDate) {
-        final group = _group(task.scheduled, now);
-        if (group != previous) rows.add(group);
-        previous = group;
-      }
-      final remaining = [task];
-      while (remaining.isNotEmpty) {
-        final row = remaining.removeLast();
-        rows.add(row);
-        if (_opened.contains(_key(row))) {
-          final subtasks = children[_key(row)];
-          if (subtasks != null) remaining.addAll(subtasks.reversed);
-        }
-      }
-    }
-    return rows;
-  }
 
   Widget _row(
     GoogleTask task,
@@ -547,100 +476,14 @@ class _TasksBlockState extends State<TasksBlock> {
     );
   }
 
-  Widget _connectionState() => switch (_store.state) {
-    .disconnected => _TaskPrompt(
-      icon: 'state-task',
-      title: 'Connect Google Tasks',
-      message:
-          'Remya can view, edit and delete tasks with your Google account.',
-      action: 'Connect Google Tasks',
-      onPressed: _connecting ? null : _connect,
-    ),
-    .authRequired => _TaskPrompt(
-      icon: 'state-offline',
-      title: 'Reconnect to sync',
-      message: _store.pendingCount > 0
-          ? 'Your changes are saved on this device.'
-          : 'Reconnect Google Tasks to get your lists.',
-      action: 'Reconnect',
-      onPressed: _connecting ? null : _connect,
-    ),
-    .error || .offline => _TaskPrompt(
-      icon: 'state-error',
-      title: 'Couldn’t sync your tasks',
-      message: _store.error ?? 'Try again when you are ready.',
-      action: 'Retry',
-      onPressed: () => _run(_store.retry),
-    ),
-    _ => const _TaskPrompt(
-      icon: 'state-sync',
-      title: 'Getting your tasks',
-      message: 'Loading your lists for the first time.',
-      loading: true,
-    ),
-  };
-
-  Widget? _syncBanner() {
-    final pending = _store.pendingCount;
-    final waiting =
-        '$pending ${pending == 1 ? 'change' : 'changes'} waiting to sync';
-    return switch (_store.state) {
-      .offline => _TaskBanner(
-        icon: 'offline',
-        title: 'Offline',
-        detail: waiting,
-        action: 'Retry',
-        onPressed: () => _run(_store.retry),
-      ),
-      .authRequired => _TaskBanner(
-        icon: 'offline',
-        title: 'Reconnect to sync',
-        detail: pending > 0 ? waiting : null,
-        action: 'Reconnect',
-        onPressed: _connecting ? null : _connect,
-      ),
-      .error => _TaskBanner(
-        title: 'Couldn’t sync',
-        detail: pending > 0
-            ? 'Your changes are saved on this device.'
-            : _store.error,
-        action: _store.issues.isEmpty ? 'Retry' : 'Review',
-        onPressed: _store.issues.isEmpty
-            ? () => _run(_store.retry)
-            : _reviewChanges,
-      ),
-      .conflict => _TaskBanner(
-        title: 'This task changed elsewhere.',
-        action: 'Resolve',
-        onPressed: _reviewChanges,
-      ),
-      _ => null,
-    };
-  }
-
-  String _syncLabel(BuildContext context) {
-    final last = _store.lastSync;
-    if (_store.state == .syncing || _store.state == .loading) return 'Syncing…';
-    if (last == null) return 'Waiting to sync';
-    final local = MaterialLocalizations.of(context);
-    final time = local.formatTimeOfDay(TimeOfDay.fromDateTime(last.toLocal()));
-    final recent = DateTime.now().difference(last) < const Duration(minutes: 1);
-    if (_store.state == .ready && recent) return 'Synced just now';
-    final date = DateUtils.isSameDay(last.toLocal(), DateTime.now())
-        ? 'today'
-        : local.formatShortDate(last.toLocal());
-    return 'Last synced $date at $time';
-  }
-
   @override
   Widget build(BuildContext context) => Focus(
     canRequestFocus: false,
-    onKeyEvent: _quickAddShortcut,
+    onKeyEvent: _addShortcut,
     child: _buildBlock(context),
   );
 
   Widget _buildBlock(BuildContext context) {
-    final theme = Theme.of(context);
     final now = DateUtils.dateOnly(DateTime.now());
     final visible = _visibleLists;
     final listNames = {for (final list in visible) list.id: list.title};
@@ -677,9 +520,6 @@ class _TasksBlockState extends State<TasksBlock> {
         : _store.findTask(_recent!.listId, _recent!.id);
     final undo = undone == null ? null : _key(undone);
     final recent = added == null ? null : _key(added);
-    final allCompleted = active.values
-        .where((task) => task.completed && !task.pending)
-        .toList();
     var matching = 0;
     var matchingCompleted = 0;
     for (final entry in active.entries) {
@@ -711,10 +551,10 @@ class _TasksBlockState extends State<TasksBlock> {
       if (_key(a) == recent) return -1;
       if (_key(b) == recent) return 1;
       if (!_manualOrder) {
-        final group = _group(
+        final group = _taskGroup(
           a.scheduled,
           now,
-        ).index.compareTo(_group(b.scheduled, now).index);
+        ).index.compareTo(_taskGroup(b.scheduled, now).index);
         if (group != 0) return group;
         if (a.scheduled != null && b.scheduled != null) {
           final date = a.scheduled!.compareTo(b.scheduled!);
@@ -727,25 +567,28 @@ class _TasksBlockState extends State<TasksBlock> {
     final limit = widget.compact
         ? widget.preferences.previewRows
         : parents.length;
-    final rows = _rows(
+    final rows = _taskRows(
       parents.take(limit).toList(),
       children,
       now,
       groupByDate: _view == .all && !_manualOrder,
+      opened: _opened,
     );
-    if ((_showCompleted || _showHidden) && completed.isNotEmpty) {
-      rows
-        ..add('Completed')
-        ..addAll(
-          _rows(
-            widget.compact ? completed.take(limit).toList() : completed,
-            children,
-            now,
-            groupByDate: false,
-          ),
-        );
+    final showCompleted = _showCompleted && completed.isNotEmpty;
+    final hasTaskRows = rows.isNotEmpty || showCompleted;
+    if (completed.isNotEmpty) rows.add(_Section.completed);
+    if (showCompleted) {
+      rows.addAll(
+        _taskRows(
+          widget.compact ? completed.take(limit).toList() : completed,
+          children,
+          now,
+          groupByDate: false,
+          opened: _opened,
+        ),
+      );
     }
-    final headerCount = rows.whereType<_Group>().length;
+    final headerCount = rows.where((row) => row is! GoogleTask).length;
     final rowIndexes = {
       for (var index = 0; index < rows.length; index++)
         if (rows[index] is GoogleTask) _key(rows[index] as GoogleTask): index,
@@ -754,135 +597,44 @@ class _TasksBlockState extends State<TasksBlock> {
         _store.lists.isNotEmpty ||
         _store.lastSync != null ||
         _store.state == .ready;
-    final banner = hasContent ? _syncBanner() : null;
-    final actions = _TasksMenu(
-      tooltip: 'Task options',
-      icon: 'settings',
-      style: IconButton.styleFrom(
-        backgroundColor: theme.colorScheme.secondaryContainer,
-        foregroundColor: theme.colorScheme.onSecondaryContainer,
-        minimumSize: const .square(40),
-      ),
-      items: [
-        (label: 'Task settings', action: widget.onSettings),
-        (label: 'Open in Google Tasks', action: () => _run(_openGoogleTasks)),
-        if (hasContent) ...[
-          (label: 'Manage lists', action: _manageLists),
-          (
-            label: 'Sync now',
-            action: () => _run(() => _store.refresh(full: true)),
-          ),
-          if (_listId != null)
-            (
-              label: _manualOrder
-                  ? 'Sort by Scheduled date'
-                  : 'Sort by My order',
-              action: () => setState(() => _sortByDate = _manualOrder),
-            ),
-          if (_listId != null && !_manualOrder)
-            (label: 'Switch to My order to reorder', action: null),
-          if (!widget.compact) ...[
-            (
-              label: _showSearch ? 'Hide search' : 'Search tasks',
-              action: () => setState(() {
-                _showSearch = !_showSearch;
-                if (_showSearch) {
-                  _searchFocus.requestFocus();
-                } else {
-                  _search.clear();
-                }
-              }),
-            ),
-            (
-              label: _showHidden
-                  ? 'Hide archived completed tasks'
-                  : 'Show hidden completed tasks',
-              action: () => setState(() {
-                _showHidden = !_showHidden;
-                if (_showHidden) _showCompleted = true;
-              }),
-            ),
-          ],
-          if (allCompleted.isNotEmpty)
-            (
-              label: 'Delete completed tasks…',
-              action: () => _bulkDelete(allCompleted),
-            ),
-          if (_store.issues.isNotEmpty || _store.conflicts.isNotEmpty)
-            (label: 'Review sync issues', action: _reviewChanges),
-        ],
-      ],
+    final status = _TasksStatus(
+      _store,
+      onConnect: _connecting ? null : _connect,
+      onRetry: () => _run(_store.retry),
+      onReview: _reviewChanges,
     );
-    final title = Text(
-      'Tasks',
-      style: theme.textTheme.headlineSmall?.copyWith(
-        fontWeight: .w700,
-        color: theme.brightness == .dark
-            ? theme.colorScheme.primaryFixed
-            : theme.colorScheme.onPrimaryFixedVariant,
-        height: 30 / 24,
-        leadingDistribution: .even,
-      ),
-    );
-    final listMenu = hasContent
-        ? _ListSelectMenu(
-            label: listNames[_listId] ?? 'All lists',
-            count: matching,
-            selectedId: _listId,
-            lists: _visibleLists,
-            onSelected: (id) => setState(() => _listId = id),
-          )
-        : null;
-    final closeButton = widget.compact
-        ? null
-        : IconButton(
-            tooltip: 'Close',
-            onPressed: () => Navigator.pop(context),
-            icon: const _TaskIcon('close', 20),
-          );
     final header = Column(
       crossAxisAlignment: .stretch,
       spacing: widget.compact ? 12 : 16,
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final inlineList =
-                constraints.maxWidth /
-                    MediaQuery.textScalerOf(context).scale(1) >=
-                260;
-            if (inlineList) {
-              return Row(
-                crossAxisAlignment: .center,
-                spacing: 8,
-                children: [
-                  title,
-                  if (listMenu != null)
-                    Expanded(
-                      child: Align(alignment: .centerLeft, child: listMenu),
-                    )
-                  else
-                    const Spacer(),
-                  actions,
-                  ?closeButton,
-                ],
-              );
-            }
-            return Row(
-              crossAxisAlignment: .start,
-              spacing: 8,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: .start,
-                    spacing: 8,
-                    children: [title, ?listMenu],
-                  ),
-                ),
-                actions,
-                ?closeButton,
-              ],
-            );
-          },
+        _TasksHeader(
+          listMenu: hasContent
+              ? _ListSelectMenu(
+                  label: listNames[_listId] ?? 'All lists',
+                  count: matching,
+                  selectedId: _listId,
+                  lists: visible,
+                  onSelected: (id) => setState(() => _listId = id),
+                  onManage: _manageLists,
+                  sortLabel: _listId == null
+                      ? null
+                      : _manualOrder
+                      ? 'Sort by Scheduled date'
+                      : 'Sort by My order',
+                  onSort: () => setState(() => _sortByDate = _manualOrder),
+                  archived: widget.compact
+                      ? null
+                      : (showing: _showHidden, toggle: _toggleArchived),
+                )
+              : null,
+          syncing: hasContent && status.syncing,
+          onSync: hasContent
+              ? () => _run(() => _store.refresh(full: true))
+              : null,
+          onSettings: widget.onSettings,
+          onSearch: hasContent && !widget.compact ? _toggleSearch : null,
+          showingSearch: _showSearch,
+          onClose: widget.compact ? null : () => Navigator.pop(context),
         ),
         if (hasContent) ...[
           if (!widget.compact &&
@@ -894,7 +646,7 @@ class _TasksBlockState extends State<TasksBlock> {
             selected: _view,
             onSelected: (view) => setState(() => _view = view),
           ),
-          ?banner,
+          ?status.banner(),
           if (destination == null)
             OutlinedButton.icon(
               onPressed: _store.lists.isEmpty
@@ -906,15 +658,6 @@ class _TasksBlockState extends State<TasksBlock> {
                     ? 'Create list'
                     : 'Choose a list for new tasks',
               ),
-            )
-          else
-            _QuickAdd(
-              controller: _quickAdd,
-              focusNode: _quickFocus,
-              label: 'Add a task to ${destination.title}',
-              saving: _adding,
-              showShortcut: true,
-              onSubmitted: _add,
             ),
           if (_showSearch)
             _SearchField(
@@ -927,10 +670,31 @@ class _TasksBlockState extends State<TasksBlock> {
       ],
     );
 
+    final completedControl = completed.isEmpty
+        ? null
+        : _CompletedControl(
+            expanded: _showCompleted,
+            onToggle: () => setState(() {
+              _showCompleted = !_showCompleted;
+              if (!_showCompleted) _showHidden = false;
+            }),
+          );
     final list = !hasContent
-        ? _connectionState()
-        : rows.isEmpty
-        ? _emptyState(query, completed.isNotEmpty)
+        ? status.prompt()
+        : !hasTaskRows
+        ? Column(
+            crossAxisAlignment: .stretch,
+            children: [
+              _emptyTasks(
+                _view,
+                query: query,
+                completed: completed.isNotEmpty,
+                onClearSearch: () => setState(_search.clear),
+                onShowCompleted: () => setState(() => _showCompleted = true),
+              ),
+              ?completedControl,
+            ],
+          )
         : ListView.builder(
             shrinkWrap:
                 widget.compact || rows.length <= _preferences.previewRows,
@@ -940,16 +704,13 @@ class _TasksBlockState extends State<TasksBlock> {
                 key is ValueKey<_TaskKey> ? rowIndexes[key.value] : null,
             itemBuilder: (context, index) {
               final entry = rows[index];
-              if (entry is! GoogleTask) {
-                return _SectionLabel(
-                  entry is _Group ? entry.label : entry as String,
-                );
-              }
+              if (entry == _Section.completed) return completedControl;
+              if (entry is _Group) return _SectionLabel(entry.label);
               final previousTask = index > 0 && rows[index - 1] is GoogleTask;
               final nextTask =
                   index + 1 < rows.length && rows[index + 1] is GoogleTask;
               return _row(
-                entry,
+                entry as GoogleTask,
                 children,
                 active,
                 siblings,
@@ -964,138 +725,38 @@ class _TasksBlockState extends State<TasksBlock> {
             },
           );
 
-    final footerAction = TextButton.styleFrom(
-      minimumSize: const Size(0, 32),
-      visualDensity: .standard,
-      textStyle: theme.textTheme.labelLarge?.copyWith(
-        fontSize: 13,
-        height: 18 / 13,
-      ),
-      padding: const .symmetric(horizontal: 8, vertical: 4),
-      tapTargetSize: .shrinkWrap,
-    );
-    final footer = Column(
-      crossAxisAlignment: .stretch,
-      spacing: 4,
-      children: [
-        if (_error case final error?)
-          _TaskBanner(
-            title: error,
-            action: 'Dismiss',
-            onPressed: () => setState(() => _error = null),
-          ),
-        if (_undo != null)
-          _TaskBanner(
-            title: 'Task completed',
-            action: 'Undo',
-            onPressed: _undoCompletion,
-          )
-        else if (_recent != null)
-          _TaskBanner(
-            title: 'Task added',
-            action: 'View task',
-            onPressed: _viewAdded,
-          ),
-        if (hasContent) ...[
-          Wrap(
-            alignment: .spaceBetween,
-            crossAxisAlignment: .center,
-            children: [
-              TextButton.icon(
-                style: footerAction.copyWith(
-                  foregroundColor: .resolveWith(
-                    (states) => states.contains(WidgetState.disabled)
-                        ? theme.colorScheme.onSurfaceVariant
-                        : theme.colorScheme.onSurface,
-                  ),
-                ),
-                icon: RotatedBox(
-                  quarterTurns: _showCompleted ? 2 : 0,
-                  child: const _TaskIcon('expand-small', 18),
-                ),
-                onPressed: completed.isEmpty
-                    ? null
-                    : () => setState(() {
-                        _showCompleted = !_showCompleted;
-                        if (!_showCompleted) _showHidden = false;
-                      }),
-                label: Text('Completed · ${completed.length}'),
-              ),
-              if (widget.compact)
-                TextButton(
-                  style: footerAction,
-                  onPressed: _viewAll,
-                  child: const Text('View all'),
-                ),
-            ],
-          ),
-          Row(
-            spacing: 8,
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const .only(left: 8),
-                  child: Row(
-                    spacing: 8,
-                    children: [
-                      const _TaskIcon('sync', 16),
-                      Flexible(child: _TaskSupporting(_syncLabel(context))),
-                    ],
-                  ),
-                ),
-              ),
-              TextButton(
-                style: footerAction.copyWith(
-                  minimumSize: const WidgetStatePropertyAll(Size(0, 24)),
-                  textStyle: WidgetStatePropertyAll(
-                    theme.textTheme.labelMedium?.copyWith(
-                      fontSize: 12,
-                      height: 16 / 12,
-                    ),
-                  ),
-                ),
-                onPressed: _manageLists,
-                child: const Text('Manage lists'),
-              ),
-            ],
-          ),
-        ],
-      ],
+    final footer = _TasksFooter(
+      error: _error == null
+          ? null
+          : _TaskBanner(
+              title: _error!,
+              action: 'Dismiss',
+              onPressed: () => setState(() => _error = null),
+            ),
+      notice: _undo != null
+          ? _TaskBanner(
+              title: 'Task completed',
+              action: 'Undo',
+              onPressed: _undoCompletion,
+            )
+          : _recent != null
+          ? _TaskBanner(
+              title: 'Task added',
+              action: 'View task',
+              onPressed: _viewAdded,
+            )
+          : null,
+      onShowAll: hasContent && widget.compact ? _viewAll : null,
+      onAdd: hasContent && destination != null ? _add : null,
+      syncLabel: hasContent ? status.label(context) : null,
     );
 
     if (!widget.compact) {
-      return LayoutBuilder(
-        builder: (_, constraints) {
-          if (constraints.maxHeight <
-              520 + (MediaQuery.textScalerOf(context).scale(16) - 16) * 16) {
-            return SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: .stretch,
-                spacing: 16,
-                children: [
-                  header,
-                  if (rows.isEmpty)
-                    list
-                  else
-                    SizedBox(height: 200, child: list),
-                  footer,
-                ],
-              ),
-            );
-          }
-          return Column(
-            mainAxisSize: .min,
-            crossAxisAlignment: .stretch,
-            spacing: 16,
-            children: [
-              header,
-              Flexible(
-                child: rows.isEmpty ? SingleChildScrollView(child: list) : list,
-              ),
-              footer,
-            ],
-          );
-        },
+      return _FullTasksLayout(
+        header: header,
+        list: list,
+        hasTaskRows: hasTaskRows,
+        footer: footer,
       );
     }
     final scaler = MediaQuery.textScalerOf(context);
@@ -1107,7 +768,7 @@ class _TasksBlockState extends State<TasksBlock> {
       spacing: 12,
       children: [
         header,
-        if (rows.isEmpty)
+        if (!hasTaskRows)
           list
         else
           ConstrainedBox(
@@ -1115,7 +776,8 @@ class _TasksBlockState extends State<TasksBlock> {
               maxHeight: math.max(
                 240,
                 limit * rowHeight +
-                    headerCount * (16 + scaler.scale(13) * 18 / 13),
+                    headerCount * (16 + scaler.scale(13) * 18 / 13) +
+                    40,
               ),
             ),
             child: list,
@@ -1125,35 +787,14 @@ class _TasksBlockState extends State<TasksBlock> {
     );
   }
 
-  Widget _emptyState(String query, bool completed) {
-    if (query.isNotEmpty) {
-      return _TaskPrompt(
-        inline: true,
-        icon: 'state-empty',
-        title: 'No matching tasks',
-        action: 'Clear search',
-        onPressed: () => setState(_search.clear),
-      );
-    }
-    if (completed) {
-      return _TaskPrompt(
-        inline: true,
-        icon: 'state-task',
-        title: 'Everything is complete',
-        message: 'Your completed tasks are still available.',
-        action: 'View completed',
-        onPressed: () => setState(() => _showCompleted = true),
-      );
-    }
-    return _TaskPrompt(
-      inline: true,
-      icon: 'state-empty',
-      title: switch (_view) {
-        .today => 'No tasks for today',
-        .upcoming => 'No upcoming tasks',
-        .all => 'No tasks yet',
-      },
-      message: 'Add a task or switch views.',
-    );
+  void _toggleSearch() {
+    setState(() {
+      _showSearch = !_showSearch;
+      if (_showSearch) {
+        _searchFocus.requestFocus();
+      } else {
+        _search.clear();
+      }
+    });
   }
 }

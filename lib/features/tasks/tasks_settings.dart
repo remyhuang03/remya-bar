@@ -3,6 +3,7 @@ import 'package:remya_ui/settings_ui.dart';
 
 import '../settings/bar_settings_tiles.dart';
 import 'tasks_integration.dart';
+import 'tasks_links.dart';
 import 'tasks_store.dart';
 
 class TasksSettings extends StatelessWidget {
@@ -63,6 +64,15 @@ class TasksSettings extends StatelessWidget {
               ),
             SettingsGroup(
               title: 'Connection',
+              trailing: TextButton.icon(
+                onPressed: () => _runTaskAction(
+                  context,
+                  'Couldn’t open Google Tasks',
+                  openGoogleTasks,
+                ),
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: const Text('Open in Google Tasks'),
+              ),
               children: [
                 settingTile(
                   status?.email ?? 'Google Tasks',
@@ -244,30 +254,6 @@ class TasksSettings extends StatelessWidget {
                   ),
                 ],
               ),
-              SettingsGroup(
-                title: 'Sync',
-                children: [
-                  choose(
-                    'Remote updates',
-                    'automatic',
-                    preferences.automatic,
-                    const {true: 'Automatic', false: 'Manual'},
-                  ),
-                  settingTile(
-                    'Last synced',
-                    detail: switch (store.lastSync) {
-                      final whenSynced? => _formatSyncTime(context, whenSynced),
-                      null => 'Never',
-                    },
-                    control: OutlinedButton(
-                      onPressed: !connected || store.state == .syncing
-                          ? null
-                          : () => store.refresh(full: true),
-                      child: const Text('Sync now'),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ],
         );
@@ -298,12 +284,6 @@ Future<void> _runTaskAction(
       ),
     );
   }
-}
-
-String _formatSyncTime(BuildContext context, DateTime time) {
-  final local = time.toLocal();
-  final format = MaterialLocalizations.of(context);
-  return '${format.formatCompactDate(local)} ${format.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
 }
 
 /// Save or explicitly discard pending operations before revoking Google access.

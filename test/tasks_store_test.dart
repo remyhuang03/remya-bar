@@ -154,7 +154,6 @@ void main() {
   TasksStore open() {
     final store = TasksStore(client: google, stateDirectory: directory);
     stores.add(store);
-    store.setAutomatic(false);
     store.start();
     return store;
   }
@@ -173,6 +172,27 @@ void main() {
     expect(
       googleScheduledDatePayload(DateTime(2026, 11, 20)),
       '2026-11-20T00:00:00.000Z',
+    );
+  });
+
+  test('refreshes a cached account automatically on startup', () async {
+    final initial = open();
+    await initial.refresh();
+    close(initial);
+    google.calls.clear();
+
+    final reopened = open();
+    final ready = Completer<void>();
+    void onChange() {
+      if (reopened.state == .ready && !ready.isCompleted) ready.complete();
+    }
+
+    reopened.addListener(onChange);
+    await ready.future;
+    reopened.removeListener(onChange);
+    expect(
+      google.calls.singleWhere((call) => call.$2 == 'tasks.list').$3,
+      containsPair('updatedMin', isA<String>()),
     );
   });
 

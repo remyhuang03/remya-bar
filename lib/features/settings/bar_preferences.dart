@@ -305,21 +305,24 @@ class BarPreferences {
           valid = ids.toSet().length == ids.length;
         }
       case 'tasks':
-        valid = _object(value, {
-          'default-list',
-          'default-list-account',
-          'visible-lists',
-          'visible-lists-account',
-          'initial-view',
-          'sort',
-          'completed-expanded',
-          'show-assigned',
-          'today-includes-unscheduled',
-          'sidebar',
-          'notifications',
-          'preview-rows',
-          'automatic',
-        });
+        valid = _object(
+          value,
+          {
+            'default-list',
+            'default-list-account',
+            'visible-lists',
+            'visible-lists-account',
+            'initial-view',
+            'sort',
+            'completed-expanded',
+            'show-assigned',
+            'today-includes-unscheduled',
+            'sidebar',
+            'notifications',
+            'preview-rows',
+          },
+          optional: {'automatic'},
+        );
         if (valid) {
           final map = value as Map;
           final target = map['default-list'];
@@ -343,13 +346,13 @@ class BarPreferences {
               const {'manual', 'date'}.contains(map['sort']) &&
               map['preview-rows'] is int &&
               const {3, 5, 8}.contains(map['preview-rows']) &&
+              (!map.containsKey('automatic') || map['automatic'] is bool) &&
               const [
                 'completed-expanded',
                 'show-assigned',
                 'today-includes-unscheduled',
                 'sidebar',
                 'notifications',
-                'automatic',
               ].every((field) => map[field] is bool);
         }
       case 'ai-ring':

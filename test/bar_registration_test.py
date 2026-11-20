@@ -30,6 +30,7 @@ class RegistrationTest(unittest.TestCase):
             'tasks': [
                 {**settings['tasks']['default'], 'preview-rows': 4},
                 {**settings['tasks']['default'], 'visible-lists': ['same', 'same']},
+                {**settings['tasks']['default'], 'automatic': 'false'},
             ],
             'resources': [
                 {**settings['resources']['default'], 'refresh-interval-ms': 250},
@@ -47,6 +48,14 @@ class RegistrationTest(unittest.TestCase):
             for value in values:
                 with self.subTest(key=key, value=value):
                     self.assertFalse(validator.is_valid(value))
+
+    def test_tasks_accepts_old_saved_sync_preferences(self):
+        setting = self.registration['settings']['tasks']
+        defaults = setting['default']
+        self.assertNotIn('automatic', defaults)
+        validator = Draft202012Validator(setting['schema'])
+        for automatic in (False, True):
+            validator.validate({**defaults, 'automatic': automatic})
 
     def test_weather_location_boundaries(self):
         schema = self.registration['settings']['weather-location']['schema']

@@ -33,7 +33,6 @@ class TasksStore extends ChangeNotifier {
   Future<void>? _running;
   bool _started = false;
   bool _disposed = false;
-  bool _automatic = true;
   bool _readAccount = false;
   bool _accountSignal = false;
   bool _pull = false;
@@ -125,19 +124,6 @@ class TasksStore extends ChangeNotifier {
       if (available) unawaited(_accountChanged());
     }, onError: (Object _) {});
     unawaited(_accountChanged());
-  }
-
-  void setAutomatic(bool value) {
-    if (_automatic == value) return;
-    _automatic = value;
-    if (!_started) return;
-    if (value) {
-      _nextPull = DateTime.now().toUtc();
-      unawaited(_run());
-    } else {
-      _nextPull = null;
-      _schedule();
-    }
   }
 
   Future<void> refresh({bool full = false}) {

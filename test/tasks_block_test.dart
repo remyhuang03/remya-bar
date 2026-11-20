@@ -60,6 +60,23 @@ class _Tasks extends TasksStore {
   Map<String, Object?>? changes;
   Map<String, Object?>? draft;
   GoogleTask? originalDraft;
+  bool? fullRefresh;
+  ({String listId, String title})? added;
+
+  @override
+  Future<void> refresh({bool full = false}) async => fullRefresh = full;
+
+  @override
+  Future<GoogleTask> addTask(
+    String listId,
+    String title, {
+    String? parent,
+    String? previous,
+    DateTime? scheduled,
+  }) async {
+    added = (listId: listId, title: title);
+    return GoogleTask(id: 'new', listId: listId, title: title);
+  }
 
   @override
   Future<void> editTask(
@@ -88,6 +105,7 @@ Future<void> _mount(
   WidgetTester tester,
   _Tasks store, {
   double textScale = 1,
+  VoidCallback? onSettings,
 }) async {
   await tester.binding.setSurfaceSize(const Size(420, 663));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -104,7 +122,7 @@ Future<void> _mount(
           child: TasksBlock(
             store: store,
             preferences: const TasksPreferences(),
-            onSettings: () {},
+            onSettings: onSettings ?? () {},
             onSetDefaultList: (_) async {},
           ),
         ),
@@ -134,12 +152,18 @@ void main() {
       (widget) => widget is SegmentedButton,
     );
     expect(tester.getSize(filters), const Size(372, 40));
+    expect(find.text('Completed'), findsNothing);
     final viewAll = tester.getCenter(find.text('View all'));
-    expect(tester.getCenter(find.text('Completed · 0')).dy, viewAll.dy);
-    expect(viewAll.dx, greaterThan(300));
+    final add = tester.getCenter(find.byType(FloatingActionButton));
+    expect(add.dx, greaterThan(viewAll.dx));
+    expect(find.text('Manage lists'), findsNothing);
+    final syncStatus = find.text('Waiting to sync');
+    final theme = Theme.of(tester.element(syncStatus));
     expect(
-      tester.getCenter(find.text('Manage lists')).dy,
-      closeTo(tester.getCenter(find.text('Waiting to sync')).dy, 1),
+      tester.widget<Text>(syncStatus).style,
+      theme.textTheme.bodySmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
     );
 
     await tester.tap(find.text('View all'));
@@ -255,43 +279,38 @@ void main() {
     });
   }
 
-  testWidgets(
-    'N focuses quick add from a task control and leaves editors alone',
-    (tester) async {
-      await _mount(tester, _Tasks(count: 1));
-      await tester.ensureVisible(find.text('View all'));
-      await tester.tap(find.text('View all'));
-      await tester.pumpAndSettle();
+  testWidgets('N opens Add task from a task control and leaves search alone', (
+    tester,
+  ) async {
+    await _mount(tester, _Tasks(count: 1));
+    await tester.ensureVisible(find.text('View all'));
+    await tester.tap(find.text('View all'));
+    await tester.pumpAndSettle();
 
-      final quick = find.widgetWithText(TextField, 'Add a task to Work').last;
-      final search = find.widgetWithText(TextField, 'Search tasks');
-      final hint = find.descendant(
-        of: find.byType(Dialog),
-        matching: find.text('N'),
-      );
-      expect(hint, findsOneWidget);
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
-      await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(quick).focusNode?.hasFocus, isTrue);
-      expect(hint, findsNothing);
+    final quick = find.widgetWithText(TextField, 'Add a task to Work');
+    final search = find.widgetWithText(TextField, 'Search tasks');
+    expect(quick, findsNothing);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNWidgets(2));
+    expect(tester.testTextInput.isVisible, isTrue);
+    expect(quick, findsOneWidget);
+    await tester.tap(find.byTooltip('Close').last);
+    await tester.pumpAndSettle();
 
-      expect(search, findsNothing);
-      await tester.tap(find.byTooltip('Task options').last);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Search tasks'));
-      await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(search).focusNode?.hasFocus, isTrue);
-      await tester.ensureVisible(search);
-      await tester.tap(search);
-      await tester.enterText(search, 'notes');
-      await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
-      await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(quick).focusNode?.hasFocus, isFalse);
-      expect(find.text('notes'), findsOneWidget);
-      expect(hint, findsOneWidget);
-    },
-  );
+    expect(search, findsNothing);
+    await tester.tap(find.byTooltip('Search tasks'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(search).focusNode?.hasFocus, isTrue);
+    await tester.ensureVisible(search);
+    await tester.tap(search);
+    await tester.enterText(search, 'notes');
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+    await tester.pumpAndSettle();
+    expect(quick, findsNothing);
+    expect(find.text('notes'), findsOneWidget);
+  });
 
   testWidgets('editor resumes a draft and submits only edited fields', (
     tester,
@@ -330,7 +349,53 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('list selector and settings button open in-place menus', (
+  testWidgets('list selector menu and direct header actions', (tester) async {
+    var settingsOpened = false;
+    final store = _Tasks(
+      count: 1,
+      extra: [
+        GoogleTask(
+          id: 'home-1',
+          listId: 'home',
+          title: 'Home task',
+          scheduled: DateUtils.dateOnly(DateTime.now()),
+        ),
+      ],
+    );
+    await _mount(tester, store, onSettings: () => settingsOpened = true);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'All lists'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.byType(MenuItemButton), findsNWidgets(4));
+    final manage = find.widgetWithText(MenuItemButton, 'Manage lists');
+    expect(tester.widget<MenuItemButton>(manage).leadingIcon, isNotNull);
+    await tester.tap(find.widgetWithText(MenuItemButton, 'Home'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(FilledButton, 'Home'), findsOneWidget);
+    expect(find.text('Home task'), findsOneWidget);
+    expect(find.text('Task 1'), findsNothing);
+
+    final sync = find.byTooltip('Sync now');
+    final settings = find.byTooltip('Task settings');
+    expect(tester.getCenter(sync).dx, lessThan(tester.getCenter(settings).dx));
+    await tester.tap(sync);
+    await tester.pumpAndSettle();
+    expect(store.fullRefresh, isTrue);
+    await tester.tap(settings);
+    await tester.pumpAndSettle();
+    expect(settingsOpened, isTrue);
+    expect(find.byType(MenuItemButton), findsNothing);
+
+    await tester.tap(find.byTooltip('Task menu for Home task'));
+    await tester.pumpAndSettle();
+    expect(
+      find.widgetWithText(MenuItemButton, 'Open in Google Tasks'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Completed toggles the rows below it without a count', (
     tester,
   ) async {
     await _mount(
@@ -339,33 +404,87 @@ void main() {
         count: 1,
         extra: [
           GoogleTask(
-            id: 'home-1',
-            listId: 'home',
-            title: 'Home task',
+            id: 'done',
+            listId: 'work',
+            title: 'Done today',
             scheduled: DateUtils.dateOnly(DateTime.now()),
+            completed: true,
           ),
         ],
       ),
     );
+    final completed = find.text('Completed');
+    final row = find.text('Done today');
+    expect(find.textContaining('Completed ·'), findsNothing);
+    expect(row, findsNothing);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'All lists'));
+    await tester.tap(completed);
     await tester.pumpAndSettle();
-    expect(find.byType(Dialog), findsNothing);
-    expect(find.byType(MenuItemButton), findsNWidgets(3));
-    await tester.tap(find.widgetWithText(MenuItemButton, 'Home'));
-    await tester.pumpAndSettle();
-    expect(find.widgetWithText(FilledButton, 'Home'), findsOneWidget);
-    expect(find.text('Home task'), findsOneWidget);
-    expect(find.text('Task 1'), findsNothing);
-
-    await tester.tap(find.byTooltip('Task options'));
-    await tester.pumpAndSettle();
-    expect(find.byType(PopupMenuItem), findsNothing);
+    final button = tester.getRect(find.widgetWithText(TextButton, 'Completed'));
     expect(
-      find.widgetWithText(MenuItemButton, 'Task settings'),
-      findsOneWidget,
+      button.top - tester.getBottomLeft(find.text('Task 1')).dy,
+      greaterThanOrEqualTo(12),
     );
-    expect(find.widgetWithText(MenuItemButton, 'Sync now'), findsOneWidget);
+    expect(tester.getTopLeft(row).dy - button.bottom, greaterThanOrEqualTo(12));
+
+    await tester.tap(completed);
+    await tester.pumpAndSettle();
+    expect(row, findsNothing);
+  });
+
+  testWidgets('Completed stays hidden until archived tasks are shown', (
+    tester,
+  ) async {
+    await _mount(
+      tester,
+      _Tasks(
+        count: 0,
+        extra: [
+          GoogleTask(
+            id: 'archived',
+            listId: 'work',
+            title: 'Archived today',
+            scheduled: DateUtils.dateOnly(DateTime.now()),
+            completed: true,
+            hidden: true,
+          ),
+        ],
+      ),
+    );
+    expect(find.text('No tasks for today'), findsOneWidget);
+    expect(find.text('Completed'), findsNothing);
+
+    await tester.tap(find.text('View all'));
+    await tester.pumpAndSettle();
+    expect(find.text('Completed'), findsNothing);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'All lists').last);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(MenuItemButton, 'Show archived tasks'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Completed'), findsOneWidget);
+    expect(find.text('Archived today'), findsOneWidget);
+  });
+
+  testWidgets('Add task FAB saves to the default list', (tester) async {
+    final store = _Tasks(count: 1);
+    await _mount(tester, store);
+    final fab = find.byType(FloatingActionButton);
+    expect(tester.widget<FloatingActionButton>(fab).child, isA<Icon>());
+    expect(find.text('Add task'), findsNothing);
+    await tester.tap(fab);
+    await tester.pumpAndSettle();
+    final title = find.widgetWithText(TextField, 'Add a task to Work');
+    expect(title, findsOneWidget);
+    await tester.enterText(title, '  New task  ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(store.added, (listId: 'work', title: 'New task'));
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.text('Task added'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 8));
   });
 
   testWidgets('the task list fits its host with enlarged text', (tester) async {
