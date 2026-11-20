@@ -1,4 +1,7 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:lottie/lottie.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_ui/remya_ui.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
@@ -41,37 +44,68 @@ void main() {
     },
   );
 
-  testWidgets('the weather pill keeps a fixed Inter Regular temperature box', (
-    tester,
-  ) async {
-    final weather = _CardWeather();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: BarPopupScope(
-          theme: const RemyaTheme(),
-          child: Material(
-            child: Center(child: BarWeather(weather: weather)),
+  test('forecast hours use a two-digit hour and the chosen clock format', () {
+    final standard = WeatherFormat.forLocale(
+      const Locale('zh', 'TW'),
+      weatherDefaults,
+    );
+    final military = WeatherFormat.forLocale(
+      const Locale('zh', 'TW'),
+      weatherDefaults,
+      use24Hour: true,
+    );
+    int utcHour(int hour) =>
+        DateTime.utc(2026, 11, 21, hour).millisecondsSinceEpoch ~/ 1000;
+    expect(standard.forecastHour(utcHour(16), 'Asia/Taipei'), '12 AM');
+    expect(standard.forecastHour(utcHour(17), 'Asia/Taipei'), '1 AM');
+    expect(standard.forecastHour(utcHour(4), 'Asia/Taipei'), '12 PM');
+    expect(standard.forecastHour(utcHour(9), 'Asia/Taipei'), '5 PM');
+    expect(military.forecastHour(utcHour(17), 'Asia/Taipei'), '01:00');
+    expect(military.forecastHour(utcHour(9), 'Asia/Taipei'), '17:00');
+  });
+
+  testWidgets(
+    'the weather pill reserves 28 pixels and lets longer temperatures grow',
+    (tester) async {
+      final weather = _CardWeather();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BarPopupScope(
+            theme: const RemyaTheme(),
+            child: Material(
+              child: Center(child: BarWeather(weather: weather)),
+            ),
           ),
         ),
-      ),
-    );
-    Finder temperature(String token) => find.text(token);
-    final original = temperature('40°');
-    final box = find
-        .ancestor(of: original, matching: find.byType(SizedBox))
-        .first;
-    final originalWidth = tester.getSize(box).width;
-    final text = tester.widget<Text>(original);
-    expect(text.style?.fontFamily, 'Inter');
-    expect(text.style?.fontWeight, FontWeight.w400);
+      );
+      Finder temperature(String token) => find.text(token);
+      final original = temperature('40°');
+      final box = find.ancestor(
+        of: original,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is ConstrainedBox && widget.constraints.minWidth == 28,
+        ),
+      );
+      final originalWidth = tester.getSize(box).width;
+      final text = tester.widget<Text>(original);
+      expect(text.style?.fontFamily, 'Inter');
+      expect(text.style?.fontWeight, FontWeight.w400);
+      expect(text.textAlign, TextAlign.left);
+      expect(text.overflow, TextOverflow.visible);
+      expect(find.byType(SvgPicture), findsOneWidget);
+      expect(find.byType(LottieBuilder), findsNothing);
 
-    weather.changePill('f', true);
-    await tester.pump();
-    final fahrenheit = find
-        .ancestor(of: temperature('104 °F'), matching: find.byType(SizedBox))
-        .first;
-    expect(tester.getSize(fahrenheit).width, originalWidth);
-  });
+      weather.changePill('f', true);
+      await tester.pump();
+      final fahrenheit = temperature('104 °F');
+      expect(tester.getSize(fahrenheit).width, greaterThan(originalWidth));
+      expect(
+        tester.getTopRight(fahrenheit).dx,
+        lessThan(tester.getTopLeft(find.byIcon(Icons.history_rounded)).dx),
+      );
+    },
+  );
 
   testWidgets(
     'hourly and daily forecasts fit large text and retain cache status',
@@ -108,6 +142,24 @@ void main() {
       );
       expect(updatedText, hasLength(1));
       expect(updatedText.single.data, endsWith('.'));
+      expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.calendar_today_outlined), findsOneWidget);
+      expect(find.byType(LottieBuilder), findsOneWidget);
+      final hourly = find.byWidgetPredicate(
+        (widget) => widget is Scrollable && widget.axis == .horizontal,
+      );
+      await tester.ensureVisible(hourly);
+      final position = tester.state<ScrollableState>(hourly).position;
+      expect(position.pixels, 0);
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          kind: .mouse,
+          position: tester.getCenter(hourly),
+          scrollDelta: const Offset(0, 100),
+        ),
+      );
+      await tester.pump();
+      expect(position.pixels, 100);
       await tester.ensureVisible(find.text('7 days'));
       await tester.tap(find.text('7 days'));
       await tester.pump();
@@ -177,7 +229,10 @@ class _CardWeather extends ChangeNotifier implements WeatherController {
         weatherCode: 97,
         precipitationProbability: 0,
       ),
-      hourly: [WeatherHour(validAt: timestamp + 3600, temperatureC: 38)],
+      hourly: [
+        for (var hour = 1; hour <= 12; hour++)
+          WeatherHour(validAt: timestamp + hour * 3600, temperatureC: 38),
+      ],
       daily: [
         WeatherDay(
           date: now

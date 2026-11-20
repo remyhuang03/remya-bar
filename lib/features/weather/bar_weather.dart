@@ -96,21 +96,20 @@ class BarWeather extends StatelessWidget {
                       ),
                     ),
                   if (content != 'icon')
-                    SizedBox(
-                      width: 42,
-                      child: FittedBox(
-                        fit: .scaleDown,
-                        alignment: .center,
-                        child: Text(
-                          temperature,
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontFamily: barFontFamily,
-                            fontFamilyFallback: barFontFamilyFallback,
-                            fontWeight: .w400,
-                            fontSize: 14,
-                            color: state.foreground,
-                          ),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 28),
+                      child: Text(
+                        temperature,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: .visible,
+                        textAlign: .left,
+                        style: TextStyle(
+                          fontFamily: barFontFamily,
+                          fontFamilyFallback: barFontFamilyFallback,
+                          fontWeight: .w400,
+                          fontSize: 14,
+                          color: state.foreground,
                         ),
                       ),
                     ),

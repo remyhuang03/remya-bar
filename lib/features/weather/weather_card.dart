@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../bar_theme.dart';
@@ -421,7 +422,7 @@ class _WeatherHero extends StatelessWidget {
                       ],
                     ),
                   ),
-                  WeatherIcon(current?.condition, size: 88),
+                  WeatherIcon(current?.condition, size: 88, animated: true),
                 ],
               ),
               Wrap(

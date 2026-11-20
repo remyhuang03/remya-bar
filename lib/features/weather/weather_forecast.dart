@@ -11,11 +11,14 @@ class _ForecastTabs extends StatelessWidget {
     return Row(
       spacing: 3,
       children: [
-        for (final (label, value) in [('Hourly', false), ('7 days', true)])
+        for (final (label, value, icon) in const [
+          ('Hourly', false, Icons.schedule_rounded),
+          ('7 days', true, Icons.calendar_today_outlined),
+        ])
           Expanded(
             child: Semantics(
               selected: value == daily,
-              child: FilledButton(
+              child: FilledButton.icon(
                 onPressed: () => onChange(value),
                 style: FilledButton.styleFrom(
                   padding: const .symmetric(horizontal: 8, vertical: 10),
@@ -42,7 +45,8 @@ class _ForecastTabs extends StatelessWidget {
                           ),
                   ),
                 ),
-                child: Text(label, textAlign: .center),
+                icon: Icon(icon, size: 18),
+                label: Text(label, textAlign: .center),
               ),
             ),
           ),
@@ -76,6 +80,29 @@ class _HourlyForecastState extends State<_HourlyForecast> {
     super.dispose();
   }
 
+  void _scrollWithWheel(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent ||
+        event.kind != .mouse ||
+        event.scrollDelta.dx != 0 ||
+        !_scroll.hasClients) {
+      return;
+    }
+    final position = _scroll.position;
+    final delta = axisDirectionIsReversed(position.axisDirection)
+        ? -event.scrollDelta.dy
+        : event.scrollDelta.dy;
+    final target = (position.pixels + delta).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    // At either edge, let the wheel continue scrolling the card vertically.
+    if (target == position.pixels) return;
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      position.pointerScroll(delta);
+      event.respond(allowPlatformDefault: false);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final current = widget.snapshot.current;
@@ -102,7 +129,7 @@ class _HourlyForecastState extends State<_HourlyForecast> {
     final selected = hours.any((hour) => hour.validAt == _selected)
         ? _selected
         : hours.first.validAt;
-    return Scrollbar(
+    final list = Scrollbar(
       controller: _scroll,
       child: SingleChildScrollView(
         scrollDirection: .horizontal,
@@ -119,7 +146,10 @@ class _HourlyForecastState extends State<_HourlyForecast> {
                       ? widget.lastConditions
                             ? 'Last'
                             : 'Now'
-                      : format.time(hour.validAt, widget.snapshot.timezone);
+                      : format.forecastHour(
+                          hour.validAt,
+                          widget.snapshot.timezone,
+                        );
                   final temperature = format.temperature(hour.temperatureC);
                   final precip = format.probability(
                     hour.precipitationProbability,
@@ -192,6 +222,7 @@ class _HourlyForecastState extends State<_HourlyForecast> {
         ),
       ),
     );
+    return Listener(onPointerSignal: _scrollWithWheel, child: list);
   }
 }
 

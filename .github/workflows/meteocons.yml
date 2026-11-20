@@ -1,0 +1,26 @@
+name: Check bundled Meteocons pre-release
+
+on:
+  schedule:
+    - cron: '26 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Check for upstream changes
+        run: |
+          python3 tool/sync_meteocons.py
+          if [[ -n "$(git status --porcelain -- assets/icons/weather/)" ]]; then
+            echo "::error::Run python tool/sync_meteocons.py and commit the updated Weather assets."
+            exit 1
+          fi

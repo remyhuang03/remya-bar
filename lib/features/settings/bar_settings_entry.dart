@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -10,6 +11,7 @@ import '../tasks/tasks_settings.dart';
 import 'bar_google_account.dart';
 import 'bar_settings_controller.dart';
 import 'bar_settings_pages.dart';
+import 'bar_settings_tiles.dart';
 
 const barSettingsChannel = MethodChannel('top.remya.bar/settings');
 
@@ -250,6 +252,52 @@ class _About extends StatelessWidget {
         repository: 'https://github.com/remyhuang03/remya-bar',
         onLicenses: onLicenses,
       ),
+      const SizedBox(height: 16),
+      const _WeatherAttribution(),
+    ],
+  );
+}
+
+class _WeatherAttribution extends StatelessWidget {
+  const _WeatherAttribution();
+
+  Future<void> _open(String url) async {
+    try {
+      await Process.start('xdg-open', [url], mode: .detached);
+    } on ProcessException catch (error) {
+      debugPrint('Opening attribution: $error');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SettingsGroup(
+    title: 'Source and licence',
+    children: [
+      for (final (title, detail, url) in const [
+        (
+          'Open-Meteo',
+          'Weather data · CC BY 4.0 · Rounded and localised by Remya',
+          'https://open-meteo.com/en/licence',
+        ),
+        (
+          'GeoNames',
+          'Location search via Open-Meteo',
+          'https://www.geonames.org/',
+        ),
+        (
+          'Meteocons',
+          'Weather icons by Bas Milius · MIT',
+          'https://github.com/basmilius/meteocons',
+        ),
+      ])
+        settingTile(
+          title,
+          detail: detail,
+          control: TextButton(
+            onPressed: () => _open(url),
+            child: const Text('View'),
+          ),
+        ),
     ],
   );
 }

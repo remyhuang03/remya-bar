@@ -67,6 +67,11 @@ jobs:
           ln -s /opt/fvm/fvm /usr/local/bin/fvm
           rm "$archive"
 
+      - name: Sync the Meteocons pre-release for the candidate
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: source/remya-bar
+        run: python tool/sync_meteocons.py
+
       - name: Check and build
         working-directory: source/remya-bar
         run: |
@@ -119,6 +124,7 @@ jobs:
           mkdir -p candidate
           printf 'repository=%s\ncommit=%s\n' "$(basename "$PWD")" "$commit" > candidate/build-info.txt
           printf 'core_commit=%s\n' "$CORE_REVISION" >> candidate/build-info.txt
+          printf 'meteocons=%s\n' "$(cat assets/icons/weather/VERSION)" >> candidate/build-info.txt
           tar --zstd --owner=0 --group=0 --mode=go-w -cf "candidate/$archive" \
             LICENSE README.md \
             build/linux/x64/release/bundle \

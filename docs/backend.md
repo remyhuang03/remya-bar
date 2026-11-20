@@ -262,15 +262,21 @@ same coordinates for up to 24 hours. The controller applies retry backoff and
 honors a provider Retry-After response. The UI distinguishes retrieval time
 from model validity.
 
-Weather icons are the nine static fill SVGs from
-[Meteocons 3.0.0-next.10](https://registry.npmjs.org/@meteocons/svg-static/-/svg-static-3.0.0-next.10.tgz)
-by Bas Milius. The app bundles the original assets and their MIT notice. The
+Weather condition icons come from [Meteocons](https://meteocons.com/) by Bas
+Milius. The forecast hero uses animated fill Lottie assets. The pill,
+forecast rows, and reduced-motion hero use static fill SVGs. The app bundles
+the original assets and their MIT notice. Candidate builds automatically
+fetch the npm `next` release and record its version in the build metadata.
+A daily CI check detects when the vendored assets need refreshing. Run
+`python tool/sync_meteocons.py` to update the local assets and their
+`assets/icons/weather/VERSION`. The
 icon-derived seed values recorded in the
 [Weather design spec](https://www.figma.com/design/86FHxWxh0HF55G8pGU45cf/Remya-Bar?node-id=323-1746)
 are reused at runtime, with the global scheme variant, brightness and contrast.
 
 Search text and forecast coordinates are sent to Open-Meteo's non-commercial
-API. Displayed values are rounded and localized by Remya. See
+API. Displayed values are rounded and localized by Remya. About lists the
+weather data, location search and icon sources. See
 [Open-Meteo terms](https://open-meteo.com/en/terms),
 [data license](https://open-meteo.com/en/licence),
 [forecast API](https://open-meteo.com/en/docs) and

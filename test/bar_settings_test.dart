@@ -431,6 +431,19 @@ void main() {
       expect(find.byType(RemyaAvatarEditor), findsOneWidget);
       expect(find.text('Change avatar'), findsOneWidget);
 
+      await tester.tap(find.byKey(const ValueKey('nav-about')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('content-about')), findsOneWidget);
+      for (final label in [
+        'Source and licence',
+        'Open-Meteo',
+        'GeoNames',
+        'Meteocons',
+      ]) {
+        expect(find.text(label), findsOneWidget);
+      }
+      expect(find.text('Reset weather settings'), findsNothing);
+
       final registration = jsonDecode(
         File('linux/packaging/remya-bar.json').readAsStringSync(),
       ) as Map<String, dynamic>;

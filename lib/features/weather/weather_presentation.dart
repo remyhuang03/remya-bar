@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:lottie/lottie.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:timezone/data/latest.dart' as zone_data;
 import 'package:timezone/timezone.dart' as zone;
@@ -73,23 +74,35 @@ class WeatherIcon extends StatelessWidget {
     super.key,
     required this.size,
     this.statusIcon,
+    this.animated = false,
   });
 
   final WeatherCondition? condition;
   final double size;
   final IconData? statusIcon;
+  final bool animated;
 
   @override
   Widget build(BuildContext context) {
     final asset = _conditions[condition]?.$1;
+    final staticIcon = SvgPicture.asset(
+      'assets/icons/weather/${asset ?? 'not-available'}.svg',
+      width: size,
+      height: size,
+    );
     return ExcludeSemantics(
-      child: asset == null
-          ? Icon(statusIcon ?? Icons.cloud_outlined, size: size * .75)
-          : SvgPicture.asset(
-              'assets/icons/weather/$asset.svg',
+      child: asset == null && statusIcon != null
+          ? Icon(statusIcon, size: size * .75)
+          : asset != null &&
+                animated &&
+                !MediaQuery.disableAnimationsOf(context)
+          ? Lottie.asset(
+              'assets/icons/weather/$asset.json',
               width: size,
               height: size,
-            ),
+              errorBuilder: (context, error, stackTrace) => staticIcon,
+            )
+          : staticIcon,
     );
   }
 }
@@ -195,6 +208,11 @@ class WeatherFormat {
   String time(int seconds, String timezone) =>
       _dateFormat(use24Hour ? 'Hm' : 'jm')
           .format(localDateTime(seconds, timezone));
+
+  String forecastHour(int seconds, String timezone) => DateFormat(
+    use24Hour ? 'HH:00' : 'h a',
+    'en',
+  ).format(localDateTime(seconds, timezone));
 
   String weekday(String date) =>
       _dateFormat('EEE').format(DateTime.parse(date));

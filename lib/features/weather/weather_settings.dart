@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_ui/settings_ui.dart';
 
-import '../settings/bar_preferences.dart';
 import '../settings/bar_settings_tiles.dart';
 import 'weather_controller.dart';
 import 'weather_location_picker.dart';
@@ -209,54 +207,6 @@ class WeatherSettings extends StatelessWidget {
                   'background',
                   detail:
                       'Update the forecast while the weather card is closed',
-                ),
-              ],
-            ),
-            SettingsGroup(
-              title: 'Source and licence',
-              children: [
-                for (final (title, detail, url) in const [
-                  (
-                    'Open-Meteo',
-                    'Weather data · CC BY 4.0 · Rounded and localised by Remya',
-                    'https://open-meteo.com/en/licence',
-                  ),
-                  (
-                    'GeoNames',
-                    'Location search via Open-Meteo',
-                    'https://www.geonames.org/',
-                  ),
-                  (
-                    'Meteocons',
-                    'Weather icons by Bas Milius · MIT',
-                    'https://github.com/basmilius/meteocons',
-                  ),
-                ])
-                  settingTile(
-                    title,
-                    detail: detail,
-                    control: TextButton(
-                      onPressed: () => unawaited(
-                        Process.start('xdg-open', [
-                          url,
-                        ], mode: .detached).then<void>(
-                          (_) {},
-                          onError: (Object error) {
-                            debugPrint('Opening attribution: $error');
-                          },
-                        ),
-                      ),
-                      child: const Text('View'),
-                    ),
-                  ),
-                settingTile(
-                  'Reset weather settings',
-                  control: TextButton(
-                    onPressed: busy
-                        ? null
-                        : () => weather.writeSettings(weatherDefaults),
-                    child: const Text('Reset'),
-                  ),
                 ),
               ],
             ),
