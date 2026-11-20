@@ -74,6 +74,7 @@ jobs:
           chown -R remya-ci:remya-ci ..
           runuser --user remya-ci -- bash -euo pipefail -s -- "$PWD" <<'BUILD'
           cd "$1"
+          python tool/check_source_length.py
           test "$(git -C ../remya-core rev-parse HEAD)" = "$CORE_REVISION"
           flutter_version=$(python -c 'import json; print(json.load(open(".fvmrc"))["flutter"])')
           python - "$flutter_version" <<'DOCS'

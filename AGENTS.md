@@ -56,6 +56,8 @@
 - Let the native runner own initial window setup and respect Wayland compositor policy. Never automatically modify user desktop configuration.
 
 ## Validation
+- Run `python tool/check_source_length.py` as part of local validation. It warns for Rust and Dart source files over 800 physical lines, including comments and blank lines. Review every reported file against the single-responsibility principle and refactor files that mix responsibilities.
+- When a reviewed file should stay together, run `python tool/check_source_length.py add <path> --reason "<why it should stay together>"` and include the updated `tool/source_length_exceptions.json` in the change. The exception applies only to that file's recorded SHA-256. Changed files still over 800 lines require another review.
 - Run relevant checks before presenting changes for review:
   ```bash
   fvm dart format --output=none --set-exit-if-changed lib test
