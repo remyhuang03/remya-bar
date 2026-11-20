@@ -59,15 +59,18 @@ class _TasksMenu extends StatelessWidget {
     required this.tooltip,
     required this.items,
     this.icon = 'more',
+    this.style,
   });
 
   final String tooltip;
   final String icon;
+  final ButtonStyle? style;
   final List<({String label, VoidCallback? action})> items;
 
   @override
   Widget build(BuildContext context) => PopupMenuButton<int>(
     tooltip: tooltip,
+    style: style,
     constraints: const BoxConstraints(minWidth: 180, maxWidth: 264),
     icon: _TaskIcon(icon, 20),
     onSelected: (index) => items[index].action?.call(),
@@ -102,24 +105,157 @@ class _ListChoiceButton extends StatelessWidget {
       style: FilledButton.styleFrom(
         backgroundColor: colors.surfaceContainerHighest,
         foregroundColor: colors.onSurface,
-        minimumSize: const Size.fromHeight(44),
-        padding: const .symmetric(horizontal: 12, vertical: 8),
-        shape: const RoundedRectangleBorder(borderRadius: .all(.circular(12))),
+        minimumSize: const Size(0, 32),
+        visualDensity: .standard,
+        padding: const .fromLTRB(10, 4, 8, 4),
+        tapTargetSize: .shrinkWrap,
+        shape: const StadiumBorder(),
       ),
       onPressed: onPressed,
       child: Row(
-        spacing: 8,
+        mainAxisSize: .min,
+        spacing: 6,
         children: [
-          _TaskIcon(icon, 20),
-          Expanded(child: Text(label, maxLines: 2, overflow: .ellipsis)),
+          _TaskIcon(icon, 18),
+          Flexible(child: Text(label, maxLines: 2, overflow: .ellipsis)),
           if (count != null)
             Semantics(
               label: '$count incomplete tasks',
               excludeSemantics: true,
-              child: _TaskSupporting('$count'),
+              child: _TaskSupporting('$count', color: colors.primary),
             ),
-          const _TaskIcon('expand', 20),
+          const _TaskIcon('expand-small', 18),
         ],
+      ),
+    );
+  }
+}
+
+class _ViewFilters extends StatelessWidget {
+  const _ViewFilters({required this.selected, required this.onSelected});
+
+  final _View selected;
+  final ValueChanged<_View> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Row(
+      spacing: 2,
+      children: [
+        for (final view in _View.values)
+          Expanded(
+            child: Semantics(
+              selected: selected == view,
+              child: FilledButton(
+                onPressed: () => onSelected(view),
+                style: FilledButton.styleFrom(
+                  backgroundColor: selected == view
+                      ? colors.primary
+                      : colors.surfaceContainerHighest,
+                  foregroundColor: selected == view
+                      ? colors.onPrimary
+                      : colors.onSurfaceVariant,
+                  textStyle: theme.textTheme.labelLarge?.copyWith(fontSize: 13),
+                  minimumSize: const .fromHeight(40),
+                  visualDensity: .standard,
+                  padding: const .symmetric(horizontal: 4, vertical: 8),
+                  tapTargetSize: .shrinkWrap,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: .horizontal(
+                      left: .circular(
+                        selected == view || view == .today ? 18 : 6,
+                      ),
+                      right: .circular(
+                        selected == view || view == .all ? 18 : 6,
+                      ),
+                    ),
+                  ),
+                ),
+                child: Text(view.label, textAlign: .center),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _TodaySummary extends StatelessWidget {
+  const _TodaySummary({required this.remaining, required this.completed});
+
+  final int remaining;
+  final int completed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final total = remaining + completed;
+    final progress = total == 0 ? 0.0 : completed / total;
+    final percent = '${(progress * 100).round()}%';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: .circular(28),
+      ),
+      child: Padding(
+        padding: const .symmetric(horizontal: 20, vertical: 18),
+        child: DefaultTextStyle.merge(
+          style: TextStyle(color: colors.onPrimaryContainer),
+          child: Column(
+            spacing: 16,
+            crossAxisAlignment: .stretch,
+            children: [
+              Row(
+                spacing: 12,
+                children: [
+                  Text(
+                    '$remaining',
+                    style: TextStyle(
+                      fontSize: remaining < 100 ? 56 : 32,
+                      height: 60 / 56,
+                      fontWeight: .w500,
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: .start,
+                      spacing: 2,
+                      children: [
+                        const Text(
+                          'left for today',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        Text(
+                          '$completed of $total done',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(percent, style: const TextStyle(fontSize: 16)),
+                ],
+              ),
+              LinearProgressIndicator(
+                // The current Material appearance adds the track gap and stop.
+                // ignore: deprecated_member_use
+                year2023: false,
+                value: progress,
+                semanticsLabel: 'Today’s task progress',
+                semanticsValue: percent,
+                minHeight: 8,
+                borderRadius: .circular(4),
+                trackGap: 4,
+                stopIndicatorRadius: 2,
+                color: colors.primary,
+                stopIndicatorColor: colors.primary,
+                backgroundColor: colors.onPrimary,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -186,6 +322,7 @@ class _QuickAdd extends StatelessWidget {
     this.focusNode,
     required this.label,
     required this.saving,
+    this.showShortcut = false,
     required this.onSubmitted,
   });
 
@@ -193,6 +330,7 @@ class _QuickAdd extends StatelessWidget {
   final FocusNode? focusNode;
   final String label;
   final bool saving;
+  final bool showShortcut;
   final VoidCallback onSubmitted;
 
   @override
@@ -206,18 +344,54 @@ class _QuickAdd extends StatelessWidget {
     decoration: _taskInput(
       context,
       hint: label,
-      icon: const Center(widthFactor: 1, child: _TaskIcon('add', 20)),
-      action: ListenableBuilder(
-        listenable: controller,
-        builder: (_, _) => controller.text.trim().isEmpty
-            ? const SizedBox.shrink()
-            : IconButton(
-                tooltip: 'Add task',
-                onPressed: saving ? null : onSubmitted,
-                icon: const _TaskIcon('add', 20),
-              ),
+      icon: Center(
+        widthFactor: 1,
+        child: IconTheme(
+          data: IconThemeData(color: Theme.of(context).colorScheme.primary),
+          child: const _TaskIcon('add', 20),
+        ),
       ),
-      radius: 16,
+      action: ListenableBuilder(
+        listenable: Listenable.merge([controller, focusNode]),
+        builder: (context, _) {
+          if (controller.text.trim().isNotEmpty) {
+            return IconButton(
+              tooltip: 'Add task',
+              onPressed: saving ? null : onSubmitted,
+              icon: const _TaskIcon('add', 20),
+            );
+          }
+          if (!showShortcut || focusNode?.hasFocus == true) {
+            return const SizedBox.shrink();
+          }
+          final colors = Theme.of(context).colorScheme;
+          return Center(
+            widthFactor: 1,
+            child: Semantics(
+              label: 'New task shortcut: N',
+              excludeSemantics: true,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHigh,
+                  borderRadius: .circular(8),
+                ),
+                child: Padding(
+                  padding: const .symmetric(horizontal: 8, vertical: 3),
+                  child: Text(
+                    'N',
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 12,
+                      height: 16 / 12,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+      radius: 24,
     ),
     onSubmitted: (_) => onSubmitted(),
   );
@@ -395,6 +569,8 @@ class _TaskRow extends StatefulWidget {
     super.key,
     required this.task,
     required this.childRow,
+    this.corners,
+    this.hasNextTask = false,
     required this.dateLabel,
     required this.listLabel,
     required this.children,
@@ -412,6 +588,8 @@ class _TaskRow extends StatefulWidget {
 
   final GoogleTask task;
   final bool childRow;
+  final BorderRadius? corners;
+  final bool hasNextTask;
   final String? dateLabel;
   final String? listLabel;
   final List<GoogleTask> children;
@@ -432,6 +610,8 @@ class _TaskRow extends StatefulWidget {
 
 class _TaskRowState extends State<_TaskRow> {
   bool _focused = false;
+  bool _focusWithin = false;
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
@@ -471,29 +651,37 @@ class _TaskRowState extends State<_TaskRow> {
       if (task.error != null) _TaskAction.issues,
     ];
 
-    return Padding(
-      padding: .only(left: widget.childRow ? 24 : 0, bottom: 2),
+    final corners = widget.corners ?? BorderRadius.circular(16);
+    final row = Padding(
+      padding: .only(
+        left: widget.childRow ? 24 : 0,
+        bottom: widget.hasNextTask ? 2 : 0,
+      ),
       child: DragTarget<_TaskKey>(
         onWillAcceptWithDetails: (details) => widget.acceptsDrag(details.data),
         onAcceptWithDetails: (details) => widget.onDrop(details.data),
         builder: (context, candidates, rejected) => Material(
           shape: RoundedRectangleBorder(
-            borderRadius: .circular(16),
+            borderRadius: corners,
             side: _focused || candidates.isNotEmpty
                 ? BorderSide(color: colors.primary, width: 2)
                 : .none,
           ),
-          color: task.error == null
+          color: task.error != null
+              ? colors.errorContainer
+              : widget.corners == null
               ? Colors.transparent
-              : colors.errorContainer,
+              : colors.surfaceContainerHigh,
           clipBehavior: .antiAlias,
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: detail.isEmpty ? 48 : 64),
             child: InkWell(
               onTap: widget.onOpen,
               onFocusChange: (focused) => setState(() => _focused = focused),
-              borderRadius: .circular(16),
-              hoverColor: colors.surfaceContainerHighest,
+              borderRadius: corners,
+              hoverColor: task.error == null
+                  ? colors.surfaceContainerHighest
+                  : null,
               child: Row(
                 children: [
                   if (widget.canDrag)
@@ -582,21 +770,36 @@ class _TaskRowState extends State<_TaskRow> {
                         child: const _TaskIcon('expand', 20),
                       ),
                     ),
-                  _TasksMenu(
-                    tooltip: 'Task menu for ${task.title}',
-                    items: [
-                      for (final action in menu)
-                        (
-                          label: action.label,
-                          action: () => widget.onAction(action),
-                        ),
-                    ],
+                  Opacity(
+                    alwaysIncludeSemantics: true,
+                    opacity: widget.corners == null || _hovered || _focusWithin
+                        ? 1
+                        : 0,
+                    child: _TasksMenu(
+                      tooltip: 'Task menu for ${task.title}',
+                      items: [
+                        for (final action in menu)
+                          (
+                            label: action.label,
+                            action: () => widget.onAction(action),
+                          ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Focus(
+        canRequestFocus: false,
+        onFocusChange: (focused) => setState(() => _focusWithin = focused),
+        child: row,
       ),
     );
   }

@@ -7,9 +7,10 @@ import 'package:remya_bar/features/tasks/tasks_store.dart';
 import 'package:remya_client/remya_client.dart';
 
 class _Tasks extends TasksStore {
-  _Tasks({this.state = .ready, this.count = 12});
+  _Tasks({this.state = .ready, this.count = 12, this.extra = const []});
 
   final int count;
+  final List<GoogleTask> extra;
 
   @override
   final TasksSyncState state;
@@ -40,6 +41,7 @@ class _Tasks extends TasksStore {
   List<GoogleTask> get tasks => state == .loading
       ? []
       : [
+          ...extra,
           for (var i = 1; i <= count; i++)
             GoogleTask(
               id: 'test-$i',
@@ -119,6 +121,10 @@ void main() {
     await _mount(tester, _Tasks());
     expect(tester.getSize(find.byType(TasksBlock)).width, 372);
     expect(find.text('12'), findsOneWidget);
+    expect(
+      tester.getSize(find.widgetWithText(FilledButton, 'All lists')).width,
+      lessThan(280),
+    );
     expect(find.text('Task 3'), findsOneWidget);
     expect(find.text('Task 4'), findsNothing);
 
@@ -137,6 +143,89 @@ void main() {
     expect(find.text('Task 12'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('only the full Today view shows progress for matching parents', (
+    tester,
+  ) async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    await _mount(
+      tester,
+      _Tasks(
+        count: 3,
+        extra: [
+          GoogleTask(
+            id: 'done',
+            listId: 'work',
+            title: 'Done today',
+            scheduled: today,
+            completed: true,
+          ),
+          GoogleTask(
+            id: 'child',
+            listId: 'work',
+            title: 'Done subtask',
+            parent: 'test-1',
+            scheduled: today,
+            completed: true,
+          ),
+          GoogleTask(
+            id: 'tomorrow',
+            listId: 'work',
+            title: 'Tomorrow',
+            scheduled: DateUtils.addDaysToDate(today, 1),
+          ),
+        ],
+      ),
+      textScale: 2,
+    );
+
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    await tester.ensureVisible(find.text('View all'));
+    await tester.tap(find.text('View all'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('left for today'), findsOneWidget);
+    expect(find.text('1 of 4 done'), findsOneWidget);
+    expect(find.text('25%'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.ensureVisible(find.text('Upcoming').last);
+    await tester.tap(find.text('Upcoming').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
+  testWidgets(
+    'N focuses quick add from a task control and leaves editors alone',
+    (tester) async {
+      await _mount(tester, _Tasks(count: 1));
+      await tester.ensureVisible(find.text('View all'));
+      await tester.tap(find.text('View all'));
+      await tester.pumpAndSettle();
+
+      final quick = find.widgetWithText(TextField, 'Add a task to Work').last;
+      final search = find.widgetWithText(TextField, 'Search tasks');
+      final hint = find.descendant(
+        of: find.byType(Dialog),
+        matching: find.text('N'),
+      );
+      expect(hint, findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(quick).focusNode?.hasFocus, isTrue);
+      expect(hint, findsNothing);
+
+      await tester.ensureVisible(search);
+      await tester.tap(search);
+      await tester.enterText(search, 'notes');
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyN);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(quick).focusNode?.hasFocus, isFalse);
+      expect(find.text('notes'), findsOneWidget);
+      expect(hint, findsOneWidget);
+    },
+  );
 
   testWidgets('editor resumes a draft and submits only edited fields', (
     tester,

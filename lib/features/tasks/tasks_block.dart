@@ -249,6 +249,25 @@ class _TasksBlockState extends State<TasksBlock> {
     }
   }
 
+  KeyEventResult _quickAddShortcut(FocusNode node, KeyEvent event) {
+    final keyboard = HardwareKeyboard.instance;
+    if (event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.keyN ||
+        keyboard.isControlPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isMetaPressed ||
+        keyboard.isShiftPressed ||
+        !_quickFocus.canRequestFocus ||
+        _quickFocus.context == null ||
+        FocusManager.instance.primaryFocus?.context
+                ?.findAncestorWidgetOfExactType<EditableText>() !=
+            null) {
+      return .ignored;
+    }
+    _quickFocus.requestFocus();
+    return .handled;
+  }
+
   Future<void> _selectList() async {
     final id = await _pick(
       context,
@@ -483,6 +502,8 @@ class _TasksBlockState extends State<TasksBlock> {
     Map<_TaskKey, List<GoogleTask>> siblingsByParent,
     Map<String, String> listNames,
     DateTime now,
+    BorderRadius corners,
+    bool hasNextTask,
   ) {
     final key = _key(task);
     final isChild = active.containsKey((
@@ -499,6 +520,8 @@ class _TasksBlockState extends State<TasksBlock> {
       key: ValueKey(key),
       task: task,
       childRow: isChild,
+      corners: corners,
+      hasNextTask: hasNextTask,
       dateLabel: task.scheduled == null
           ? null
           : _friendlyDate(context, task.scheduled!, now),
@@ -615,7 +638,13 @@ class _TasksBlockState extends State<TasksBlock> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => Focus(
+    canRequestFocus: false,
+    onKeyEvent: _quickAddShortcut,
+    child: _buildBlock(context),
+  );
+
+  Widget _buildBlock(BuildContext context) {
     final theme = Theme.of(context);
     final now = DateUtils.dateOnly(DateTime.now());
     final visible = _visibleLists;
@@ -656,7 +685,8 @@ class _TasksBlockState extends State<TasksBlock> {
     final allCompleted = active.values
         .where((task) => task.completed && !task.pending)
         .toList();
-    int matching = 0;
+    var matching = 0;
+    var matchingCompleted = 0;
     for (final entry in active.entries) {
       final task = entry.value;
       if (task.parent != null &&
@@ -671,7 +701,13 @@ class _TasksBlockState extends State<TasksBlock> {
                     (child) => _matchesSearch(child, query),
                   ) ??
                   false));
-      if (filtered && !task.completed) matching++;
+      if (filtered) {
+        if (task.completed) {
+          matchingCompleted++;
+        } else {
+          matching++;
+        }
+      }
       if (filtered || entry.key == undo || entry.key == recent) {
         (task.completed && entry.key != undo ? completed : parents).add(task);
       }
@@ -727,6 +763,11 @@ class _TasksBlockState extends State<TasksBlock> {
     final actions = _TasksMenu(
       tooltip: 'Task options',
       icon: 'settings',
+      style: IconButton.styleFrom(
+        backgroundColor: theme.colorScheme.secondaryContainer,
+        foregroundColor: theme.colorScheme.onSecondaryContainer,
+        minimumSize: const .square(40),
+      ),
       items: [
         (label: 'Task settings', action: widget.onSettings),
         (label: 'Open in Google Tasks', action: () => _run(_openGoogleTasks)),
@@ -770,20 +811,29 @@ class _TasksBlockState extends State<TasksBlock> {
       spacing: 12,
       children: [
         Row(
+          crossAxisAlignment: .start,
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: .start,
+                spacing: 8,
                 children: [
                   Text(
                     'Tasks',
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: .w700,
-                      color: theme.colorScheme.primary,
+                      color: theme.brightness == .dark
+                          ? theme.colorScheme.primaryFixed
+                          : theme.colorScheme.onPrimaryFixedVariant,
                       height: 30 / 24,
                     ),
                   ),
-                  const _TaskSupporting('Google Tasks'),
+                  if (hasContent)
+                    _ListChoiceButton(
+                      label: listNames[_listId] ?? 'All lists',
+                      count: matching,
+                      onPressed: _selectList,
+                    ),
                 ],
               ),
             ),
@@ -797,20 +847,11 @@ class _TasksBlockState extends State<TasksBlock> {
           ],
         ),
         if (hasContent) ...[
-          _ListChoiceButton(
-            label: listNames[_listId] ?? 'All lists',
-            count: matching,
-            onPressed: _selectList,
-          ),
-          SegmentedButton<_View>(
-            showSelectedIcon: false,
-            segments: [
-              for (final view in _View.values)
-                ButtonSegment(value: view, label: Text(view.label)),
-            ],
-            selected: {_view},
-            onSelectionChanged: (selected) =>
-                setState(() => _view = selected.single),
+          if (!widget.compact && _view == .today && query.isEmpty)
+            _TodaySummary(remaining: matching, completed: matchingCompleted),
+          _ViewFilters(
+            selected: _view,
+            onSelected: (view) => setState(() => _view = view),
           ),
           ?banner,
           if (destination == null)
@@ -831,6 +872,7 @@ class _TasksBlockState extends State<TasksBlock> {
               focusNode: _quickFocus,
               label: 'Add a task to ${destination.title}',
               saving: _adding,
+              showShortcut: true,
               onSubmitted: _add,
             ),
           if (!widget.compact)
@@ -853,21 +895,37 @@ class _TasksBlockState extends State<TasksBlock> {
             itemCount: rows.length,
             findChildIndexCallback: (key) =>
                 key is ValueKey<_TaskKey> ? rowIndexes[key.value] : null,
-            itemBuilder: (context, index) => switch (rows[index]) {
-              final GoogleTask task => _row(
-                task,
+            itemBuilder: (context, index) {
+              final entry = rows[index];
+              if (entry is! GoogleTask) {
+                return _SectionLabel(
+                  entry is _Group ? entry.label : entry as String,
+                );
+              }
+              final previousTask = index > 0 && rows[index - 1] is GoogleTask;
+              final nextTask =
+                  index + 1 < rows.length && rows[index + 1] is GoogleTask;
+              return _row(
+                entry,
                 children,
                 active,
                 siblings,
                 listNames,
                 now,
-              ),
-              final _Group group => _SectionLabel(group.label),
-              final String label => _SectionLabel(label),
-              _ => const SizedBox.shrink(),
+                BorderRadius.vertical(
+                  top: .circular(previousTask ? 4 : 20),
+                  bottom: .circular(nextTask ? 4 : 20),
+                ),
+                nextTask,
+              );
             },
           );
 
+    final footerAction = TextButton.styleFrom(
+      minimumSize: const .fromHeight(32),
+      padding: const .symmetric(horizontal: 8, vertical: 4),
+      tapTargetSize: .shrinkWrap,
+    );
     final footer = Column(
       crossAxisAlignment: .stretch,
       spacing: 4,
@@ -896,6 +954,7 @@ class _TasksBlockState extends State<TasksBlock> {
             crossAxisAlignment: .center,
             children: [
               TextButton.icon(
+                style: footerAction,
                 icon: RotatedBox(
                   quarterTurns: _showCompleted ? 2 : 0,
                   child: const _TaskIcon('expand-small', 18),
@@ -909,7 +968,11 @@ class _TasksBlockState extends State<TasksBlock> {
                 label: Text('Completed · ${completed.length}'),
               ),
               if (widget.compact)
-                TextButton(onPressed: _viewAll, child: const Text('View all')),
+                TextButton(
+                  style: footerAction,
+                  onPressed: _viewAll,
+                  child: const Text('View all'),
+                ),
             ],
           ),
           Wrap(
@@ -926,6 +989,7 @@ class _TasksBlockState extends State<TasksBlock> {
                 ],
               ),
               TextButton(
+                style: footerAction,
                 onPressed: _manageLists,
                 child: const Text('Manage lists'),
               ),
