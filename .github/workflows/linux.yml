@@ -40,7 +40,7 @@ jobs:
       - name: Install Arch Linux build dependencies
         run: |
           pacman -Syu --noconfirm --needed git curl cmake ninja clang rustup python zstd \
-            gtk3 gtk-layer-shell glib2-devel wayland wayland-protocols libxkbcommon inter-font python-jsonschema unzip xz
+            gtk3 gtk-layer-shell glib2-devel wayland wayland-protocols libxkbcommon inter-font python-jsonschema unzip xz dbus
 
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -101,7 +101,7 @@ jobs:
           fvm flutter pub get --enforce-lockfile
           fvm dart format --output=none --set-exit-if-changed lib test
           fvm flutter analyze --no-pub
-          fvm flutter test --no-pub
+          dbus-run-session -- fvm flutter test --no-pub
           python -m unittest test/install_test.py test/bar_registration_test.py
           cargo clippy --locked --workspace --all-targets -- -D warnings
           cargo test --locked --workspace
