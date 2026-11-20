@@ -32,6 +32,26 @@ class _Client extends SettingsClient {
   ThemeConfig theme = const .new();
   String? accent;
   Object? failure;
+  Map<String, dynamic> google = const {
+    'configured': true,
+    'pending': false,
+    'email': null,
+    'calendar': false,
+    'tasks': false,
+    'error': null,
+  };
+  Map<String, dynamic>? requestedGoogleAccess;
+
+  void completeGoogleSignIn({required bool calendar, required bool tasks}) {
+    google = {
+      ...google,
+      'pending': false,
+      'email': 'bar@example.com',
+      'calendar': calendar,
+      'tasks': tasks,
+    };
+    signals.add((topic: googleAccountTopic, value: const {}));
+  }
 
   /// Core revisions are per setting.
   String revision(String key) =>
@@ -57,6 +77,20 @@ class _Client extends SettingsClient {
     List<String> arguments = const [],
   ]) async {
     if (failure case final error?) throw error;
+    if (arguments.first == googleAccountTopic) return google;
+    if (arguments.first == 'google-account.connect') {
+      requestedGoogleAccess = jsonDecode(arguments[1]) as Map<String, dynamic>;
+      return google = {...google, 'pending': true};
+    }
+    if (arguments.first == 'google-account.disconnect') {
+      return google = {
+        ...google,
+        'pending': false,
+        'email': null,
+        'calendar': false,
+        'tasks': false,
+      };
+    }
     if (arguments.first == aiProvidersSettingId) {
       return {
         'value': {
@@ -437,5 +471,46 @@ void main() {
     expect(installed({'XDG_DATA_HOME': 'data', 'HOME': root.path}), isFalse);
     entry.deleteSync();
     expect(installed({'XDG_DATA_HOME': '${root.path}/data'}), isFalse);
+  });
+
+  testWidgets('Google account requests identity only and supports disconnect', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final client = _Client();
+    final controller = BarSettingsController(client: client);
+    final preferences = SettingsThemeController.service(client: client);
+    addTearDown(controller.dispose);
+    addTearDown(preferences.dispose);
+    await tester.pumpWidget(
+      BarSettingsEntry(
+        page: 'account',
+        request: 1,
+        preferences: preferences,
+        controller: controller,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextButton, 'Privacy policy'), findsOneWidget);
+
+    await tester.tap(find.text('Connect'));
+    await tester.pumpAndSettle();
+    expect(client.requestedGoogleAccess, {'calendar': false, 'tasks': false});
+    expect(find.text('Continue in your browser'), findsOneWidget);
+
+    client.completeGoogleSignIn(calendar: false, tasks: false);
+    await tester.pumpAndSettle();
+    expect(find.text('bar@example.com'), findsOneWidget);
+    expect(find.text('Grant access'), findsNothing);
+
+    await tester.tap(find.text('Disconnect'));
+    await tester.pumpAndSettle();
+    expect(find.text('Disconnect Google account?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Disconnect'));
+    await tester.pumpAndSettle();
+    expect(find.text('bar@example.com'), findsNothing);
+    expect(find.text('Connect'), findsOneWidget);
   });
 }

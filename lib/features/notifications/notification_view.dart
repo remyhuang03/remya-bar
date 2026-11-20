@@ -21,11 +21,13 @@ class NotificationCenterCard extends StatefulWidget {
     required this.data,
     required this.onAction,
     this.onHeight,
+    this.tasks,
   });
 
   final Map<String, Object?> data;
   final NotificationAction onAction;
   final ValueChanged<double>? onHeight;
+  final Widget? tasks;
 
   @override
   State<NotificationCenterCard> createState() => _NotificationCenterCardState();
@@ -88,10 +90,16 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
                   foreground: colors.onPrimary,
                 ),
               if (items.isNotEmpty)
-                FilledButton.tonal(
-                  onPressed: () =>
-                      widget.onAction(const {'action': 'notification.clear'}),
-                  child: const Text('Clear all'),
+                Expanded(
+                  child: Align(
+                    alignment: .centerRight,
+                    child: TextButton(
+                      onPressed: () => widget.onAction(const {
+                        'action': 'notification.clear',
+                      }),
+                      child: const Text('Clear notifications', textAlign: .end),
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -150,6 +158,10 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
                   ),
               ],
             ),
+          if (widget.tasks case final tasks?) ...[
+            Divider(height: 1, color: colors.outlineVariant),
+            tasks,
+          ],
         ],
       );
       return Padding(

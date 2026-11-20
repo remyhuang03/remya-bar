@@ -16,10 +16,13 @@ Compiled bundles do not require sibling checkouts.
 ## Bar preferences and settings window
 
 [linux/packaging/remya-bar.json](../linux/packaging/remya-bar.json) owns schemas,
-defaults and pages (`layout`, `osd`, `notifications`, `ai-ring`). The
+defaults and pages (`layout`, `osd`, `notifications`, `ai-ring`, `tasks`). The
 `material-theme` and `account` pages link to Core’s shared theme and avatar
 editors. An avatar saved in either the Bar Account page or Remya Settings
-updates Bar’s sidebar profile.
+updates Bar’s sidebar profile. The Account page also uses Core's Google OAuth
+service for identity-only sign-in. Bar links to the [Remya Apps privacy policy](https://apps.remya.top/privacy),
+and allows users to disconnect the shared authorization. Core owns the tokens
+and browser flow.
 It is installed at `$XDG_DATA_HOME/remya/apps/remya-bar.json`. `BarPreferences`
 accesses values only through `AppPreferences('remya-bar')`; editors use
 revision-checked Replace.
@@ -270,6 +273,37 @@ API. Displayed values are rounded and localized by Remya. See
 [data license](https://open-meteo.com/en/licence),
 [forecast API](https://open-meteo.com/en/docs) and
 [GeoNames search attribution](https://open-meteo.com/en/docs/geocoding-api).
+
+## Google Tasks
+
+Settings → Tasks → Connection requests Google Tasks read/write consent through
+[Core’s Google account service](../../remya-core/docs/google-account.md). The
+Account page requests identity only. Both pages show the shared connection.
+Disconnect can retain the account's local work or discard it by explicit choice.
+The Tasks settings page also controls list visibility, quick-add destination,
+view defaults, placement and remote update mode. Set `@default` to use the
+Google default list. A missing explicit target requires a new choice.
+
+One application-wide store serves all monitors, the right sidebar, the optional
+Tasks section in Notifications, and Settings. Notifications clear independently
+of tasks. The store follows Core account changes and associates saved drafts,
+pending operations and confirmed responses with the opaque Google account ID.
+The cache and edit journal live in the account's private directory under
+`$XDG_STATE_HOME/remya/bar/tasks/`, with the absolute HOME fallback. The journal
+includes task titles, notes, edit baselines and drafts. OAuth credentials and
+the authenticated API transport belong to Core.
+
+Sync paginates the list directory and reads each list in sequence through Core.
+Automatic mode starts with two-minute polls and full refreshes every 30 minutes.
+Accounts with many lists poll less frequently to reduce API use. Sync retains
+prior data while refreshing, replays pending edits when the account is available, and
+offers a field-level comparison for concurrent changes. A write re-reads the
+item before patching, so a remote write can still race the patch. Creates with
+an uncertain outcome require review in Google Tasks before a new create is
+attempted. Manual mode disables periodic fetches and keeps local submissions
+enabled. The UI treats Scheduled date as a calendar date independent of
+timezone. Google Tasks remains the entry point for advanced fields and source
+applications own assignment changes.
 
 ## Local observations and keyboard
 

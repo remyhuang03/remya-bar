@@ -293,6 +293,54 @@ class BarPreferences {
           final ids = [for (final Map app in value['apps']) app['id']];
           valid = ids.toSet().length == ids.length;
         }
+      case 'tasks':
+        valid = _object(value, {
+          'default-list',
+          'default-list-account',
+          'visible-lists',
+          'visible-lists-account',
+          'initial-view',
+          'sort',
+          'completed-expanded',
+          'show-assigned',
+          'today-includes-unscheduled',
+          'sidebar',
+          'notifications',
+          'preview-rows',
+          'automatic',
+        });
+        if (valid) {
+          final map = value as Map;
+          final target = map['default-list'];
+          valid =
+              (target == '@default' ||
+                  (_text(map['default-list-account']) &&
+                      (target == '' || _text(target)))) &&
+              (map['default-list-account'] == '' ||
+                  _text(map['default-list-account'])) &&
+              (map['visible-lists-account'] == '' ||
+                  _text(map['visible-lists-account'])) &&
+              _strings(map['visible-lists'], _text) &&
+              (map['visible-lists'] as List).length <= 2000 &&
+              ((map['visible-lists'] as List).isEmpty ||
+                  _text(map['visible-lists-account'])) &&
+              const {
+                'today',
+                'upcoming',
+                'all',
+              }.contains(map['initial-view']) &&
+              const {'manual', 'date'}.contains(map['sort']) &&
+              map['preview-rows'] is int &&
+              const {3, 5, 8}.contains(map['preview-rows']) &&
+              const [
+                'completed-expanded',
+                'show-assigned',
+                'today-includes-unscheduled',
+                'sidebar',
+                'notifications',
+                'automatic',
+              ].every((field) => map[field] is bool);
+        }
       case 'ai-ring':
         valid =
             _object(value, {

@@ -86,13 +86,39 @@ void main() {
     await tester.tap(find.text('Reply'));
     await tester.tap(follower);
     await tester.tap(find.byType(Switch));
-    await tester.tap(find.text('Clear all'));
+    await tester.tap(find.text('Clear notifications'));
     expect(actions, [
       {'action': 'notification.invoke', 'id': 3, 'key': 'reply'},
       {'action': 'notification.invoke', 'id': 1, 'key': 'default'},
       {'action': 'notification.dnd', 'value': true},
       {'action': 'notification.clear'},
     ]);
+  });
+
+  testWidgets('clearing the notification history preserves the Tasks section', (
+    tester,
+  ) async {
+    var notifications = [_item(1, 'mail')];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: StatefulBuilder(
+            builder: (context, setState) => NotificationCenterCard(
+              data: {'notifications': notifications},
+              tasks: const Text('Review benchmarks'),
+              onAction: (action) {
+                expect(action, {'action': 'notification.clear'});
+                setState(() => notifications = []);
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Clear notifications'));
+    await tester.pump();
+    expect(find.text('Summary 1'), findsNothing);
+    expect(find.text('Review benchmarks'), findsOneWidget);
   });
 
   testWidgets('center reports an unavailable service', (tester) async {
@@ -112,7 +138,7 @@ void main() {
       find.text('Another notification service is running'),
       findsOneWidget,
     );
-    expect(find.text('Clear all'), findsNothing);
+    expect(find.text('Clear notifications'), findsNothing);
   });
 
   testWidgets(
@@ -148,7 +174,7 @@ void main() {
       expect(dndTop, lessThan(listTop));
       expect(
         tester.getTopRight(find.byType(Switch)).dx,
-        closeTo(tester.getTopRight(find.text('Clear all')).dx, 16),
+        closeTo(tester.getTopRight(find.text('Clear notifications')).dx, 16),
       );
       await tester.drag(history, const Offset(0, -500));
       await tester.pumpAndSettle();

@@ -104,12 +104,14 @@ class RightSidebar extends StatefulWidget {
     required this.onAction,
     required this.onHeight,
     this.weather,
+    this.tasks,
   });
 
   final Map<String, Object?> data;
   final Future<void> Function(Map<String, Object?>) onAction;
   final ValueChanged<double> onHeight;
   final WeatherController? weather;
+  final Widget? tasks;
 
   @override
   State<RightSidebar> createState() => _RightSidebarState();
@@ -155,6 +157,7 @@ class _RightSidebarState extends State<RightSidebar> {
 
   String? _detail;
   bool _power = false;
+  bool _expandedControls = false;
   int _pendingActions = 0;
   bool get _busy => _pendingActions > 0;
   String? _error;
@@ -559,6 +562,9 @@ class _RightSidebarState extends State<RightSidebar> {
   List<Widget> _overview(ThemeData theme) {
     final colors = theme.colorScheme;
     final edit = _draft != null;
+    final tasks = widget.tasks;
+    final collapsed = tasks != null && !edit && !_expandedControls;
+    final large = _tiles.where(_large.containsKey).toList();
     final brightness = _map(widget.data['brightness']);
     final hidden = [
       ..._large.keys,
@@ -604,9 +610,9 @@ class _RightSidebarState extends State<RightSidebar> {
           ],
         ),
       ),
-      if (_tiles.any(_large.containsKey) || edit)
-        _grid(2, _tiles.where(_large.containsKey).toList(), _largeTile),
-      if (_tiles.any(_small.containsKey) || edit)
+      if (large.isNotEmpty || edit)
+        _grid(2, collapsed ? large.take(2).toList() : large, _largeTile),
+      if (!collapsed && (_tiles.any(_small.containsKey) || edit))
         _grid(5, _tiles.where(_small.containsKey).toList(), _smallTile),
       if (widget.weather case final weather? when !edit)
         ValueListenableBuilder(
@@ -615,6 +621,17 @@ class _RightSidebarState extends State<RightSidebar> {
               ? WeatherCard(compact: true, controller: weather)
               : const SizedBox.shrink(),
         ),
+      if (tasks != null && !edit) ...[
+        Align(
+          alignment: .centerLeft,
+          child: TextButton(
+            onPressed: () => setState(() => _expandedControls = collapsed),
+            child: Text(collapsed ? 'Show all controls' : 'Collapse controls'),
+          ),
+        ),
+        Divider(height: 1, color: colors.outlineVariant),
+        tasks,
+      ],
       if (edit) ...[
         Column(
           crossAxisAlignment: .stretch,
@@ -646,18 +663,17 @@ class _RightSidebarState extends State<RightSidebar> {
           ],
         ),
       ],
-      Text(
-        edit
-            ? 'Esc to finish'
-            : _power
-            ? 'Log out, restart and shut down need a second click within 3 s'
-            : 'Esc to close',
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: colors.onSurfaceVariant,
-          fontSize: 12,
-          height: 1.2,
+      if (edit || _power)
+        Text(
+          edit
+              ? 'Esc to finish'
+              : 'Log out, restart and shut down need a second click within 3 s',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colors.onSurfaceVariant,
+            fontSize: 12,
+            height: 1.2,
+          ),
         ),
-      ),
     ];
   }
 

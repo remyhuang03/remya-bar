@@ -10,6 +10,9 @@ import '../keyboard/keyboard_panel.dart';
 import '../ai_usage/ai_usage_data.dart';
 import '../notifications/notification_view.dart';
 import '../osd/osd_slider.dart';
+import '../settings/bar_settings_entry.dart';
+import '../tasks/tasks_block.dart';
+import '../tasks/tasks_integration.dart';
 import '../tray/tray_menu_popup.dart';
 import '../workspaces/bar_workspaces.dart';
 import '../workspaces/workspace_overview.dart';
@@ -104,6 +107,9 @@ class _BarPopupAppState extends State<BarPopupApp>
   }
 
   final _navigator = GlobalKey<NavigatorState>();
+  late final _panelRoutes = _PanelRoutes(_panelRouteChanged);
+  double _panelHeight = sidebarSize.height;
+  bool _hasPanelRoute = false;
   String? _kind;
   int _contentGeneration = 0;
   int _opening = 0;
@@ -229,6 +235,7 @@ class _BarPopupAppState extends State<BarPopupApp>
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       navigatorKey: _navigator,
+      navigatorObservers: [_panelRoutes],
       theme: barTheme(theme.theme(.light)),
       darkTheme: barTheme(theme.theme(.dark)),
       themeMode: theme.mode,
@@ -277,20 +284,25 @@ class _BarPopupAppState extends State<BarPopupApp>
                   translation: Offset(offset, 0),
                   child: child,
                 ),
-                child: _kind == 'notifications'
-                    ? NotificationCenterCard(
-                        data: details,
-                        onAction: (action) =>
-                            widget.channel.invokeMethod<void>('action', action),
-                        onHeight: _resize,
-                      )
-                    : RightSidebar(
-                        weather: WeatherController.instance,
-                        data: details,
-                        onAction: (action) =>
-                            widget.channel.invokeMethod<void>('action', action),
-                        onHeight: _resize,
-                      ),
+                child: ListenableBuilder(
+                  listenable: TasksIntegration.shared.settings,
+                  builder: (context, _) => _kind == 'notifications'
+                      ? NotificationCenterCard(
+                          data: details,
+                          onAction: (action) => widget.channel
+                              .invokeMethod<void>('action', action),
+                          onHeight: _resizePanel,
+                          tasks: _tasksBlock(notifications: true),
+                        )
+                      : RightSidebar(
+                          weather: WeatherController.instance,
+                          data: details,
+                          onAction: (action) => widget.channel
+                              .invokeMethod<void>('action', action),
+                          onHeight: _resizePanel,
+                          tasks: _tasksBlock(notifications: false),
+                        ),
+                ),
               ),
             )
           : _CardScrollbar(
@@ -386,6 +398,50 @@ class _BarPopupAppState extends State<BarPopupApp>
       ),
     ],
   );
+
+  Widget? _tasksBlock({required bool notifications}) {
+    final tasks = TasksIntegration.shared;
+    final enabled = notifications
+        ? tasks.preferences.notifications
+        : tasks.preferences.sidebar;
+    if (!enabled) return null;
+    return ListenableBuilder(
+      listenable: tasks.store,
+      builder: (context, _) {
+        final accountId = tasks.store.account?.accountId;
+        return TasksBlock(
+          key: ValueKey(accountId),
+          store: tasks.store,
+          preferences: tasks.preferences,
+          onSettings: () => _send(_openTasksSettings()),
+          onSetDefaultList: (id) {
+            if (accountId == null) throw StateError('Connect Google Tasks.');
+            return tasks.setDefaultList(id, accountId);
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openTasksSettings() async {
+    await openBarSettings(page: 'tasks');
+    if (mounted) {
+      await widget.channel.invokeMethod<void>('action', {'action': 'close'});
+    }
+  }
+
+  void _resizePanel(double height) {
+    _panelHeight = height;
+    if (!_hasPanelRoute) _resize(height);
+  }
+
+  void _panelRouteChanged(bool overlay) {
+    if (_hasPanelRoute == overlay) return;
+    _hasPanelRoute = overlay;
+    if (_kind == 'sidebar' || _kind == 'notifications') {
+      _resize(overlay ? sidebarSize.height : _panelHeight);
+    }
+  }
 
   void _resize(double height) => _send(
     widget.channel.invokeMethod<void>('resize', {'height': height.ceil()}),
@@ -493,4 +549,15 @@ class _CardScrollbar extends StatelessWidget {
             child: child,
           ),
         );
+}
+
+class _PanelRoutes extends NavigatorObserver {
+  _PanelRoutes(this.onRoute);
+
+  final ValueChanged<bool> onRoute;
+
+  @override
+  void didChangeTop(Route<dynamic> topRoute, Route<dynamic>? previousTopRoute) {
+    onRoute(!topRoute.isFirst);
+  }
 }

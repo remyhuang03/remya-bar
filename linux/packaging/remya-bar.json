@@ -32,6 +32,15 @@
       "keywords": []
     },
     {
+      "id": "tasks",
+      "title": "Tasks",
+      "keywords": [
+        "Google Tasks",
+        "task lists",
+        "sync"
+      ]
+    },
+    {
       "id": "material-theme",
       "title": "Material theme",
       "keywords": []
@@ -39,10 +48,114 @@
     {
       "id": "account",
       "title": "Account",
-      "keywords": ["avatar", "profile picture"]
+      "keywords": ["avatar", "profile picture", "Google account"]
     }
   ],
   "settings": {
+    "tasks": {
+      "title": "Google Tasks preferences",
+      "page": "tasks",
+      "keywords": [
+        "Google Tasks"
+      ],
+      "default": {
+        "default-list": "@default",
+        "default-list-account": "",
+        "visible-lists": [],
+        "visible-lists-account": "",
+        "initial-view": "today",
+        "sort": "manual",
+        "completed-expanded": false,
+        "show-assigned": true,
+        "today-includes-unscheduled": false,
+        "sidebar": true,
+        "notifications": false,
+        "preview-rows": 3,
+        "automatic": true
+      },
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "default-list": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "default-list-account": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "visible-lists": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 2000,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "visible-lists-account": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "initial-view": {
+            "enum": [
+              "today",
+              "upcoming",
+              "all"
+            ]
+          },
+          "sort": {
+            "enum": [
+              "manual",
+              "date"
+            ]
+          },
+          "completed-expanded": {
+            "type": "boolean"
+          },
+          "show-assigned": {
+            "type": "boolean"
+          },
+          "today-includes-unscheduled": {
+            "type": "boolean"
+          },
+          "sidebar": {
+            "type": "boolean"
+          },
+          "notifications": {
+            "type": "boolean"
+          },
+          "preview-rows": {
+            "enum": [
+              3,
+              5,
+              8
+            ]
+          },
+          "automatic": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "default-list",
+          "default-list-account",
+          "visible-lists",
+          "visible-lists-account",
+          "initial-view",
+          "sort",
+          "completed-expanded",
+          "show-assigned",
+          "today-includes-unscheduled",
+          "sidebar",
+          "notifications",
+          "preview-rows",
+          "automatic"
+        ],
+        "additionalProperties": false
+      }
+    },
     "layout": {
       "title": "Bar layout",
       "page": "layout",

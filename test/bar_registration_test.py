@@ -27,6 +27,10 @@ class RegistrationTest(unittest.TestCase):
             'folded-apps': [['a\n'], [''], [' '], ['a', 'a'], ['a' * 257]],
             'sidebar-layout': [['vpn'], ['audio', 'audio']],
             'ai-ring': [{**settings['ai-ring']['default'], 'pinned': ['a', 'b', 'c', 'd']}],
+            'tasks': [
+                {**settings['tasks']['default'], 'preview-rows': 4},
+                {**settings['tasks']['default'], 'visible-lists': ['same', 'same']},
+            ],
             'quiet-schedule': [{**settings['quiet-schedule']['default'], 'start': time}
                                for time in ['24:00', '22:00\n', '7:00']],
         }.items():

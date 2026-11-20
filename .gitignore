@@ -49,9 +49,10 @@ app.*.map.json
 
 # FVM and Rust
 .fvm/
-/target/
+/target
 
 # Local configuration
+/pubspec_overrides.yaml
 .env
 .env.*
 !.env.example
