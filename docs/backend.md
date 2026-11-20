@@ -16,7 +16,7 @@ Compiled bundles do not require sibling checkouts.
 ## Bar preferences and settings window
 
 [linux/packaging/remya-bar.json](../linux/packaging/remya-bar.json) owns schemas,
-defaults and pages (`layout`, `osd`, `notifications`, `ai-ring`). The
+defaults and pages (`layout`, `osd`, `notifications`, `ai-ring`, `tasks`). The
 `material-theme` and `account` pages link to Core’s shared theme and avatar
 editors. An avatar saved in either the Bar Account page or Remya Settings
 updates Bar’s sidebar profile. The Account page also uses Core's Google OAuth
@@ -229,6 +229,37 @@ from change and service-availability signals. Normal and forced reads share the
 same single-flight logic. A failed fetch leaves the latest sample available
 until its freshness window expires. Large response bodies decode off the UI
 isolate.
+
+## Google Tasks
+
+Settings → Tasks → Connection requests Google Tasks read/write consent through
+[Core’s Google account service](../../remya-core/docs/google-account.md). The
+Account page requests identity only. Both pages show the shared connection.
+Disconnect can retain the account's local work or discard it by explicit choice.
+The Tasks settings page also controls list visibility, quick-add destination,
+view defaults, placement and remote update mode. Set `@default` to use the
+Google default list. A missing explicit target requires a new choice.
+
+One application-wide store serves all monitors, the right sidebar, the optional
+Tasks section in Notifications, and Settings. Notifications clear independently
+of tasks. The store follows Core account changes and associates saved drafts,
+pending operations and confirmed responses with the opaque Google account ID.
+The cache and edit journal live in the account's private directory under
+`$XDG_STATE_HOME/remya/bar/tasks/`, with the absolute HOME fallback. The journal
+includes task titles, notes, edit baselines and drafts. OAuth credentials and
+the authenticated API transport belong to Core.
+
+Sync paginates the list directory and reads each list in sequence through Core.
+Automatic mode starts with two-minute polls and full refreshes every 30 minutes.
+Accounts with many lists poll less frequently to reduce API use. Sync retains
+prior data while refreshing, replays pending edits when the account is available, and
+offers a field-level comparison for concurrent changes. A write re-reads the
+item before patching, so a remote write can still race the patch. Creates with
+an uncertain outcome require review in Google Tasks before a new create is
+attempted. Manual mode disables periodic fetches and keeps local submissions
+enabled. The UI treats Scheduled date as a calendar date independent of
+timezone. Google Tasks remains the entry point for advanced fields and source
+applications own assignment changes.
 
 ## Local observations and keyboard
 

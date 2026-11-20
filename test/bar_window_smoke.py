@@ -36,7 +36,7 @@ def check_bars(process, before):
 
 
 def check_settings(binary, process, before):
-    for page in ('layout', 'notifications', 'material-theme', 'account'):
+    for page in ('layout', 'notifications', 'tasks', 'material-theme', 'account'):
         forwarded = subprocess.run([str(binary), '--settings', page],
                                    capture_output=True, text=True, timeout=10)
         assert forwarded.returncode == 0, forwarded.stderr
@@ -45,7 +45,7 @@ def check_settings(binary, process, before):
             clients = [c for c in hyprctl('clients') if c['pid'] == process.pid]
             if len(clients) == 1 and clients[0]['title'] == "Remy'a Bar Settings":
                 break
-            assert time.monotonic() < deadline, clients
+            assert time.monotonic() < deadline, (page, clients)
             time.sleep(0.1)
         assert clients[0]['class'] == 'top.remya.bar', clients
         assert {m['name']: m['reserved'] for m in hyprctl('monitors')} == {
@@ -96,6 +96,9 @@ def main():
             print(f'PASS: one 40-pixel top bar on each of {len(before)} outputs; '
                   'reserved space, no keyboard focus, no normal windows.')
             check_settings(binary, process, before)
+        except AssertionError as error:
+            log.seek(0)
+            raise AssertionError(f'{error}\n{log.read()}') from error
         finally:
             if process.poll() is None:
                 process.terminate()

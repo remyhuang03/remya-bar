@@ -19,6 +19,7 @@ import 'features/popups/bar_popup.dart';
 import 'features/settings/bar_theme_controller.dart';
 import 'features/sidebar/sidebar_app_launcher.dart';
 import 'features/system/system_backend.dart';
+import 'features/tasks/tasks_integration.dart';
 import 'features/tray/tray_backend.dart';
 
 Future<void> main() async {
@@ -91,10 +92,12 @@ class _BarApplicationState extends State<_BarApplication> {
     _account.start();
     _notifications.start();
     _notificationSettings.start();
+    unawaited(TasksIntegration.shared.start());
   }
 
   @override
   void dispose() {
+    TasksIntegration.shared.dispose();
     unawaited(_notificationSettings.close());
     unawaited(_osdSettings.close());
     _notifications.dispose();

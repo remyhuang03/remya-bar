@@ -5,6 +5,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:remya_client/remya_client.dart';
 import 'package:remya_ui/settings_ui.dart';
 
+import '../tasks/tasks_settings.dart';
+import '../tasks/tasks_store.dart';
 import 'bar_settings_controller.dart';
 import 'bar_settings_tiles.dart';
 
@@ -76,27 +78,7 @@ class _BarGoogleAccountState extends State<BarGoogleAccount> {
   }
 
   Future<void> _disconnect() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Disconnect Google account?'),
-        content: const Text(
-          'This removes Google access for Remya Apps on this Google account.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: destructiveFilledButtonStyle(context),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Disconnect'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
+    if (await confirmGoogleDisconnect(context, TasksStore.shared) && mounted) {
       await _run(widget.client.disconnectGoogleAccount);
     }
   }

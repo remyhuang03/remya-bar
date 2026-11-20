@@ -34,12 +34,17 @@ String barSettingsError(Object error) => switch (error) {
 /// displayed value with its revision, so a change from another view surfaces
 /// Core's conflict message instead of being overwritten.
 class BarSettingsController extends ChangeNotifier {
-  BarSettingsController({SettingsClient? client})
-    : client = client ?? SettingsClient(),
-      _ownsClient = client == null {
+  BarSettingsController({
+    SettingsClient? client,
+    this.keys = barSettingsKeys,
+    this.loadAiProviders = true,
+  }) : client = client ?? SettingsClient(),
+       _ownsClient = client == null {
     preferences = BarPreferences(client: this.client);
   }
 
+  final List<String> keys;
+  final bool loadAiProviders;
   final SettingsClient client;
   final bool _ownsClient;
   late final BarPreferences preferences;
@@ -70,11 +75,11 @@ class BarSettingsController extends ChangeNotifier {
     _subscriptions
       ..add(
         client.changes.listen((change) {
-          if (change.topic == aiProvidersSettingId) {
+          if (loadAiProviders && change.topic == aiProvidersSettingId) {
             unawaited(loadAi());
           } else if (change.topic.startsWith('remya-bar.')) {
             final key = change.topic.substring('remya-bar.'.length);
-            if (barSettingsKeys.contains(key)) unawaited(load(key));
+            if (keys.contains(key)) unawaited(load(key));
           }
         }, onError: (Object _) {}),
       )
@@ -88,7 +93,10 @@ class BarSettingsController extends ChangeNotifier {
 
   Future<void> reload() async {
     writeErrors.clear();
-    await Future.wait([for (final key in barSettingsKeys) load(key), loadAi()]);
+    await Future.wait([
+      for (final key in keys) load(key),
+      if (loadAiProviders) loadAi(),
+    ]);
   }
 
   Future<void> load(String key) async {
@@ -134,17 +142,17 @@ class BarSettingsController extends ChangeNotifier {
   }
 
   /// Replaces [key] using the revision of the value currently displayed.
-  Future<void> write(String key, Object value) async {
+  Future<void> write(String key, Object value, {String? revision}) async {
     if (_disposed || !values.containsKey(key) || busy(key)) return;
     final write = _writes[key] = Completer<void>();
-    final revision = preferences.revision(key);
+    final expectedRevision = revision ?? preferences.revision(key);
     _advanceRead(key);
     _notify();
     try {
       await preferences.replace(
         key,
         value,
-        revision,
+        expectedRevision,
         isCurrent: () => !_disposed,
       );
       if (_disposed) return;

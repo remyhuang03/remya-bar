@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:remya_ui/remya_ui.dart';
 import 'package:remya_ui/settings_ui.dart';
 
+import '../tasks/tasks_settings.dart';
 import 'bar_google_account.dart';
 import 'bar_settings_controller.dart';
 import 'bar_settings_pages.dart';
@@ -16,6 +17,7 @@ Future<void> openBarSettings({String page = ''}) =>
     barSettingsChannel.invokeMethod<void>('open', page);
 
 const _accountPage = 'account';
+const _tasksPage = 'tasks';
 
 /// Bar preference pages in navigation order.
 const barSettingsPages = [
@@ -75,6 +77,7 @@ class _BarSettingsEntryState extends State<BarSettingsEntry> {
   void _open(String page) {
     if (page == remyaMaterialThemePageId ||
         page == _accountPage ||
+        page == _tasksPage ||
         barSettingsPages.any((entry) => entry.id == page)) {
       _selected = page;
     }
@@ -147,6 +150,13 @@ class _BarSettingsEntryState extends State<BarSettingsEntry> {
                       builder: (context) =>
                           BarSettingsPage(id: page.id, controller: _controller),
                     ),
+                  RemyaSettingsPage(
+                    id: _tasksPage,
+                    title: 'Tasks',
+                    icon: Icons.task_alt_rounded,
+                    category: .system,
+                    builder: (_) => const TasksSettings(),
+                  ),
                   remyaMaterialThemePage(client: _controller.client),
                   RemyaSettingsPage(
                     id: _accountPage,
