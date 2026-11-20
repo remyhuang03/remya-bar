@@ -12,9 +12,14 @@ import 'bar_settings_tiles.dart';
 
 /// Connects the shared Remya account from Bar settings.
 class BarGoogleAccount extends StatefulWidget {
-  const BarGoogleAccount({super.key, required this.client});
+  const BarGoogleAccount({
+    super.key,
+    required this.client,
+    required this.pickAvatar,
+  });
 
   final SettingsClient client;
+  final Future<String?> Function() pickAvatar;
 
   @override
   State<BarGoogleAccount> createState() => _BarGoogleAccountState();
@@ -121,6 +126,12 @@ class _BarGoogleAccountState extends State<BarGoogleAccount> {
           children: [
             settingTile(
               email ?? 'Connect a Google account',
+              leading: Image.asset(
+                'assets/icons/google.png',
+                width: 20,
+                height: 20,
+                excludeFromSemantics: true,
+              ),
               detail: switch (status) {
                 null => _busy ? 'Checking connection…' : 'Status unavailable',
                 _ when pending => 'Continue in your browser',
@@ -149,6 +160,22 @@ class _BarGoogleAccountState extends State<BarGoogleAccount> {
             ),
           ],
         ),
+        const SettingsSectionTitle('Profile picture'),
+        SettingsSurface(
+          child: settingSwitch(
+            'Sync with Google account',
+            email == null
+                ? 'Connect a Google account to sync your picture'
+                : null,
+            status?.avatarSync ?? false,
+            _busy || pending || email == null
+                ? null
+                : (enabled) =>
+                      _run(() => widget.client.setGoogleAvatarSync(enabled)),
+          ),
+        ),
+        const SizedBox(height: 4),
+        RemyaAvatarEditor(client: widget.client, pickImage: widget.pickAvatar),
       ],
     );
   }

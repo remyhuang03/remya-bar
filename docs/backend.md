@@ -17,12 +17,13 @@ Compiled bundles do not require sibling checkouts.
 
 [linux/packaging/remya-bar.json](../linux/packaging/remya-bar.json) owns schemas,
 defaults and pages (`layout`, `osd`, `notifications`, `ai-ring`, `tasks`). The
-`material-theme` and `account` pages link to Core’s shared theme and avatar
-editors. An avatar saved in either the Bar Account page or Remya Settings
+`material-theme` and `account` pages use Core’s shared theme and avatar editors. An avatar saved in either the Bar Account page or Remya Settings
 updates Bar’s sidebar profile. The Account page also uses Core's Google OAuth
 service for identity-only sign-in. Bar links to the [Remya Apps privacy policy](https://apps.remya.top/privacy),
-and allows users to disconnect the shared authorization. Core owns the tokens
-and browser flow.
+and allows users to disconnect the shared authorization. The profile picture
+can sync with Google after the user grants profile access. Core owns the tokens,
+browser flow and periodic avatar refresh. Turning sync off restores the locally
+chosen picture.
 It is installed at `$XDG_DATA_HOME/remya/apps/remya-bar.json`. `BarPreferences`
 accesses values only through `AppPreferences('remya-bar')`; editors use
 revision-checked Replace.

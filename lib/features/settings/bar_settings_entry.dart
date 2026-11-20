@@ -171,20 +171,12 @@ class _BarSettingsEntryState extends State<BarSettingsEntry> {
                     title: 'Account',
                     icon: Icons.person_outline_rounded,
                     category: .privacy,
-                    builder: (context) => Column(
-                      crossAxisAlignment: .stretch,
-                      children: [
-                        BarGoogleAccount(client: _controller.client),
-                        const SettingsSectionTitle('Profile picture'),
-                        RemyaAvatarEditor(
-                          client: _controller.client,
-                          pickImage: () =>
-                              barSettingsChannel.invokeMethod<String>(
-                                'pickAvatar',
-                                View.of(context).viewId,
-                              ),
-                        ),
-                      ],
+                    builder: (context) => BarGoogleAccount(
+                      client: _controller.client,
+                      pickAvatar: () => barSettingsChannel.invokeMethod<String>(
+                        'pickAvatar',
+                        View.of(context).viewId,
+                      ),
                     ),
                   ),
                 ],

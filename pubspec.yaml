@@ -33,6 +33,7 @@ flutter:
     - LICENSE
     - assets/licenses/rust-dependencies.txt
     - assets/icons/app_icon.svg
+    - assets/icons/google.png
     - assets/icons/media-artwork.png
     - assets/icons/media-live-dot.png
     - assets/icons/battery-card-status.png
