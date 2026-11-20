@@ -98,7 +98,10 @@ abstract class SystemRustLibApi extends BaseApi {
 
   Future<int?> crateApiCodexbarServerPort({required String token});
 
-  Future<SystemSnapshot> crateApiHardwareSnapshot();
+  Future<SystemSnapshot> crateApiHardwareSnapshot({
+    required int refreshIntervalMs,
+    required int timeRangeSeconds,
+  });
 
   Future<void> crateApiMediaAction({
     required String busName,
@@ -290,11 +293,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   );
 
   @override
-  Future<SystemSnapshot> crateApiHardwareSnapshot() {
+  Future<SystemSnapshot> crateApiHardwareSnapshot({
+    required int refreshIntervalMs,
+    required int timeRangeSeconds,
+  }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_32(refreshIntervalMs, serializer);
+          sse_encode_u_32(timeRangeSeconds, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -307,14 +315,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           decodeErrorData: sse_decode_String,
         ),
         constMeta: kCrateApiHardwareSnapshotConstMeta,
-        argValues: [],
+        argValues: [refreshIntervalMs, timeRangeSeconds],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiHardwareSnapshotConstMeta =>
-      const TaskConstMeta(debugName: "hardware_snapshot", argNames: []);
+  TaskConstMeta get kCrateApiHardwareSnapshotConstMeta => const TaskConstMeta(
+    debugName: "hardware_snapshot",
+    argNames: ["refreshIntervalMs", "timeRangeSeconds"],
+  );
 
   @override
   Future<void> crateApiMediaAction({

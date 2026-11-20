@@ -61,8 +61,13 @@ Future<void> trayMenuAction({
 );
 
 /// All views share one sample and one set of CPU/network baselines.
-Future<SystemSnapshot> hardwareSnapshot() =>
-    SystemRustLib.instance.api.crateApiHardwareSnapshot();
+Future<SystemSnapshot> hardwareSnapshot({
+  required int refreshIntervalMs,
+  required int timeRangeSeconds,
+}) => SystemRustLib.instance.api.crateApiHardwareSnapshot(
+  refreshIntervalMs: refreshIntervalMs,
+  timeRangeSeconds: timeRangeSeconds,
+);
 
 Future<void> sidebarSessionAction({required String action}) =>
     SystemRustLib.instance.api.crateApiSidebarSessionAction(action: action);

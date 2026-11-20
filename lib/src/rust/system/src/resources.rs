@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 const BARS: usize = 18;
-const WINDOW: Duration = Duration::from_secs(60);
+const MAX_WINDOW: Duration = Duration::from_secs(600);
+const SENSOR_DISCOVERY: Duration = Duration::from_secs(60);
 
 #[derive(Default)]
 pub(crate) struct History {
@@ -26,6 +27,8 @@ impl History {
     pub(crate) fn record(
         &mut self,
         time: Instant,
+        window: Duration,
+        refresh_interval: Duration,
         snapshot: &mut SystemSnapshot,
         gpu_measured: bool,
     ) {
@@ -62,18 +65,33 @@ impl History {
         while self
             .points
             .front()
-            .is_some_and(|point| time.duration_since(point.time) >= WINDOW)
+            .is_some_and(|point| time.duration_since(point.time) >= MAX_WINDOW)
         {
             self.points.pop_front();
         }
-        self.populate(time, details);
+        self.populate(time, window, refresh_interval, details);
     }
 
-    fn populate(&self, time: Instant, details: &mut ResourceDetails) {
-        let mut bins = [[(0.0, 0u32); BARS]; 4];
+    fn populate(
+        &self,
+        time: Instant,
+        window: Duration,
+        refresh_interval: Duration,
+        details: &mut ResourceDetails,
+    ) {
+        let window_ms = window.as_millis().max(1);
+        let refresh_ms = refresh_interval.as_millis().max(1);
+        let bars = (window_ms / refresh_ms).clamp(1, BARS as u128) as usize;
+        let mut bins: [Vec<(f64, u32)>; 4] = std::array::from_fn(|_| vec![(0.0, 0u32); bars]);
         for point in &self.points {
-            let age = time.duration_since(point.time).as_millis();
-            let index = BARS - 1 - (age * BARS as u128 / WINDOW.as_millis()) as usize;
+            let Some(age) = time.checked_duration_since(point.time) else {
+                continue;
+            };
+            if age >= window {
+                continue;
+            }
+            let raw = (age.as_millis() * bars as u128 / window_ms) as usize;
+            let index = bars - 1 - raw.min(bars - 1);
             for (metric, value) in point.values.iter().enumerate() {
                 if let Some(value) = value
                     && (metric != 1 || point.gpu_id == self.gpu_id)
@@ -229,7 +247,10 @@ pub(crate) struct TemperatureSensors {
 
 impl TemperatureSensors {
     pub(crate) fn read(&mut self, root: &Path, drivers: &[&str], labels: &[&str]) -> Option<f64> {
-        if self.discovered.is_none_or(|time| time.elapsed() >= WINDOW) {
+        if self
+            .discovered
+            .is_none_or(|time| time.elapsed() >= SENSOR_DISCOVERY)
+        {
             self.discovered = Some(Instant::now());
             self.paths = temperature_paths(root, drivers, labels);
         }
@@ -351,11 +372,13 @@ mod tests {
             memory_total_bytes: None,
             temperature_celsius: None,
         });
+        let window = Duration::from_secs(60);
+        let refresh = Duration::from_secs(1);
         snapshot.cpu_percent = Some(42.0);
-        history.record(time, &mut snapshot, true);
+        history.record(time, window, refresh, &mut snapshot, true);
         let later = time + Duration::from_secs(5);
         snapshot.cpu_percent = Some(12.0);
-        history.record(later, &mut snapshot, false);
+        history.record(later, window, refresh, &mut snapshot, false);
         let details = snapshot.resources.as_ref().unwrap();
         assert_eq!(details.cpu_history[BARS - 2], Some(42.0));
         assert_eq!(details.cpu_history[BARS - 1], Some(12.0));
@@ -393,19 +416,81 @@ mod tests {
         });
         let mut snapshot = crate::metrics::Sampler::default().sample().unwrap().1;
         snapshot.cpu_percent = None;
+        let window = Duration::from_secs(60);
+        let refresh = Duration::from_secs(1);
         let almost_expired = time + Duration::from_secs(59);
-        history.record(almost_expired, &mut snapshot, false);
+        history.record(almost_expired, window, refresh, &mut snapshot, false);
         let values = &snapshot.resources.as_ref().unwrap().cpu_history;
         assert_eq!(values[0], Some(42.0));
         assert!(values[1..].iter().all(Option::is_none));
-        history.record(time + WINDOW, &mut snapshot, false);
+        history.record(time + window, window, refresh, &mut snapshot, false);
         assert!(
             snapshot
                 .resources
+                .as_ref()
                 .unwrap()
                 .cpu_history
                 .iter()
                 .all(Option::is_none)
         );
+        // Switching to a 5-minute window reveals earlier samples retained up to MAX_WINDOW.
+        history.record(
+            time + window,
+            Duration::from_secs(300),
+            refresh,
+            &mut snapshot,
+            false,
+        );
+        assert!(
+            snapshot
+                .resources
+                .as_ref()
+                .unwrap()
+                .cpu_history
+                .contains(&Some(42.0))
+        );
+    }
+
+    #[test]
+    fn history_bins_scale_with_window_and_refresh_rate() {
+        let time = Instant::now();
+        let mut history = History::default();
+        let mut snapshot = crate::metrics::Sampler::default().sample().unwrap().1;
+
+        // 30s window at 5s refresh rate -> 6 evenly spaced bins (no gaps).
+        let window = Duration::from_secs(30);
+        let refresh = Duration::from_secs(5);
+        for step in 0..6 {
+            snapshot.cpu_percent = Some((step + 1) as f64 * 10.0);
+            history.record(
+                time + Duration::from_secs(step * 5),
+                window,
+                refresh,
+                &mut snapshot,
+                false,
+            );
+        }
+        assert_eq!(
+            snapshot.resources.as_ref().unwrap().cpu_history,
+            vec![
+                Some(10.0),
+                Some(20.0),
+                Some(30.0),
+                Some(40.0),
+                Some(50.0),
+                Some(60.0),
+            ]
+        );
+
+        // 30s window at 500ms refresh rate caps cleanly at 18 bars.
+        snapshot.cpu_percent = Some(75.0);
+        history.record(
+            time + Duration::from_secs(26),
+            Duration::from_secs(30),
+            Duration::from_millis(500),
+            &mut snapshot,
+            false,
+        );
+        assert_eq!(snapshot.resources.as_ref().unwrap().cpu_history.len(), BARS);
     }
 }

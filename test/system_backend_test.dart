@@ -49,6 +49,7 @@ class _Settings extends SettingsClient {
   Completer<Map<String, dynamic>>? read;
   Completer<Map<String, dynamic>>? layout;
   String position = 'top';
+  Map<String, Object> resources = BarResourcePreferences.defaults.toJson();
   int reads = 0;
   final gets = <String>[];
 
@@ -85,6 +86,9 @@ class _Settings extends SettingsClient {
       return layout?.future ??
           {'value': BarLayout.defaults.toJson(), 'revision': 'a' * 64};
     }
+    if (method == 'Get' && arguments.single == barResourcesSettingId) {
+      return {'value': resources, 'revision': 'a' * 64};
+    }
     return {};
   }
 
@@ -99,6 +103,7 @@ class _MediaApi implements SystemRustLibApi {
   var updates = StreamController<List<MediaPlayerSnapshot>>();
   Completer<void>? action;
   int subscriptions = 0;
+  final hardwareCalls = <({int refreshIntervalMs, int timeRangeSeconds})>[];
 
   @override
   Stream<List<MediaPlayerSnapshot>> crateApiSubscribeMedia() {
@@ -113,8 +118,16 @@ class _MediaApi implements SystemRustLibApi {
   }) => this.action?.future ?? Future.value();
 
   @override
-  Future<SystemSnapshot> crateApiHardwareSnapshot() async =>
-      const SystemSnapshot(batteries: [], gpus: []);
+  Future<SystemSnapshot> crateApiHardwareSnapshot({
+    required int refreshIntervalMs,
+    required int timeRangeSeconds,
+  }) async {
+    hardwareCalls.add((
+      refreshIntervalMs: refreshIntervalMs,
+      timeRangeSeconds: timeRangeSeconds,
+    ));
+    return const SystemSnapshot(batteries: [], gpus: []);
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -290,4 +303,34 @@ void main() {
     await _flush();
     expect(backend.bottom, isTrue);
   });
+
+  test(
+    'resources preference updates hardwareSnapshot interval and time range',
+    () async {
+      expect(api.hardwareCalls.last, (
+        refreshIntervalMs: 1000,
+        timeRangeSeconds: 60,
+      ));
+      settings.resources = const BarResourcePreferences(
+        refreshIntervalMs: 500,
+        timeRangeSeconds: 300,
+      ).toJson();
+      settings.updates.add((topic: barResourcesSettingId, value: {}));
+      await _flush();
+      await _flush();
+      expect(api.hardwareCalls.last, (
+        refreshIntervalMs: 500,
+        timeRangeSeconds: 300,
+      ));
+      await Future<void>.delayed(const Duration(milliseconds: 550));
+      expect(
+        api.hardwareCalls
+            .where(
+              (call) => call == (refreshIntervalMs: 500, timeRangeSeconds: 300),
+            )
+            .length,
+        greaterThanOrEqualTo(2),
+      );
+    },
+  );
 }

@@ -86,7 +86,7 @@ void main() {
     await tester.tap(find.text('Reply'));
     await tester.tap(follower);
     await tester.tap(find.byType(Switch));
-    await tester.tap(find.text('Clear notifications'));
+    await tester.tap(find.text('Clear All'));
     expect(actions, [
       {'action': 'notification.invoke', 'id': 3, 'key': 'reply'},
       {'action': 'notification.invoke', 'id': 1, 'key': 'default'},
@@ -115,7 +115,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Clear notifications'));
+    await tester.tap(find.text('Clear All'));
     await tester.pump();
     expect(find.text('Summary 1'), findsNothing);
     expect(find.text('Review benchmarks'), findsOneWidget);
@@ -138,7 +138,7 @@ void main() {
       find.text('Another notification service is running'),
       findsOneWidget,
     );
-    expect(find.text('Clear notifications'), findsNothing);
+    expect(find.text('Clear All'), findsNothing);
   });
 
   testWidgets(
@@ -174,7 +174,7 @@ void main() {
       expect(dndTop, lessThan(listTop));
       expect(
         tester.getTopRight(find.byType(Switch)).dx,
-        closeTo(tester.getTopRight(find.text('Clear notifications')).dx, 16),
+        closeTo(tester.getTopRight(find.text('Clear All')).dx, 16),
       );
       await tester.drag(history, const Offset(0, -500));
       await tester.pumpAndSettle();

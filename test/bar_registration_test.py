@@ -31,6 +31,15 @@ class RegistrationTest(unittest.TestCase):
                 {**settings['tasks']['default'], 'preview-rows': 4},
                 {**settings['tasks']['default'], 'visible-lists': ['same', 'same']},
             ],
+            'resources': [
+                {**settings['resources']['default'], 'refresh-interval-ms': 250},
+                {**settings['resources']['default'], 'refresh-interval-ms': 0},
+                {**settings['resources']['default'], 'time-range-seconds': 15},
+                {**settings['resources']['default'], 'time-range-seconds': 900},
+            ],
+            'weather': [
+                {**settings['weather']['default'], 'enabled': True},
+            ],
             'quiet-schedule': [{**settings['quiet-schedule']['default'], 'start': time}
                                for time in ['24:00', '22:00\n', '7:00']],
         }.items():

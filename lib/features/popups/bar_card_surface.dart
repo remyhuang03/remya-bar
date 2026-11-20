@@ -147,11 +147,20 @@ class BarCardSurface extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) => Padding(
             padding: insetsFor(pill, constraints.maxWidth, bottom: bottom),
-            child: Material(
-              type: .transparency,
-              child: SingleChildScrollView(
-                padding: const .all(24),
-                child: child,
+            // Strip the outer card scrollbar's shadow insets so inner scrollables
+            // inside the card keep their scrollbars aligned with the content.
+            child: MediaQuery.removePadding(
+              context: context,
+              removeLeft: true,
+              removeTop: true,
+              removeRight: true,
+              removeBottom: true,
+              child: Material(
+                type: .transparency,
+                child: SingleChildScrollView(
+                  padding: const .all(24),
+                  child: child,
+                ),
               ),
             ),
           ),

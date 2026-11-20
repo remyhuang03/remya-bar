@@ -10,6 +10,7 @@ const barSettingsKeys = [
   'layout',
   'position',
   'clock-seconds',
+  'resources',
   'keyboard-preview',
   'folded-apps',
   'osd',

@@ -254,11 +254,11 @@ impl SensorWorker {
         }));
     }
 
-    pub(crate) fn apply(&mut self, snapshot: &mut SystemSnapshot) -> bool {
+    pub(crate) fn apply(&mut self, snapshot: &mut SystemSnapshot, stale_after: Duration) -> bool {
         let Some((time, sensors)) = self.last_sample.as_ref() else {
             return false;
         };
-        if time.elapsed() >= Duration::from_secs(3) {
+        if time.elapsed() >= stale_after {
             return false;
         }
         snapshot.gpus.clone_from(&sensors.gpus);
@@ -452,5 +452,27 @@ mod tests {
         assert_eq!(memory.len(), 2);
         assert_eq!(memory["MemTotal"], 2097152);
         assert_eq!(memory["MemAvailable"], 524288);
+    }
+
+    #[test]
+    fn sensor_worker_honors_caller_staleness_window() {
+        let mut worker = SensorWorker::default();
+        let Some(five_seconds_ago) = Instant::now().checked_sub(Duration::from_secs(5)) else {
+            return;
+        };
+        worker.last_sample = Some((
+            five_seconds_ago,
+            SensorSample {
+                cpu_cores: Some(8),
+                cpu_frequency_ghz: Some(3.6),
+                cpu_temperature_celsius: Some(55.0),
+                gpus: vec![],
+            },
+        ));
+        let mut snapshot = Sampler::default().sample().unwrap().1;
+        assert!(!worker.apply(&mut snapshot, Duration::from_secs(3)));
+        assert_eq!(snapshot.resources.as_ref().unwrap().cpu_cores, None,);
+        assert!(worker.apply(&mut snapshot, Duration::from_secs(11)));
+        assert_eq!(snapshot.resources.as_ref().unwrap().cpu_cores, Some(8),);
     }
 }

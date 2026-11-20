@@ -18,8 +18,6 @@ import '../osd/osd_slider.dart';
 import '../popups/bar_popup_button.dart';
 import '../popups/popup_measure.dart';
 import '../settings/remya_settings_installed.dart';
-import '../weather/weather_card.dart';
-import '../weather/weather_controller.dart';
 
 part 'sidebar_controls.dart';
 part 'sidebar_detail.dart';
@@ -103,14 +101,12 @@ class RightSidebar extends StatefulWidget {
     required this.data,
     required this.onAction,
     required this.onHeight,
-    this.weather,
     this.tasks,
   });
 
   final Map<String, Object?> data;
   final Future<void> Function(Map<String, Object?>) onAction;
   final ValueChanged<double> onHeight;
-  final WeatherController? weather;
   final Widget? tasks;
 
   @override
@@ -614,13 +610,6 @@ class _RightSidebarState extends State<RightSidebar> {
         _grid(2, collapsed ? large.take(2).toList() : large, _largeTile),
       if (!collapsed && (_tiles.any(_small.containsKey) || edit))
         _grid(5, _tiles.where(_small.containsKey).toList(), _smallTile),
-      if (widget.weather case final weather? when !edit)
-        ValueListenableBuilder(
-          valueListenable: weather.visibility,
-          builder: (context, enabled, _) => enabled
-              ? WeatherCard(compact: true, controller: weather)
-              : const SizedBox.shrink(),
-        ),
       if (tasks != null && !edit) ...[
         Align(
           alignment: .centerLeft,

@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/features/popups/bar_card_surface.dart';
+import 'package:remya_bar/features/popups/bar_popup.dart';
+import 'package:remya_ui/remya_ui.dart';
 
 void main() {
   const body = Rect.fromLTWH(40, 12, 420, 300);
@@ -70,5 +72,40 @@ void main() {
       (bottom.left, bottom.right, bottom.top, bottom.bottom),
       (top.left, top.right, top.bottom, top.top),
     );
+  });
+
+  testWidgets('strips outer shadow padding from descendant MediaQuery', (
+    tester,
+  ) async {
+    late EdgeInsets childPadding;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(
+            padding: EdgeInsets.fromLTRB(40, 36, 44, 76),
+          ),
+          child: BarPopupScope(
+            theme: const RemyaTheme(),
+            child: Center(
+              child: SizedBox(
+                width: 452,
+                height: 674,
+                child: BarCardSurface(
+                  styleVariant: .tonalSpot,
+                  child: Builder(
+                    builder: (context) {
+                      childPadding = MediaQuery.paddingOf(context);
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(childPadding, EdgeInsets.zero);
   });
 }

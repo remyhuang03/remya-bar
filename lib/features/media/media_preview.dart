@@ -112,96 +112,90 @@ class _PlayerHeader extends StatelessWidget {
     final colors = theme.colorScheme;
     final player = players.firstOrNull;
     final playing = player?['status'] == 'Playing';
-    return ConstrainedBox(
-      constraints: const .new(minHeight: 48),
-      child: Align(
-        alignment: .centerLeft,
-        child: LayoutBuilder(
-          builder: (context, constraints) => SizedBox(
-            width: constraints.maxWidth,
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: .spaceBetween,
-              crossAxisAlignment: .center,
-              children: [
-                Text(
-                  'Now playing',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: .w700,
-                    color: theme.brightness == .dark
-                        ? colors.primaryFixed
-                        : colors.onSurface,
-                  ),
-                ),
-                if (player != null)
-                  PopupMenuButton<String>(
-                    tooltip: 'Select media player',
-                    initialValue: _text(player['name']),
-                    enabled: players.length > 1,
-                    onSelected: (name) =>
-                        onAction({'action': 'media.select', 'player': name}),
-                    itemBuilder: (context) => [
-                      for (final choice in players)
-                        PopupMenuItem(
-                          value: _text(choice['name']),
-                          child: Text(
-                            _playerLabel(choice),
-                            maxLines: 2,
-                            overflow: .ellipsis,
-                          ),
-                        ),
-                    ],
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: colors.secondaryContainer,
-                        borderRadius: .circular(999),
-                      ),
-                      child: Padding(
-                        padding: const .fromLTRB(12, 6, 8, 6),
-                        child: Row(
-                          mainAxisSize: .min,
-                          spacing: 6,
-                          children: [
-                            Semantics(
-                              label: playing ? 'Playing' : 'Idle',
-                              child: Image.asset(
-                                'assets/icons/media-live-dot.png',
-                                width: 8,
-                                height: 8,
-                                color: playing
-                                    ? colors.tertiary
-                                    : colors.onSurfaceVariant,
-                              ),
-                            ),
-                            ConstrainedBox(
-                              constraints: const .new(maxWidth: 140),
-                              child: Text(
-                                _playerLabel(player),
-                                maxLines: 1,
-                                overflow: .ellipsis,
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: colors.onSecondaryContainer,
-                                  fontSize: 12,
-                                  height: 1.2,
-                                ),
-                              ),
-                            ),
-                            Icon(
-                              Icons.arrow_drop_down,
-                              size: 18,
-                              color: colors.onSecondaryContainer,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+    return Row(
+      crossAxisAlignment: .center,
+      spacing: 8,
+      children: [
+        Expanded(
+          child: Text(
+            'Now playing',
+            maxLines: 1,
+            overflow: .ellipsis,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: .w700,
+              height: 30 / 24,
+              leadingDistribution: .even,
+              color: theme.brightness == .dark
+                  ? colors.primaryFixed
+                  : colors.onSurface,
             ),
           ),
         ),
-      ),
+        if (players.length > 1)
+          PopupMenuButton<String>(
+            tooltip: 'Select media player',
+            position: .under,
+            borderRadius: .circular(999),
+            initialValue: _text(player!['name']),
+            onSelected: (name) =>
+                onAction({'action': 'media.select', 'player': name}),
+            itemBuilder: (context) => [
+              for (final choice in players)
+                PopupMenuItem(
+                  value: _text(choice['name']),
+                  child: Text(
+                    _playerLabel(choice),
+                    maxLines: 2,
+                    overflow: .ellipsis,
+                  ),
+                ),
+            ],
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.secondaryContainer,
+                borderRadius: .circular(999),
+              ),
+              child: Padding(
+                padding: const .fromLTRB(12, 6, 8, 6),
+                child: Row(
+                  mainAxisSize: .min,
+                  spacing: 6,
+                  children: [
+                    Semantics(
+                      label: playing ? 'Playing' : 'Idle',
+                      child: Image.asset(
+                        'assets/icons/media-live-dot.png',
+                        width: 8,
+                        height: 8,
+                        color: playing
+                            ? colors.tertiary
+                            : colors.onSurfaceVariant,
+                      ),
+                    ),
+                    ConstrainedBox(
+                      constraints: const .new(maxWidth: 140),
+                      child: Text(
+                        _playerLabel(player),
+                        maxLines: 1,
+                        overflow: .ellipsis,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colors.onSecondaryContainer,
+                          fontSize: 12,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      size: 18,
+                      color: colors.onSecondaryContainer,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

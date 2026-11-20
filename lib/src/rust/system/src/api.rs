@@ -248,20 +248,33 @@ pub struct NetworkOverview {
 }
 
 /// All views share one sample and one set of CPU/network baselines.
-pub async fn hardware_snapshot() -> Result<SystemSnapshot, String> {
+pub async fn hardware_snapshot(
+    refresh_interval_ms: u32,
+    time_range_seconds: u32,
+) -> Result<SystemSnapshot, String> {
     #[derive(Default)]
     struct Cache {
-        updated: Option<Instant>,
+        updated: Option<(Instant, u64, u64)>,
         snapshot: Option<SystemSnapshot>,
         resources: crate::resources::History,
         sensors: crate::metrics::SensorWorker,
     }
     static CACHE: OnceLock<tokio::sync::Mutex<Cache>> = OnceLock::new();
     static SAMPLER: OnceLock<std::sync::Mutex<crate::metrics::Sampler>> = OnceLock::new();
+    let interval_ms = u64::from(refresh_interval_ms.clamp(500, 60_000));
+    let window_secs = u64::from(time_range_seconds.clamp(10, 600));
+    let refresh_interval = Duration::from_millis(interval_ms);
+    let window = Duration::from_secs(window_secs);
+    let ttl = Duration::from_millis((interval_ms * 9 / 10).min(900));
+    let stale_after =
+        Duration::from_secs(3).max(refresh_interval.saturating_mul(2) + Duration::from_secs(1));
+
     let mut cache = CACHE.get_or_init(Default::default).lock().await;
     if cache
         .updated
-        .is_some_and(|time| time.elapsed() < Duration::from_millis(900))
+        .is_some_and(|(time, cached_interval, cached_window)| {
+            cached_interval == interval_ms && cached_window == window_secs && time.elapsed() < ttl
+        })
     {
         return Ok(cache.snapshot.as_ref().unwrap().clone());
     }
@@ -277,11 +290,15 @@ pub async fn hardware_snapshot() -> Result<SystemSnapshot, String> {
     .await
     .map_err(|error| error.to_string())??;
     cache.sensors.poll().await;
-    let gpu_measured = cache.sensors.apply(&mut snapshot);
-    cache
-        .resources
-        .record(sampled_at, &mut snapshot, gpu_measured);
-    cache.updated = Some(sampled_at);
+    let gpu_measured = cache.sensors.apply(&mut snapshot, stale_after);
+    cache.resources.record(
+        sampled_at,
+        window,
+        refresh_interval,
+        &mut snapshot,
+        gpu_measured,
+    );
+    cache.updated = Some((sampled_at, interval_ms, window_secs));
     cache.snapshot = Some(snapshot.clone());
     Ok(snapshot)
 }

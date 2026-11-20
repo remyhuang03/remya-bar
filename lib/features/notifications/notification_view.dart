@@ -97,7 +97,7 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
                       onPressed: () => widget.onAction(const {
                         'action': 'notification.clear',
                       }),
-                      child: const Text('Clear notifications', textAlign: .end),
+                      child: const Text('Clear All', textAlign: .end),
                     ),
                   ),
                 ),

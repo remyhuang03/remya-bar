@@ -103,7 +103,6 @@ class ResourceCard extends StatelessWidget {
           ),
         _MemoryTile(data: data),
         _NetworkTile(data: data),
-        const _Note('Updated every second · last 60 s'),
       ],
     );
   }

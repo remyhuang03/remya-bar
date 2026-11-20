@@ -142,6 +142,57 @@ void main() {
     expect(find.byType(Text), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'media header hides selector for one player and aligns for many',
+    (tester) async {
+      await tester.pumpWidget(_mediaSliders((_) {}));
+      expect(find.byTooltip('Select media player'), findsNothing);
+      expect(find.text('Test player'), findsNothing);
+
+      final selected = <Map<String, Object?>>[];
+      await tester.pumpWidget(
+        _host(
+          SizedBox(
+            width: 372,
+            child: MediaPreview(
+              data: const {
+                'players': [
+                  {
+                    'name': 'p1',
+                    'identity': 'Player One',
+                    'title': 'Track 1',
+                    'status': 'Playing',
+                  },
+                  {
+                    'name': 'p2',
+                    'identity': 'Player Two',
+                    'title': 'Track 2',
+                    'status': 'Paused',
+                  },
+                ],
+              },
+              onAction: selected.add,
+            ),
+          ),
+        ),
+      );
+      final title = tester.getRect(find.text('Now playing'));
+      final selectorFinder = find.byTooltip('Select media player');
+      expect(selectorFinder, findsOneWidget);
+      final selector = tester.getRect(selectorFinder);
+      expect(selector.center.dy, closeTo(title.center.dy, 2));
+      expect(selector.left, greaterThan(title.right));
+
+      await tester.tap(selectorFinder);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Player Two').last);
+      await tester.pumpAndSettle();
+      expect(selected, [
+        {'action': 'media.select', 'player': 'p2'},
+      ]);
+    },
+  );
 }
 
 Widget _mediaSliders(

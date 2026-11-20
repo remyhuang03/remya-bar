@@ -37,10 +37,13 @@ class SystemBackend extends ChangeNotifier {
   final _pendingPlayback = <String, ({String status, DateTime expires})>{};
   String? mediaError;
   StreamSubscription<SettingsChange>? _settingsChanges;
+  StreamSubscription<bool>? _serviceChanges;
   bool _writingPower = false;
   int _powerRevision = 0;
   bool showClockSeconds = true;
   BarLayout layout = BarLayout.defaults;
+  BarResourcePreferences resources = BarResourcePreferences.defaults;
+  bool _refreshAgain = false;
 
   /// Whether the bar sits on the bottom output edge.
   bool bottom = false;
@@ -109,6 +112,8 @@ class SystemBackend extends ChangeNotifier {
           unawaited(_refreshClockPreference());
         case barLayoutSettingId:
           unawaited(_refreshLayout());
+        case barResourcesSettingId:
+          unawaited(_refreshResources());
         case barPositionSettingId:
           unawaited(_refreshPosition());
         case 'network' || 'bluetooth':
@@ -124,33 +129,56 @@ class SystemBackend extends ChangeNotifier {
           }
       }
     }, onError: (Object error) => debugPrint('Settings changes: $error'));
+    _serviceChanges = _settings.serviceAvailableChanges.listen((available) {
+      if (available) unawaited(_refreshResources());
+    }, onError: (Object _) {});
     _subscribeMedia();
     // Settings values are read once, then follow its Changed signals.
     unawaited(_refreshPower());
     unawaited(_refreshClockPreference());
     unawaited(_refreshLayout());
+    unawaited(_refreshResources());
     unawaited(_refreshPosition());
     unawaited(_refreshQuickStatus());
-    void refresh() {
-      unawaited(_refresh());
-      unawaited(_refreshSound());
-    }
+    _tick();
+    _restartTimer();
+  }
 
-    refresh();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => refresh());
+  void _tick() {
+    unawaited(_refresh());
+    unawaited(_refreshSound());
+  }
+
+  void _restartTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(
+      Duration(milliseconds: resources.refreshIntervalMs),
+      (_) => _tick(),
+    );
   }
 
   Future<void> _refresh() async {
-    if (_disposed || _refreshing) return;
+    if (_disposed) return;
+    if (_refreshing) {
+      _refreshAgain = true;
+      return;
+    }
     _refreshing = true;
     try {
-      final next = await api.hardwareSnapshot();
+      final next = await api.hardwareSnapshot(
+        refreshIntervalMs: resources.refreshIntervalMs,
+        timeRangeSeconds: resources.timeRangeSeconds,
+      );
       if (_disposed) return;
       resourceSnapshot = next;
     } catch (failure) {
       if (!_disposed) debugPrint('System hardware: $failure');
     } finally {
       _refreshing = false;
+      if (_refreshAgain && !_disposed) {
+        _refreshAgain = false;
+        unawaited(_refresh());
+      }
     }
   }
 
@@ -173,6 +201,19 @@ class SystemBackend extends ChangeNotifier {
     _preferences.readLayout,
     () => layout,
     (next) => layout = next,
+  );
+
+  Future<void> _refreshResources() => _refreshPreference(
+    'resources',
+    _preferences.readResources,
+    () => resources,
+    (next) {
+      final intervalChanged =
+          next.refreshIntervalMs != resources.refreshIntervalMs;
+      resources = next;
+      if (intervalChanged && _timer != null) _restartTimer();
+      unawaited(_refresh());
+    },
   );
 
   /// Reads one Bar preference, rerunning once if it changed mid-read. Errors
@@ -545,6 +586,7 @@ class SystemBackend extends ChangeNotifier {
     _playbackExpiry?.cancel();
     unawaited(_mediaSubscription?.cancel());
     unawaited(_settingsChanges?.cancel());
+    unawaited(_serviceChanges?.cancel());
     unawaited(_settings.close());
     _hardware.dispose();
     _resourcePill.dispose();

@@ -232,14 +232,16 @@ isolate.
 
 ## Weather
 
-The Weather pill, forecast card and sidebar summary use one controller per
-Flutter engine. Weather starts disabled. Open **System → Weather** in Bar
-Settings to enable it, choose a location and set display or update preferences.
-The location picker accepts a city, postal code or named coordinates. Search
-can take a language and country filter. The `weather-location` preference
-stores both the active location and saved locations in a revision-checked Core
-transaction. An empty object or an object with only `saved` has no active
-location. The `weather` preference stores the other controls separately.
+The Weather pill and forecast card use one controller per Flutter engine.
+Layout controls whether the Weather pill is shown in the bar, and Weather
+background updates run while the pill is placed in the bar. Open
+**System → Weather** in Bar Settings to choose a location and set display or
+update preferences. The location picker accepts a city, postal code or named
+coordinates. Search can take a language and country filter. The
+`weather-location` preference stores both the active location and saved
+locations in a revision-checked Core transaction. An empty object or an object
+with only `saved` has no active location. The `weather` preference stores the
+other controls separately.
 
 Open-Meteo supplies model conditions, up to 25 hourly entries and seven local
 calendar days. The bridge supplies Unix seconds for hourly and current
@@ -299,8 +301,7 @@ Accounts with many lists poll less frequently to reduce API use. Sync retains
 prior data while refreshing, replays pending edits when the account is available, and
 offers a field-level comparison for concurrent changes. A write re-reads the
 item before patching, so a remote write can still race the patch. Creates with
-an uncertain outcome require review in Google Tasks before a new create is
-attempted. Manual mode disables periodic fetches and keeps local submissions
+an uncertain outcome require review in Google Tasks before explicitly retrying or discarding. Manual mode disables periodic fetches and keeps local submissions
 enabled. The UI treats Scheduled date as a calendar date independent of
 timezone. Google Tasks remains the entry point for advanced fields and source
 applications own assignment changes.
@@ -314,10 +315,14 @@ live time and opens system settings through the public opener.
 Battery and resource samples are shared across views. Only system batteries count.
 Low charge takes precedence over energy-saver color. Battery policy comes from Core.
 
-CPU, memory and network counters are sampled once per second. Each sample also
+CPU, memory and network counters are sampled on the configured System card
+refresh interval (`500` ms minimum, `1000` ms default) and binned over the
+configured history time range (`30`–`600` seconds, `60` seconds default) via
+`hardware_snapshot(refresh_interval_ms, time_range_seconds)`. Each sample also
 requests CPU frequency, temperature and GPU readings from a separate blocking
-worker. All views share the readings and 60-second history, including while the
-resource card is closed. The resource pill updates every three seconds.
+worker. All views share the readings and retained history (up to 600 seconds),
+including while the resource card is closed. The resource pill updates every
+three seconds.
 GPU history only records measured utilization and shows gaps for unsampled
 intervals. CPU topology, GPU identity and sensor paths are cached with periodic
 rediscovery. NVIDIA uses one shared NVML library. Missing sensors remain unknown

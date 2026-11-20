@@ -15,6 +15,7 @@ const _pageKeys = {
     'position',
     'layout',
     'clock-seconds',
+    'resources',
     'folded-apps',
     'keyboard-preview',
   ],
@@ -79,6 +80,9 @@ class BarSettingsPage extends StatelessWidget {
     final json = controller.values['layout'];
     final layout = json == null ? null : BarLayout.fromJson(json);
     final seconds = controller.values['clock-seconds'] as bool?;
+    final resources = controller.values['resources'] == null
+        ? null
+        : BarResourcePreferences.fromJson(controller.values['resources']);
     final folded = controller.values['folded-apps'] as List?;
     final preview = controller.values['keyboard-preview'] as bool?;
     final position = controller.values['position'] as String?;
@@ -120,6 +124,52 @@ class BarSettingsPage extends StatelessWidget {
           onLayout: layoutBusy ? null : setLayout,
         ),
       ],
+      if (resources != null)
+        SettingsGroup(
+          title: 'System card',
+          children: [
+            settingTile(
+              'Refresh rate',
+              detail: 'How often system usage updates (minimum 0.5 s)',
+              control: SettingChoice<int>(
+                selected: resources.refreshIntervalMs,
+                choices: const {
+                  500: '0.5 s',
+                  1000: '1 s',
+                  2000: '2 s',
+                  5000: '5 s',
+                  10000: '10 s',
+                },
+                onSelected: controller.busy('resources')
+                    ? null
+                    : (value) => controller.write(
+                        'resources',
+                        resources.copyWith(refreshIntervalMs: value).toJson(),
+                      ),
+              ),
+            ),
+            settingTile(
+              'Time range',
+              detail: 'History shown in the system card graphs',
+              control: SettingChoice<int>(
+                selected: resources.timeRangeSeconds,
+                choices: const {
+                  30: '30 s',
+                  60: '1 min',
+                  120: '2 min',
+                  300: '5 min',
+                  600: '10 min',
+                },
+                onSelected: controller.busy('resources')
+                    ? null
+                    : (value) => controller.write(
+                        'resources',
+                        resources.copyWith(timeRangeSeconds: value).toJson(),
+                      ),
+              ),
+            ),
+          ],
+        ),
       if (folded != null)
         SettingsGroup(
           title: 'App tray',

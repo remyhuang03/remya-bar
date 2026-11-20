@@ -14,6 +14,7 @@ const barKeyboardPreviewSettingId = 'remya-bar.keyboard-preview';
 const barFoldedAppsSettingId = 'remya-bar.folded-apps';
 const barSidebarLayoutSettingId = 'remya-bar.sidebar-layout';
 const barNotificationsSettingId = 'remya-bar.notifications';
+const barResourcesSettingId = 'remya-bar.resources';
 const aiRingSettingId = 'remya-bar.ai-ring';
 const sidebarTileIds = [
   'internet',
@@ -93,6 +94,9 @@ class BarPreferences {
 
   Future<BarLayout> readLayout() async =>
       BarLayout.fromJson(await read('layout'));
+
+  Future<BarResourcePreferences> readResources() async =>
+      BarResourcePreferences.fromJson(await read('resources'));
 
   Future<({Map<String, Object> value, String revision})>
   readWeatherLocationPreference() async {
@@ -246,6 +250,13 @@ class BarPreferences {
               (!map.containsKey('center') ||
                   _range(map['center'], 0, groups.length - 1));
         }
+      case 'resources':
+        valid =
+            _object(value, {'refresh-interval-ms', 'time-range-seconds'}) &&
+            barResourceRefreshChoices.contains(
+              (value as Map)['refresh-interval-ms'],
+            ) &&
+            barResourceTimeRangeChoices.contains(value['time-range-seconds']);
       case 'osd':
         valid =
             _object(value, {
@@ -362,7 +373,6 @@ class BarPreferences {
 }
 
 const weatherDefaults = <String, Object>{
-  'enabled': false,
   'temperature': 'system',
   'wind': 'km/h',
   'precipitation': 'mm',

@@ -1,11 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
 import '../../bar_theme.dart';
-import '../popups/bar_popup.dart';
 import '../settings/bar_settings_entry.dart';
 import 'weather_backend.dart';
 import 'weather_controller.dart';
@@ -15,15 +13,9 @@ import 'weather_presentation.dart';
 part 'weather_forecast.dart';
 
 class WeatherCard extends StatefulWidget {
-  const WeatherCard({
-    super.key,
-    this.compact = false,
-    this.onSettings,
-    this.controller,
-  });
+  const WeatherCard({super.key, this.onSettings, this.controller});
   final VoidCallback? onSettings;
   final WeatherController? controller;
-  final bool compact;
 
   @override
   State<WeatherCard> createState() => _WeatherCardState();
@@ -32,7 +24,6 @@ class WeatherCard extends StatefulWidget {
 class _WeatherCardState extends State<WeatherCard> {
   late final _weather = widget.controller ?? WeatherController.instance;
   bool? _daily;
-  bool _expanded = false;
   bool _picking = false;
 
   @override
@@ -53,7 +44,6 @@ class _WeatherCardState extends State<WeatherCard> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: _weather,
     builder: (context, _) {
-      if (widget.compact && !_weather.enabled) return const SizedBox.shrink();
       if (_picking) {
         return WeatherLocationPicker(
           controller: _weather,
@@ -63,33 +53,7 @@ class _WeatherCardState extends State<WeatherCard> {
       final format = WeatherFormat(context, _weather.settings);
       final snapshot = _weather.snapshot;
       final daily = _daily ?? (_weather.settings['forecast'] == 'daily');
-      final full = !widget.compact || _expanded;
-      final theme = Theme.of(context);
-      if (!widget.compact) return _body(context, snapshot, format, daily, full);
-      final scope = BarPopupScope.themeOf(context);
-      final seed = currentWeatherSeed(_weather);
-      final colors = seed == null
-          ? theme.colorScheme
-          : ColorScheme.fromSeed(
-              seedColor: seed,
-              brightness: theme.brightness,
-              dynamicSchemeVariant: scope.styleVariant,
-              contrastLevel: scope.contrast.level,
-            );
-      return Material(
-        color: colors.surfaceContainerHigh,
-        borderRadius: .circular(28),
-        child: Theme(
-          data: theme.copyWith(colorScheme: colors),
-          child: Padding(
-            padding: const .all(16),
-            child: Builder(
-              builder: (context) =>
-                  _body(context, snapshot, format, daily, full),
-            ),
-          ),
-        ),
-      );
+      return _body(context, snapshot, format, daily);
     },
   );
 
@@ -98,7 +62,6 @@ class _WeatherCardState extends State<WeatherCard> {
     WeatherSnapshot? snapshot,
     WeatherFormat format,
     bool daily,
-    bool full,
   ) {
     final location = _weather.location;
     final current = snapshot?.current;
@@ -187,75 +150,37 @@ class _WeatherCardState extends State<WeatherCard> {
             format: format,
             lastConditions: currentOld,
           ),
-          if (full) ...[
-            if (!stale &&
-                (current == null ||
-                    snapshot.hourly.isEmpty ||
-                    snapshot.daily.isEmpty))
-              const _WeatherBanner(
-                title: 'Some forecast data is missing',
-                detail: 'Missing fields are shown as —.',
-                icon: Icons.info_outline_rounded,
-              ),
-            _WeatherMetrics(current: current, format: format),
-            _ForecastTabs(
-              daily: daily,
-              onChange: (value) => setState(() => _daily = value),
+          if (!stale &&
+              (current == null ||
+                  snapshot.hourly.isEmpty ||
+                  snapshot.daily.isEmpty))
+            const _WeatherBanner(
+              title: 'Some forecast data is missing',
+              detail: 'Missing fields are shown as —.',
+              icon: Icons.info_outline_rounded,
             ),
-            if (daily)
-              _DailyForecast(days: snapshot.daily, today: today, format: format)
-            else
-              _HourlyForecast(
-                key: ValueKey(location),
-                snapshot: snapshot,
-                format: format,
-                lastConditions: currentOld,
-              ),
-          ],
-          if (widget.compact)
-            Align(
-              alignment: .centerLeft,
-              child: TextButton(
-                onPressed: () {
-                  setState(() => _expanded = !_expanded);
-                },
-                child: Text(_expanded ? 'Show less' : 'Show forecast'),
-              ),
+          _WeatherMetrics(current: current, format: format),
+          _ForecastTabs(
+            daily: daily,
+            onChange: (value) => setState(() => _daily = value),
+          ),
+          if (daily)
+            _DailyForecast(days: snapshot.daily, today: today, format: format)
+          else
+            _HourlyForecast(
+              key: ValueKey(location),
+              snapshot: snapshot,
+              format: format,
+              lastConditions: currentOld,
             ),
         ],
-        Wrap(
-          alignment: .spaceBetween,
-          crossAxisAlignment: .center,
-          spacing: 8,
-          children: [
-            if (snapshot != null && age != null)
-              Text(
-                'Retrieved ${format.age(age)}'
-                '${current == null ? '' : ' · valid at ${format.time(current.validAt, snapshot.timezone)}'}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-            TextButton(
-              onPressed: () => unawaited(
-                Process.start('xdg-open', [
-                  'https://open-meteo.com/',
-                ], mode: .detached).then<void>(
-                  (_) {},
-                  onError: (Object error) {
-                    debugPrint('Opening weather attribution: $error');
-                  },
-                ),
-              ),
-              style: TextButton.styleFrom(
-                padding: .zero,
-                minimumSize: const Size(0, 32),
-                tapTargetSize: .shrinkWrap,
-              ),
-              child: Text(snapshot == null ? weatherSource : 'Open-Meteo'),
+        if (snapshot != null && current != null)
+          Text(
+            'Updated at ${format.time(current.validAt, snapshot.timezone)}.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
             ),
-          ],
-        ),
+          ),
       ],
     );
   }

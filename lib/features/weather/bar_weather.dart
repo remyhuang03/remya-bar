@@ -18,7 +18,6 @@ class BarWeather extends StatelessWidget {
     return ListenableBuilder(
       listenable: weather,
       builder: (context, _) {
-        if (!weather.enabled) return const SizedBox.shrink();
         final theme = Theme.of(context);
         final remya = BarPopupScope.themeOf(context);
         final seed = currentWeatherSeed(weather);
@@ -109,7 +108,7 @@ class BarWeather extends StatelessWidget {
                             fontFamily: barFontFamily,
                             fontFamilyFallback: barFontFamilyFallback,
                             fontWeight: .w400,
-                            fontSize: 16,
+                            fontSize: 14,
                             color: state.foreground,
                           ),
                         ),

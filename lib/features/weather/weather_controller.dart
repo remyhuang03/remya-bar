@@ -16,6 +16,8 @@ class WeatherController extends ChangeNotifier {
           unawaited(_readSettings());
         case 'remya-bar.weather-location':
           unawaited(_readLocation());
+        case barLayoutSettingId:
+          unawaited(_readLayout());
       }
     }, onError: (Object _) {});
     _client.serviceAvailableChanges.listen((available) {
@@ -40,6 +42,8 @@ class WeatherController extends ChangeNotifier {
   String? _locationRevision;
   int _settingsRead = 0;
   int _locationRead = 0;
+  int _layoutRead = 0;
+  bool _inLayout = false;
   int _generation = 0;
   int _openCards = 0;
   int _failures = 0;
@@ -54,9 +58,8 @@ class WeatherController extends ChangeNotifier {
   final _random = Random();
 
   bool get ready => _settingsRevision != null && _locationRevision != null;
-  final visibility = ValueNotifier(false);
 
-  bool get enabled => settings['enabled'] == true;
+  bool get enabled => _inLayout;
   bool get _automatic => settings['background'] == true || _openCards > 0;
   int get minutes => settings['interval'] as int;
   WeatherSnapshot? get snapshot => result?.snapshot;
@@ -78,15 +81,24 @@ class WeatherController extends ChangeNotifier {
 
   bool get rateLimited => result?.error?.contains('HTTP 429') == true;
 
-  BarPreferences get layoutPreferences => _preferences;
-
-  void reportSettingsError(String message) {
-    settingsError = message;
-    notifyListeners();
+  Future<void> reload() async {
+    await Future.wait([_readSettings(), _readLocation(), _readLayout()]);
   }
 
-  Future<void> reload() async {
-    await Future.wait([_readSettings(), _readLocation()]);
+  Future<void> _readLayout() async {
+    final request = ++_layoutRead;
+    try {
+      final layout = await _preferences.readLayout();
+      if (request != _layoutRead) return;
+      final next = !layout.hidden.contains('weather');
+      if (next != _inLayout) {
+        _inLayout = next;
+        _reset();
+        notifyListeners();
+      }
+    } catch (_) {
+      // Retain the last known layout state until the next signal or reload.
+    }
   }
 
   Future<void> _readSettings() async {
@@ -105,19 +117,13 @@ class WeatherController extends ChangeNotifier {
 
   void _applySettings(Map<String, Object> value, String revision) {
     final changed = !mapEquals(settings, value) || _settingsRevision == null;
-    final wasEnabled = enabled;
     final automatic = _automatic;
     final interval = minutes;
     settings = value;
     _settingsRevision = revision;
-    visibility.value = enabled;
     settingsError = null;
-    if (changed) {
-      if (wasEnabled != enabled) {
-        _reset();
-      } else if (automatic != _automatic || interval != minutes) {
-        _schedule();
-      }
+    if (changed && (automatic != _automatic || interval != minutes)) {
+      _schedule();
     }
     notifyListeners();
   }

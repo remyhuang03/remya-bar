@@ -83,6 +83,7 @@ void main() {
         expect(await prefs.read(key), values[key], reason: key);
       }
       expect(await prefs.readLayout(), BarLayout.defaults);
+      expect(await prefs.readResources(), BarResourcePreferences.defaults);
       expect(await prefs.readBottom(), isFalse);
       expect(await prefs.readClockSeconds(), isTrue);
       expect(await prefs.readKeyboardPreview(), isTrue);
@@ -248,6 +249,30 @@ void main() {
           throwsFormatException,
         );
       }
+      expect(
+        () => BarPreferences.validate('resources', {
+          'refresh-interval-ms': 500,
+          'time-range-seconds': 600,
+        }),
+        returnsNormally,
+      );
+      for (final invalid in [
+        {'refresh-interval-ms': 250, 'time-range-seconds': 60},
+        {'refresh-interval-ms': 1000, 'time-range-seconds': 15},
+        {'refresh-interval-ms': 1000},
+      ]) {
+        expect(
+          () => BarPreferences.validate('resources', invalid),
+          throwsFormatException,
+        );
+      }
+      expect(
+        () => BarPreferences.validate('weather', {
+          ...weatherDefaults,
+          'enabled': false,
+        }),
+        throwsFormatException,
+      );
     },
   );
 }

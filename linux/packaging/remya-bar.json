@@ -418,7 +418,6 @@
         "appearance"
       ],
       "default": {
-        "enabled": false,
         "temperature": "system",
         "wind": "km/h",
         "precipitation": "mm",
@@ -434,9 +433,6 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
           "temperature": {
             "enum": [
               "system",
@@ -495,7 +491,6 @@
           }
         },
         "required": [
-          "enabled",
           "temperature",
           "wind",
           "precipitation",
@@ -768,6 +763,52 @@
         "required": [
           "calls",
           "apps"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "resources": {
+      "title": "System card",
+      "page": "layout",
+      "keywords": [
+        "system",
+        "refresh",
+        "interval",
+        "time range",
+        "history"
+      ],
+      "default": {
+        "refresh-interval-ms": 1000,
+        "time-range-seconds": 60
+      },
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "refresh-interval-ms": {
+            "type": "integer",
+            "enum": [
+              500,
+              1000,
+              2000,
+              5000,
+              10000
+            ]
+          },
+          "time-range-seconds": {
+            "type": "integer",
+            "enum": [
+              30,
+              60,
+              120,
+              300,
+              600
+            ]
+          }
+        },
+        "required": [
+          "refresh-interval-ms",
+          "time-range-seconds"
         ],
         "additionalProperties": false
       }

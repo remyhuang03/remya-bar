@@ -90,52 +90,6 @@ class WeatherSettings extends StatelessWidget {
               title: 'Weather',
               children: [
                 settingTile(
-                  'Weather module',
-                  control: Switch(
-                    value: weather.enabled,
-                    onChanged: busy
-                        ? null
-                        : (enabled) async {
-                            if (enabled) {
-                              final layout = weather.layoutPreferences;
-                              try {
-                                final current = await layout.readLayout();
-                                if (current.hidden.contains('weather')) {
-                                  final group = current.groups.indexWhere(
-                                    (pills) => pills.contains('sidebar'),
-                                  );
-                                  await layout.replace(
-                                    'layout',
-                                    current
-                                        .movePill(
-                                          'weather',
-                                          group,
-                                          current.groups[group].indexOf(
-                                            'sidebar',
-                                          ),
-                                        )
-                                        .toJson(),
-                                    layout.revision('layout'),
-                                  );
-                                }
-                              } catch (_) {
-                                weather.reportSettingsError(
-                                  'Could not add the weather pill to Layout. Reload and try again.',
-                                );
-                                return;
-                              }
-                            }
-                            await weather.writeSettings({'enabled': enabled});
-                            if (context.mounted &&
-                                enabled &&
-                                weather.enabled &&
-                                weather.location == null) {
-                              _pick(context);
-                            }
-                          },
-                  ),
-                ),
-                settingTile(
                   'Location',
                   detail: location == null
                       ? 'Choose a location'
@@ -300,10 +254,7 @@ class WeatherSettings extends StatelessWidget {
                   control: TextButton(
                     onPressed: busy
                         ? null
-                        : () => weather.writeSettings({
-                            ...weatherDefaults,
-                            'enabled': weather.enabled,
-                          }),
+                        : () => weather.writeSettings(weatherDefaults),
                     child: const Text('Reset'),
                   ),
                 ),

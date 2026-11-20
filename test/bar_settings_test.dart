@@ -316,6 +316,7 @@ void main() {
 
     await open('osd', 1);
     expect(find.text('Maximum volume'), findsOneWidget);
+
     await open('notifications', 2);
     expect(find.text('Popup duration'), findsOneWidget);
     // Schedule details stay hidden until the schedule is on.

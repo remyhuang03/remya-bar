@@ -102,6 +102,12 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Heavy thunderstorm'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Open-Meteo'), findsNothing);
+      final updatedText = tester.widgetList<Text>(
+        find.textContaining('Updated at '),
+      );
+      expect(updatedText, hasLength(1));
+      expect(updatedText.single.data, endsWith('.'));
       await tester.ensureVisible(find.text('7 days'));
       await tester.tap(find.text('7 days'));
       await tester.pump();
@@ -122,6 +128,9 @@ class _CardWeather extends ChangeNotifier implements WeatherController {
     _showUnit = showUnit;
     notifyListeners();
   }
+
+  @override
+  bool get ready => true;
 
   @override
   bool get enabled => true;

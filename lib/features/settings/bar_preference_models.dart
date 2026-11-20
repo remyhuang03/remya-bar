@@ -163,6 +163,60 @@ class BarLayout {
   int get hashCode => jsonEncode(this).hashCode;
 }
 
+const barResourceRefreshChoices = [500, 1000, 2000, 5000, 10000];
+const barResourceTimeRangeChoices = [30, 60, 120, 300, 600];
+
+/// Refresh interval and history window for the System card, owned by Bar.
+class BarResourcePreferences {
+  const BarResourcePreferences({
+    this.refreshIntervalMs = 1000,
+    this.timeRangeSeconds = 60,
+  });
+
+  static const defaults = BarResourcePreferences();
+
+  final int refreshIntervalMs;
+  final int timeRangeSeconds;
+
+  factory BarResourcePreferences.fromJson(Object? json) {
+    if (json
+        case {
+          'refresh-interval-ms': final int refreshIntervalMs,
+          'time-range-seconds': final int timeRangeSeconds,
+        }
+        when barResourceRefreshChoices.contains(refreshIntervalMs) &&
+            barResourceTimeRangeChoices.contains(timeRangeSeconds)) {
+      return .new(
+        refreshIntervalMs: refreshIntervalMs,
+        timeRangeSeconds: timeRangeSeconds,
+      );
+    }
+    throw const FormatException("Invalid Remy'a Bar system card preferences");
+  }
+
+  Map<String, Object> toJson() => {
+    'refresh-interval-ms': refreshIntervalMs,
+    'time-range-seconds': timeRangeSeconds,
+  };
+
+  BarResourcePreferences copyWith({
+    int? refreshIntervalMs,
+    int? timeRangeSeconds,
+  }) => .new(
+    refreshIntervalMs: refreshIntervalMs ?? this.refreshIntervalMs,
+    timeRangeSeconds: timeRangeSeconds ?? this.timeRangeSeconds,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is BarResourcePreferences &&
+      other.refreshIntervalMs == refreshIntervalMs &&
+      other.timeRangeSeconds == timeRangeSeconds;
+
+  @override
+  int get hashCode => Object.hash(refreshIntervalMs, timeRangeSeconds);
+}
+
 const barOsdSettingId = 'remya-bar.osd';
 const barOsdSettingIds = {barOsdSettingId};
 

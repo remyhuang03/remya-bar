@@ -107,7 +107,7 @@ class _HourlyForecastState extends State<_HourlyForecast> {
       child: SingleChildScrollView(
         scrollDirection: .horizontal,
         controller: _scroll,
-        padding: const .only(bottom: 8),
+        padding: const .only(bottom: 12),
         child: Row(
           spacing: 4,
           children: [
