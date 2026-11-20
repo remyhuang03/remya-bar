@@ -272,21 +272,6 @@ class _TasksBlockState extends State<TasksBlock> {
     return .handled;
   }
 
-  Future<void> _selectList() async {
-    final id = await _pick(
-      context,
-      title: 'Visible task list',
-      store: _store,
-      selected: _listId ?? '',
-      choices: [
-        (id: '', label: 'All lists'),
-        for (final list in _visibleLists) (id: list.id, label: list.title),
-      ],
-    );
-    if (id == null || !mounted) return;
-    setState(() => _listId = id.isEmpty ? null : id);
-  }
-
   Future<void> _selectDefaultList() async {
     final account = _accountId;
     final id = await _pick(
@@ -828,45 +813,76 @@ class _TasksBlockState extends State<TasksBlock> {
         ],
       ],
     );
+    final title = Text(
+      'Tasks',
+      style: theme.textTheme.headlineSmall?.copyWith(
+        fontWeight: .w700,
+        color: theme.brightness == .dark
+            ? theme.colorScheme.primaryFixed
+            : theme.colorScheme.onPrimaryFixedVariant,
+        height: 30 / 24,
+        leadingDistribution: .even,
+      ),
+    );
+    final listMenu = hasContent
+        ? _ListSelectMenu(
+            label: listNames[_listId] ?? 'All lists',
+            count: matching,
+            selectedId: _listId,
+            lists: _visibleLists,
+            onSelected: (id) => setState(() => _listId = id),
+          )
+        : null;
+    final closeButton = widget.compact
+        ? null
+        : IconButton(
+            tooltip: 'Close',
+            onPressed: () => Navigator.pop(context),
+            icon: const _TaskIcon('close', 20),
+          );
     final header = Column(
       crossAxisAlignment: .stretch,
       spacing: widget.compact ? 12 : 16,
       children: [
-        Row(
-          crossAxisAlignment: .start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: .start,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final inlineList =
+                constraints.maxWidth /
+                    MediaQuery.textScalerOf(context).scale(1) >=
+                260;
+            if (inlineList) {
+              return Row(
+                crossAxisAlignment: .center,
                 spacing: 8,
                 children: [
-                  Text(
-                    'Tasks',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: .w700,
-                      color: theme.brightness == .dark
-                          ? theme.colorScheme.primaryFixed
-                          : theme.colorScheme.onPrimaryFixedVariant,
-                      height: 30 / 24,
-                    ),
-                  ),
-                  if (hasContent)
-                    _ListChoiceButton(
-                      label: listNames[_listId] ?? 'All lists',
-                      count: matching,
-                      onPressed: _selectList,
-                    ),
+                  title,
+                  if (listMenu != null)
+                    Expanded(
+                      child: Align(alignment: .centerLeft, child: listMenu),
+                    )
+                  else
+                    const Spacer(),
+                  actions,
+                  ?closeButton,
                 ],
-              ),
-            ),
-            actions,
-            if (!widget.compact)
-              IconButton(
-                tooltip: 'Close',
-                onPressed: () => Navigator.pop(context),
-                icon: const _TaskIcon('close', 20),
-              ),
-          ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: .start,
+              spacing: 8,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: .start,
+                    spacing: 8,
+                    children: [title, ?listMenu],
+                  ),
+                ),
+                actions,
+                ?closeButton,
+              ],
+            );
+          },
         ),
         if (hasContent) ...[
           if (!widget.compact &&

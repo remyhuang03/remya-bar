@@ -68,21 +68,77 @@ class _TasksMenu extends StatelessWidget {
   final List<({String label, VoidCallback? action})> items;
 
   @override
-  Widget build(BuildContext context) => PopupMenuButton<int>(
-    tooltip: tooltip,
-    style: style,
-    constraints: const BoxConstraints(minWidth: 180, maxWidth: 264),
-    icon: _TaskIcon(icon, 20),
-    onSelected: (index) => items[index].action?.call(),
-    itemBuilder: (_) => [
-      for (var index = 0; index < items.length; index++)
-        PopupMenuItem(
-          value: index,
-          enabled: items[index].action != null,
-          child: Text(items[index].label),
+  Widget build(BuildContext context) => MenuAnchor(
+    alignmentOffset: const Offset(0, 4),
+    style: const MenuStyle(
+      minimumSize: WidgetStatePropertyAll(Size(180, 0)),
+      maximumSize: WidgetStatePropertyAll(Size(264, 320)),
+    ),
+    menuChildren: [
+      for (final item in items)
+        MenuItemButton(
+          onPressed: item.action,
+          child: Text(item.label, maxLines: 2, overflow: .ellipsis),
         ),
     ],
+    builder: (context, controller, _) => IconButton(
+      tooltip: tooltip,
+      style: style,
+      onPressed: () =>
+          controller.isOpen ? controller.close() : controller.open(),
+      icon: _TaskIcon(icon, 20),
+    ),
   );
+}
+
+class _ListSelectMenu extends StatelessWidget {
+  const _ListSelectMenu({
+    required this.label,
+    required this.count,
+    required this.selectedId,
+    required this.lists,
+    required this.onSelected,
+  });
+
+  final String label;
+  final int count;
+  final String? selectedId;
+  final List<TaskList> lists;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget check(bool selected) => selected
+        ? const Icon(Icons.check_rounded, size: 18)
+        : const SizedBox.square(dimension: 18);
+    return MenuAnchor(
+      alignmentOffset: const Offset(0, 4),
+      style: const MenuStyle(
+        minimumSize: WidgetStatePropertyAll(Size(180, 0)),
+        maximumSize: WidgetStatePropertyAll(Size(264, 320)),
+      ),
+      menuChildren: [
+        MenuItemButton(
+          leadingIcon: check(selectedId == null),
+          onPressed: () => onSelected(null),
+          child: const Text('All lists'),
+        ),
+        for (final list in lists)
+          MenuItemButton(
+            leadingIcon: check(selectedId == list.id),
+            onPressed: () => onSelected(list.id),
+            child: Text(list.title, maxLines: 1, overflow: .ellipsis),
+          ),
+      ],
+      builder: (context, controller, _) => _ListChoiceButton(
+        label: label,
+        count: count,
+        maxLines: 1,
+        onPressed: () =>
+            controller.isOpen ? controller.close() : controller.open(),
+      ),
+    );
+  }
 }
 
 class _ListChoiceButton extends StatelessWidget {
@@ -91,11 +147,13 @@ class _ListChoiceButton extends StatelessWidget {
     required this.onPressed,
     this.count,
     this.icon = 'list',
+    this.maxLines = 2,
   });
 
   final String label;
   final String icon;
   final int? count;
+  final int maxLines;
   final VoidCallback? onPressed;
 
   @override
@@ -122,7 +180,9 @@ class _ListChoiceButton extends StatelessWidget {
         spacing: 6,
         children: [
           _TaskIcon(icon, 18),
-          Flexible(child: Text(label, maxLines: 2, overflow: .ellipsis)),
+          Flexible(
+            child: Text(label, maxLines: maxLines, overflow: .ellipsis),
+          ),
           if (count != null)
             Semantics(
               label: '$count incomplete tasks',

@@ -188,12 +188,21 @@ class TasksStore extends ChangeNotifier {
     _publish();
   }
 
-  Future<void> retry() {
+  Future<void> retry() => _requeueAndRefresh((edit) => edit.phase == .failed);
+
+  /// Re-queues one failed or ambiguous issue after explicit user review.
+  Future<void> retryIssue(TasksIssue issue) => _requeueAndRefresh(
+    (edit) =>
+        edit.id == issue.id &&
+        (edit.phase == .failed || edit.phase == .ambiguous),
+  );
+
+  Future<void> _requeueAndRefresh(bool Function(_TaskEdit edit) match) {
     final data = _data;
     if (data != null && data.loaded) {
       data.saveEdits([
         for (final edit in data.edits)
-          edit.phase == .failed ? edit.change(.queued) : edit,
+          match(edit) ? edit.change(.queued) : edit,
       ], data.drafts);
     }
     _publish();
@@ -311,6 +320,7 @@ class TasksStore extends ChangeNotifier {
   void discardDraft(GoogleTask base) {
     final data = _editable();
     _requireAccount(base.accountId);
+    if (!data.drafts.containsKey((base.listId, base.id))) return;
     final next = Map<_TaskKey, _TaskDraft>.of(data.drafts)
       ..remove((base.listId, base.id));
     data.saveEdits(data.edits, next);

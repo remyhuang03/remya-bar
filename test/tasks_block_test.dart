@@ -121,10 +121,13 @@ void main() {
     await _mount(tester, _Tasks());
     expect(tester.getSize(find.byType(TasksBlock)).width, 372);
     expect(find.text('12'), findsOneWidget);
-    expect(
-      tester.getSize(find.widgetWithText(FilledButton, 'All lists')).width,
-      lessThan(280),
-    );
+    final listButtonFinder = find.widgetWithText(FilledButton, 'All lists');
+    expect(tester.getSize(listButtonFinder).width, lessThan(280));
+    final titleRect = tester.getRect(find.text('Tasks'));
+    final listButtonRect = tester.getRect(listButtonFinder);
+    expect(listButtonRect.left, greaterThan(titleRect.right));
+    expect(listButtonRect.center.dy, closeTo(titleRect.center.dy, 2));
+
     expect(find.text('Task 3'), findsOneWidget);
     expect(find.text('Task 4'), findsNothing);
     final filters = find.byWidgetPredicate(
@@ -325,6 +328,44 @@ void main() {
       'scheduled': DateUtils.addDaysToDate(DateTime.now(), 1),
     });
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('list selector and settings button open in-place menus', (
+    tester,
+  ) async {
+    await _mount(
+      tester,
+      _Tasks(
+        count: 1,
+        extra: [
+          GoogleTask(
+            id: 'home-1',
+            listId: 'home',
+            title: 'Home task',
+            scheduled: DateUtils.dateOnly(DateTime.now()),
+          ),
+        ],
+      ),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'All lists'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.byType(MenuItemButton), findsNWidgets(3));
+    await tester.tap(find.widgetWithText(MenuItemButton, 'Home'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(FilledButton, 'Home'), findsOneWidget);
+    expect(find.text('Home task'), findsOneWidget);
+    expect(find.text('Task 1'), findsNothing);
+
+    await tester.tap(find.byTooltip('Task options'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PopupMenuItem), findsNothing);
+    expect(
+      find.widgetWithText(MenuItemButton, 'Task settings'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(MenuItemButton, 'Sync now'), findsOneWidget);
   });
 
   testWidgets('the task list fits its host with enlarged text', (tester) async {

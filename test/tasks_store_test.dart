@@ -322,6 +322,12 @@ void main() {
       expect(google.creations, 1);
       expect(reopened.issues.single.ambiguous, isTrue);
       expect(reopened.findTask('shared-id', 'created-0')?.title, 'Unsure task');
+
+      google.ambiguousCreate = false;
+      await reopened.retryIssue(reopened.issues.single);
+      expect(google.creations, 2);
+      expect(reopened.issues, isEmpty);
+      expect(reopened.pendingCount, 0);
     },
   );
   test('pauses replay on expired authorization until a reconnect', () async {

@@ -1519,12 +1519,13 @@ class _SyncIssuesState extends State<_SyncIssues> {
                                       _openGoogleTasks(issue.task?.webViewLink),
                                 ),
                           child: const Text('Open in Google Tasks'),
-                        )
-                      else
-                        FilledButton.tonal(
-                          onPressed: _busy ? null : () => _run(_store.retry),
-                          child: const Text('Retry'),
                         ),
+                      FilledButton.tonal(
+                        onPressed: _busy
+                            ? null
+                            : () => _run(() => _store.retryIssue(issue)),
+                        child: Text(issue.ambiguous ? 'Try again' : 'Retry'),
+                      ),
                     ],
                   ),
                   const Divider(),

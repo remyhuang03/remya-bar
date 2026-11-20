@@ -397,6 +397,7 @@ extension _TasksSync on TasksStore {
       await _accept(data, inFlight, result);
       _clearBackoff();
     } on Object catch (error) {
+      debugPrint('Tasks sync ${edit.op} failed: $error');
       if (!data.edits.contains(inFlight)) rethrow;
       final code = error is GoogleTasksException ? error.code : null;
       if (_requiresExplicitRetry(edit.op) &&
