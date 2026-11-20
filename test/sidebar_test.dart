@@ -739,18 +739,21 @@ void main() {
     ]);
   });
 
-  testWidgets('capture quick tiles send sidebar.capture targets', (
-    tester,
-  ) async {
+  testWidgets('app shortcut tiles send their sidebar actions', (tester) async {
     final actions = <Map<String, Object?>>[];
     await showSidebar(
       tester,
       actions,
       overrides: {
-        'layout': ['screenshot', 'record', 'picker'],
+        'layout': ['screenshot', 'record', 'picker', 'clipboard'],
       },
     );
-    for (final title in ['Screenshot', 'Screen record', 'Color picker']) {
+    for (final title in [
+      'Screenshot',
+      'Screen record',
+      'Color picker',
+      'Clipboard',
+    ]) {
       await tester.tap(
         find.byWidgetPredicate((w) => w is Tooltip && w.message == title),
       );
@@ -760,6 +763,7 @@ void main() {
       {'action': 'sidebar.capture', 'value': null, 'target': 'screenshot'},
       {'action': 'sidebar.capture', 'value': null, 'target': 'record'},
       {'action': 'sidebar.capture', 'value': null, 'target': 'picker'},
+      {'action': 'sidebar.clipboard', 'value': null, 'target': null},
     ]);
   });
 

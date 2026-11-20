@@ -17,7 +17,7 @@ import 'features/notifications/notification_settings.dart';
 import 'features/osd/osd_controller.dart';
 import 'features/popups/bar_popup.dart';
 import 'features/settings/bar_theme_controller.dart';
-import 'features/sidebar/sidebar_screen_capture.dart';
+import 'features/sidebar/sidebar_app_launcher.dart';
 import 'features/system/system_backend.dart';
 import 'features/tray/tray_backend.dart';
 

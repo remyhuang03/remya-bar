@@ -892,7 +892,12 @@ class _RightSidebarState extends State<RightSidebar> {
       'mic-mute' => _map(input?['preferences'])['muted'] as bool?,
       _ => null,
     };
-    final actionTile = id == 'record' || id == 'screenshot' || id == 'picker';
+    final actionTile = const {
+      'record',
+      'screenshot',
+      'picker',
+      'clipboard',
+    }.contains(id);
     final available = actionTile || selected != null;
     final tile = _SmallTile(
       icon: icon,
@@ -906,6 +911,7 @@ class _RightSidebarState extends State<RightSidebar> {
                 'sidebar.capture',
                 target: id,
               ),
+              'clipboard' when !_busy => () => _send('sidebar.clipboard'),
               'caffeine' when selected != null => () => _send(
                 'sidebar.keep-awake',
                 value: !selected,

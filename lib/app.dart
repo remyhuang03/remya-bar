@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show ProcessException;
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -14,7 +15,7 @@ import 'features/ai_usage/ai_usage_backend.dart';
 import 'features/ai_usage/ai_usage_data.dart';
 import 'features/sidebar/right_sidebar.dart';
 import 'features/sidebar/sidebar_backend.dart';
-import 'features/sidebar/sidebar_screen_capture.dart';
+import 'features/sidebar/sidebar_app_launcher.dart';
 import 'features/notifications/notification_backend.dart';
 import 'features/notifications/notification_view.dart';
 import 'features/osd/osd_controller.dart';
@@ -52,6 +53,7 @@ class RemyaBarApp extends StatefulWidget {
     this.onOpenSettings = openRemyaSettings,
     this.onOpenPowerSettings = _openPowerSettings,
     this.onLaunchScreenCapture = _defaultLaunchScreenCapture,
+    this.onOpenClipboard = openRemyaClipboard,
   });
 
   final SettingsThemeController preferences;
@@ -68,6 +70,7 @@ class RemyaBarApp extends StatefulWidget {
   final Future<void> Function() onOpenSettings;
   final Future<void> Function() onOpenPowerSettings;
   final Future<void> Function(List<String> arguments) onLaunchScreenCapture;
+  final Future<void> Function() onOpenClipboard;
 
   @override
   State<RemyaBarApp> createState() => _RemyaBarAppState();

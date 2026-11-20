@@ -35,14 +35,25 @@ extension _PopupActions on _RemyaBarAppState {
     } else if (action == 'notifications.closed') {
       _notificationsOpen = false;
       unawaited(_syncToasts());
-    } else if (action == 'sidebar.capture') {
-      final arguments = switch (args['target']) {
-        'screenshot' => const <String>[],
-        'record' => const ['--record'],
-        'picker' => const ['--color-picker'],
-        _ => throw const FormatException('Invalid capture target'),
-      };
-      await widget.onLaunchScreenCapture(arguments);
+    } else if (action == 'sidebar.capture' || action == 'sidebar.clipboard') {
+      if (action == 'sidebar.clipboard') {
+        try {
+          await widget.onOpenClipboard();
+        } on ProcessException {
+          throw PlatformException(
+            code: 'launcher-unavailable',
+            message: 'Could not open Remya Launcher.',
+          );
+        }
+      } else {
+        final arguments = switch (args['target']) {
+          'screenshot' => const <String>[],
+          'record' => const ['--record'],
+          'picker' => const ['--color-picker'],
+          _ => throw const FormatException('Invalid capture target'),
+        };
+        await widget.onLaunchScreenCapture(arguments);
+      }
       if (!mounted) return null;
       await _popup.hide(kind: 'sidebar');
       _sidebarOpen = false;

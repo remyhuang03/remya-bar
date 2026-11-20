@@ -629,7 +629,7 @@ void main() {
     expect(preferences.error, isNull);
   });
 
-  testWidgets('sidebar.capture launches screen capture with expected args', (
+  testWidgets('sidebar app actions launch their app then close the sidebar', (
     tester,
   ) async {
     final calls = <MethodCall>[];
@@ -647,6 +647,7 @@ void main() {
       ),
     );
     final launched = <List<String>>[];
+    var clipboardLaunches = 0;
     await tester.pumpWidget(
       RemyaBarApp(
         popup: _popup,
@@ -654,29 +655,30 @@ void main() {
           () => File('/nonexistent/theme.toml'),
         ),
         onLaunchScreenCapture: (args) async => launched.add(args),
+        onOpenClipboard: () async => clipboardLaunches++,
       ),
     );
     const codec = StandardMethodCodec();
-    for (final target in ['screenshot', 'record', 'picker']) {
+    for (final args in [
+      for (final target in ['screenshot', 'record', 'picker'])
+        {'action': 'sidebar.capture', 'target': target},
+      {'action': 'sidebar.clipboard'},
+    ]) {
       final reply = await tester.binding.defaultBinaryMessenger
           .handlePlatformMessage(
             _popup.channel.name,
-            codec.encodeMethodCall(
-              MethodCall('action', {
-                'action': 'sidebar.capture',
-                'target': target,
-              }),
-            ),
+            codec.encodeMethodCall(MethodCall('action', args)),
             (_) {},
           );
       codec.decodeEnvelope(reply!);
     }
-    expect(calls.where((call) => call.method == 'hide').length, 3);
+    expect(calls.where((call) => call.method == 'hide').length, 4);
     expect(launched, [
       const <String>[],
       const ['--record'],
       const ['--color-picker'],
     ]);
+    expect(clipboardLaunches, 1);
     await tester.pumpWidget(const SizedBox());
   });
 }

@@ -4,12 +4,21 @@ import 'dart:io';
 Future<void> openRemyaScreenCapture({
   File? debugExecutable,
   List<String> arguments = const [],
-}) async {
-  final executable = _resolveExecutable(debugExecutable);
+}) => _openApp('remya_screen_capture', arguments, debugExecutable);
+
+Future<void> openRemyaClipboard() =>
+    _openApp('remya_launcher', const ['--clipboard']);
+
+Future<void> _openApp(
+  String name,
+  List<String> arguments, [
+  File? debugExecutable,
+]) async {
+  final executable = _resolveExecutable(name, debugExecutable);
   await Process.start(executable, arguments, mode: .detached);
 }
 
-String _resolveExecutable(File? debugExecutable) {
+String _resolveExecutable(String name, File? debugExecutable) {
   if (debugExecutable != null && debugExecutable.existsSync()) {
     return debugExecutable.path;
   }
@@ -21,14 +30,12 @@ String _resolveExecutable(File? debugExecutable) {
       ? '$home/.local/share'
       : null;
   if (dataHome != null) {
-    final bundled = File(
-      '$dataHome/remya/remya_screen_capture/remya_screen_capture',
-    );
+    final bundled = File('$dataHome/remya/$name/$name');
     if (bundled.existsSync()) return bundled.path;
   }
   if (home != null && home.startsWith('/')) {
-    final command = File('$home/.local/bin/remya_screen_capture');
+    final command = File('$home/.local/bin/$name');
     if (command.existsSync()) return command.path;
   }
-  return 'remya_screen_capture';
+  return name;
 }

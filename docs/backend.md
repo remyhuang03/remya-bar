@@ -211,6 +211,8 @@ hl.bind("SUPER + A", hl.dsp.exec_cmd(
 Session actions use logind. Suspend, log out, reboot and shutdown require a second
 click within three seconds. Capture tiles launch `remya_screen_capture` with no
 arguments, `--record` or `--color-picker`, using debug or installed resolution.
+The Clipboard tile opens the installed `remya_launcher --clipboard` and closes
+the sidebar once the command starts. Launcher owns clipboard history and policy.
 
 MPRIS signals coalesce for 25 ms; position refreshes each second while playing.
 Player selection is shared across outputs; reconnects use bounded backoff and
