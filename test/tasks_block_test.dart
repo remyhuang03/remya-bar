@@ -214,6 +214,41 @@ void main() {
     expect(find.byType(LinearProgressIndicator), findsNothing);
   });
 
+  for (final total in [0, 1]) {
+    testWidgets('Today progress visibility with $total completed tasks', (
+      tester,
+    ) async {
+      await _mount(
+        tester,
+        _Tasks(
+          count: 0,
+          extra: [
+            if (total > 0)
+              GoogleTask(
+                id: 'done',
+                listId: 'work',
+                title: 'Done today',
+                scheduled: DateUtils.dateOnly(DateTime.now()),
+                completed: true,
+              ),
+          ],
+        ),
+      );
+      await tester.tap(find.text('View all'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('$total of $total done'), findsOneWidget);
+      final indicator = find.byType(LinearProgressIndicator);
+      if (total == 0) {
+        expect(indicator, findsNothing);
+        expect(find.text('0%'), findsNothing);
+      } else {
+        expect(tester.widget<LinearProgressIndicator>(indicator).value, 1);
+        expect(find.text('100%'), findsOneWidget);
+      }
+    });
+  }
+
   testWidgets(
     'N focuses quick add from a task control and leaves editors alone',
     (tester) async {

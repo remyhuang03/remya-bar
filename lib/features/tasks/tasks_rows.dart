@@ -260,24 +260,26 @@ class _TodaySummary extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Text(percent, style: const TextStyle(fontSize: 16)),
+                  if (total > 0)
+                    Text(percent, style: const TextStyle(fontSize: 16)),
                 ],
               ),
-              LinearProgressIndicator(
-                // The current Material appearance adds the track gap and stop.
-                // ignore: deprecated_member_use
-                year2023: false,
-                value: progress,
-                semanticsLabel: 'Today’s task progress',
-                semanticsValue: percent,
-                minHeight: 8,
-                borderRadius: .circular(4),
-                trackGap: 4,
-                stopIndicatorRadius: 2,
-                color: colors.primary,
-                stopIndicatorColor: colors.primary,
-                backgroundColor: colors.onPrimary,
-              ),
+              if (total > 0)
+                LinearProgressIndicator(
+                  // The current Material appearance adds the track gap and stop.
+                  // ignore: deprecated_member_use
+                  year2023: false,
+                  value: progress,
+                  semanticsLabel: 'Today’s task progress',
+                  semanticsValue: percent,
+                  minHeight: 8,
+                  borderRadius: .circular(4),
+                  trackGap: 4,
+                  stopIndicatorRadius: 2,
+                  color: colors.primary,
+                  stopIndicatorColor: colors.primary,
+                  backgroundColor: colors.onPrimary,
+                ),
             ],
           ),
         ),

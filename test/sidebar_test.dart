@@ -537,6 +537,7 @@ void main() {
   ) async {
     final actions = <Map<String, Object?>>[];
     await showSidebar(tester, actions);
+    expect(find.text('Esc to close'), findsNothing);
     await tester.tap(find.byTooltip('Edit layout'));
     await tester.pumpAndSettle();
     final smallTile = find
@@ -555,6 +556,9 @@ void main() {
       'target': ['internet', 'power', 'audio', 'caffeine'],
       'value': ['power', 'audio', 'caffeine'],
     });
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(actions.last, {'action': 'close'});
   });
 
   testWidgets(

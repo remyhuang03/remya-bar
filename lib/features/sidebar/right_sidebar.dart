@@ -652,18 +652,17 @@ class _RightSidebarState extends State<RightSidebar> {
           ],
         ),
       ],
-      Text(
-        edit
-            ? 'Esc to finish'
-            : _power
-            ? 'Log out, restart and shut down need a second click within 3 s'
-            : 'Esc to close',
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: colors.onSurfaceVariant,
-          fontSize: 12,
-          height: 1.2,
+      if (edit || _power)
+        Text(
+          edit
+              ? 'Esc to finish'
+              : 'Log out, restart and shut down need a second click within 3 s',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colors.onSurfaceVariant,
+            fontSize: 12,
+            height: 1.2,
+          ),
         ),
-      ),
     ];
   }
 
