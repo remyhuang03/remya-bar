@@ -158,7 +158,10 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
                   ),
               ],
             ),
-          if (widget.tasks case final tasks?) ...[const Divider(), tasks],
+          if (widget.tasks case final tasks?) ...[
+            Divider(height: 1, color: colors.outlineVariant),
+            tasks,
+          ],
         ],
       );
       return Padding(

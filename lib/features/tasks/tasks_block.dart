@@ -64,6 +64,7 @@ class _TasksBlockState extends State<TasksBlock> {
   final _quickAdd = TextEditingController();
   final _quickFocus = FocusNode();
   final _search = TextEditingController();
+  final _searchFocus = FocusNode();
   final _opened = <_TaskKey>{};
   late final _viewPreferences = ValueNotifier(_preferences);
   late _View _view;
@@ -78,6 +79,7 @@ class _TasksBlockState extends State<TasksBlock> {
   bool _adding = false;
   bool _connecting = false;
   bool _showHidden = false;
+  bool _showSearch = false;
 
   TasksStore get _store => widget.store;
   TasksPreferences get _preferences => widget.preferences;
@@ -131,6 +133,7 @@ class _TasksBlockState extends State<TasksBlock> {
     _quickAdd.dispose();
     _quickFocus.dispose();
     _search.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -145,6 +148,7 @@ class _TasksBlockState extends State<TasksBlock> {
         _opened.clear();
         _quickAdd.clear();
         _search.clear();
+        _showSearch = false;
         _undo = null;
         _recent = null;
         _error = null;
@@ -308,23 +312,28 @@ class _TasksBlockState extends State<TasksBlock> {
   Future<void> _viewAll({_View? view, String? list}) => showDialog<void>(
     context: context,
     builder: (context) => Dialog(
-      insetPadding: const .all(8),
+      insetPadding: .zero,
       backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
       shape: const RoundedRectangleBorder(borderRadius: .all(.circular(32))),
+      clipBehavior: .antiAlias,
       child: SizedBox(
         width: 420,
+        height: double.infinity,
         child: Padding(
           padding: const .all(24),
-          child: ValueListenableBuilder(
-            valueListenable: _viewPreferences,
-            builder: (_, preferences, _) => TasksBlock(
-              store: _store,
-              preferences: preferences,
-              initialView: (view ?? _view).name,
-              initialList: list ?? _listId,
-              onSettings: widget.onSettings,
-              onSetDefaultList: widget.onSetDefaultList,
-              compact: false,
+          child: Align(
+            alignment: .topCenter,
+            child: ValueListenableBuilder(
+              valueListenable: _viewPreferences,
+              builder: (_, preferences, _) => TasksBlock(
+                store: _store,
+                preferences: preferences,
+                initialView: (view ?? _view).name,
+                initialList: list ?? _listId,
+                onSettings: widget.onSettings,
+                onSetDefaultList: widget.onSetDefaultList,
+                compact: false,
+              ),
             ),
           ),
         ),
@@ -506,10 +515,7 @@ class _TasksBlockState extends State<TasksBlock> {
     bool hasNextTask,
   ) {
     final key = _key(task);
-    final isChild = active.containsKey((
-      list: task.listId,
-      task: task.parent ?? '',
-    ));
+    final parent = active[(list: task.listId, task: task.parent ?? '')];
     final subtasks = children[key] ?? const <GoogleTask>[];
     final siblings =
         siblingsByParent[(list: task.listId, task: task.parent ?? '')] ??
@@ -519,13 +525,17 @@ class _TasksBlockState extends State<TasksBlock> {
     return _TaskRow(
       key: ValueKey(key),
       task: task,
-      childRow: isChild,
+      childRow: parent != null,
       corners: corners,
       hasNextTask: hasNextTask,
-      dateLabel: task.scheduled == null
-          ? null
-          : _friendlyDate(context, task.scheduled!, now),
-      listLabel: _listId == null ? listNames[task.listId] : null,
+      dateLabel:
+          task.scheduled != null &&
+              !DateUtils.isSameDay(task.scheduled, parent?.scheduled)
+          ? _friendlyDate(context, task.scheduled!, now)
+          : null,
+      listLabel: _listId == null && parent == null
+          ? listNames[task.listId]
+          : null,
       children: subtasks,
       expanded: _opened.contains(key),
       onExpand: () => setState(() {
@@ -786,7 +796,18 @@ class _TasksBlockState extends State<TasksBlock> {
             ),
           if (_listId != null && !_manualOrder)
             (label: 'Switch to My order to reorder', action: null),
-          if (!widget.compact)
+          if (!widget.compact) ...[
+            (
+              label: _showSearch ? 'Hide search' : 'Search tasks',
+              action: () => setState(() {
+                _showSearch = !_showSearch;
+                if (_showSearch) {
+                  _searchFocus.requestFocus();
+                } else {
+                  _search.clear();
+                }
+              }),
+            ),
             (
               label: _showHidden
                   ? 'Hide archived completed tasks'
@@ -796,6 +817,7 @@ class _TasksBlockState extends State<TasksBlock> {
                 if (_showHidden) _showCompleted = true;
               }),
             ),
+          ],
           if (allCompleted.isNotEmpty)
             (
               label: 'Delete completed tasks…',
@@ -808,7 +830,7 @@ class _TasksBlockState extends State<TasksBlock> {
     );
     final header = Column(
       crossAxisAlignment: .stretch,
-      spacing: 12,
+      spacing: widget.compact ? 12 : 16,
       children: [
         Row(
           crossAxisAlignment: .start,
@@ -875,9 +897,10 @@ class _TasksBlockState extends State<TasksBlock> {
               showShortcut: true,
               onSubmitted: _add,
             ),
-          if (!widget.compact)
+          if (_showSearch)
             _SearchField(
               controller: _search,
+              focusNode: _searchFocus,
               hint: 'Search tasks',
               onChanged: () => setState(() {}),
             ),
@@ -888,9 +911,10 @@ class _TasksBlockState extends State<TasksBlock> {
     final list = !hasContent
         ? _connectionState()
         : rows.isEmpty
-        ? _emptyState(query, completed.isNotEmpty, destination != null)
+        ? _emptyState(query, completed.isNotEmpty)
         : ListView.builder(
-            shrinkWrap: widget.compact,
+            shrinkWrap:
+                widget.compact || rows.length <= _preferences.previewRows,
             primary: false,
             itemCount: rows.length,
             findChildIndexCallback: (key) =>
@@ -922,7 +946,12 @@ class _TasksBlockState extends State<TasksBlock> {
           );
 
     final footerAction = TextButton.styleFrom(
-      minimumSize: const .fromHeight(32),
+      minimumSize: const Size(0, 32),
+      visualDensity: .standard,
+      textStyle: theme.textTheme.labelLarge?.copyWith(
+        fontSize: 13,
+        height: 18 / 13,
+      ),
       padding: const .symmetric(horizontal: 8, vertical: 4),
       tapTargetSize: .shrinkWrap,
     );
@@ -954,7 +983,13 @@ class _TasksBlockState extends State<TasksBlock> {
             crossAxisAlignment: .center,
             children: [
               TextButton.icon(
-                style: footerAction,
+                style: footerAction.copyWith(
+                  foregroundColor: .resolveWith(
+                    (states) => states.contains(WidgetState.disabled)
+                        ? theme.colorScheme.onSurfaceVariant
+                        : theme.colorScheme.onSurface,
+                  ),
+                ),
                 icon: RotatedBox(
                   quarterTurns: _showCompleted ? 2 : 0,
                   child: const _TaskIcon('expand-small', 18),
@@ -975,21 +1010,31 @@ class _TasksBlockState extends State<TasksBlock> {
                 ),
             ],
           ),
-          Wrap(
-            alignment: .spaceBetween,
-            crossAxisAlignment: .center,
+          Row(
             spacing: 8,
             children: [
-              Row(
-                mainAxisSize: .min,
-                spacing: 8,
-                children: [
-                  const _TaskIcon('sync', 16),
-                  Flexible(child: _TaskSupporting(_syncLabel(context))),
-                ],
+              Expanded(
+                child: Padding(
+                  padding: const .only(left: 8),
+                  child: Row(
+                    spacing: 8,
+                    children: [
+                      const _TaskIcon('sync', 16),
+                      Flexible(child: _TaskSupporting(_syncLabel(context))),
+                    ],
+                  ),
+                ),
               ),
               TextButton(
-                style: footerAction,
+                style: footerAction.copyWith(
+                  minimumSize: const WidgetStatePropertyAll(Size(0, 24)),
+                  textStyle: WidgetStatePropertyAll(
+                    theme.textTheme.labelMedium?.copyWith(
+                      fontSize: 12,
+                      height: 16 / 12,
+                    ),
+                  ),
+                ),
                 onPressed: _manageLists,
                 child: const Text('Manage lists'),
               ),
@@ -1007,7 +1052,7 @@ class _TasksBlockState extends State<TasksBlock> {
             return SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: .stretch,
-                spacing: 12,
+                spacing: 16,
                 children: [
                   header,
                   if (rows.isEmpty)
@@ -1020,11 +1065,12 @@ class _TasksBlockState extends State<TasksBlock> {
             );
           }
           return Column(
+            mainAxisSize: .min,
             crossAxisAlignment: .stretch,
-            spacing: 12,
+            spacing: 16,
             children: [
               header,
-              Expanded(
+              Flexible(
                 child: rows.isEmpty ? SingleChildScrollView(child: list) : list,
               ),
               footer,
@@ -1033,7 +1079,9 @@ class _TasksBlockState extends State<TasksBlock> {
         },
       );
     }
-    final scaledHeight = MediaQuery.textScalerOf(context).scale(22) - 22;
+    final scaler = MediaQuery.textScalerOf(context);
+    final rowHeight =
+        16 + 2 * (scaler.scale(16) * 22 / 16 + scaler.scale(13) * 18 / 13) + 2;
     return Column(
       mainAxisSize: .min,
       crossAxisAlignment: .stretch,
@@ -1047,7 +1095,8 @@ class _TasksBlockState extends State<TasksBlock> {
             constraints: BoxConstraints(
               maxHeight: math.max(
                 240,
-                limit * (64 + scaledHeight * 2) + headerCount * 34 + 8,
+                limit * rowHeight +
+                    headerCount * (16 + scaler.scale(13) * 18 / 13),
               ),
             ),
             child: list,
@@ -1057,9 +1106,10 @@ class _TasksBlockState extends State<TasksBlock> {
     );
   }
 
-  Widget _emptyState(String query, bool completed, bool canAdd) {
+  Widget _emptyState(String query, bool completed) {
     if (query.isNotEmpty) {
       return _TaskPrompt(
+        inline: true,
         icon: 'state-empty',
         title: 'No matching tasks',
         action: 'Clear search',
@@ -1068,6 +1118,7 @@ class _TasksBlockState extends State<TasksBlock> {
     }
     if (completed) {
       return _TaskPrompt(
+        inline: true,
         icon: 'state-task',
         title: 'Everything is complete',
         message: 'Your completed tasks are still available.',
@@ -1076,15 +1127,14 @@ class _TasksBlockState extends State<TasksBlock> {
       );
     }
     return _TaskPrompt(
+      inline: true,
       icon: 'state-empty',
       title: switch (_view) {
         .today => 'No tasks for today',
         .upcoming => 'No upcoming tasks',
         .all => 'No tasks yet',
       },
-      message: 'Add a task or explore your other lists.',
-      action: 'Add a task',
-      onPressed: canAdd ? _quickFocus.requestFocus : null,
+      message: 'Add a task or switch views.',
     );
   }
 }

@@ -618,7 +618,7 @@ class _RightSidebarState extends State<RightSidebar> {
             child: Text(collapsed ? 'Show all controls' : 'Collapse controls'),
           ),
         ),
-        const Divider(),
+        Divider(height: 1, color: colors.outlineVariant),
         tasks,
       ],
       if (edit) ...[

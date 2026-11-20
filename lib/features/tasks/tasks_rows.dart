@@ -100,11 +100,16 @@ class _ListChoiceButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return FilledButton.tonal(
       style: FilledButton.styleFrom(
         backgroundColor: colors.surfaceContainerHighest,
         foregroundColor: colors.onSurface,
+        textStyle: theme.textTheme.labelLarge?.copyWith(
+          fontSize: 14,
+          height: 20 / 14,
+        ),
         minimumSize: const Size(0, 32),
         visualDensity: .standard,
         padding: const .fromLTRB(10, 4, 8, 4),
@@ -141,39 +146,59 @@ class _ViewFilters extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    return Row(
-      spacing: 2,
-      children: [
+    return SegmentedButton<_View>(
+      expandedInsets: .zero,
+      showSelectedIcon: false,
+      selected: {selected},
+      onSelectionChanged: (views) => onSelected(views.single),
+      style: SegmentedButton.styleFrom(
+        side: .none,
+        foregroundColor: colors.onSurfaceVariant,
+        selectedForegroundColor: colors.onPrimary,
+        backgroundColor: Colors.transparent,
+        selectedBackgroundColor: Colors.transparent,
+        textStyle: theme.textTheme.labelLarge?.copyWith(
+          fontSize: 13,
+          height: 18 / 13,
+          fontWeight: .w400,
+          letterSpacing: 0,
+        ),
+        shape: const StadiumBorder(),
+        padding: .zero,
+        visualDensity: .standard,
+        tapTargetSize: .shrinkWrap,
+      ),
+      segments: [
         for (final view in _View.values)
-          Expanded(
-            child: Semantics(
-              selected: selected == view,
-              child: FilledButton(
-                onPressed: () => onSelected(view),
-                style: FilledButton.styleFrom(
-                  backgroundColor: selected == view
+          ButtonSegment(
+            value: view,
+            label: Padding(
+              padding: .fromSTEB(
+                view == .today ? 0 : 1,
+                0,
+                view == .all ? 0 : 1,
+                0,
+              ),
+              child: Ink(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: selected == view
                       ? colors.primary
                       : colors.surfaceContainerHighest,
-                  foregroundColor: selected == view
-                      ? colors.onPrimary
-                      : colors.onSurfaceVariant,
-                  textStyle: theme.textTheme.labelLarge?.copyWith(fontSize: 13),
-                  minimumSize: const .fromHeight(40),
-                  visualDensity: .standard,
-                  padding: const .symmetric(horizontal: 4, vertical: 8),
-                  tapTargetSize: .shrinkWrap,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: .horizontal(
-                      left: .circular(
-                        selected == view || view == .today ? 18 : 6,
-                      ),
-                      right: .circular(
-                        selected == view || view == .all ? 18 : 6,
-                      ),
+                  borderRadius: BorderRadiusDirectional.horizontal(
+                    start: .circular(
+                      selected == view || view == .today ? 20 : 6,
                     ),
+                    end: .circular(selected == view || view == .all ? 20 : 6),
                   ),
                 ),
-                child: Text(view.label, textAlign: .center),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 40),
+                  child: Padding(
+                    padding: const .symmetric(horizontal: 4, vertical: 8),
+                    child: Center(child: Text(view.label, textAlign: .center)),
+                  ),
+                ),
               ),
             ),
           ),
@@ -341,6 +366,8 @@ class _QuickAdd extends StatelessWidget {
     maxLength: 1024,
     buildCounter: _lengthCounter,
     textInputAction: .done,
+    style: Theme.of(context).textTheme.bodyMedium
+        ?.copyWith(fontSize: 15, height: 20 / 15),
     decoration: _taskInput(
       context,
       hint: label,
@@ -402,15 +429,18 @@ class _SearchField extends StatelessWidget {
     required this.controller,
     required this.hint,
     required this.onChanged,
+    this.focusNode,
   });
 
   final TextEditingController controller;
   final String hint;
+  final FocusNode? focusNode;
   final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) => TextField(
     controller: controller,
+    focusNode: focusNode,
     decoration: _taskInput(
       context,
       hint: hint,
@@ -438,6 +468,7 @@ class _TaskPrompt extends StatelessWidget {
     this.action,
     this.onPressed,
     this.loading = false,
+    this.inline = false,
   });
 
   final String icon;
@@ -446,10 +477,46 @@ class _TaskPrompt extends StatelessWidget {
   final String? action;
   final VoidCallback? onPressed;
   final bool loading;
+  final bool inline;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    if (inline) {
+      return Semantics(
+        liveRegion: true,
+        child: Card(
+          margin: .zero,
+          elevation: 0,
+          color: theme.colorScheme.surfaceContainerHigh,
+          shape: const RoundedRectangleBorder(
+            borderRadius: .all(.circular(20)),
+          ),
+          child: Padding(
+            padding: const .all(16),
+            child: Row(
+              spacing: 12,
+              children: [
+                _TaskIcon(icon, 40),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: .min,
+                    crossAxisAlignment: .start,
+                    spacing: 4,
+                    children: [
+                      Text(title, style: theme.textTheme.titleMedium),
+                      if (message != null) _TaskSupporting(message!),
+                      if (action != null)
+                        TextButton(onPressed: onPressed, child: Text(action!)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return Semantics(
       liveRegion: true,
       child: Padding(
@@ -653,10 +720,7 @@ class _TaskRowState extends State<_TaskRow> {
 
     final corners = widget.corners ?? BorderRadius.circular(16);
     final row = Padding(
-      padding: .only(
-        left: widget.childRow ? 24 : 0,
-        bottom: widget.hasNextTask ? 2 : 0,
-      ),
+      padding: .only(bottom: widget.hasNextTask ? 2 : 0),
       child: DragTarget<_TaskKey>(
         onWillAcceptWithDetails: (details) => widget.acceptsDrag(details.data),
         onAcceptWithDetails: (details) => widget.onDrop(details.data),
@@ -684,6 +748,7 @@ class _TaskRowState extends State<_TaskRow> {
                   : null,
               child: Row(
                 children: [
+                  if (widget.childRow) const SizedBox(width: 24),
                   if (widget.canDrag)
                     LongPressDraggable<_TaskKey>(
                       data: _key(task),
@@ -711,7 +776,7 @@ class _TaskRowState extends State<_TaskRow> {
                         ? 'Mark ${task.title} incomplete'
                         : 'Complete ${task.title}',
                     child: SizedBox.square(
-                      dimension: 44,
+                      dimension: 48,
                       child: Checkbox(
                         value: task.completed,
                         onChanged: widget.onComplete == null
@@ -723,7 +788,7 @@ class _TaskRowState extends State<_TaskRow> {
                   ),
                   Expanded(
                     child: Padding(
-                      padding: const .symmetric(vertical: 8, horizontal: 4),
+                      padding: const .fromLTRB(0, 8, 8, 8),
                       child: Column(
                         crossAxisAlignment: .start,
                         children: [

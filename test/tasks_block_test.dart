@@ -89,7 +89,7 @@ Future<void> _mount(
   _Tasks store, {
   double textScale = 1,
 }) async {
-  await tester.binding.setSurfaceSize(const Size(420, 720));
+  await tester.binding.setSurfaceSize(const Size(420, 663));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   addTearDown(store.dispose);
   await tester.pumpWidget(
@@ -127,9 +127,28 @@ void main() {
     );
     expect(find.text('Task 3'), findsOneWidget);
     expect(find.text('Task 4'), findsNothing);
+    final filters = find.byWidgetPredicate(
+      (widget) => widget is SegmentedButton,
+    );
+    expect(tester.getSize(filters), const Size(372, 40));
+    final viewAll = tester.getCenter(find.text('View all'));
+    expect(tester.getCenter(find.text('Completed · 0')).dy, viewAll.dy);
+    expect(viewAll.dx, greaterThan(300));
+    expect(
+      tester.getCenter(find.text('Manage lists')).dy,
+      closeTo(tester.getCenter(find.text('Waiting to sync')).dy, 1),
+    );
 
     await tester.tap(find.text('View all'));
     await tester.pumpAndSettle();
+    final dialog = find.byType(Dialog);
+    expect(tester.getSize(dialog), const Size(420, 663));
+    final block = find.descendant(
+      of: dialog,
+      matching: find.byType(TasksBlock),
+    );
+    expect(tester.getSize(block).width, 372);
+    expect(find.widgetWithText(TextField, 'Search tasks'), findsNothing);
     final rows = find.byType(ListView).last;
     final scroller = find.descendant(
       of: rows,
@@ -216,6 +235,12 @@ void main() {
       expect(tester.widget<TextField>(quick).focusNode?.hasFocus, isTrue);
       expect(hint, findsNothing);
 
+      expect(search, findsNothing);
+      await tester.tap(find.byTooltip('Task options').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Search tasks'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(search).focusNode?.hasFocus, isTrue);
       await tester.ensureVisible(search);
       await tester.tap(search);
       await tester.enterText(search, 'notes');
