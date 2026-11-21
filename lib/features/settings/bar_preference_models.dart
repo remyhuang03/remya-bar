@@ -39,7 +39,7 @@ class BarLayout {
     this.resources = barResourceIds,
     this.windowAppName = false,
     this.mediaMarquee = false,
-    this.clickCards = const ['weather'],
+    this.clickCards = const [],
     this.center,
   });
 
@@ -86,7 +86,7 @@ class BarLayout {
         mediaMarquee: mediaMarquee,
         clickCards: switch (json['click-cards']) {
           final List cards => List<String>.from(cards),
-          _ => const ['weather'],
+          _ => const [],
         },
         center: json['center'] as int?,
       );

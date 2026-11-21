@@ -178,6 +178,8 @@ class _SettingNumberFieldState extends State<SettingNumberField> {
               textAlign: .center,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              // A one- or two-digit field has nothing worth a context menu.
+              contextMenuBuilder: null,
               style: Theme.of(context).textTheme.titleMedium,
               decoration: InputDecoration(
                 isDense: true,

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/features/settings/bar_pill_layout.dart';
@@ -206,9 +205,9 @@ void main() {
     expect(split.groups.expand((g) => g).where((id) => id == 'weather'), [
       'weather',
     ]);
-    expect(BarLayout.fromJson(layout.toJson()).clickCards, ['weather']);
+    expect(BarLayout.fromJson(layout.toJson()).clickCards, isEmpty);
     final json = layout.toJson()..remove('click-cards');
-    expect(BarLayout.fromJson(json).clickCards, ['weather']);
+    expect(BarLayout.fromJson(json).clickCards, isEmpty);
     final clicks = layout.copyWith(clickCards: ['clock', 'battery']);
     expect(BarLayout.fromJson(clicks.toJson()).clickCards, [
       'clock',
@@ -249,38 +248,64 @@ void main() {
         ),
       ),
     );
-    Future<void> menu(String pill, String item) async {
-      await tester.tap(find.text(pill).first, buttons: kSecondaryButton);
+    // Every pill opens the same panel; a second tap closes it.
+    Future<void> panel(String pill, String action) async {
+      await tester.tap(find.text(pill).first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text(item));
+      await tester.tap(find.text(action));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(pill).first);
       await tester.pumpAndSettle();
     }
 
-    await menu('System resources', 'Open card on click');
-    expect(current.clickCards, contains('resources'));
-    await menu('System resources', 'Open card on hover');
-    expect(current.clickCards, isNot(contains('resources')));
-    await menu('System resources', 'Move to own group');
-    expect(current.groups, anyElement(equals(['resources'])));
-    await menu('Weather', 'Show in new group');
-    expect(current.hidden, isNot(contains('weather')));
-    await menu('Clock', 'Center its group');
-    expect(current.center, isNull);
+    Future<void> drag(Finder from, Finder to) async {
+      final gesture = await tester.startGesture(tester.getCenter(from));
+      await gesture.moveBy(const Offset(20, 20));
+      await gesture.moveTo(tester.getCenter(to));
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+    }
 
-    final gesture = await tester.startGesture(
-      tester.getCenter(find.text('Clock').first),
-    );
-    await gesture.moveBy(const Offset(20, 20));
-    await gesture.moveTo(tester.getCenter(find.text('Hidden')));
-    await tester.pump();
-    await gesture.up();
+    await panel('System resources', 'Click');
+    expect(current.clickCards, contains('resources'));
+    expect(find.text('Card opens on click'), findsOneWidget);
+    await panel('System resources', 'Hover');
+    expect(current.clickCards, isNot(contains('resources')));
+    // Pills without anything to set do not expand.
+    await tester.tap(find.text('Quick settings').first);
     await tester.pumpAndSettle();
+    expect(find.byType(Divider), findsNothing);
+
+    await drag(find.text('System resources').first, find.text('New group'));
+    expect(current.groups.last, ['resources']);
+    await tester.tap(find.byKey(const ValueKey('show-weather')));
+    await tester.pumpAndSettle();
+    expect(current.groups.last, ['weather']);
+    await tester.tap(find.byKey(const ValueKey('hide-weather')));
+    await tester.pumpAndSettle();
+    expect(current.hidden, contains('weather'));
+    expect(find.byKey(const ValueKey('hide-sidebar')), findsNothing);
+
+    final centered = current.groups.indexWhere((g) => g.contains('clock'));
+    await tester.tap(find.widgetWithText(FilterChip, 'Center').at(centered));
+    await tester.pumpAndSettle();
+    expect(current.center, isNull);
+    await tester.tap(find.widgetWithText(FilterChip, 'Center').first);
+    await tester.pumpAndSettle();
+    expect(current.center, 0);
+
+    await drag(
+      find.text('Clock').first,
+      find.byKey(const ValueKey('hidden-pills')),
+    );
     expect(current.hidden, contains('clock'));
 
     await tester.tap(find.text('Reset'));
     await tester.pumpAndSettle();
     expect(current.groups, BarLayout.defaults.groups);
     expect(current.center, BarLayout.defaults.center);
+    expect(find.byType(SegmentedButton<bool>), findsNothing);
   });
 
   testWidgets('number field clamps typed values and batches steps', (

@@ -17,6 +17,45 @@ import '../tray/tray_backend.dart';
 import '../weather/weather_controller.dart';
 import 'bar_preference_models.dart';
 
+const barPillNames = {
+  'notifications': 'Notifications',
+  'window': 'Active window',
+  'resources': 'System resources',
+  'media': 'Media',
+  'workspaces': 'Workspaces',
+  'clock': 'Clock',
+  'weather': 'Weather',
+  'tray': 'App tray',
+  'ai-usage': 'AI Usage',
+  'battery': 'Battery',
+  'sidebar': 'Quick settings',
+};
+
+const _pillIcons = {
+  'notifications': Icons.notifications_rounded,
+  'window': Icons.web_asset_rounded,
+  'resources': Icons.memory_rounded,
+  'media': Icons.music_note_rounded,
+  'workspaces': Icons.space_dashboard_rounded,
+  'clock': Icons.schedule_rounded,
+  'weather': Icons.cloud_outlined,
+  'tray': Icons.apps_rounded,
+  'ai-usage': Icons.auto_awesome_rounded,
+  'battery': Icons.battery_std_rounded,
+  'sidebar': Icons.tune_rounded,
+};
+
+/// Shown for a pill that currently has nothing to display.
+const _idleLabels = {
+  'window': 'No window',
+  'resources': 'No data',
+  'media': 'Not playing',
+  'workspaces': 'Unavailable',
+  'tray': 'No apps',
+  'ai-usage': 'No providers',
+  'battery': 'No battery',
+};
+
 /// The application's running services, so settings can draw real pills with
 /// live data instead of illustrations.
 class BarLiveServices extends InheritedWidget {
@@ -169,4 +208,59 @@ class BarLiveTheme extends StatelessWidget {
     data: barTheme(Theme.of(context)),
     child: IgnorePointer(child: ExcludeSemantics(child: child)),
   );
+}
+
+/// The real pill [id], or a labelled placeholder when it has nothing to show.
+class BarLivePill extends StatelessWidget {
+  const BarLivePill({
+    super.key,
+    required this.id,
+    required this.layout,
+    required this.live,
+  });
+
+  final String id;
+  final BarLayout layout;
+  final BarLiveBuilder? live;
+
+  @override
+  Widget build(BuildContext context) {
+    final pill = live?.pill(context, id, layout);
+    if (pill != null) {
+      return BarLiveTheme(
+        child: SizedBox(height: 40, child: Center(widthFactor: 1, child: pill)),
+      );
+    }
+    final colors = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return SizedBox(
+      height: 40,
+      child: Center(
+        widthFactor: 1,
+        child: DecoratedBox(
+          decoration: ShapeDecoration(
+            shape: StadiumBorder(side: BorderSide(color: colors.outline)),
+          ),
+          child: Padding(
+            padding: const .symmetric(horizontal: 12, vertical: 6),
+            child: Row(
+              mainAxisSize: .min,
+              spacing: 6,
+              children: [
+                Icon(_pillIcons[id], size: 16, color: colors.onSurfaceVariant),
+                Text(barPillNames[id]!, style: text.labelMedium),
+                if (_idleLabels[id] case final idle? when live != null)
+                  Text(
+                    idle,
+                    style: text.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

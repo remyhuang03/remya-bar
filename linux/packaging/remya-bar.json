@@ -189,7 +189,7 @@
         ],
         "window-app-name": false,
         "media-marquee": false,
-        "click-cards": ["weather"],
+        "click-cards": [],
         "center": 1
       },
       "schema": {

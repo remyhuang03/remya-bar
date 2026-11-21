@@ -49,6 +49,7 @@
 - Split complex components into smaller objects with clear responsibilities. Keep small, non-reusable components private in the same file and composition shallow.
 - All UI must follow Material Design 3 Expressive (MD3E).
 - Import `package:material_ui/material_ui.dart` instead of `package:flutter/material.dart`.
+- In settings, use `remya_ui` controls instead of their Material counterparts: `SettingsSegmentedButton` (solid connected segments, optional `SettingsSegment.icon`) or `SettingChoice` for single choices, never Material `SegmentedButton`.
 - Enable Material 3 and Expressive color schemes; follow the design system for spacing, shape, typography, and motion.
 - Preserve keyboard navigation, visible focus, readable contrast, and scrolling at supported window sizes.
 - Keep tooltips and other user-facing hints concise. Prefer a short name or status over an action sentence; use `Settings`, not `Open Remya Settings`. Put detailed diagnostics in logs or an appropriate detail view.

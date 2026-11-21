@@ -132,8 +132,8 @@ in popup coordinates. Flutter draws the neck and animated shape while resize
 measures full content, including neck and shadows. When the monitor clamps a
 card's height, the neck and header stay fixed and only the body below the
 header scrolls. A pill wider than its card tapers into the body with rounded
-curves. Layout `click-cards` lists card pills that open on click; the others
-open on hover. The settings Layout page renders the real pills through the
+curves. Layout `click-cards` lists card pills that open on click (none by
+default); the others open on hover. The settings Layout page renders the real pills through the
 application's shared services, without popups or pointer input. Media `cardSeed` makes pill
 and card use the same artwork palette. Sidebar/tray openings hide and block cards.
 Cards use an OVERLAY surface with ON_DEMAND focus; Escape hides immediately.

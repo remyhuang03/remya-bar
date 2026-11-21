@@ -46,6 +46,7 @@ class BarResources extends StatelessWidget {
     if (segments.isEmpty) return const SizedBox.shrink();
     return Align(
       alignment: .centerRight,
+      widthFactor: 1,
       child: BarPill(
         semanticsLabel: 'System resources',
         padding: compact

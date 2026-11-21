@@ -125,7 +125,7 @@ class BarSettingsPage extends StatelessWidget {
     ];
   }
 
-  /// Rows of the layout inspector for pill [id].
+  /// Rows of pill [id]'s own options in its layout panel.
   List<Widget> _pillOptions(
     String id, {
     required BarLayout layout,

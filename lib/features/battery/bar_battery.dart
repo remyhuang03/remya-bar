@@ -91,6 +91,7 @@ class BarBattery extends StatelessWidget {
 
     return Align(
       alignment: .center,
+      widthFactor: 1,
       child: BarPill(
         padding: const .symmetric(horizontal: 8),
         card: BarPillCard(
