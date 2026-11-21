@@ -194,14 +194,23 @@ Do Not Disturb and sidebar layout remain Bar preferences.
 Writes run FIFO; queued volume/brightness values coalesce per action and target.
 Predictions reconcile with confirmed results, and refresh reads wait for the
 queue to drain. Volume respects the Bar ceiling (100–150%); zero also mutes,
-audible levels unmute, and unmuting silence restores one step. Brightness crosses
-from hardware's 1% floor into software gamma, clearing gamma before increasing
-hardware. Sliders throttle to 60 ms, send release values and hold them until
-readback catches up or 1.5 seconds pass. Errors retain observed state.
+audible levels unmute, and unmuting silence restores one step. Hardware brightness
+`0` is Core's device-specific, nonzero minimum. The inner panel can use raw
+`1` when its controller is opted in. Other backlights and DDC/CI use conservative
+positive floors. Brightness reaches the confirmed hardware minimum before
+entering software dimming and restores gamma to 100 before raising hardware.
+Hardware and software brightness both target the selected output. Bar uses
+Core's per-output `display-gamma:<output>` API for software dimming. An output
+with a usable gamma ramp can dim without hardware control. When its ramp is
+unavailable, Bar leaves only the hardware range if present. If applying gamma
+fails after a move to the hardware minimum, Bar attempts to restore the prior
+hardware brightness. Sliders throttle to 60 ms, send release values and hold them
+until readback catches up or 1.5 seconds pass.
 
 OSD follows Core change signals, reloads its baseline on reconnect/output changes,
-and shows confirmed values only. Hardware brightness feedback targets that output;
-volume/gamma target the focused output. Its overlay has no focus or input region.
+and reconciles predicted key presses with readback. Brightness feedback targets
+the affected output. Volume feedback targets the focused output. The overlay
+has no focus or input region.
 Shortcuts at `/top/remya/bar`, interface `top.remya.bar.Shortcuts`, are VolumeUp,
 VolumeDown, VolumeMute, BrightnessUp, BrightnessDown and ToggleSidebar. Repeats
 coalesce without skipping the hardware/gamma boundary. Signals are scoped to the

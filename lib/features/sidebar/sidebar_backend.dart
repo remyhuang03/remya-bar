@@ -60,9 +60,13 @@ class SidebarBackend extends ChangeNotifier {
           unawaited(_readOsdPreferences());
           return;
         }
+        if (change.topic == displayGammaTopic &&
+            change.value['output'] != _output) {
+          return;
+        }
         if (const {
               'display-brightness',
-              displayGammaSettingId,
+              displayGammaTopic,
             }.contains(change.topic) &&
             _applyBrightnessChange(change)) {
           return;
@@ -76,7 +80,7 @@ class SidebarBackend extends ChangeNotifier {
           'bluetooth',
           'night-light',
           'display-brightness',
-          displayGammaSettingId,
+          displayGammaTopic,
           barSidebarLayoutSettingId,
         }.contains(change.topic)) {
           unawaited(_refresh());
@@ -166,9 +170,9 @@ class SidebarBackend extends ChangeNotifier {
     }
   }
 
-  Future<int?> _readGamma() async {
+  Future<int?> _readGamma(String output) async {
     try {
-      return await _display.readGamma();
+      return await _display.readGamma(output);
     } catch (error) {
       debugPrint('Sidebar software brightness: $error');
       return null;
@@ -176,7 +180,7 @@ class SidebarBackend extends ChangeNotifier {
   }
 
   Future<Map<String, Object?>> _brightness(String output) async {
-    final gamma = _readGamma();
+    final gamma = _readGamma(output);
     final hardware = await _settings.call('Get', [
       'display-brightness:$output',
     ]);
@@ -189,7 +193,7 @@ class SidebarBackend extends ChangeNotifier {
     final value = change.value;
     final outputs = value['outputs'];
     final update = switch (change.topic) {
-      displayGammaSettingId => {'gamma': value['gamma']},
+      displayGammaTopic => {'gamma': BarDisplay.gammaFor(_output!, value)},
       _ when value['output'] == _output => value,
       _ when outputs is List =>
         outputs
@@ -295,15 +299,19 @@ class SidebarBackend extends ChangeNotifier {
       case 'sidebar.brightness' when output != null && output == target:
         final confirmed = _confirmedBrightness;
         if (confirmed?['output'] != output) return;
-        if (value case {'gamma': final int gamma} when _validGamma(gamma)) {
+        if (value case {'gamma': final int gamma}
+            when _validGamma(gamma) && confirmed?['gamma'] is int) {
           patch('brightness', {
             'gamma': gamma,
-            if (confirmed?['percent'] is num) 'percent': 1,
+            if (confirmed?['percent'] is num && gamma < 100) 'percent': 0,
           });
-        } else if (_validHardware(value)) {
+        } else if (_validHardware(value) && confirmed?['percent'] is num) {
           patch('brightness', {
             'percent': value,
-            if (confirmed?['gamma'] is num) 'gamma': 100,
+            if (confirmed?['gamma'] is num &&
+                ((value as num).round() == 0 ||
+                    value.round() >= (confirmed?['percent'] as num).round()))
+              'gamma': 100,
           });
         }
       case 'sidebar.wifi' when value is bool:
@@ -571,7 +579,7 @@ class SidebarBackend extends ChangeNotifier {
   }
 
   bool _validHardware(Object? value) =>
-      value is num && value.isFinite && value >= 1 && value <= 100;
+      value is num && value.isFinite && value >= 0 && value <= 100;
 
   bool _validGamma(int value) => value >= _osd.gammaMin && value <= 100;
 
@@ -584,40 +592,48 @@ class SidebarBackend extends ChangeNotifier {
       state = await _brightness(output);
     }
     final result = Map<String, Object?>.of(state);
-    Future<void> hardware(int percent) async {
-      if (result['percent'] == percent) return;
-      final actual = await _display.setBrightness(output, percent);
-      if (actual == null) {
-        throw StateError('Missing hardware brightness readback');
-      }
-      result['percent'] = actual;
-    }
-
-    Future<void> software(int gamma) async {
-      if (result['gamma'] != gamma) {
-        result['gamma'] = await _display.setGamma(gamma);
-      }
-    }
-
+    final hardware = (state['percent'] as num?)?.round();
+    final gamma = state['gamma'] as int?;
+    final target = switch (value) {
+      {'gamma': final int level} when _validGamma(level) && gamma != null => (
+        level: level,
+        software: true,
+      ),
+      final num level when _validHardware(level) && hardware != null => (
+        level: level.round(),
+        software: false,
+      ),
+      _ => throw const FormatException('Invalid sidebar brightness'),
+    };
     try {
-      if (value case {'gamma': final int gamma}
-          when _validGamma(gamma) && result['gamma'] is num) {
-        if (result['percent'] is num) await hardware(1);
-        await software(gamma);
-      } else if (_validHardware(value) && result['percent'] is num) {
-        if (result['gamma'] is num && result['gamma'] != 100) {
-          await software(100);
-        }
-        await hardware((value as num).round());
-      } else {
-        throw const FormatException('Invalid sidebar brightness');
-      }
+      await _display.setLevel(
+        output,
+        hardware: hardware,
+        gamma: gamma,
+        target: target.level,
+        mode: target.software
+            ? target.level < 100
+                  ? .softwareWithFloor
+                  : .software
+            : target.level > 0 && target.level < hardware!
+            ? .hardwareOnly
+            : .hardware,
+        isCurrent: () => !_disposed && _output == output,
+        onReadback: (hardware, gamma) {
+          result['percent'] = hardware;
+          result['gamma'] = gamma;
+        },
+      );
+      if (_output == output) _confirmedBrightness = result;
       return result;
-    } finally {
-      if (_output == output) {
-        _confirmedBrightness = result;
+    } catch (_) {
+      // A failed command can still affect the device. Re-read before retrying.
+      if (!_disposed && _output == output) {
+        _confirmedBrightness = null;
         _data['brightness'] = result;
+        notifyListeners();
       }
+      rethrow;
     }
   }
 

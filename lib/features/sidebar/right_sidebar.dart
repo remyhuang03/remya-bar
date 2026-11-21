@@ -678,32 +678,34 @@ class _RightSidebarState extends State<RightSidebar> {
     final hardware = brightness['percent'] as num?;
     final gamma = brightness['gamma'] as num?;
     final minimum = _osdPreferences.gammaMin;
-    final offset = hardware == null ? 0 : 99;
-    final position = gamma != null && (hardware == null || gamma < 100)
+    final offset = hardware == null ? 0 : 100;
+    final position =
+        gamma != null && (hardware == null || hardware == 0 && gamma < 100)
         ? gamma - offset
-        : hardware?.clamp(1, 100);
+        : hardware?.clamp(0, 100);
     bool software(double value) =>
-        gamma != null && (hardware == null || value < 1);
+        gamma != null && (hardware == null || value.round() < 0);
     return _SidebarSlider(
       key: ValueKey((brightness['output'], hardware != null)),
       icon: Icons.brightness_6_rounded,
       label: 'Brightness',
       percent: position,
-      min: gamma == null ? 1 : (minimum - offset).toDouble(),
+      min: gamma == null ? 0 : (minimum - offset).toDouble(),
       // Software dimming sits below the hardware floor, or below 100% alone.
       threshold: gamma == null ? null : 100.0 - offset,
       zone: .software,
-      // The gamma fill color marks software dimming; no extra wording.
-      valueLabel: (value) =>
-          '${(software(value) ? value + offset : value).round()}%',
+      valueLabel: (value) {
+        if (software(value)) return '${value.round() + offset}%';
+        return value.round() == 0 ? 'Minimum backlight' : '${value.round()}%';
+      },
       onChange: edit || position == null || brightness['output'] == null
           ? null
           : (value) => _send(
               'sidebar.brightness',
               target: brightness['output'],
               value: software(value)
-                  ? {'gamma': (value + offset).round()}
-                  : value,
+                  ? {'gamma': value.round() + offset}
+                  : value.round(),
             ),
     );
   }

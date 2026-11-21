@@ -471,7 +471,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       final current = osd.state;
       var visible = current != null;
       final hyprland = widget.hyprland;
-      if (visible && current.type != .brightness && hyprland != null) {
+      if (visible && current.type == .volume && hyprland != null) {
         final output = hyprland.output?.name;
         if (output != null) {
           final focused = await hyprland.focusedOutput();

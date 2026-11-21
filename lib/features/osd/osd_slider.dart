@@ -158,6 +158,11 @@ class OsdCapsuleSlider extends StatelessWidget {
         color: boost.color,
         foreground: boost.onColor,
       ),
+      .brightness when percent == 0 => (
+        text: 'Minimum backlight',
+        color: scheme.secondaryContainer,
+        foreground: scheme.onSecondaryContainer,
+      ),
       .gamma when dimming => (
         text: 'Software brightness',
         color: gamma.color,

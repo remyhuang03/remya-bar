@@ -7,7 +7,7 @@ import 'package:remya_client/remya_client.dart';
 
 import 'package:remya_bar/features/settings/bar_preferences.dart';
 
-import '../settings/bar_display.dart' show displayGammaSettingId;
+import '../settings/bar_display.dart';
 
 import 'osd_slider.dart';
 
@@ -56,6 +56,7 @@ class OsdController extends ChangeNotifier {
        _ownsSettings = settings == null;
 
   final SettingsClient _settings;
+  late final _display = BarDisplay(_settings);
   late final _preferences = BarPreferences(client: _settings);
   final bool _ownsSettings;
   final Duration timeout;
@@ -75,13 +76,16 @@ class OsdController extends ChangeNotifier {
 
   int? _hwBrightness;
   bool _hardwareSupported = false;
+  bool _backlightOff = false;
   bool _brightnessInitialized = false;
 
   int? _gamma;
+  int _gammaRevision = 0;
+  (int?, int?)? _brightnessPreview;
 
   bool _disposed = false;
   bool _writingVolume = false;
-  bool _writingBrightness = false;
+  String? _writingBrightnessOutput;
   Timer? _hideTimer;
   StreamSubscription<SettingsChange>? _changes;
   StreamSubscription<bool>? _serviceChanges;
@@ -106,15 +110,22 @@ class OsdController extends ChangeNotifier {
     if (_disposed || _output == output) return;
     _output = output;
     _resetBrightness();
-    if (state?.type == .brightness) dismiss();
-    unawaited(_refreshBrightness());
+    if (state?.type != .volume) dismiss();
+    unawaited(_refreshDisplay());
+  }
+
+  Future<void> _refreshDisplay() async {
+    await Future.wait([_refreshBrightness(), _refreshGamma()]);
   }
 
   void _resetBrightness() {
     _outputRevision++;
     _hwBrightness = null;
     _hardwareSupported = false;
+    _backlightOff = false;
     _brightnessInitialized = false;
+    _gamma = null;
+    _brightnessPreview = null;
   }
 
   void _onServiceChange(bool available) {
@@ -123,7 +134,6 @@ class OsdController extends ChangeNotifier {
     _volumePercent = null;
     _volumeMuted = null;
     _preMuteVolume = null;
-    _gamma = null;
     _resetBrightness();
     dismiss();
     if (available) unawaited(_initializeState());
@@ -133,8 +143,7 @@ class OsdController extends ChangeNotifier {
     await Future.wait([
       _refreshPreferences(),
       _refreshSound(),
-      _refreshBrightness(),
-      _refreshGamma(),
+      _refreshDisplay(),
     ]);
   }
 
@@ -151,14 +160,16 @@ class OsdController extends ChangeNotifier {
           _applySoundPayload(change.value, showChanges: _shortcuts.isEmpty);
         }
       case 'display-brightness' || 'display.5d419889':
-        if (!_writingBrightness) {
+        if (_writingBrightnessOutput != _output) {
           _applyBrightnessPayload(
             change.value,
             showChanges: _shortcuts.isEmpty,
           );
         }
-      case 'display-gamma' || 'night-light':
-        if (!_writingBrightness) {
+      case displayGammaTopic:
+        if (change.value['output'] == _output &&
+            _output != null &&
+            _writingBrightnessOutput != _output) {
           _applyGammaPayload(change.value, showChanges: _shortcuts.isEmpty);
         }
     }
@@ -271,6 +282,7 @@ class OsdController extends ChangeNotifier {
           item['backend'] == 'backlight' || item['backend'] == 'ddc';
       _brightnessInitialized = true;
     }
+    _backlightOff = _hardwareSupported && item['raw_value'] == 0;
     _hwBrightness = percent;
     if (showChanges && changed && percent != null) {
       _show(OsdState(type: .brightness, value: percent));
@@ -279,28 +291,36 @@ class OsdController extends ChangeNotifier {
   }
 
   Future<void> _refreshGamma() async {
-    final revision = _serviceRevision;
+    final output = _output;
+    if (output == null || output.isEmpty) return;
+    final revision = _outputRevision;
+    final gammaRevision = _gammaRevision;
     try {
-      final response = await _settings.call('Get', ['display-gamma']);
-      if (_disposed || _serviceRevision != revision || _gamma != null) return;
-      _applyGammaPayload(response);
+      final gamma = await _display.readGamma(output);
+      if (_disposed ||
+          _outputRevision != revision ||
+          _gammaRevision != gammaRevision) {
+        return;
+      }
+      _gamma = gamma;
     } catch (error) {
       if (!_disposed) debugPrint('OSD gamma read: $error');
     }
   }
 
-  int? _applyGammaPayload(
+  void _applyGammaPayload(
     Map<String, Object?> payload, {
     bool showChanges = false,
   }) {
-    final raw = payload['gamma'];
-    if (raw is! int || raw < 1 || raw > 100) return null;
-    final changed = _gamma != null && _gamma != raw;
-    _gamma = raw;
-    if (showChanges && changed) {
-      _show(OsdState(type: .gamma, value: raw));
+    final gamma = BarDisplay.gammaFor(_output!, payload);
+    final changed = _gamma != null && _gamma != gamma;
+    _gammaRevision++;
+    _gamma = gamma;
+    if (gamma == null && state?.type == .gamma) {
+      dismiss();
+    } else if (showChanges && changed && gamma != null) {
+      _show(_brightnessState(.gamma, gamma, _hwBrightness));
     }
-    return raw;
   }
 
   Future<void> handleShortcut(String action) {
@@ -350,12 +370,7 @@ class OsdController extends ChangeNotifier {
         );
       case 'BrightnessUp' || 'BrightnessDown':
         if (!_brightnessInitialized) return;
-        final (hardware, gamma) = switch (predicted) {
-          OsdState(type: .brightness, :final value) => (value, 100),
-          OsdState(type: .gamma, :final value) => (_hwBrightness, value),
-          _ => (_hwBrightness, _gamma),
-        };
-        if (gamma == null) return;
+        final (hardware, gamma) = _brightnessPreview ?? (_hwBrightness, _gamma);
         final step = preferences.brightnessStep;
         final plan = _brightnessPlan(
           hardware,
@@ -363,7 +378,11 @@ class OsdController extends ChangeNotifier {
           action == 'BrightnessUp' ? step : -step,
           1,
         );
-        _show(OsdState(type: plan.type, value: plan.target));
+        if (plan == null) return;
+        final nextHardware = plan.type == .brightness ? plan.target : hardware;
+        final nextGamma = plan.type == .gamma ? plan.target : gamma;
+        _brightnessPreview = (nextHardware, nextGamma);
+        _show(_brightnessState(plan.type, plan.target, nextHardware));
     }
   }
 
@@ -382,19 +401,22 @@ class OsdController extends ChangeNotifier {
   }
 
   /// Hardware brightness above full gamma, software gamma below it.
-  ({OsdType type, int current, int target, int steps}) _brightnessPlan(
+  ({OsdType type, int current, int target, int steps})? _brightnessPlan(
     int? brightness,
-    int gamma,
+    int? gamma,
     int delta,
     int count,
   ) {
+    if (delta > 0 && _backlightOff) brightness ??= 0;
     final hardware =
         _hardwareSupported &&
         brightness != null &&
-        gamma == 100 &&
-        (delta > 0 || brightness > 1);
+        (delta < 0
+            ? brightness > 0 || gamma == null
+            : gamma == null || gamma == 100);
     final current = hardware ? brightness : gamma;
-    final floor = hardware ? 1 : math.min(gamma, preferences.gammaMin);
+    if (current == null) return null;
+    final floor = hardware ? 0 : math.min(gamma!, preferences.gammaMin);
     final limit = delta > 0 ? 100 : floor;
     final steps = current == limit
         ? 0
@@ -406,6 +428,11 @@ class OsdController extends ChangeNotifier {
       steps: steps,
     );
   }
+
+  OsdState _brightnessState(OsdType type, int value, int? hardware) =>
+      type == .gamma && value == 100 && hardware == 0
+      ? const OsdState(type: .brightness, value: 0)
+      : OsdState(type: type, value: value);
 
   Future<void> _drainShortcuts() async {
     _drainingShortcuts = true;
@@ -435,6 +462,7 @@ class OsdController extends ChangeNotifier {
       }
     }
     _drainingShortcuts = false;
+    _brightnessPreview = null;
   }
 
   void _showVolume() {
@@ -493,51 +521,68 @@ class OsdController extends ChangeNotifier {
 
   Future<void> _adjustBrightness(int delta, int count) async {
     final revision = _outputRevision;
+    bool isCurrent() => !_disposed && _outputRevision == revision;
     final output = _output;
     if (output == null || output.isEmpty) return;
     if (!_brightnessInitialized) await _refreshBrightness();
-    if (_disposed || _outputRevision != revision || !_brightnessInitialized) {
-      return;
-    }
+    if (!isCurrent() || !_brightnessInitialized) return;
     if (_gamma == null) await _refreshGamma();
-    _writingBrightness = true;
+    if (!isCurrent()) return;
+    _writingBrightnessOutput = output;
+    _gammaRevision++;
+    int? previousHardware;
     try {
-      while (count > 0 && !_disposed && _outputRevision == revision) {
-        final gamma = _gamma;
-        if (gamma == null) return;
-        final plan = _brightnessPlan(_hwBrightness, gamma, delta, count);
+      while (count > 0 && isCurrent()) {
+        final hardware = _hwBrightness;
+        final plan = _brightnessPlan(hardware, _gamma, delta, count);
+        if (plan == null) return;
         if (plan.steps == 0) {
           if (_shortcuts.isEmpty) {
-            _show(OsdState(type: plan.type, value: plan.current));
+            _brightnessPreview = null;
+            _show(_brightnessState(plan.type, plan.current, hardware));
           }
           return;
         }
-        final hardware = plan.type == .brightness;
-        final key = hardware
-            ? 'display-brightness:$output'
-            : displayGammaSettingId;
-        final response = await _settings.call('Set', [key, '${plan.target}']);
-        if (_disposed || _outputRevision != revision) return;
-        final actual = hardware
-            ? _applyBrightnessPayload(response)
-            : _applyGammaPayload(response);
-        if (actual == null) throw StateError('Missing brightness readback');
+        final software = plan.type == .gamma;
+        await _display.setLevel(
+          output,
+          hardware: hardware,
+          gamma: _gamma,
+          target: plan.target,
+          mode: software
+              ? .software
+              : delta < 0
+              ? .hardwareOnly
+              : .hardware,
+          isCurrent: isCurrent,
+          previousHardware: previousHardware,
+          onReadback: (hardware, gamma) {
+            if (hardware != null) _backlightOff = false;
+            _hwBrightness = hardware;
+            _gamma = gamma;
+          },
+        );
+        if (!isCurrent()) return;
+        previousHardware = !software && plan.target == 0 ? hardware : null;
+        final actual = (software ? _gamma : _hwBrightness)!;
         count -= plan.steps;
         // Intermediate and superseded readbacks would step backwards.
         if (count == 0 && _shortcuts.isEmpty) {
-          _show(OsdState(type: plan.type, value: actual));
+          _brightnessPreview = null;
+          _show(_brightnessState(plan.type, actual, _hwBrightness));
         }
       }
     } catch (error) {
-      if (!_disposed && _outputRevision == revision) {
+      if (isCurrent()) {
         _brightnessInitialized = false;
         _hwBrightness = null;
         _gamma = null;
+        _brightnessPreview = null;
         if (state?.type != .volume) dismiss();
         debugPrint('OSD brightness write: $error');
       }
     } finally {
-      _writingBrightness = false;
+      _writingBrightnessOutput = null;
     }
   }
 

@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/bar_theme.dart';
 import 'package:remya_bar/features/osd/osd_controller.dart';
 import 'package:remya_bar/features/osd/osd_slider.dart';
+import 'package:remya_bar/features/settings/bar_display.dart';
 import 'package:remya_client/remya_client.dart';
 import 'package:remya_bar/features/settings/bar_preferences.dart';
 import 'package:remya_ui/remya_ui.dart';
@@ -70,10 +71,17 @@ void main() {
       );
       expect(find.text('85%'), findsOneWidget);
       expect(find.text('Software brightness'), findsNothing);
+      final readoutRight = tester.getTopRight(find.text('85%')).dx;
+
+      await tester.pumpWidget(
+        wrap(const OsdCapsuleSlider(type: .brightness, value: 0)),
+      );
+      expect(find.text('Minimum backlight'), findsOneWidget);
+      expect(find.text('0%'), findsOneWidget);
+      expect(find.text('Muted'), findsNothing);
       expect(find.text('Boost'), findsNothing);
 
       // Software brightness uses its own label and keeps the same readout edge.
-      final readoutRight = tester.getTopRight(find.text('85%')).dx;
       await tester.pumpWidget(
         wrap(const OsdCapsuleSlider(type: .gamma, value: 65)),
       );
@@ -255,34 +263,41 @@ void main() {
       expect((settings.volumePercent, settings.volumeMuted), (10, false));
     });
 
-    test('brightness shortcuts transition between hardware backlight and hyprsunset gamma', () async {
-      settings.emitBrightness(percent: 6);
-      await Future<void>.delayed(Duration.zero);
-      await controller.handleShortcut('BrightnessDown');
-      expect(controller.state, const OsdState(type: .brightness, value: 1));
-      expect(settings.brightnessPercent, 1);
-      expect(settings.gammaPercent, 100);
+    test(
+      'brightness shortcuts transition between hardware and per-output gamma',
+      () async {
+        settings.emitBrightness(percent: 6);
+        await Future<void>.delayed(Duration.zero);
+        await controller.handleShortcut('BrightnessDown');
+        expect(controller.state, const OsdState(type: .brightness, value: 1));
+        expect(settings.brightnessPercent, 1);
+        expect(settings.gammaPercent, 100);
 
-      // At hardware floor (1%), BrightnessDown transitions into Gamma dimming
-      await controller.handleShortcut('BrightnessDown');
-      expect(controller.state, const OsdState(type: .gamma, value: 95));
-      expect(settings.gammaPercent, 95);
+        await controller.handleShortcut('BrightnessDown');
+        expect(controller.state, const OsdState(type: .brightness, value: 0));
+        expect(settings.brightnessPercent, 0);
+        expect(settings.gammaPercent, 100);
 
-      await controller.handleShortcut('BrightnessDown');
-      expect(controller.state, const OsdState(type: .gamma, value: 90));
-      expect(settings.gammaPercent, 90);
+        await controller.handleShortcut('BrightnessDown');
+        expect(controller.state, const OsdState(type: .gamma, value: 95));
+        expect(settings.gammaPercent, 95);
 
-      // BrightnessUp brings Gamma back to 100% before increasing hardware backlight
-      await controller.handleShortcut('BrightnessUp');
-      expect(controller.state, const OsdState(type: .gamma, value: 95));
-      await controller.handleShortcut('BrightnessUp');
-      expect(controller.state, const OsdState(type: .gamma, value: 100));
+        await controller.handleShortcut('BrightnessDown');
+        expect(controller.state, const OsdState(type: .gamma, value: 90));
+        expect(settings.gammaPercent, 90);
 
-      // Now that Gamma is 100%, BrightnessUp increases hardware backlight
-      await controller.handleShortcut('BrightnessUp');
-      expect(controller.state, const OsdState(type: .brightness, value: 6));
-      expect(settings.brightnessPercent, 6);
-    });
+        // BrightnessUp brings Gamma back to 100% before increasing hardware backlight
+        await controller.handleShortcut('BrightnessUp');
+        expect(controller.state, const OsdState(type: .gamma, value: 95));
+        await controller.handleShortcut('BrightnessUp');
+        expect(controller.state, const OsdState(type: .brightness, value: 0));
+
+        // Now that Gamma is 100%, BrightnessUp increases hardware backlight
+        await controller.handleShortcut('BrightnessUp');
+        expect(controller.state, const OsdState(type: .brightness, value: 5));
+        expect(settings.brightnessPercent, 5);
+      },
+    );
 
     test('queued hardware keys use confirmed readbacks and do not show failed targets', () async {
       settings.failBrightnessWrite = true;
@@ -306,10 +321,102 @@ void main() {
         for (var index = 0; index < 5; index++)
           controller.handleShortcut('BrightnessDown'),
       ]);
-      expect(settings.brightnessWrites, ['11', '1', '90']);
-      expect(settings.brightnessPercent, 1);
-      expect(controller.state, const OsdState(type: .gamma, value: 90));
+      expect(settings.brightnessWrites, ['11', '0', '95']);
+      expect(settings.brightnessPercent, 0);
+      expect(controller.state, const OsdState(type: .gamma, value: 95));
     });
+
+    test(
+      'a failed gamma write restores the hardware lowered by its batch',
+      () async {
+        settings.emitBrightness(percent: 6);
+        settings.failGammaWrite = true;
+        await Future<void>.delayed(Duration.zero);
+        await Future.wait([
+          for (var index = 0; index < 3; index++)
+            controller.handleShortcut('BrightnessDown'),
+        ]);
+        expect(settings.brightnessWrites, ['1', '0', '95', '1']);
+        expect(settings.brightnessPercent, 1);
+        expect(settings.gammaPercent, 100);
+        expect(controller.state, isNull);
+        await controller.handleShortcut('BrightnessUp');
+        expect(controller.state, const OsdState(type: .brightness, value: 6));
+      },
+    );
+
+    test('an output without hardware dims its own gamma only', () async {
+      controller.updateOutput('DP-2');
+      await Future<void>.delayed(Duration.zero);
+      await controller.handleShortcut('BrightnessDown');
+      expect(settings.brightnessWrites, ['95']);
+      expect(settings.gammaByOutput, {'DP-2': 95});
+      expect(settings.brightnessPercent, 50);
+      expect(controller.state, const OsdState(type: .gamma, value: 95));
+      await controller.handleShortcut('BrightnessUp');
+      expect(controller.state, const OsdState(type: .gamma, value: 100));
+      expect(settings.gammaByOutput, {'DP-2': 100});
+    });
+
+    test('switching output leaves the first output dimmed and uses the second output baseline', () async {
+      settings.emitGamma('eDP-1', 10);
+      await Future<void>.delayed(Duration.zero);
+      controller.updateOutput('DP-3');
+      await Future<void>.delayed(Duration.zero);
+      settings.emitGamma('eDP-1', 15);
+      settings.changesController.add((
+        topic: displayGammaTopic,
+        value: {'gamma': 15},
+      ));
+      await Future<void>.delayed(Duration.zero);
+      await Future.wait([
+        controller.handleShortcut('BrightnessDown'),
+        controller.handleShortcut('BrightnessDown'),
+        controller.handleShortcut('BrightnessDown'),
+      ]);
+      expect(settings.externalBrightness, 0);
+      expect(settings.brightnessPercent, 50);
+      expect(settings.gammaByOutput, {'eDP-1': 15, 'DP-3': 95});
+      expect(settings.brightnessWrites, ['3', '0', '95']);
+      await controller.handleShortcut('BrightnessUp');
+      expect(settings.gammaByOutput, {'eDP-1': 15, 'DP-3': 100});
+    });
+
+    test(
+      'an unavailable per-output ramp leaves hardware control usable',
+      () async {
+        settings.unavailableGamma.add('DP-3');
+        controller.updateOutput('DP-3');
+        await Future<void>.delayed(Duration.zero);
+        await Future.wait([
+          for (var i = 0; i < 3; i++)
+            controller.handleShortcut('BrightnessDown'),
+        ]);
+        expect(settings.brightnessWrites, ['3', '0']);
+        expect(settings.gammaByOutput, isEmpty);
+        await controller.handleShortcut('BrightnessUp');
+        expect(settings.externalBrightness, 5);
+      },
+    );
+
+    test(
+      'BrightnessUp recovers an externally switched-off backlight',
+      () async {
+        settings.changesController.add((
+          topic: 'display-brightness',
+          value: {
+            'output': 'eDP-1',
+            'backend': 'backlight',
+            'percent': null,
+            'raw_value': 0,
+          },
+        ));
+        await Future<void>.delayed(Duration.zero);
+        await controller.handleShortcut('BrightnessUp');
+        expect(settings.brightnessWrites, ['5']);
+        expect(controller.state, const OsdState(type: .brightness, value: 5));
+      },
+    );
 
     test(
       'service reconnect reloads the baseline without opening the popup',
@@ -348,21 +455,31 @@ void main() {
       expect(controller.state, const OsdState(type: .brightness, value: 40));
     });
 
-    test('a late brightness read for the old output cannot overwrite the new output', () async {
-      final pending = Completer<Map<String, dynamic>>();
-      settings.pendingBrightness = pending;
-      controller.updateOutput('DP-1');
-      controller.updateOutput('eDP-1');
-      pending.complete({
-        'output': 'DP-1',
-        'percent': 80,
-        'backend': 'ddc',
-        'reason': '',
-      });
-      await Future<void>.delayed(Duration.zero);
-      await controller.handleShortcut('BrightnessUp');
-      expect(controller.state, const OsdState(type: .brightness, value: 55));
-    });
+    test(
+      'late hardware and gamma reads stay scoped to their original output',
+      () async {
+        final pending = Completer<Map<String, dynamic>>();
+        final pendingGamma = Completer<Map<String, dynamic>>();
+        settings.pendingBrightness = pending;
+        settings.pendingGamma = pendingGamma;
+        controller.updateOutput('DP-1');
+        controller.updateOutput('eDP-1');
+        pending.complete({
+          'output': 'DP-1',
+          'percent': 80,
+          'backend': 'ddc',
+          'reason': '',
+        });
+        pendingGamma.complete({
+          'output': 'DP-1',
+          'available': true,
+          'gamma': 45,
+        });
+        await Future<void>.delayed(Duration.zero);
+        await controller.handleShortcut('BrightnessUp');
+        expect(controller.state, const OsdState(type: .brightness, value: 55));
+      },
+    );
   });
 }
 
@@ -376,10 +493,15 @@ class _FakeSettingsClient extends SettingsClient {
   int volumePercent = 50;
   bool volumeMuted = false;
   int brightnessPercent = 50;
+  int externalBrightness = 8;
   bool failBrightnessWrite = false;
-  int gammaPercent = 100;
+  bool failGammaWrite = false;
+  final gammaByOutput = <String, int>{};
+  final unavailableGamma = <String>{};
+  int get gammaPercent => gammaByOutput['eDP-1'] ?? 100;
   final brightnessWrites = <String>[];
   Completer<Map<String, dynamic>>? pendingBrightness;
+  Completer<Map<String, dynamic>>? pendingGamma;
 
   @override
   Stream<SettingsChange> get changes => changesController.stream;
@@ -410,6 +532,17 @@ class _FakeSettingsClient extends SettingsClient {
     ));
   }
 
+  Map<String, dynamic> _gamma(String output) => {
+    'output': output,
+    'gamma': gammaByOutput[output] ?? 100,
+    'available': !unavailableGamma.contains(output),
+  };
+
+  void emitGamma(String output, int gamma) {
+    gammaByOutput[output] = gamma;
+    changesController.add((topic: displayGammaTopic, value: _gamma(output)));
+  }
+
   Map<String, dynamic> _soundPayload() => {
     'available': true,
     'system': {
@@ -437,6 +570,9 @@ class _FakeSettingsClient extends SettingsClient {
       if (key == 'display-brightness:DP-1' && pendingBrightness != null) {
         return pendingBrightness!.future;
       }
+      if (key == displayGammaSettingId('DP-1') && pendingGamma != null) {
+        return pendingGamma!.future;
+      }
       return switch (key) {
         barOsdSettingId => {
           'value': {
@@ -454,11 +590,19 @@ class _FakeSettingsClient extends SettingsClient {
           'backend': 'backlight',
           'reason': '',
         },
-        'display-gamma' => {
-          'gamma': gammaPercent,
-          'running': gammaPercent < 100,
-          'available': true,
+        'display-brightness:DP-2' => {
+          'output': 'DP-2',
+          'backend': null,
+          'percent': null,
         },
+        'display-brightness:DP-3' => {
+          'output': 'DP-3',
+          'backend': 'ddc',
+          'percent': externalBrightness,
+        },
+        _ when key.startsWith('$displayGammaTopic:') => _gamma(
+          key.substring(displayGammaTopic.length + 1),
+        ),
         _ => <String, dynamic>{},
       };
     }
@@ -485,14 +629,16 @@ class _FakeSettingsClient extends SettingsClient {
               {'output': 'eDP-1', 'percent': brightnessPercent},
             ],
           };
-        case 'display-gamma':
+        case 'display-brightness:DP-3':
           brightnessWrites.add(raw);
-          gammaPercent = int.parse(raw);
-          return {
-            'gamma': gammaPercent,
-            'running': gammaPercent < 100,
-            'available': true,
-          };
+          externalBrightness = int.parse(raw);
+          return {'output': 'DP-3', 'percent': externalBrightness};
+        case _ when key.startsWith('$displayGammaTopic:'):
+          brightnessWrites.add(raw);
+          if (failGammaWrite) throw StateError('Gamma write rejected');
+          final output = key.substring(displayGammaTopic.length + 1);
+          gammaByOutput[output] = int.parse(raw);
+          return _gamma(output);
       }
     }
     return <String, dynamic>{};

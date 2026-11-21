@@ -38,6 +38,12 @@ void main() {
       'value': percent,
     }, 'eDP-1');
 
+    Future<void> brightness(Object value) => backend.perform({
+      'action': 'sidebar.brightness',
+      'target': 'eDP-1',
+      'value': value,
+    }, 'eDP-1');
+
     test(
       'FIFO writes coalesce only queued volume for the same target',
       () async {
@@ -117,32 +123,82 @@ void main() {
       settings.writes.single.result.complete(_sound(130));
       await boosted;
 
-      Future<void> brightness(Object value) => backend.perform({
-        'action': 'sidebar.brightness',
-        'target': 'eDP-1',
-        'value': value,
-      }, 'eDP-1');
       final dim = brightness({'gamma': 75});
       expect(settings.writes.last.id, 'display-brightness:eDP-1');
-      expect(settings.writes.last.value, '1');
-      settings.writes.last.result.complete({'percent': 1});
+      expect(settings.writes.last.value, '0');
+      settings.writes.last.result.complete({'percent': 0});
       await _flush();
-      expect(settings.writes.last.id, displayGammaSettingId);
+      expect(settings.writes.last.id, displayGammaSettingId('eDP-1'));
       expect(settings.writes.last.value, '75');
-      settings.writes.last.result.complete({'gamma': 75});
+      settings.writes.last.result.complete(_gamma('eDP-1', 75));
       await dim;
       expect((backend.data['brightness'] as Map)['gamma'], 75);
 
       final brighter = brightness(40);
-      expect(settings.writes.last.id, displayGammaSettingId);
+      expect(settings.writes.last.id, displayGammaSettingId('eDP-1'));
       expect(settings.writes.last.value, '100');
-      settings.writes.last.result.complete({'gamma': 100});
+      settings.writes.last.result.complete(_gamma('eDP-1', 100));
       await _flush();
       expect(settings.writes.last.id, 'display-brightness:eDP-1');
       expect(settings.writes.last.value, '40');
       settings.writes.last.result.complete({'percent': 40});
       await brighter;
       expect((backend.data['brightness'] as Map)['percent'], 40);
+    });
+
+    test(
+      'gamma failure restores confirmed hardware and reports the failure',
+      () async {
+        backend.close();
+        final dim = brightness({'gamma': 75});
+        final failure = expectLater(dim, throwsStateError);
+        settings.writes.single.result.complete({'percent': 0});
+        await _flush();
+        settings.writes.last.result.complete({
+          ..._gamma('eDP-1', 100),
+          'available': false,
+        });
+        await _flush();
+        expect(settings.writes.last.id, 'display-brightness:eDP-1');
+        expect(settings.writes.last.value, '50');
+        settings.writes.last.result.complete({'percent': 50});
+        await failure;
+        expect(backend.data['brightness'], {
+          'output': 'eDP-1',
+          'percent': 50,
+          'gamma': 100,
+        });
+      },
+    );
+
+    test('a nonzero floor readback prevents gamma dimming', () async {
+      backend.close();
+      final dim = brightness({'gamma': 75});
+      final failure = expectLater(dim, throwsStateError);
+      settings.writes.single.result.complete({'percent': 1});
+      await failure;
+      expect(settings.writes, hasLength(1));
+      expect((backend.data['brightness'] as Map)['percent'], 1);
+    });
+
+    test('brightness signals only update the selected output', () async {
+      settings.updates.add((
+        topic: displayGammaTopic,
+        value: _gamma('eDP-1', 25),
+      ));
+      settings.updates.add((
+        topic: displayGammaTopic,
+        value: _gamma('DP-3', 40),
+      ));
+      settings.updates.add((topic: displayGammaTopic, value: {'gamma': 65}));
+      await _flush();
+      backend.close();
+      final dim = brightness(30);
+      expect(settings.writes.single.id, 'display-brightness:eDP-1');
+      settings.writes.single.result.complete({'percent': 30});
+      await dim;
+      expect(settings.writes, hasLength(1));
+      expect((backend.data['brightness'] as Map)['gamma'], 25);
     });
 
     test('volume coalescing keeps different device targets separate', () async {
@@ -611,20 +667,63 @@ void main() {
       tester,
       actions,
       overrides: {
-        'brightness': {'output': 'eDP-1', 'percent': 1, 'gamma': 75},
+        'brightness': {'output': 'eDP-1', 'percent': 0, 'gamma': 75},
         'osd': const BarOsdPreferences(gammaMin: 15).toJson(),
         'sound': _sound(130),
       },
     );
     final sliders = tester.widgetList<Slider>(find.byType(Slider)).toList();
-    expect(sliders[0].min, -84);
+    expect(sliders[0].min, -85);
+    expect(sliders[0].value, -25);
     expect(find.text('75%'), findsOneWidget);
-    sliders[0].onChanged!(-84);
+    sliders[0].onChanged!(-85);
     expect(actions.last['value'], {'gamma': 15});
     expect(sliders[1].max, 150);
     expect(find.text('130%'), findsOneWidget);
     sliders[1].onChanged!(150);
     expect(actions.last['value'], 150);
+  });
+
+  testWidgets('brightness slider keeps an actionable hardware minimum', (
+    tester,
+  ) async {
+    final actions = <Map<String, Object?>>[];
+    await showSidebar(
+      tester,
+      actions,
+      overrides: {
+        'brightness': {'output': 'eDP-1', 'percent': 0, 'gamma': 100},
+      },
+    );
+    final slider = tester.widget<Slider>(find.byType(Slider).first);
+    expect(slider.value, 0);
+    expect(find.text('Minimum backlight'), findsOneWidget);
+    slider.onChanged!(-.4);
+    expect(actions.last['value'], 0);
+    slider.onChanged!(-.5);
+    expect(actions.last['value'], {'gamma': 99});
+    slider.onChanged!(.5);
+    expect(actions.last['value'], 1);
+  });
+
+  testWidgets('software-only brightness keeps its full gamma range', (
+    tester,
+  ) async {
+    final actions = <Map<String, Object?>>[];
+    await showSidebar(
+      tester,
+      actions,
+      overrides: {
+        'brightness': {'output': 'DP-1', 'gamma': 75},
+      },
+    );
+    final slider = tester.widget<Slider>(find.byType(Slider).first);
+    expect(slider.value, 75);
+    expect(slider.min, 10);
+    expect(find.text('75%'), findsOneWidget);
+    slider.onChanged!(100);
+    expect(actions.last['target'], 'DP-1');
+    expect(actions.last['value'], {'gamma': 100});
   });
 
   testWidgets('volume slider honors the ceiling and shows zero as muted', (
@@ -819,6 +918,12 @@ void main() {
 
 Future<void> _flush() => Future<void>.delayed(Duration.zero);
 
+Map<String, dynamic> _gamma(String output, int gamma) => {
+  'output': output,
+  'gamma': gamma,
+  'available': true,
+};
+
 Map _preferences(Map data, String direction) =>
     (((data['sound'] as Map)['system'] as Map)['devices'] as List).firstWhere(
           (device) => device['direction'] == direction,
@@ -875,7 +980,7 @@ class _Settings extends SettingsClient {
       'system': {'profile': 'balanced'},
     },
     'display-brightness:eDP-1': {'output': 'eDP-1', 'percent': 50},
-    displayGammaSettingId: {'gamma': 100},
+    displayGammaSettingId('eDP-1'): _gamma('eDP-1', 100),
     barOsdSettingId: {
       'revision': 'a' * 64,
       'value': {

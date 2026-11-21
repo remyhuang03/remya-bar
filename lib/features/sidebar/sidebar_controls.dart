@@ -568,7 +568,9 @@ class _SidebarSliderState extends State<_SidebarSlider> {
     final onChange = widget.onChange;
     final threshold = widget.threshold;
     final software =
-        widget.zone == .software && threshold != null && percent < threshold;
+        widget.zone == .software &&
+        threshold != null &&
+        percent.round() < threshold;
     final boost = OsdAccents.boost(colors);
     final gamma = OsdAccents.gamma(colors);
     final active = muted
