@@ -66,7 +66,17 @@ class _KeyboardPanelState extends State<KeyboardPanel> {
     super.initState();
     _device = widget.data['device'] as Map<Object?, Object?>;
     _layout = widget.data['layout'] as Map<Object?, Object?>;
-    _poll = Timer.periodic(const Duration(seconds: 1), (_) => _refresh());
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) => _refresh());
+    unawaited(_refresh());
+  }
+
+  @override
+  void didUpdateWidget(KeyboardPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final refresh = widget.data['refresh'];
+    if (refresh != null && refresh != oldWidget.data['refresh']) {
+      unawaited(_refresh());
+    }
   }
 
   @override
@@ -152,13 +162,25 @@ class _KeyboardPanelState extends State<KeyboardPanel> {
   void _press(int code) {
     final modifiers = _modifiers.keys.fold(0, (mask, key) => mask | key.mask);
     final locks = (_caps ? 1 : 0) | (_device['num'] == true ? 2 : 0);
-    unawaited(_action('press', [code, modifiers, locks]));
+    final press = _action('press', [code, modifiers, locks]);
+    if (code == 58 || code == 69 || code == 70) {
+      unawaited(
+        press.then((_) {
+          if (mounted) return _refresh();
+        }),
+      );
+    } else {
+      unawaited(press);
+    }
     setState(() {
       _modifiers.removeWhere((_, state) => state.$1 == .latched);
     });
   }
 
-  void _toggleCaps() => setState(() => _capsOverride = !_caps);
+  void _toggleCaps() {
+    setState(() => _capsOverride = !_caps);
+    unawaited(_refresh());
+  }
 
   Future<void> _dock() async {
     final docked = !_docked;

@@ -88,7 +88,7 @@ class SidebarBackend extends ChangeNotifier {
       },
       onError: (Object error) => debugPrint('Sidebar Settings changes: $error'),
     );
-    _poll ??= Timer.periodic(const Duration(seconds: 4), (_) => _refresh());
+    _poll ??= Timer.periodic(const Duration(seconds: 30), (_) => _refresh());
     if (wasClosed) unawaited(_readOsdPreferences());
     unawaited(_refresh());
   }

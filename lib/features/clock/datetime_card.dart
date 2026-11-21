@@ -1,6 +1,8 @@
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../popups/bar_card_surface.dart';
+
 class DatetimeCard extends StatelessWidget {
   const DatetimeCard({super.key, required this.data, required this.onSettings});
 
@@ -19,25 +21,23 @@ class DatetimeCard extends StatelessWidget {
         millis.abs() < 8640000000000000 - Duration.millisecondsPerDay &&
         offset is int &&
         offset.abs() < Duration.secondsPerDay;
-    return Column(
-      crossAxisAlignment: .stretch,
-      spacing: 16,
-      children: [
-        Row(
-          mainAxisAlignment: .spaceBetween,
-          children: [
-            Text(
-              'Datetime',
-              style: _type(context, 24, colors.primaryFixed, .w700),
+    return BarCardSections(
+      header: Row(
+        mainAxisAlignment: .spaceBetween,
+        children: [
+          Text(
+            'Datetime',
+            style: _type(context, 24, colors.primaryFixed, .w700),
+          ),
+          if (onSettings != null)
+            IconButton.filledTonal(
+              tooltip: 'Date and time settings',
+              onPressed: onSettings,
+              icon: const Icon(Icons.settings_outlined),
             ),
-            if (onSettings != null)
-              IconButton.filledTonal(
-                tooltip: 'Date and time settings',
-                onPressed: onSettings,
-                icon: const Icon(Icons.settings_outlined),
-              ),
-          ],
-        ),
+        ],
+      ),
+      children: [
         if (valid)
           _CurrentDateTime(
             utc: DateTime.fromMillisecondsSinceEpoch(millis, isUtc: true),

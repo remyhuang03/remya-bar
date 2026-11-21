@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
+import '../popups/bar_card_surface.dart';
+
 import '../../widgets/percent_text.dart';
 import 'resource_style.dart';
 
@@ -45,41 +47,39 @@ class ResourceCard extends StatelessWidget {
             ].join(' · '),
           )
         : null;
-    return Column(
-      crossAxisAlignment: .stretch,
-      spacing: 16,
-      children: [
-        SizedBox(
-          height: 48,
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'System',
-                  style: theme.textTheme.titleLarge!.copyWith(
-                    fontSize: 24,
-                    fontWeight: .w700,
-                    color: colors.brightness == .dark
-                        ? colors.primaryFixed
-                        : colors.onSurface,
-                  ),
+    return BarCardSections(
+      header: SizedBox(
+        height: 48,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'System',
+                style: theme.textTheme.titleLarge!.copyWith(
+                  fontSize: 24,
+                  fontWeight: .w700,
+                  color: colors.brightness == .dark
+                      ? colors.primaryFixed
+                      : colors.onSurface,
                 ),
               ),
-              IconButton.filledTonal(
-                tooltip: 'Open system monitor',
-                onPressed: onOpenMonitor,
-                style: IconButton.styleFrom(
-                  fixedSize: const Size.square(40),
-                  padding: .zero,
-                ),
-                icon: ResourceGlyph(
-                  'monitor',
-                  color: colors.onSecondaryContainer,
-                ),
+            ),
+            IconButton.filledTonal(
+              tooltip: 'Open system monitor',
+              onPressed: onOpenMonitor,
+              style: IconButton.styleFrom(
+                fixedSize: const Size.square(40),
+                padding: .zero,
               ),
-            ],
-          ),
+              icon: ResourceGlyph(
+                'monitor',
+                color: colors.onSecondaryContainer,
+              ),
+            ),
+          ],
         ),
+      ),
+      children: [
         if (gpu == null)
           cpu
         else

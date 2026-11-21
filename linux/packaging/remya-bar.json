@@ -189,6 +189,7 @@
         ],
         "window-app-name": false,
         "media-marquee": false,
+        "click-cards": ["weather"],
         "center": 1
       },
       "schema": {
@@ -255,6 +256,14 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9
+          },
+          "click-cards": {
+            "type": "array",
+            "items": {
+              "enum": ["resources", "media", "clock", "ai-usage", "weather", "battery"]
+            },
+            "uniqueItems": true,
+            "maxItems": 6
           }
         },
         "required": [

@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../popups/bar_card_surface.dart';
+
 import '../../bar_theme.dart';
 import '../settings/bar_settings_entry.dart';
 import 'weather_backend.dart';
@@ -87,10 +89,18 @@ class _WeatherCardState extends State<WeatherCard> {
     final todayWeather = snapshot?.daily
         .where((day) => day.date == today)
         .firstOrNull;
-    return Column(
-      crossAxisAlignment: .stretch,
-      mainAxisSize: .min,
-      spacing: 16,
+    return BarCardSections(
+      header: _WeatherHeader(
+        title: snapshot == null ? 'Weather' : location!.name,
+        subtitle: snapshot == null ? location?.name : subtitle,
+        refresh: _weather.canRefresh
+            ? () => _weather.refresh(manual: true)
+            : null,
+        busy: _weather.refreshing,
+        settings:
+            widget.onSettings ??
+            () => unawaited(openBarSettings(page: 'weather')),
+      ),
       children: [
         if (stale)
           _WeatherBanner(
@@ -105,17 +115,7 @@ class _WeatherCardState extends State<WeatherCard> {
                 ? () => _weather.refresh(manual: true)
                 : null,
           ),
-        _WeatherHeader(
-          title: snapshot == null ? 'Weather' : location!.name,
-          subtitle: snapshot == null ? location?.name : subtitle,
-          refresh: _weather.canRefresh
-              ? () => _weather.refresh(manual: true)
-              : null,
-          busy: _weather.refreshing,
-          settings:
-              widget.onSettings ??
-              () => unawaited(openBarSettings(page: 'weather')),
-        ),
+
         if (snapshot == null)
           if (location == null)
             _WeatherMessage(

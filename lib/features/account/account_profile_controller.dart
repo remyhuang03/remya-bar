@@ -23,7 +23,7 @@ class AccountProfileController extends ChangeNotifier {
     }, onError: (Object error) => debugPrint('Account profile: $error'));
     unawaited(refresh());
     // Periodic readback catches changes made outside Core.
-    _timer = Timer.periodic(const Duration(minutes: 1), (_) => refresh());
+    _timer = Timer.periodic(const Duration(minutes: 15), (_) => refresh());
   }
 
   Future<void> refresh() async {

@@ -13,6 +13,9 @@ final StreamController<void> _themeChanges = StreamController<void>.broadcast(
   onCancel: () => barIconChannel.setMethodCallHandler(null),
 );
 
+/// Emits whenever GTK reports an icon theme change on [barIconChannel].
+Stream<void> get barIconThemeChanges => _themeChanges.stream;
+
 Future<Map<String, String>> lookupBarIconPaths(List<String> keys) async {
   final paths = await barIconChannel.invokeMapMethod<String, String>(
     'lookup',

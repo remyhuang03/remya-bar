@@ -54,6 +54,9 @@ class HyprlandStore extends ChangeNotifier {
   int snapshotReads = 0;
   int snapshotRevision = 0;
   DateTime? capturedAt;
+  final _layoutChanges = ValueNotifier<int>(0);
+
+  ValueListenable<int> get layoutChanges => _layoutChanges;
 
   void start() {
     _started = true;
@@ -115,6 +118,9 @@ class HyprlandStore extends ChangeNotifier {
             _focusedOutput = name;
             notifyListeners();
           }
+        }
+        if (update.name == 'activelayout') {
+          _layoutChanges.value++;
         }
         if (_affectsWorkspaces(update.name)) _scheduleRefresh();
     }
@@ -275,6 +281,7 @@ class HyprlandStore extends ChangeNotifier {
     _eventRefresh?.cancel();
     unawaited(_subscription?.cancel());
     _icons.dispose();
+    _layoutChanges.dispose();
     super.dispose();
   }
 }
@@ -393,6 +400,7 @@ class HyprlandBackend extends ChangeNotifier {
   }
 
   Future<String?> focusedOutput() => _store.focusedOutput();
+  ValueListenable<int> get layoutChanges => _store.layoutChanges;
   Future<void> setWorkspaceCount(int count) => _store.setWorkspaceCount(count);
   Future<void> refresh() => _store.refresh();
   void start() => _store.start();

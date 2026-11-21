@@ -2,6 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
+
+import '../popups/bar_card_surface.dart';
+
 import 'package:remya_ui/remya_ui.dart';
 
 import '../../widgets/percent_text.dart';
@@ -21,47 +24,45 @@ class AiUsageCard extends StatelessWidget {
     final updated = aiDate(data['updatedAt']);
     final age = updated == null ? null : now.difference(updated);
     final refresh = data['refreshing'] == true ? null : onRefresh;
-    return Column(
-      crossAxisAlignment: .stretch,
-      spacing: 16,
+    return BarCardSections(
+      header: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'AI Usage',
+              style: _style(
+                context,
+                24,
+                color: _headline(colors),
+                weight: .w700,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const .only(right: 4),
+            child: IconButton.filledTonal(
+              tooltip: 'Refresh',
+              onPressed: refresh,
+              icon: SvgPicture.asset(
+                'assets/icons/ai_usage/refresh.svg',
+                width: 18,
+                height: 18,
+                colorFilter: ColorFilter.mode(
+                  refresh == null
+                      ? colors.onSurface.withValues(alpha: .38)
+                      : colors.onSecondaryContainer,
+                  .srcIn,
+                ),
+              ),
+              style: IconButton.styleFrom(
+                fixedSize: const Size.square(40),
+                padding: .zero,
+              ),
+            ),
+          ),
+        ],
+      ),
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                'AI Usage',
-                style: _style(
-                  context,
-                  24,
-                  color: _headline(colors),
-                  weight: .w700,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const .only(right: 4),
-              child: IconButton.filledTonal(
-                tooltip: 'Refresh',
-                onPressed: refresh,
-                icon: SvgPicture.asset(
-                  'assets/icons/ai_usage/refresh.svg',
-                  width: 18,
-                  height: 18,
-                  colorFilter: ColorFilter.mode(
-                    refresh == null
-                        ? colors.onSurface.withValues(alpha: .38)
-                        : colors.onSecondaryContainer,
-                    .srcIn,
-                  ),
-                ),
-                style: IconButton.styleFrom(
-                  fixedSize: const Size.square(40),
-                  padding: .zero,
-                ),
-              ),
-            ),
-          ],
-        ),
         for (final (index, provider) in aiVisibleProviders(data, now).indexed)
           _ProviderTile(
             provider: provider,

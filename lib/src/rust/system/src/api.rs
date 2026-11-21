@@ -161,7 +161,7 @@ mod tests {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TrayItem {
     pub id: String,
     pub app_id: String,
@@ -189,6 +189,9 @@ pub struct TrayMenuEntry {
 }
 pub async fn tray_items() -> Result<Vec<TrayItem>, String> {
     crate::tray::items().await
+}
+pub async fn subscribe_tray(sink: crate::frb_generated::StreamSink<Vec<TrayItem>>) {
+    crate::tray::subscribe(sink).await;
 }
 pub async fn tray_action(id: String, action: String, delta: i32) -> Result<(), String> {
     crate::tray::action(&id, &action, delta).await

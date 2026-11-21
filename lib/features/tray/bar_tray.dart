@@ -19,9 +19,10 @@ const _menuKind = 'tray-menu';
 const _motion = Duration(milliseconds: 240);
 
 class BarTray extends StatefulWidget {
-  const BarTray({super.key, required this.popup, required this.backend});
+  const BarTray({super.key, this.popup, required this.backend});
 
-  final BarPopup popup;
+  /// Null for a display-only tray, such as a settings preview.
+  final BarPopup? popup;
   final TrayBackend backend;
 
   @override
@@ -128,7 +129,9 @@ class BarTrayState extends State<BarTray> {
   void _setExpanded(bool expanded) {
     if (_expanded == expanded) return;
     setState(() => _expanded = expanded);
-    _send(widget.popup.watchTrayOutside(expanded));
+    if (widget.popup case final popup?) {
+      _send(popup.watchTrayOutside(expanded));
+    }
   }
 
   void _send(Future<void> request) {
@@ -141,7 +144,7 @@ class BarTrayState extends State<BarTray> {
       ++_menuToken;
       _menuItem = null;
     });
-    _send(widget.popup.hide(kind: _menuKind));
+    if (widget.popup case final popup?) _send(popup.hide(kind: _menuKind));
   }
 
   Future<void> _openMenu(BuildContext context, api.TrayItem item) async {
@@ -221,7 +224,9 @@ class BarTrayState extends State<BarTray> {
       (200 * _textScale).clamp(200, 420),
       ((entries?.length ?? 2) * 36.0 + 98).clamp(64, 720),
     );
-    await (first ? widget.popup.show : widget.popup.update)(
+    final popup = widget.popup;
+    if (popup == null) return;
+    await (first ? popup.show : popup.update)(
       kind: _menuKind,
       anchor: _menuAnchor!,
       size: size,
@@ -298,9 +303,13 @@ class BarTrayState extends State<BarTray> {
     if (_visible) widget.backend.removeListener(_onTrayChanged);
     unawaited(_changes.cancel().whenComplete(_settings.close));
     if (_expanded) {
-      _send(widget.popup.watchTrayOutside(false));
+      if (widget.popup case final popup?) {
+        _send(popup.watchTrayOutside(false));
+      }
     }
-    if (_menuItem != null) _send(widget.popup.hide(kind: _menuKind));
+    if ((_menuItem, widget.popup) case (_?, final popup?)) {
+      _send(popup.hide(kind: _menuKind));
+    }
     super.dispose();
   }
 

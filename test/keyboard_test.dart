@@ -87,6 +87,40 @@ void main() {
     ]);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  testWidgets('refreshes on open and on refresh signal', (tester) async {
+    var deviceReads = 0;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(_channel, (
+      call,
+    ) async {
+      if (call.arguments['action'] == 'keyboard.device') deviceReads++;
+      return null;
+    });
+    final labels = List.generate(
+      4,
+      (layer) => List<String>.filled(128, '')..[30] = layer.isOdd ? 'A' : 'a',
+    );
+    Widget host(int? refresh) => MaterialApp(
+      home: KeyboardPanel(
+        channel: _channel,
+        data: {
+          'device': {
+            'config': {'group': 0, 'layout': 'us'},
+          },
+          'layout': {
+            'layouts': ['English (US)'],
+            'labels': labels,
+          },
+          'refresh': ?refresh,
+        },
+      ),
+    );
+    await tester.pumpWidget(host(null));
+    expect(deviceReads, 1);
+    await tester.pumpWidget(host(1));
+    expect(deviceReads, 2);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }
 
 Widget _keyboard() {

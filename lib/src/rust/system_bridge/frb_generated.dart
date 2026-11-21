@@ -73,7 +73,7 @@ class SystemRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 564573110;
+  int get rustContentHash => -504542853;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -145,6 +145,8 @@ abstract class SystemRustLibApi extends BaseApi {
   Stream<List<MediaPlayerSnapshot>> crateApiSubscribeMedia();
 
   Stream<NotificationCenter> crateApiSubscribeNotifications();
+
+  Stream<List<TrayItem>> crateApiSubscribeTray();
 
   Future<void> crateApiTrayAction({
     required String id,
@@ -773,6 +775,38 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       );
 
   @override
+  Stream<List<TrayItem>> crateApiSubscribeTray() {
+    final sink = RustStreamSink<List<TrayItem>>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_StreamSink_list_tray_item_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 19,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: null,
+          ),
+          constMeta: kCrateApiSubscribeTrayConstMeta,
+          argValues: [sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiSubscribeTrayConstMeta =>
+      const TaskConstMeta(debugName: "subscribe_tray", argNames: ["sink"]);
+
+  @override
   Future<void> crateApiTrayAction({
     required String id,
     required String action,
@@ -788,7 +822,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 20,
             port: port_,
           );
         },
@@ -817,7 +851,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 21,
             port: port_,
           );
         },
@@ -849,7 +883,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 22,
             port: port_,
           );
         },
@@ -883,7 +917,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 23,
             port: port_,
           );
         },
@@ -917,7 +951,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 24,
             port: port_,
           );
         },
@@ -953,7 +987,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 25,
             port: port_,
           );
         },
@@ -989,7 +1023,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1018,6 +1052,14 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   @protected
   RustStreamSink<List<MediaPlayerSnapshot>>
   dco_decode_StreamSink_list_media_player_snapshot_Sse(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
+  RustStreamSink<List<TrayItem>> dco_decode_StreamSink_list_tray_item_Sse(
+    dynamic raw,
+  ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     throw UnimplementedError();
   }
@@ -1700,6 +1742,14 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   @protected
   RustStreamSink<List<MediaPlayerSnapshot>>
   sse_decode_StreamSink_list_media_player_snapshot_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
+  RustStreamSink<List<TrayItem>> sse_decode_StreamSink_list_tray_item_Sse(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -2696,6 +2746,23 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       self.setupAndSerialize(
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_media_player_snapshot,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_StreamSink_list_tray_item_Sse(
+    RustStreamSink<List<TrayItem>> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_tray_item,
           decodeErrorData: sse_decode_AnyhowException,
         ),
       ),

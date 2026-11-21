@@ -27,7 +27,9 @@ class AiUsageBackend extends ChangeNotifier {
   Future<void>? _readingBar;
   bool _barDirty = false;
   bool _retryBar = false;
-  Timer? _timer;
+  bool _started = false;
+  Timer? _pollTimer;
+  Timer? _tickTimer;
   StreamSubscription<SettingsChange>? _changes;
   StreamSubscription<bool>? _availability;
   bool _disposed = false;
@@ -38,30 +40,59 @@ class AiUsageBackend extends ChangeNotifier {
   bool get visible => aiPillProviders(data, DateTime.now()).isNotEmpty;
 
   void start() {
-    if (_disposed || _timer != null) return;
+    if (_disposed || _started) return;
+    _started = true;
     _changes = _settings.changes.listen((change) {
       if (change.topic == aiRingSettingId) {
         unawaited(_readBar());
       } else if (change.topic == aiProvidersSettingId) {
         _polling.invalidate();
-        unawaited(_polling.read(false));
+        unawaited(_runScheduledPoll());
       }
     }, onError: (Object _) {});
     _availability = _settings.serviceAvailableChanges.listen((available) {
       if (!available) return;
       unawaited(_readBar());
       _polling.invalidate();
-      unawaited(_polling.read(false));
+      unawaited(_runScheduledPoll());
     }, onError: (Object _) {});
     unawaited(_readBar());
-    unawaited(_polling.read(false));
-    _timer = Timer.periodic(const Duration(seconds: 15), (_) {
-      unawaited(_polling.read(false));
-      if (_retryBar) unawaited(_readBar());
-      if (_publishedVisible || visible) {
-        tick++;
-        _publish();
-      }
+    unawaited(_runScheduledPoll());
+  }
+
+  Future<void> _runScheduledPoll() async {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    if (_disposed) return;
+    if (_retryBar) unawaited(_readBar());
+    try {
+      await _polling.read(false);
+    } finally {
+      _schedulePoll();
+    }
+  }
+
+  void _schedulePoll() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    if (_disposed || !_started) return;
+    _pollTimer = Timer(
+      _polling.nextDelay(),
+      () => unawaited(_runScheduledPoll()),
+    );
+  }
+
+  void _syncTickTimer() {
+    if (_disposed || !(_publishedVisible || visible)) {
+      _tickTimer?.cancel();
+      _tickTimer = null;
+      return;
+    }
+    _tickTimer ??= Timer(const Duration(minutes: 1), () {
+      _tickTimer = null;
+      if (_disposed || !(_publishedVisible || visible)) return;
+      tick++;
+      _publish();
     });
   }
 
@@ -100,6 +131,7 @@ class AiUsageBackend extends ChangeNotifier {
       'pinned': [...?(_bar?['pinned'] as List?)?.whereType<String>()],
     };
     _publishedVisible = visible;
+    _syncTickTimer();
     if (wasVisible || _publishedVisible) notifyListeners();
   }
 
@@ -111,6 +143,7 @@ class AiUsageBackend extends ChangeNotifier {
       await _polling.read(true);
     } finally {
       refreshing = false;
+      _schedulePoll();
       if (!_disposed) notifyListeners();
     }
   }
@@ -118,7 +151,8 @@ class AiUsageBackend extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    _timer?.cancel();
+    _pollTimer?.cancel();
+    _tickTimer?.cancel();
     unawaited(_changes?.cancel());
     unawaited(_availability?.cancel());
     if (_ownsSettings) unawaited(_settings.close());

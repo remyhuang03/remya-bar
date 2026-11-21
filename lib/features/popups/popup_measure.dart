@@ -37,12 +37,23 @@ class _PopupMeasureBox extends RenderProxyBox {
     markNeedsLayout();
   }
 
+  // Reports the child's natural height, then fits it into a window that the
+  // compositor clamped smaller, so the card body scrolls inside its shape.
   @override
   void performLayout() {
-    super.performLayout();
-    if (_height == size.height) return;
-    _height = size.height;
-    final height = size.height;
+    final child = this.child!;
+    final natural = constraints.copyWith(
+      minHeight: 0,
+      maxHeight: double.infinity,
+    );
+    child.layout(natural, parentUsesSize: true);
+    final height = child.size.height;
+    if (height > constraints.maxHeight) {
+      child.layout(constraints.copyWith(minHeight: 0), parentUsesSize: true);
+    }
+    size = constraints.constrain(child.size);
+    if (_height == height) return;
+    _height = height;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (attached) onHeight(height);
     });

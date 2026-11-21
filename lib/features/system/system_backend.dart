@@ -19,15 +19,17 @@ class SystemBackend extends ChangeNotifier {
   final SettingsClient _settings;
   late final _preferences = BarPreferences(client: _settings);
   Timer? _timer;
+  Duration? _timerInterval;
+  bool _started = false;
   bool _disposed = false;
   bool _refreshing = false;
   bool _refreshingPower = false;
-  final _soundReconcile = Stopwatch();
   bool _refreshingSound = false;
   bool _writingSound = false;
   int _soundRevision = 0;
   ({String output, double percent})? _queuedSound;
   bool _soundRefreshPending = false;
+  final _hardwareHolders = <Object>{};
   Map<String, Object?> mediaOutput = const {};
   List<api.MediaPlayerSnapshot> players = const [];
   StreamSubscription<List<api.MediaPlayerSnapshot>>? _mediaSubscription;
@@ -99,8 +101,33 @@ class SystemBackend extends ChangeNotifier {
     );
   }
 
+  bool get _hasResources =>
+      layout.groups.any((group) => group.contains('resources'));
+  bool get _hasBattery =>
+      layout.groups.any((group) => group.contains('battery'));
+
+  Duration? get _desiredHardwareInterval {
+    if (_hasResources || _hardwareHolders.isNotEmpty) {
+      return Duration(milliseconds: resources.refreshIntervalMs);
+    }
+    if (_hasBattery) return const Duration(seconds: 30);
+    return null;
+  }
+
+  /// Requests active hardware sampling while [owner] (e.g. a popup card) is open.
+  void holdHardware(Object owner) {
+    if (_disposed) return;
+    if (_hardwareHolders.add(owner) && _started) _syncHardwareTimer();
+  }
+
+  /// Releases a hardware sampling hold previously registered by [owner].
+  void releaseHardware(Object owner) {
+    if (_hardwareHolders.remove(owner) && _started) _syncHardwareTimer();
+  }
+
   void start() {
-    if (_disposed || _timer != null) return;
+    if (_disposed || _started) return;
+    _started = true;
     unawaited(
       _settings.ensureIdleDaemon().catchError((Object error) {
         if (!_disposed) debugPrint('hypridle startup: $error');
@@ -120,41 +147,50 @@ class SystemBackend extends ChangeNotifier {
           unawaited(_refreshQuickStatus());
         case 'power':
           unawaited(_refreshPower());
+          if (_hasBattery && !_hasResources && _hardwareHolders.isEmpty) {
+            unawaited(_refresh());
+          }
         case 'sound':
           if (change.value.containsKey('available') && !_writingSound) {
             _soundRevision++;
             _applySound(change.value);
           } else {
-            unawaited(_refreshSound(force: true));
+            unawaited(_refreshSound());
           }
       }
     }, onError: (Object error) => debugPrint('Settings changes: $error'));
     _serviceChanges = _settings.serviceAvailableChanges.listen((available) {
-      if (available) unawaited(_refreshResources());
+      if (!available) return;
+      unawaited(_refreshResources());
+      unawaited(_refreshSound());
     }, onError: (Object _) {});
     _subscribeMedia();
     // Settings values are read once, then follow its Changed signals.
     unawaited(_refreshPower());
+    unawaited(_refreshSound());
     unawaited(_refreshClockPreference());
     unawaited(_refreshLayout());
     unawaited(_refreshResources());
     unawaited(_refreshPosition());
     unawaited(_refreshQuickStatus());
-    _tick();
-    _restartTimer();
+    _syncHardwareTimer();
   }
 
-  void _tick() {
-    unawaited(_refresh());
-    unawaited(_refreshSound());
-  }
-
-  void _restartTimer() {
+  void _syncHardwareTimer() {
+    if (_disposed || !_started) return;
+    final desired = _desiredHardwareInterval;
+    if (desired == null) {
+      _timer?.cancel();
+      _timer = null;
+      _timerInterval = null;
+      return;
+    }
+    if (_timer != null && _timerInterval == desired) return;
+    final refreshNow = _timer == null || desired < _timerInterval!;
     _timer?.cancel();
-    _timer = Timer.periodic(
-      Duration(milliseconds: resources.refreshIntervalMs),
-      (_) => _tick(),
-    );
+    _timerInterval = desired;
+    _timer = Timer.periodic(desired, (_) => unawaited(_refresh()));
+    if (refreshNow) unawaited(_refresh());
   }
 
   Future<void> _refresh() async {
@@ -200,7 +236,10 @@ class SystemBackend extends ChangeNotifier {
     'layout',
     _preferences.readLayout,
     () => layout,
-    (next) => layout = next,
+    (next) {
+      layout = next;
+      _syncHardwareTimer();
+    },
   );
 
   Future<void> _refreshResources() => _refreshPreference(
@@ -208,11 +247,9 @@ class SystemBackend extends ChangeNotifier {
     _preferences.readResources,
     () => resources,
     (next) {
-      final intervalChanged =
-          next.refreshIntervalMs != resources.refreshIntervalMs;
       resources = next;
-      if (intervalChanged && _timer != null) _restartTimer();
-      unawaited(_refresh());
+      _syncHardwareTimer();
+      if (_timer != null) unawaited(_refresh());
     },
   );
 
@@ -414,10 +451,12 @@ class SystemBackend extends ChangeNotifier {
         else
           player,
     ];
+    final wasEmpty = players.isEmpty;
     final changed =
         !listEquals(players, effective) || clearError && mediaError != null;
     players = effective;
     if (clearError) mediaError = null;
+    if (wasEmpty && players.isNotEmpty) unawaited(_refreshSound());
     _playbackExpiry?.cancel();
     if (_pendingPlayback.isNotEmpty) {
       final expires = _pendingPlayback.values
@@ -430,20 +469,12 @@ class SystemBackend extends ChangeNotifier {
     if (changed) notifyListeners();
   }
 
-  Future<void> _refreshSound({bool force = false}) async {
-    if (_disposed || players.isEmpty) return;
+  Future<void> _refreshSound() async {
+    if (_disposed) return;
     if (_refreshingSound || _writingSound) {
-      if (force) _soundRefreshPending = true;
+      _soundRefreshPending = true;
       return;
     }
-    if (!force &&
-        _soundReconcile.isRunning &&
-        _soundReconcile.elapsed < const Duration(seconds: 5)) {
-      return;
-    }
-    _soundReconcile
-      ..reset()
-      ..start();
     _refreshingSound = true;
     final revision = _soundRevision;
     try {
@@ -456,7 +487,7 @@ class SystemBackend extends ChangeNotifier {
       _refreshingSound = false;
       if (_soundRefreshPending) {
         _soundRefreshPending = false;
-        unawaited(_refreshSound(force: true));
+        unawaited(_refreshSound());
       }
     }
   }
@@ -543,7 +574,7 @@ class SystemBackend extends ChangeNotifier {
         unawaited(_writeMediaVolume(queued).catchError((Object _) {}));
       } else if (_soundRefreshPending) {
         _soundRefreshPending = false;
-        await _refreshSound(force: true);
+        await _refreshSound();
       }
     }
   }
@@ -580,6 +611,7 @@ class SystemBackend extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _hardwareHolders.clear();
     _timer?.cancel();
     _resourcePillTimer?.cancel();
     _mediaRetry?.cancel();

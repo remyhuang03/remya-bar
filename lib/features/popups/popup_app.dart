@@ -16,7 +16,6 @@ import '../tasks/tasks_integration.dart';
 import '../tray/tray_menu_popup.dart';
 import '../workspaces/bar_workspaces.dart';
 import '../workspaces/workspace_overview.dart';
-import 'bar_card_surface.dart';
 import 'bar_detail_card.dart';
 import 'bar_popup.dart';
 import 'popup_measure.dart';
@@ -303,43 +302,40 @@ class _BarPopupAppState extends State<BarPopupApp>
                 ),
               ),
             )
-          : _CardScrollbar(
+          : _ScrollUnlessCard(
               card: _card,
-              pill: cardPill(details['pill']),
-              child: SingleChildScrollView(
-                child: PopupMeasure(
-                  generation: _contentGeneration,
-                  onHeight: (height) => _send(
-                    widget.channel.invokeMethod<void>('resize', {
-                      'height': height.ceil(),
-                    }),
-                  ),
-                  child:
-                      _kind == 'tooltip' ||
-                          _card ||
-                          _kind == notificationToastsKind
-                      ? _content(details, textScale)
-                      : TweenAnimationBuilder<double>(
-                          key: ValueKey(_opening),
-                          duration: const Duration(milliseconds: 150),
-                          tween: Tween(begin: 0, end: 1),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, progress, child) => Opacity(
-                            opacity: progress,
-                            child: Transform.scale(
-                              scale: .96 + .04 * progress,
-                              alignment: switch ((_kind, _bottom)) {
-                                ('tray-menu', false) => .topLeft,
-                                ('tray-menu', true) => .bottomLeft,
-                                (_, false) => .topCenter,
-                                (_, true) => .bottomCenter,
-                              },
-                              child: child,
-                            ),
-                          ),
-                          child: _content(details, textScale),
-                        ),
+              child: PopupMeasure(
+                generation: _contentGeneration,
+                onHeight: (height) => _send(
+                  widget.channel.invokeMethod<void>('resize', {
+                    'height': height.ceil(),
+                  }),
                 ),
+                child:
+                    _kind == 'tooltip' ||
+                        _card ||
+                        _kind == notificationToastsKind
+                    ? _content(details, textScale)
+                    : TweenAnimationBuilder<double>(
+                        key: ValueKey(_opening),
+                        duration: const Duration(milliseconds: 150),
+                        tween: Tween(begin: 0, end: 1),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, progress, child) => Opacity(
+                          opacity: progress,
+                          child: Transform.scale(
+                            scale: .96 + .04 * progress,
+                            alignment: switch ((_kind, _bottom)) {
+                              ('tray-menu', false) => .topLeft,
+                              ('tray-menu', true) => .bottomLeft,
+                              (_, false) => .topCenter,
+                              (_, true) => .bottomCenter,
+                            },
+                            child: child,
+                          ),
+                        ),
+                        child: _content(details, textScale),
+                      ),
               ),
             ),
     );
@@ -517,36 +513,16 @@ class _TooltipContent extends StatelessWidget {
   }
 }
 
-/// Keeps a card's scrollbar inside its rounded body instead of on the
-/// window edge, which includes the card's shadow margins.
-class _CardScrollbar extends StatelessWidget {
-  const _CardScrollbar({
-    required this.card,
-    required this.pill,
-    required this.child,
-  });
+/// Scrolls overlong popups as a whole. Cards instead keep their shape and
+/// header fixed and scroll only their body.
+class _ScrollUnlessCard extends StatelessWidget {
+  const _ScrollUnlessCard({required this.card, required this.child});
   final bool card;
-  final Rect? pill;
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => !card
-      ? child
-      : LayoutBuilder(
-          builder: (context, constraints) => MediaQuery(
-            // Material scrollbars inset their track by the MediaQuery padding.
-            data: MediaQuery.of(context).copyWith(
-              padding:
-                  BarCardSurface.insetsFor(
-                    pill,
-                    constraints.maxWidth,
-                    bottom: BarPopupScope.bottomOf(context),
-                  ) +
-                  const EdgeInsets.fromLTRB(0, 24, 4, 24),
-            ),
-            child: child,
-          ),
-        );
+  Widget build(BuildContext context) =>
+      card ? child : SingleChildScrollView(child: child);
 }
 
 class _PanelRoutes extends NavigatorObserver {

@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:material_ui/material_ui.dart';
 
+import '../popups/bar_card_surface.dart';
+
 import 'weather_backend.dart';
 import 'weather_controller.dart';
 
@@ -115,27 +117,24 @@ class _WeatherLocationPickerState extends State<WeatherLocationPicker> {
         color: colors.onSurfaceVariant,
       );
       final canSelect = _revision != null && !_weather.savingLocation;
-      return Column(
-        mainAxisSize: .min,
-        crossAxisAlignment: .stretch,
-        spacing: 16,
+      return BarCardSections(
+        header: Row(
+          spacing: 8,
+          children: [
+            Expanded(
+              child: Text(
+                _manual ? 'Enter coordinates' : 'Choose a location',
+                style: theme.textTheme.headlineSmall,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Close location picker',
+              onPressed: _weather.savingLocation ? null : widget.onClose,
+              icon: const Icon(Icons.close_rounded, size: 20),
+            ),
+          ],
+        ),
         children: [
-          Row(
-            spacing: 8,
-            children: [
-              Expanded(
-                child: Text(
-                  _manual ? 'Enter coordinates' : 'Choose a location',
-                  style: theme.textTheme.headlineSmall,
-                ),
-              ),
-              IconButton(
-                tooltip: 'Close location picker',
-                onPressed: _weather.savingLocation ? null : widget.onClose,
-                icon: const Icon(Icons.close_rounded, size: 20),
-              ),
-            ],
-          ),
           if (_saveError ?? (_revision == null ? _weather.locationError : null)
               case final error?)
             _PickerError(

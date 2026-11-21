@@ -14,6 +14,15 @@ class AiUsagePoll {
   int _failures = 0;
   int _generation = 0;
 
+  DateTime? get nextPoll => _nextPoll;
+
+  Duration nextDelay() {
+    final next = _nextPoll;
+    if (next == null) return Duration.zero;
+    final delay = next.difference(_now());
+    return delay > Duration.zero ? delay : Duration.zero;
+  }
+
   void invalidate() {
     _generation++;
     _nextPoll = null;

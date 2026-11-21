@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/bar_pill.dart';
@@ -48,11 +49,8 @@ class BarMedia extends StatelessWidget {
         marquee: marquee,
         title: player.title.isEmpty ? player.identity : player.title,
         playing: playing,
-        progress: switch ((player.positionSeconds, player.lengthSeconds)) {
-          (final position?, final length?) when length > 0 =>
-            (position / length).clamp(0, 1),
-          _ => 0,
-        },
+        position: player.positionSeconds,
+        length: player.lengthSeconds,
         onToggle:
             toggle != null &&
                 player.canControl &&
@@ -70,12 +68,13 @@ class BarMedia extends StatelessWidget {
   }
 }
 
-class _MediaPill extends StatelessWidget {
+class _MediaPill extends StatefulWidget {
   const _MediaPill({
     required this.title,
     required this.marquee,
     required this.playing,
-    required this.progress,
+    required this.position,
+    required this.length,
     required this.onToggle,
     required this.scheme,
     required this.card,
@@ -84,13 +83,79 @@ class _MediaPill extends StatelessWidget {
   final String title;
   final bool marquee;
   final bool playing;
-  final double progress;
+  final double? position;
+  final double? length;
   final VoidCallback? onToggle;
   final ColorScheme? scheme;
   final BarPillCard card;
 
   @override
+  State<_MediaPill> createState() => _MediaPillState();
+}
+
+class _MediaPillState extends State<_MediaPill> {
+  Timer? _progressTimer;
+  DateTime _capturedAt = DateTime.now();
+
+  bool get _interpolating =>
+      widget.playing &&
+      widget.position != null &&
+      widget.length != null &&
+      widget.length! > 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncTimer();
+  }
+
+  @override
+  void didUpdateWidget(_MediaPill oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.position != oldWidget.position ||
+        widget.playing != oldWidget.playing ||
+        widget.length != oldWidget.length ||
+        widget.title != oldWidget.title) {
+      _capturedAt = DateTime.now();
+      _syncTimer();
+    }
+  }
+
+  void _syncTimer() {
+    if (_interpolating) {
+      _progressTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      _progressTimer?.cancel();
+      _progressTimer = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _progressTimer?.cancel();
+    super.dispose();
+  }
+
+  double get _progress {
+    final position = widget.position;
+    final length = widget.length;
+    if (position == null || length == null || length <= 0) return 0;
+    final elapsed = _interpolating
+        ? DateTime.now().difference(_capturedAt).inMilliseconds / 1000
+        : 0.0;
+    return ((position + elapsed) / length).clamp(0.0, 1.0);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final title = widget.title;
+    final marquee = widget.marquee;
+    final playing = widget.playing;
+    final onToggle = widget.onToggle;
+    final scheme = widget.scheme;
+    final card = widget.card;
     final theme = Theme.of(context);
     final colors = scheme ?? theme.colorScheme;
     final duration = MediaQuery.disableAnimationsOf(context)
@@ -110,7 +175,7 @@ class _MediaPill extends StatelessWidget {
       expandedPadding: const .fromLTRB(8, 0, 14, 0),
       background: FractionallySizedBox(
         alignment: .centerLeft,
-        widthFactor: progress,
+        widthFactor: _progress,
         child: ColoredBox(
           color: playing
               ? colors.secondaryContainer
@@ -236,34 +301,31 @@ class _ScrollingTitle extends StatefulWidget {
   State<_ScrollingTitle> createState() => _ScrollingTitleState();
 }
 
-class _ScrollingTitleState extends State<_ScrollingTitle> {
+class _ScrollingTitleState extends State<_ScrollingTitle>
+    with SingleTickerProviderStateMixin {
   static const _gap = 32.0;
   static const _speed = 16.0;
   static const _frameInterval = Duration(milliseconds: 50);
-  final _elapsed = Stopwatch()..start();
   final _travel = ValueNotifier(0.0);
-  Timer? _timer;
+  late final Ticker _ticker = createTicker(_onTick);
+  Duration _lastTick = Duration.zero;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (TickerMode.valuesOf(context).enabled) {
-      // Measure time independently so a delayed tick doesn't slow the scroll.
-      _timer ??= Timer.periodic(_frameInterval, (_) {
-        _travel.value =
-            _speed *
-            _elapsed.elapsedMicroseconds /
-            Duration.microsecondsPerSecond;
-      });
-    } else {
-      _timer?.cancel();
-      _timer = null;
-    }
+  void initState() {
+    super.initState();
+    _ticker.start();
+  }
+
+  void _onTick(Duration elapsed) {
+    if (elapsed - _lastTick < _frameInterval) return;
+    _lastTick = elapsed;
+    _travel.value =
+        _speed * elapsed.inMicroseconds / Duration.microsecondsPerSecond;
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _ticker.dispose();
     _travel.dispose();
     super.dispose();
   }

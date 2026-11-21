@@ -89,115 +89,23 @@ class BarSettingsPage extends StatelessWidget {
     final layoutBusy = controller.busy('layout');
     void setLayout(BarLayout next) => controller.write('layout', next.toJson());
     return [
-      if (position != null)
-        SettingsGroup(
-          title: 'Bar',
-          children: [
-            settingTile(
-              'Position',
-              detail: 'Screen edge the bar sits on',
-              control: SettingChoice<String>(
-                selected: position,
-                choices: const {'top': 'Top', 'bottom': 'Bottom'},
-                onSelected: controller.busy('position')
-                    ? null
-                    : (value) => controller.write('position', value),
-              ),
-            ),
-          ],
-        ),
-      if (layout != null) ...[
-        const SettingsSectionTitle('Pills'),
-        SettingsSurface(
-          child: BarPillLayoutEditor(
-            layout: layout,
-            showSeconds: seconds ?? true,
-            onChanged: layoutBusy ? null : setLayout,
-          ),
-        ),
-        _PillOptions(
+      if (layout != null)
+        BarPillLayoutEditor(
           layout: layout,
-          showSeconds: seconds,
-          onSeconds: controller.busy('clock-seconds')
+          bottom: position == 'bottom',
+          onChanged: layoutBusy ? null : setLayout,
+          onBottom: position == null || controller.busy('position')
               ? null
-              : (value) => controller.write('clock-seconds', value),
-          onLayout: layoutBusy ? null : setLayout,
-        ),
-      ],
-      if (resources != null)
-        SettingsGroup(
-          title: 'System card',
-          children: [
-            settingTile(
-              'Refresh rate',
-              detail: 'How often system usage updates (minimum 0.5 s)',
-              control: SettingChoice<int>(
-                selected: resources.refreshIntervalMs,
-                choices: const {
-                  500: '0.5 s',
-                  1000: '1 s',
-                  2000: '2 s',
-                  5000: '5 s',
-                  10000: '10 s',
-                },
-                onSelected: controller.busy('resources')
-                    ? null
-                    : (value) => controller.write(
-                        'resources',
-                        resources.copyWith(refreshIntervalMs: value).toJson(),
-                      ),
-              ),
-            ),
-            settingTile(
-              'Time range',
-              detail: 'History shown in the system card graphs',
-              control: SettingChoice<int>(
-                selected: resources.timeRangeSeconds,
-                choices: const {
-                  30: '30 s',
-                  60: '1 min',
-                  120: '2 min',
-                  300: '5 min',
-                  600: '10 min',
-                },
-                onSelected: controller.busy('resources')
-                    ? null
-                    : (value) => controller.write(
-                        'resources',
-                        resources.copyWith(timeRangeSeconds: value).toJson(),
-                      ),
-              ),
-            ),
-          ],
-        ),
-      if (folded != null)
-        SettingsGroup(
-          title: 'App tray',
-          children: [
-            settingTile(
-              'Folded apps',
-              detail:
-                  'Folded apps are hidden from the bar. Fold an app from its '
-                  'tray menu, and pin it here to show it again.',
-            ),
-            if (folded.isEmpty)
-              settingTile('No folded apps')
-            else
-              for (final id in [...folded.cast<String>()]..sort())
-                settingTile(
-                  id,
-                  control: FilledButton.tonalIcon(
-                    onPressed: controller.busy('folded-apps')
-                        ? null
-                        : () => controller.write('folded-apps', [
-                            for (final other in folded)
-                              if (other != id) other,
-                          ]),
-                    icon: const Icon(Icons.push_pin_outlined),
-                    label: const Text('Pin to tray'),
-                  ),
-                ),
-          ],
+              : (bottom) =>
+                    controller.write('position', bottom ? 'bottom' : 'top'),
+          options: (id) => _pillOptions(
+            id,
+            layout: layout,
+            seconds: seconds,
+            resources: resources,
+            onLayout: layoutBusy ? null : setLayout,
+            folded: folded,
+          ),
         ),
       if (preview != null)
         SettingsGroup(
@@ -216,6 +124,168 @@ class BarSettingsPage extends StatelessWidget {
         ),
     ];
   }
+
+  /// Rows of the layout inspector for pill [id].
+  List<Widget> _pillOptions(
+    String id, {
+    required BarLayout layout,
+    required bool? seconds,
+    required BarResourcePreferences? resources,
+    required ValueChanged<BarLayout>? onLayout,
+    required List? folded,
+  }) => switch (id) {
+    'clock' when seconds != null => [
+      settingSwitch(
+        'Show seconds',
+        null,
+        seconds,
+        controller.busy('clock-seconds')
+            ? null
+            : (value) => controller.write('clock-seconds', value),
+      ),
+    ],
+    'workspaces' => [
+      settingTile(
+        'Workspaces shown',
+        control: SettingNumberField(
+          value: layout.workspaceCount,
+          min: 1,
+          max: 10,
+          onChanged: onLayout == null
+              ? null
+              : (count) => onLayout(layout.copyWith(workspaceCount: count)),
+        ),
+      ),
+    ],
+    'resources' => [
+      SettingRow(
+        id: 'Shown metrics',
+        label: Column(
+          crossAxisAlignment: .start,
+          spacing: 12,
+          children: [
+            const SettingLabel('Shown metrics'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final metric in barResourceIds)
+                  FilterChip(
+                    label: Text(barResourceNames[metric]!),
+                    selected: layout.resources.contains(metric),
+                    // At least one metric stays; hide the pill to remove it.
+                    onSelected:
+                        onLayout == null ||
+                            layout.resources.length == 1 &&
+                                layout.resources.contains(metric)
+                        ? null
+                        : (selected) => onLayout(
+                            layout.copyWith(
+                              resources: [
+                                for (final other in barResourceIds)
+                                  if (other == metric
+                                      ? selected
+                                      : layout.resources.contains(other))
+                                    other,
+                              ],
+                            ),
+                          ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      if (resources != null) ...[
+        settingTile(
+          'Refresh rate',
+          detail: 'How often usage updates',
+          control: SettingChoice<int>(
+            selected: resources.refreshIntervalMs,
+            choices: const {
+              500: '0.5 s',
+              1000: '1 s',
+              2000: '2 s',
+              5000: '5 s',
+              10000: '10 s',
+            },
+            onSelected: controller.busy('resources')
+                ? null
+                : (value) => controller.write(
+                    'resources',
+                    resources.copyWith(refreshIntervalMs: value).toJson(),
+                  ),
+          ),
+        ),
+        settingTile(
+          'Graph history',
+          detail: 'Time range of the System card graphs',
+          control: SettingChoice<int>(
+            selected: resources.timeRangeSeconds,
+            choices: const {
+              30: '30 s',
+              60: '1 min',
+              120: '2 min',
+              300: '5 min',
+              600: '10 min',
+            },
+            onSelected: controller.busy('resources')
+                ? null
+                : (value) => controller.write(
+                    'resources',
+                    resources.copyWith(timeRangeSeconds: value).toJson(),
+                  ),
+          ),
+        ),
+      ],
+    ],
+    'media' => [
+      settingSwitch(
+        'Scroll long titles',
+        'Experimental; uses more power',
+        layout.mediaMarquee,
+        onLayout == null
+            ? null
+            : (value) => onLayout(layout.copyWith(mediaMarquee: value)),
+      ),
+    ],
+    'window' => [
+      settingSwitch(
+        'Show app name',
+        null,
+        layout.windowAppName,
+        onLayout == null
+            ? null
+            : (value) => onLayout(layout.copyWith(windowAppName: value)),
+      ),
+    ],
+    'tray' when folded != null => [
+      settingTile(
+        'Folded apps',
+        detail:
+            'Folded apps are hidden from the bar. Fold an app from its '
+            'tray menu, and pin it here to show it again.',
+      ),
+      if (folded.isEmpty)
+        settingTile('No folded apps')
+      else
+        for (final id in [...folded.cast<String>()]..sort())
+          settingTile(
+            id,
+            control: FilledButton.tonalIcon(
+              onPressed: controller.busy('folded-apps')
+                  ? null
+                  : () => controller.write('folded-apps', [
+                      for (final other in folded)
+                        if (other != id) other,
+                    ]),
+              icon: const Icon(Icons.push_pin_outlined),
+              label: const Text('Pin to tray'),
+            ),
+          ),
+    ],
+    _ => const [],
+  };
 
   List<Widget> _osd() {
     final osd = _map('osd');
@@ -557,134 +627,6 @@ class BarSettingsPage extends StatelessWidget {
         ),
       ),
     ];
-  }
-}
-
-/// Options of visible pills; options of hidden pills are omitted.
-class _PillOptions extends StatelessWidget {
-  const _PillOptions({
-    required this.layout,
-    required this.showSeconds,
-    required this.onSeconds,
-    required this.onLayout,
-  });
-
-  final BarLayout layout;
-  final bool? showSeconds;
-  final ValueChanged<bool>? onSeconds;
-  final ValueChanged<BarLayout>? onLayout;
-
-  @override
-  Widget build(BuildContext context) {
-    final hidden = layout.hidden;
-    Widget sample(String pill) => BarPillSample(
-      id: pill,
-      layout: layout,
-      showSeconds: showSeconds ?? true,
-    );
-    Widget toggle(
-      String pill,
-      String title,
-      bool value,
-      ValueChanged<bool>? on,
-    ) => settingSwitch(
-      title,
-      barPillNames[pill],
-      value,
-      on,
-      leading: sample(pill),
-    );
-    final rows = [
-      if (!hidden.contains('clock') && showSeconds != null)
-        toggle('clock', 'Show seconds', showSeconds!, onSeconds),
-      if (!hidden.contains('workspaces'))
-        settingTile(
-          'Workspaces shown',
-          detail: barPillNames['workspaces'],
-          leading: sample('workspaces'),
-          control: SettingChoice<int>(
-            selected: layout.workspaceCount,
-            choices: {
-              for (var count = 1; count <= 10; count++) count: '$count',
-            },
-            onSelected: onLayout == null
-                ? null
-                : (count) => onLayout!(layout.copyWith(workspaceCount: count)),
-          ),
-        ),
-      if (!hidden.contains('resources'))
-        SettingRow(
-          id: 'Shown metrics',
-          label: Column(
-            crossAxisAlignment: .start,
-            spacing: 12,
-            children: [
-              Row(
-                mainAxisSize: .min,
-                spacing: 16,
-                children: [
-                  sample('resources'),
-                  Flexible(
-                    child: SettingLabel(
-                      'Shown metrics',
-                      description: barPillNames['resources'],
-                    ),
-                  ),
-                ],
-              ),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final id in barResourceIds)
-                    FilterChip(
-                      label: Text(barResourceNames[id]!),
-                      selected: layout.resources.contains(id),
-                      // At least one metric stays; hide the pill to remove it.
-                      onSelected:
-                          onLayout == null ||
-                              layout.resources.length == 1 &&
-                                  layout.resources.contains(id)
-                          ? null
-                          : (selected) => onLayout!(
-                              layout.copyWith(
-                                resources: [
-                                  for (final metric in barResourceIds)
-                                    if (metric == id
-                                        ? selected
-                                        : layout.resources.contains(metric))
-                                      metric,
-                                ],
-                              ),
-                            ),
-                    ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      if (!hidden.contains('media'))
-        toggle(
-          'media',
-          'Enable marquee (experimental, performance degrade)',
-          layout.mediaMarquee,
-          onLayout == null
-              ? null
-              : (value) => onLayout!(layout.copyWith(mediaMarquee: value)),
-        ),
-      if (!hidden.contains('window'))
-        toggle(
-          'window',
-          'Show app name',
-          layout.windowAppName,
-          onLayout == null
-              ? null
-              : (value) => onLayout!(layout.copyWith(windowAppName: value)),
-        ),
-    ];
-    return rows.isEmpty
-        ? const SizedBox.shrink()
-        : SettingsGroup(title: 'Pill options', children: rows);
   }
 }
 

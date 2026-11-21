@@ -22,6 +22,9 @@ class BarPopupScope extends InheritedWidget {
   static RemyaTheme themeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<BarPopupScope>()!.theme;
 
+  static RemyaTheme? maybeThemeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<BarPopupScope>()?.theme;
+
   static bool bottomOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<BarPopupScope>()?.bottom ??
       false;

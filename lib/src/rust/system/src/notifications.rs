@@ -257,6 +257,44 @@ fn scheduled(preferences: &NotificationPreferences, now: NaiveDateTime) -> bool 
     }
 }
 
+/// Duration until the next quiet-hours start or end boundary after `now`.
+fn next_schedule_boundary(
+    preferences: &NotificationPreferences,
+    now: NaiveDateTime,
+) -> Option<Duration> {
+    let (start, end) = (
+        preferences.schedule_start_minutes,
+        preferences.schedule_end_minutes,
+    );
+    if !preferences.schedule || start == end || preferences.schedule_days.is_empty() {
+        return None;
+    }
+    let start_time = chrono::NaiveTime::from_num_seconds_from_midnight_opt(start * 60, 0)?;
+    let end_time = chrono::NaiveTime::from_num_seconds_from_midnight_opt(end * 60, 0)?;
+    let today = now.date();
+    let mut earliest: Option<NaiveDateTime> = None;
+    for offset in -1..=7 {
+        let Some(date) = today.checked_add_signed(chrono::TimeDelta::days(offset)) else {
+            continue;
+        };
+        if !preferences
+            .schedule_days
+            .contains(&date.weekday().number_from_monday())
+        {
+            continue;
+        }
+        let start_dt = date.and_time(start_time);
+        let end_date = if start < end { date } else { date.succ_opt()? };
+        let end_dt = end_date.and_time(end_time);
+        for candidate in [start_dt, end_dt] {
+            if candidate > now && earliest.is_none_or(|best| candidate < best) {
+                earliest = Some(candidate);
+            }
+        }
+    }
+    earliest.and_then(|dt| (dt - now).to_std().ok())
+}
+
 /// Plays the requested sound or the theme's message sound through libcanberra.
 fn play_sound(file: Option<String>, name: Option<String>) {
     let mut command = tokio::process::Command::new("canberra-gtk-play");
@@ -830,12 +868,30 @@ async fn own_name(server: Server) -> Result<zbus::Connection, String> {
 
 async fn expire_popups() {
     loop {
-        let next = daemon().lock().await.next_deadline();
-        // The schedule is checked every 30 seconds even without popups.
-        let tick = Instant::now() + Duration::from_secs(30);
+        let (next_popup, next_schedule, next_retry) = {
+            let daemon = daemon().lock().await;
+            let now_instant = Instant::now();
+            (
+                daemon.next_deadline(),
+                next_schedule_boundary(&daemon.preferences, Local::now().naive_local())
+                    .map(|delay| now_instant + delay),
+                daemon
+                    .history
+                    .as_ref()
+                    .is_some_and(History::needs_retry)
+                    .then(|| now_instant + Duration::from_secs(30)),
+            )
+        };
+        let deadline = [next_popup, next_schedule, next_retry]
+            .into_iter()
+            .flatten()
+            .min();
         let wake = timers().notified();
-        let _ =
-            tokio::time::timeout_at(next.map_or(tick, |next| next.min(tick)).into(), wake).await;
+        if let Some(deadline) = deadline {
+            let _ = tokio::time::timeout_at(deadline.into(), wake).await;
+        } else {
+            wake.await;
+        }
         let mut daemon = daemon().lock().await;
         let before = daemon.center();
         let mut ended = daemon.refresh_quiet(Local::now().naive_local());
@@ -888,6 +944,7 @@ pub(crate) async fn configure(preferences: NotificationPreferences) {
     daemon.preferences_loaded = true;
     let ended = daemon.refresh_quiet(Local::now().naive_local());
     publish(&mut daemon);
+    timers().notify_one();
     let connection = daemon.connection.clone();
     drop(daemon);
     if tokio::time::timeout(Duration::from_secs(2), closed(connection, ended, EXPIRED))
@@ -910,6 +967,7 @@ pub(crate) async fn fullscreen(output: String, fullscreen: bool) {
     }
     let ended = daemon.refresh_quiet(Local::now().naive_local());
     publish(&mut daemon);
+    timers().notify_one();
     let connection = daemon.connection.clone();
     drop(daemon);
     closed(connection, ended, EXPIRED).await;
@@ -1366,5 +1424,49 @@ mod tests {
         daemon.next_id = u32::MAX;
         assert_eq!(daemon.allocate_id(), u32::MAX);
         assert_eq!(daemon.allocate_id(), 1);
+    }
+
+    #[test]
+    fn next_schedule_boundary_finds_start_and_end_or_none_when_disabled() {
+        let at = |s: &str| NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").unwrap();
+        let mut preferences = NotificationPreferences {
+            do_not_disturb: false,
+            fullscreen: false,
+            timeout_seconds: 5,
+            sounds: true,
+            schedule: false,
+            schedule_start_minutes: 22 * 60,
+            schedule_end_minutes: 7 * 60,
+            schedule_days: vec![1, 5], // Monday and Friday.
+            priority_calls: false,
+            priority_apps: vec![],
+        };
+        assert_eq!(
+            next_schedule_boundary(&preferences, at("2026-11-09 21:00:00")),
+            None
+        );
+
+        preferences.schedule = true;
+        // Monday 21:00 -> Monday 22:00 (1 hour).
+        assert_eq!(
+            next_schedule_boundary(&preferences, at("2026-11-09 21:00:00")),
+            Some(Duration::from_secs(3600))
+        );
+        // Monday 23:30 -> Tuesday 07:00 (7.5 hours).
+        assert_eq!(
+            next_schedule_boundary(&preferences, at("2026-11-09 23:30:00")),
+            Some(Duration::from_secs(7 * 3600 + 1800))
+        );
+        // Tuesday 07:00 (end of Monday's overnight period) -> Friday 22:00.
+        assert_eq!(
+            next_schedule_boundary(&preferences, at("2026-11-10 07:00:00")),
+            Some(Duration::from_secs((3 * 24 + 15) * 3600))
+        );
+        // Equal start and end means no schedule boundaries.
+        preferences.schedule_end_minutes = preferences.schedule_start_minutes;
+        assert_eq!(
+            next_schedule_boundary(&preferences, at("2026-11-09 21:00:00")),
+            None
+        );
     }
 }

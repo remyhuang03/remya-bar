@@ -129,7 +129,12 @@ supplies its theme. App services stay alive when the last output is removed.
 
 Detail cards share one per-output slot. Native injects `data.pill: [x, width]`
 in popup coordinates. Flutter draws the neck and animated shape while resize
-measures full content, including neck and shadows. Media `cardSeed` makes pill
+measures full content, including neck and shadows. When the monitor clamps a
+card's height, the neck and header stay fixed and only the body below the
+header scrolls. A pill wider than its card tapers into the body with rounded
+curves. Layout `click-cards` lists card pills that open on click; the others
+open on hover. The settings Layout page renders the real pills through the
+application's shared services, without popups or pointer input. Media `cardSeed` makes pill
 and card use the same artwork palette. Sidebar/tray openings hide and block cards.
 Cards use an OVERLAY surface with ON_DEMAND focus; Escape hides immediately.
 
@@ -164,8 +169,9 @@ History and the next ID commit transactionally to
 Transient entries stay in memory. Restored entries never replay popups, sounds
 or actions belonging to the old daemon. Tests use isolated state roots and buses.
 The application applies Core's notification preferences to Rust in order.
-All outputs observe the same applied Do Not Disturb setting. Rust checks schedules
-every 30 seconds. Critical, priority-call and priority-app
+All outputs observe the same applied Do Not Disturb setting. Rust sleeps until
+the next schedule boundary, recomputed when preferences change. Critical,
+priority-call and priority-app
 notifications bypass suppression. Sound uses `canberra-gtk-play` unless disabled
 or suppressed; replacements stay silent.
 
@@ -175,8 +181,13 @@ the popup stack until empty, preventing duplicates across racing outputs; it hid
 the stack while that output's notification panel is open.
 
 The tray registers a StatusNotifierHost and supplies a watcher only if absent.
-Visible tray widgets share one item poll and icon lookup. Identical snapshots
-retain their icons and skip UI updates. Passive or disconnected items hide.
+Visible tray widgets share one D-Bus signal subscription (`StatusNotifierItem`,
+`StatusNotifierWatcher` and `NameOwnerChanged`, debounced 50 ms with a 60 s
+full-resync safety net) and icon lookup. Rust re-reads only items whose sender
+and path matched (or refreshes the item list on watcher or owner changes) and
+emits only changed snapshots; Dart re-runs icon lookup only when item icon
+names or paths change or the GTK icon theme invalidates. Passive or
+disconnected items hide.
 Icons validate ARGB or resolve through GTK. Menus load one level at a time with
 AboutToShow/GetLayout and revalidate enabled leaf actions before Event. Activation,
 secondary activation and scrolling target the current D-Bus owner. Without a
@@ -227,7 +238,8 @@ arguments, `--record` or `--color-picker`, using debug or installed resolution.
 The Clipboard tile opens the installed `remya_launcher --clipboard` and closes
 the sidebar once the command starts. Launcher owns clipboard history and policy.
 
-MPRIS signals coalesce for 25 ms; position refreshes each second while playing.
+MPRIS signals coalesce for 25 ms; Dart interpolates playback position while
+playing instead of re-reading every second.
 Player selection is shared across outputs; reconnects use bounded backoff and
 unchanged snapshots are suppressed. Optimistic playback expires after two seconds
 or rolls back on failure. Seek validates capabilities, unique owner and track ID.
@@ -335,18 +347,20 @@ Battery and resource samples are shared across views. Only system batteries coun
 Low charge takes precedence over energy-saver color. Battery policy comes from Core.
 
 CPU, memory and network counters are sampled on the configured System card
-refresh interval (`500` ms minimum, `1000` ms default) and binned over the
-configured history time range (`30`–`600` seconds, `60` seconds default) via
-`hardware_snapshot(refresh_interval_ms, time_range_seconds)`. Each sample also
-requests CPU frequency, temperature and GPU readings from a separate blocking
-worker. All views share the readings and retained history (up to 600 seconds),
-including while the resource card is closed. The resource pill updates every
-three seconds.
+refresh interval (`500` ms minimum, `1000` ms default) while `resources` is in
+the layout or a System/Battery card is open, or every 30 seconds while only
+`battery` is in the layout (plus immediate refreshes on Core `power` changes),
+and binned over the configured history time range (`30`–`600` seconds, `60`
+seconds default) via `hardware_snapshot(refresh_interval_ms, time_range_seconds)`.
+Each sample also requests CPU frequency, temperature and GPU readings from a
+separate blocking worker. All views share the readings and retained history (up
+to 600 seconds), including while the resource card is closed. The resource pill
+updates every three seconds.
 GPU history only records measured utilization and shows gaps for unsampled
 intervals. CPU topology, GPU identity and sensor paths are cached with periodic
 rediscovery. NVIDIA uses one shared NVML library. Missing sensors remain unknown
 and network totals mark partial daily coverage. Core-backed quick status follows
-Changed signals. Account has a one-minute fallback for edits made outside Core.
+Changed signals. Account has a 15-minute fallback for edits made outside Core.
 
 The keyboard uses a non-focusable virtual-keyboard overlay, following Hyprland's
 layout group and Caps Lock. Native compiles XKB and sends evdev events through

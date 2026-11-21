@@ -381,6 +381,22 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     );
   }
 
+  void _onKeyboardLayout() {
+    final hyprland = widget.hyprland;
+    if (!mounted || hyprland == null || !BarPopup.keyboardOpen.value) return;
+    unawaited(
+      _popup
+          .update(
+            kind: keyboardKind,
+            anchor: _popupAnchor,
+            size: keyboardSize,
+            data: {'refresh': hyprland.layoutChanges.value},
+            theme: widget.preferences.theme,
+          )
+          .catchError((Object error) => debugPrint('Keyboard layout: $error')),
+    );
+  }
+
   void _updatePopupThemes() {
     _updateSidebar();
     _updateNotifications();
@@ -409,6 +425,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     }
     if (widget.hyprland case final hyprland?) {
       hyprland.addListener(_onOutputState);
+      hyprland.layoutChanges.addListener(_onKeyboardLayout);
       _onOutputState();
     }
     widget.account?.addListener(_updateSidebar);
@@ -602,6 +619,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     widget.osd?.removeListener(_syncOsd);
     widget.notifications?.releaseOutput(this);
     widget.hyprland?.removeListener(_onOutputState);
+    widget.hyprland?.layoutChanges.removeListener(_onKeyboardLayout);
+    widget.system?.releaseHardware(this);
     _sidebar?.dispose();
     unawaited(_keyboardDevice.close());
     widget.account?.removeListener(_updateSidebar);

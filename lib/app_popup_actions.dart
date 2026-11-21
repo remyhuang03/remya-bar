@@ -25,8 +25,14 @@ extension _PopupActions on _RemyaBarAppState {
       }
       if (open) {
         _popup.openCard.value = kind;
+        if (kind == 'resources' || kind == 'battery') {
+          widget.system?.holdHardware(this);
+        }
       } else if (_popup.openCard.value == kind) {
         _popup.openCard.value = null;
+        if (kind == 'resources' || kind == 'battery') {
+          widget.system?.releaseHardware(this);
+        }
       }
     } else if (action == 'keyboard.visibility' && args['open'] is bool) {
       BarPopup.setKeyboardVisibility(args['open'] as bool);

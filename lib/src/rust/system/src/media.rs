@@ -256,29 +256,15 @@ async fn watch_connection(
     loop {
         let players = read_players(true).await?;
         *backoff = 1;
-        let playing = players
-            .iter()
-            .any(|player| player.playback_status == "Playing");
         if replace_changed(&mut previous, players)
             && sink.add(previous.as_ref().unwrap().clone()).is_err()
         {
             return Ok(());
         }
-        let signal = async {
-            match future::select(Box::pin(signals.next()), Box::pin(changes.changed())).await {
-                future::Either::Left((Some(Ok(_)), _)) | future::Either::Right((Ok(()), _)) => {
-                    Ok(())
-                }
-                future::Either::Left((Some(Err(error)), _)) => Err(error.to_string()),
-                _ => Err("MPRIS signal stream closed".into()),
-            }
-        };
-        if playing {
-            if let Ok(result) = tokio::time::timeout(Duration::from_secs(1), signal).await {
-                result?;
-            }
-        } else {
-            signal.await?;
+        match future::select(Box::pin(signals.next()), Box::pin(changes.changed())).await {
+            future::Either::Left((Some(Ok(_)), _)) | future::Either::Right((Ok(()), _)) => {}
+            future::Either::Left((Some(Err(error)), _)) => return Err(error.to_string()),
+            _ => return Err("MPRIS signal stream closed".into()),
         }
         tokio::time::sleep(Duration::from_millis(25)).await;
         loop {

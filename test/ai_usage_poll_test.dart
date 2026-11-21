@@ -79,4 +79,24 @@ void main() {
     await poll.read(false);
     expect(calls, 2);
   });
+
+  test('nextDelay tracks due time across success, failure backoff, and invalidation', () async {
+    var now = DateTime.utc(2026, 1, 1);
+    var succeed = false;
+    final poll = AiUsagePoll((_) async => succeed, now: () => now);
+    expect(poll.nextDelay(), Duration.zero);
+
+    await poll.read(false);
+    expect(poll.nextDelay(), const Duration(seconds: 5));
+    now = now.add(const Duration(seconds: 2));
+    expect(poll.nextDelay(), const Duration(seconds: 3));
+
+    succeed = true;
+    now = now.add(const Duration(seconds: 3));
+    await poll.read(false);
+    expect(poll.nextDelay(), const Duration(minutes: 5));
+
+    poll.invalidate();
+    expect(poll.nextDelay(), Duration.zero);
+  });
 }

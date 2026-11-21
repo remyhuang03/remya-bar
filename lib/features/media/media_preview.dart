@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
@@ -7,6 +6,7 @@ import '../../widgets/percent_text.dart';
 import '../popups/bar_card_surface.dart';
 import '../popups/bar_popup.dart';
 import 'media_artwork.dart';
+import 'media_slider.dart';
 
 class MediaPreview extends StatelessWidget {
   const MediaPreview({
@@ -66,11 +66,9 @@ class MediaPreview extends StatelessWidget {
             pill: pill,
             emergence: emergence,
             styleVariant: styleVariant,
-            child: Column(
-              crossAxisAlignment: .stretch,
-              spacing: 16,
+            child: BarCardSections(
+              header: _PlayerHeader(players: players, onAction: onAction),
               children: [
-                _PlayerHeader(players: players, onAction: onAction),
                 if (error.isNotEmpty)
                   Text(error, style: TextStyle(color: theme.colorScheme.error)),
                 if (player == null && error.isEmpty)
@@ -386,35 +384,89 @@ class _Track extends StatelessWidget {
   }
 }
 
-class _PlaybackProgress extends StatelessWidget {
+class _PlaybackProgress extends StatefulWidget {
   const _PlaybackProgress({required this.player, required this.onAction});
 
   final Map player;
   final _Action onAction;
 
   @override
+  State<_PlaybackProgress> createState() => _PlaybackProgressState();
+}
+
+class _PlaybackProgressState extends State<_PlaybackProgress> {
+  Timer? _timer;
+  DateTime _capturedAt = DateTime.now();
+
+  double? get _basePosition => _number(widget.player['positionSeconds']);
+  double? get _length => _number(widget.player['lengthSeconds']);
+  bool get _playing => widget.player['status'] == 'Playing';
+  bool get _known => _basePosition != null && _length != null && _length! > 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncTimer();
+  }
+
+  @override
+  void didUpdateWidget(_PlaybackProgress oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_number(widget.player['positionSeconds']) !=
+            _number(oldWidget.player['positionSeconds']) ||
+        widget.player['status'] != oldWidget.player['status'] ||
+        widget.player['seekToken'] != oldWidget.player['seekToken'] ||
+        widget.player['name'] != oldWidget.player['name']) {
+      _capturedAt = DateTime.now();
+      _syncTimer();
+    }
+  }
+
+  void _syncTimer() {
+    if (_playing && _known) {
+      _timer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      _timer?.cancel();
+      _timer = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final position = _number(player['positionSeconds']);
-    final length = _number(player['lengthSeconds']);
-    final track = _text(player['seekToken']);
-    final known = position != null && length != null && length > 0;
+    final basePosition = _basePosition;
+    final length = _length;
+    final track = _text(widget.player['seekToken']);
+    final known = _known;
+    final position = known && _playing
+        ? (basePosition! +
+                  DateTime.now().difference(_capturedAt).inMilliseconds / 1000)
+              .clamp(0.0, length!)
+        : basePosition;
     final seekable = known && track.isNotEmpty;
     return Column(
       spacing: 6,
       children: [
         if (known)
-          _MediaSlider(
-            key: ValueKey((player['name'], track)),
+          MediaSlider(
+            key: ValueKey((widget.player['name'], track)),
             label: 'Playback position',
-            value: (position / length).clamp(0, 1),
-            wave: player['status'] == 'Playing',
+            value: (position! / length!).clamp(0, 1),
+            wave: _playing,
             seek: true,
             displayValue: (value) => _time(value * length),
             onCommit: seekable
-                ? (value) => onAction({
+                ? (value) => widget.onAction({
                     'action': 'media.seek',
-                    'player': player['name'],
+                    'player': widget.player['name'],
                     'track': track,
                     'seconds': value * length,
                   })
@@ -499,7 +551,7 @@ class _OutputVolume extends StatelessWidget {
             ),
             Expanded(
               flex: 2,
-              child: _MediaSlider(
+              child: MediaSlider(
                 key: ValueKey(name),
                 label: 'Output volume',
                 live: true,
@@ -529,223 +581,6 @@ class _OutputVolume extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _MediaSlider extends StatefulWidget {
-  const _MediaSlider({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.displayValue,
-    required this.onCommit,
-    this.seek = false,
-    this.wave = false,
-    this.live = false,
-  });
-
-  final String label;
-  final double value;
-  final String Function(double) displayValue;
-  final ValueChanged<double>? onCommit;
-  final bool seek;
-  final bool wave;
-  final bool live;
-
-  @override
-  State<_MediaSlider> createState() => _MediaSliderState();
-}
-
-class _MediaSliderState extends State<_MediaSlider> {
-  double? _drag;
-  ({double value, DateTime committed})? _pending;
-  Timer? _pendingTimer;
-  Timer? _liveTimer;
-  double? _trailing;
-
-  @override
-  void didUpdateWidget(covariant _MediaSlider oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (_pending case final pending?) {
-      if ((widget.value - pending.value).abs() <= 0.005 ||
-          DateTime.now().difference(pending.committed) >=
-              const Duration(milliseconds: 1500)) {
-        _pending = null;
-        _pendingTimer?.cancel();
-      }
-    }
-  }
-
-  void _changed(double value) {
-    setState(() => _drag = value);
-    if (!widget.live) return;
-    if (_liveTimer != null) {
-      _trailing = value;
-      return;
-    }
-    widget.onCommit?.call(value);
-    _liveTimer = Timer(const Duration(milliseconds: 60), _sendTrailing);
-  }
-
-  void _sendTrailing() {
-    _liveTimer = null;
-    final value = _trailing;
-    _trailing = null;
-    if (value == null) return;
-    widget.onCommit?.call(value);
-    _liveTimer = Timer(const Duration(milliseconds: 60), _sendTrailing);
-  }
-
-  void _committed(double value) {
-    _liveTimer?.cancel();
-    _liveTimer = null;
-    _trailing = null;
-    _pendingTimer?.cancel();
-    setState(() {
-      _drag = null;
-      _pending = (value: value, committed: DateTime.now());
-    });
-    _pendingTimer = Timer(const Duration(milliseconds: 1500), () {
-      setState(() => _pending = null);
-    });
-    widget.onCommit?.call(value);
-  }
-
-  @override
-  void dispose() {
-    _pendingTimer?.cancel();
-    _liveTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final seek = widget.seek;
-    final active = seek && Theme.of(context).brightness == .light
-        ? colors.onPrimaryContainer
-        : colors.primary;
-    final inactive = seek
-        ? Color.alphaBlend(
-            colors.onPrimary.withValues(alpha: 0.65),
-            colors.primaryContainer,
-          )
-        : colors.secondaryContainer;
-    return Semantics(
-      label: widget.label,
-      child: SizedBox(
-        height: seek ? 24 : 32,
-        child: SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: seek ? 8 : 16,
-            trackGap: seek ? 3 : 6,
-            padding: const .symmetric(horizontal: 2),
-            trackShape: seek
-                ? _SeekTrack(wave: widget.wave)
-                : const GappedSliderTrackShape(),
-            thumbShape: const HandleThumbShape(),
-            thumbSize: .all(Size(4, seek ? 24 : 32)),
-            thumbColor: seek ? colors.onPrimaryContainer : active,
-            activeTrackColor: active,
-            inactiveTrackColor: inactive,
-            disabledActiveTrackColor: widget.seek ? active : colors.outline,
-            disabledInactiveTrackColor: inactive,
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-          ),
-          child: Slider(
-            value: widget.onCommit == null
-                ? widget.value
-                : _drag ?? _pending?.value ?? widget.value,
-            semanticFormatterCallback: widget.displayValue,
-            onChanged: widget.onCommit == null ? null : _changed,
-            onChangeEnd: widget.onCommit == null ? null : _committed,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SeekTrack extends GappedSliderTrackShape {
-  const _SeekTrack({required this.wave});
-
-  final bool wave;
-
-  @override
-  void paint(
-    PaintingContext context,
-    Offset offset, {
-    required RenderBox parentBox,
-    required SliderThemeData sliderTheme,
-    required Animation<double> enableAnimation,
-    required TextDirection textDirection,
-    required Offset thumbCenter,
-    Offset? secondaryOffset,
-    bool isDiscrete = false,
-    bool isEnabled = false,
-    double additionalActiveTrackHeight = 2,
-  }) {
-    if (!wave) {
-      super.paint(
-        context,
-        offset,
-        parentBox: parentBox,
-        sliderTheme: sliderTheme,
-        enableAnimation: enableAnimation,
-        textDirection: textDirection,
-        thumbCenter: thumbCenter,
-        isEnabled: isEnabled,
-      );
-      return;
-    }
-    final rect = getPreferredRect(
-      parentBox: parentBox,
-      offset: offset,
-      sliderTheme: sliderTheme,
-      isEnabled: isEnabled,
-    );
-    final rtl = textDirection == .rtl;
-    final width = rect.width;
-    final progress =
-        (rtl ? rect.right - thumbCenter.dx : thumbCenter.dx - rect.left).clamp(
-          0.0,
-          width,
-        );
-    final canvas = context.canvas
-      ..save()
-      ..translate(rtl ? rect.right : rect.left, rect.center.dy)
-      ..scale(rtl ? -1 : 1);
-    final start = progress + 3;
-    if (start < width) {
-      canvas.drawRRect(
-        RRect.fromLTRBR(start, -4, width, 4, const Radius.circular(4)),
-        Paint()..color = sliderTheme.inactiveTrackColor!,
-      );
-      if (start < width - 4) {
-        canvas.drawCircle(
-          Offset(width - 4, 0),
-          2,
-          Paint()..color = sliderTheme.thumbColor!,
-        );
-      }
-    }
-    final end = progress - 3;
-    if (end > 0) {
-      final path = Path()..moveTo(0, 0);
-      for (var x = 1.0; x < end; x++) {
-        path.lineTo(x, math.sin(x * math.pi / 20) * 3);
-      }
-      path.lineTo(end, math.sin(end * math.pi / 20) * 3);
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = sliderTheme.activeTrackColor!
-          ..style = .stroke
-          ..strokeWidth = 8
-          ..strokeCap = .round,
-      );
-    }
-    canvas.restore();
   }
 }
 

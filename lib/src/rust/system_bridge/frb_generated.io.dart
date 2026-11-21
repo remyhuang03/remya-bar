@@ -30,6 +30,11 @@ abstract class SystemRustLibApiImplPlatform
   dco_decode_StreamSink_list_media_player_snapshot_Sse(dynamic raw);
 
   @protected
+  RustStreamSink<List<TrayItem>> dco_decode_StreamSink_list_tray_item_Sse(
+    dynamic raw,
+  );
+
+  @protected
   RustStreamSink<NotificationCenter>
   dco_decode_StreamSink_notification_center_Sse(dynamic raw);
 
@@ -250,6 +255,11 @@ abstract class SystemRustLibApiImplPlatform
   @protected
   RustStreamSink<List<MediaPlayerSnapshot>>
   sse_decode_StreamSink_list_media_player_snapshot_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<List<TrayItem>> sse_decode_StreamSink_list_tray_item_Sse(
     SseDeserializer deserializer,
   );
 
@@ -525,6 +535,12 @@ abstract class SystemRustLibApiImplPlatform
   @protected
   void sse_encode_StreamSink_list_media_player_snapshot_Sse(
     RustStreamSink<List<MediaPlayerSnapshot>> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_list_tray_item_Sse(
+    RustStreamSink<List<TrayItem>> self,
     SseSerializer serializer,
   );
 

@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../popups/bar_card_surface.dart';
+
 import '../settings/remya_settings_installed.dart';
 
 import '../../widgets/percent_text.dart';
@@ -19,33 +21,31 @@ class BatteryCard extends StatelessWidget {
     final health = _number(data['healthPercent']);
     final cycles = data['cycleCount'];
     final present = data['present'];
-    return Column(
-      crossAxisAlignment: .stretch,
-      spacing: 16,
-      children: [
-        Row(
-          spacing: 8,
-          children: [
-            Expanded(
-              child: Text(
-                'Battery',
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  height: 1.25,
-                  fontWeight: .bold,
-                  color: _emphasis(theme),
-                ),
+    return BarCardSections(
+      header: Row(
+        spacing: 8,
+        children: [
+          Expanded(
+            child: Text(
+              'Battery',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                height: 1.25,
+                fontWeight: .bold,
+                color: _emphasis(theme),
               ),
             ),
-            if (remyaSettingsInstalled())
-              IconButton.filledTonal(
-                tooltip: 'Power settings',
-                onPressed: data['pending'] == true
-                    ? null
-                    : () => onAction(const {'action': 'battery.settings'}),
-                icon: const Icon(Icons.settings_outlined),
-              ),
-          ],
-        ),
+          ),
+          if (remyaSettingsInstalled())
+            IconButton.filledTonal(
+              tooltip: 'Power settings',
+              onPressed: data['pending'] == true
+                  ? null
+                  : () => onAction(const {'action': 'battery.settings'}),
+              icon: const Icon(Icons.settings_outlined),
+            ),
+        ],
+      ),
+      children: [
         if (data['error'] case final String error)
           Text(
             error,

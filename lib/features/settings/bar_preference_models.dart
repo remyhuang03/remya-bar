@@ -17,6 +17,17 @@ const barPillIds = [
   'sidebar',
 ];
 
+/// Pills that open a detail card. Each opens it on hover or on click; the
+/// notification and quick settings pills toggle their own panels instead.
+const barCardPillIds = [
+  'resources',
+  'media',
+  'clock',
+  'ai-usage',
+  'weather',
+  'battery',
+];
+
 /// System resources metrics in display order.
 const barResourceIds = ['cpu', 'memory', 'gpu', 'network'];
 
@@ -28,6 +39,7 @@ class BarLayout {
     this.resources = barResourceIds,
     this.windowAppName = false,
     this.mediaMarquee = false,
+    this.clickCards = const ['weather'],
     this.center,
   });
 
@@ -49,6 +61,9 @@ class BarLayout {
   final bool windowAppName;
   final bool mediaMarquee;
 
+  /// Card pills that open their card on click; the others open on hover.
+  final List<String> clickCards;
+
   /// Index of the group centered on the bar, or null. Groups before and after
   /// it are spaced evenly within their own side.
   final int? center;
@@ -62,13 +77,17 @@ class BarLayout {
           'window-app-name': final bool windowAppName,
           'media-marquee': final bool mediaMarquee,
         }
-        when json['center'] is int?) {
+        when json['center'] is int? && json['click-cards'] is List?) {
       return .new(
         groups: [for (final group in groups) List<String>.from(group as List)],
         workspaceCount: workspaceCount,
         resources: List<String>.from(resources),
         windowAppName: windowAppName,
         mediaMarquee: mediaMarquee,
+        clickCards: switch (json['click-cards']) {
+          final List cards => List<String>.from(cards),
+          _ => const ['weather'],
+        },
         center: json['center'] as int?,
       );
     }
@@ -81,6 +100,7 @@ class BarLayout {
     'resources': resources,
     'window-app-name': windowAppName,
     'media-marquee': mediaMarquee,
+    'click-cards': clickCards,
     'center': ?center,
   };
 
@@ -94,12 +114,14 @@ class BarLayout {
     List<String>? resources,
     bool? windowAppName,
     bool? mediaMarquee,
+    List<String>? clickCards,
   }) => .new(
     groups: groups,
     workspaceCount: workspaceCount ?? this.workspaceCount,
     resources: resources ?? this.resources,
     windowAppName: windowAppName ?? this.windowAppName,
     mediaMarquee: mediaMarquee ?? this.mediaMarquee,
+    clickCards: clickCards ?? this.clickCards,
     center: center,
   );
 
@@ -110,6 +132,7 @@ class BarLayout {
     resources: resources,
     windowAppName: windowAppName,
     mediaMarquee: mediaMarquee,
+    clickCards: clickCards,
     center: center,
   );
 
@@ -138,6 +161,15 @@ class BarLayout {
     if (group == next.length) next.add([]);
     final target = next[group];
     target.insert((index ?? target.length).clamp(0, target.length), id);
+  });
+
+  /// Moves [id] into a new group of its own at [group], counted before the
+  /// pill leaves its old group.
+  BarLayout insertGroup(String id, int group) => _edit((next) {
+    for (final pills in next) {
+      pills.remove(id);
+    }
+    next.insert(group.clamp(0, next.length), [id]);
   });
 
   BarLayout hidePill(String id) => _edit((next) {

@@ -222,7 +222,7 @@ class BarPreferences {
             'window-app-name',
             'media-marquee',
           },
-          optional: {'center'},
+          optional: {'center', 'click-cards'},
         );
         if (valid) {
           final map = value as Map;
@@ -248,7 +248,9 @@ class BarPreferences {
               map['window-app-name'] is bool &&
               map['media-marquee'] is bool &&
               (!map.containsKey('center') ||
-                  _range(map['center'], 0, groups.length - 1));
+                  _range(map['center'], 0, groups.length - 1)) &&
+              (!map.containsKey('click-cards') ||
+                  _strings(map['click-cards'], barCardPillIds.contains));
         }
       case 'resources':
         valid =

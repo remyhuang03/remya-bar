@@ -256,6 +256,7 @@ class WeatherController extends ChangeNotifier {
 
   void _schedule() {
     _timer?.cancel();
+    _timer = null;
     if (!enabled || location == null || refreshing) return;
     final waiting = _failures > 0 && _sinceFailure.elapsed < _retryDelay;
     final cacheAge = age;
@@ -267,8 +268,22 @@ class WeatherController extends ChangeNotifier {
       _timer = Timer(Duration.zero, () => unawaited(refresh()));
       return;
     }
-    // Update timestamps and button cooldown even when background fetching is off.
-    _timer = Timer(const Duration(seconds: 15), () {
+    final deadline = nextWeatherDeadline(
+      automatic: _automatic,
+      background: settings['background'] == true,
+      intervalMinutes: minutes,
+      cacheAge: cacheAge,
+      hasSnapshot: snapshot != null,
+      hasError: result?.error != null,
+      waitingFailure: waiting,
+      retryAfterRequired: _retryAfterRequired,
+      sinceFailure: _sinceFailure.elapsed,
+      retryDelay: _retryDelay,
+      manualRunning: _sinceManual.isRunning,
+      sinceManual: _sinceManual.elapsed,
+    );
+    if (deadline == null) return;
+    _timer = Timer(deadline, () {
       if ((age?.inHours ?? 0) >= 24) {
         result = WeatherResult(status: .unavailable, error: result?.error);
       }
@@ -341,3 +356,56 @@ bool sameWeatherLocation(WeatherLocation? a, WeatherLocation b) =>
 
 String weatherRegion(WeatherLocation location) =>
     [location.region, location.country].nonNulls.toSet().join(', ');
+
+/// Returns the shortest positive duration until the next weather refresh,
+/// staleness threshold, 24-hour cache expiry, or cooldown boundary.
+@visibleForTesting
+Duration? nextWeatherDeadline({
+  required bool automatic,
+  required bool background,
+  required int intervalMinutes,
+  required Duration? cacheAge,
+  required bool hasSnapshot,
+  required bool hasError,
+  required bool waitingFailure,
+  required bool retryAfterRequired,
+  required Duration sinceFailure,
+  required Duration retryDelay,
+  required bool manualRunning,
+  required Duration sinceManual,
+}) {
+  Duration? earliest;
+  void consider(Duration candidate) {
+    final bounded = candidate < const Duration(milliseconds: 50)
+        ? const Duration(milliseconds: 50)
+        : candidate;
+    if (earliest == null || bounded < earliest!) earliest = bounded;
+  }
+
+  if (automatic) {
+    if (waitingFailure) {
+      consider(retryDelay - sinceFailure);
+    } else if (cacheAge != null &&
+        !cacheAge.isNegative &&
+        cacheAge.inMinutes < intervalMinutes) {
+      consider(Duration(minutes: intervalMinutes) - cacheAge);
+    }
+  }
+  if (hasSnapshot && cacheAge != null && !cacheAge.isNegative) {
+    const maxAge = Duration(hours: 24);
+    if (cacheAge < maxAge) consider(maxAge - cacheAge);
+    final staleAfter = Duration(
+      minutes: background ? max(30, intervalMinutes * 2) : 30,
+    );
+    if (!hasError && cacheAge < staleAfter) {
+      consider(staleAfter - cacheAge);
+    }
+  }
+  if (manualRunning && sinceManual < const Duration(seconds: 60)) {
+    consider(const Duration(seconds: 60) - sinceManual);
+  }
+  if (retryAfterRequired && sinceFailure < retryDelay) {
+    consider(retryDelay - sinceFailure);
+  }
+  return earliest;
+}

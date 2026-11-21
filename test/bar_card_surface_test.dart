@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/features/popups/bar_card_surface.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
+import 'package:remya_bar/features/popups/popup_measure.dart';
 import 'package:remya_ui/remya_ui.dart';
 
 void main() {
@@ -35,6 +36,19 @@ void main() {
     final clamped = attachedCardPath(body, 74, 140);
     expect(clamped.contains(const Offset(71, 10)), isFalse);
     expect(clamped.contains(const Offset(73.5, 11.5)), isTrue);
+  });
+
+  test('a pill wider than the body tapers into it without square corners', () {
+    final path = attachedCardPath(body, 20, 480);
+    expect(path.contains(const Offset(21, 1)), isTrue);
+    expect(path.contains(const Offset(499, 1)), isTrue);
+    // The old step left a square corner under each pill end at the body top.
+    expect(path.contains(const Offset(499, 13)), isFalse);
+    expect(path.contains(const Offset(21, 13)), isFalse);
+    expect(path.contains(const Offset(492, 13)), isTrue);
+    expect(path.contains(const Offset(459, 44)), isTrue);
+    expect(path.contains(const Offset(461, 44)), isFalse);
+    expect(path.contains(body.center), isTrue);
   });
 
   test('body shifts under a pill clamped at a screen edge', () {
@@ -107,5 +121,47 @@ void main() {
     );
     await tester.pump();
     expect(childPadding, EdgeInsets.zero);
+  });
+
+  testWidgets('a clamped card scrolls its body under a fixed header', (
+    tester,
+  ) async {
+    double? natural;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BarPopupScope(
+          theme: const RemyaTheme(),
+          child: Align(
+            alignment: .topCenter,
+            child: SizedBox(
+              width: 500,
+              height: 400,
+              child: PopupMeasure(
+                onHeight: (height) => natural = height,
+                child: BarCardSurface(
+                  pill: const Rect.fromLTWH(200, 0, 100, 0),
+                  child: BarCardSections(
+                    header: const Text('Title'),
+                    children: [
+                      for (var i = 0; i < 20; i++)
+                        SizedBox(height: 60, child: Text('Row $i')),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    // The window asks for the whole content, but only the body scrolls.
+    expect(natural, greaterThan(1200));
+    final title = tester.getTopLeft(find.text('Title'));
+    final row = tester.getTopLeft(find.text('Row 0'));
+    await tester.drag(find.text('Row 2'), const Offset(0, -200));
+    await tester.pump();
+    expect(tester.getTopLeft(find.text('Title')), title);
+    expect(tester.getTopLeft(find.text('Row 0')).dy, lessThan(row.dy - 100));
   });
 }

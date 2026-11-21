@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_bar/features/settings/bar_pill_layout.dart';
 import 'package:remya_bar/features/settings/bar_preferences.dart';
 import 'package:remya_bar/features/settings/bar_settings_controller.dart';
 import 'package:remya_bar/features/settings/bar_settings_entry.dart';
+import 'package:remya_bar/features/settings/bar_settings_tiles.dart';
 import 'package:remya_bar/features/settings/remya_settings_installed.dart';
 import 'package:remya_client/remya_client.dart';
 import 'package:remya_ui/remya_ui.dart';
@@ -198,49 +200,116 @@ void main() {
     );
   });
 
-  testWidgets('editor drags pills into new groups and edits groups', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(1200, 1600);
+  test('pills split into their own groups and cards pick a trigger', () {
+    final split = layout.insertGroup('weather', 0);
+    expect(split.groups.first, ['weather']);
+    expect(split.groups.expand((g) => g).where((id) => id == 'weather'), [
+      'weather',
+    ]);
+    expect(BarLayout.fromJson(layout.toJson()).clickCards, ['weather']);
+    final json = layout.toJson()..remove('click-cards');
+    expect(BarLayout.fromJson(json).clickCards, ['weather']);
+    final clicks = layout.copyWith(clickCards: ['clock', 'battery']);
+    expect(BarLayout.fromJson(clicks.toJson()).clickCards, [
+      'clock',
+      'battery',
+    ]);
+    expect(
+      () => BarPreferences.validate('layout', clicks.toJson()),
+      returnsNormally,
+    );
+    expect(
+      () => BarPreferences.validate('layout', {
+        ...clicks.toJson(),
+        'click-cards': ['sidebar'],
+      }),
+      throwsA(anything),
+    );
+  });
+
+  testWidgets('editor selects, hides, splits and resets pills', (tester) async {
+    tester.view.physicalSize = const Size(1200, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    BarLayout? changed;
+    var current = layout;
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SingleChildScrollView(
-            child: BarPillLayoutEditor(
-              layout: layout,
-              showSeconds: true,
-              onChanged: (next) => changed = next,
+          body: StatefulBuilder(
+            builder: (context, setState) => SingleChildScrollView(
+              child: BarPillLayoutEditor(
+                layout: current,
+                bottom: false,
+                onChanged: (next) => setState(() => current = next),
+                onBottom: (_) {},
+                options: (_) => const [],
+              ),
             ),
           ),
         ),
       ),
     );
+    Future<void> menu(String pill, String item) async {
+      await tester.tap(find.text(pill).first, buttons: kSecondaryButton);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(item));
+      await tester.pumpAndSettle();
+    }
+
+    await menu('System resources', 'Open card on click');
+    expect(current.clickCards, contains('resources'));
+    await menu('System resources', 'Open card on hover');
+    expect(current.clickCards, isNot(contains('resources')));
+    await menu('System resources', 'Move to own group');
+    expect(current.groups, anyElement(equals(['resources'])));
+    await menu('Weather', 'Show in new group');
+    expect(current.hidden, isNot(contains('weather')));
+    await menu('Clock', 'Center its group');
+    expect(current.center, isNull);
+
     final gesture = await tester.startGesture(
-      tester.getCenter(find.text('Clock')),
+      tester.getCenter(find.text('Clock').first),
     );
     await gesture.moveBy(const Offset(20, 20));
-    await gesture.moveTo(
-      tester.getCenter(find.text('Drop a pill here to add a group')),
-    );
+    await gesture.moveTo(tester.getCenter(find.text('Hidden')));
     await tester.pump();
     await gesture.up();
-    await tester.pump();
-    expect(changed!.groups.last, ['clock']);
-    expect(changed!.center, isNull);
+    await tester.pumpAndSettle();
+    expect(current.hidden, contains('clock'));
 
-    await tester.tap(find.byTooltip('Center on bar').first);
-    expect(changed!.center, 0);
-    await tester.tap(find.byTooltip('Remove group').first);
-    expect(changed!.groups, [
-      ['clock'],
-      ['sidebar'],
-    ]);
-    await tester.tap(find.text('Reset layout'));
-    expect(changed!.groups, BarLayout.defaults.groups);
-    expect(changed!.center, BarLayout.defaults.center);
+    await tester.tap(find.text('Reset'));
+    await tester.pumpAndSettle();
+    expect(current.groups, BarLayout.defaults.groups);
+    expect(current.center, BarLayout.defaults.center);
+  });
+
+  testWidgets('number field clamps typed values and batches steps', (
+    tester,
+  ) async {
+    final writes = <int>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SettingNumberField(
+              value: 5,
+              min: 1,
+              max: 25,
+              onChanged: writes.add,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.enterText(find.byType(TextField), '200');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    expect(writes, [25]);
+    await tester.tap(find.byTooltip('Decrease'));
+    await tester.tap(find.byTooltip('Decrease'));
+    await tester.pump(const Duration(milliseconds: 700));
+    // Steps continue from the written value until it reads back.
+    expect(writes, [25, 23]);
   });
 
   test(

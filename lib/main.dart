@@ -9,6 +9,7 @@ import 'package:remya_ui/remya_ui.dart';
 
 import 'app.dart';
 import 'bar_view_host.dart';
+import 'features/settings/bar_live_pills.dart';
 import 'features/account/account_profile_controller.dart';
 import 'features/ai_usage/ai_usage_backend.dart';
 import 'features/hyprland/hyprland_backend.dart';
@@ -115,9 +116,18 @@ class _BarApplicationState extends State<_BarApplication> {
   }
 
   @override
-  Widget build(BuildContext context) => BarViewHost(
-    preferences: widget.preferences,
-    buildBar: (viewId) => _BarOutput(viewId: viewId, app: this),
+  Widget build(BuildContext context) => BarLiveServices(
+    theme: widget.preferences,
+    hyprland: _hyprland,
+    system: _system,
+    weather: WeatherController.instance,
+    notifications: _notifications,
+    aiUsage: _aiUsage,
+    tray: _tray,
+    child: BarViewHost(
+      preferences: widget.preferences,
+      buildBar: (viewId) => _BarOutput(viewId: viewId, app: this),
+    ),
   );
 }
 

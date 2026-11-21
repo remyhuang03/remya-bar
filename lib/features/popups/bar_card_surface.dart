@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/rendering.dart';
+
 import 'package:material_ui/material_ui.dart';
 
 import 'bar_popup.dart';
@@ -31,34 +33,50 @@ Path attachedCardPath(
   final top = neckTop;
   final right = pillLeft + pillWidth;
   final f = math.min(fillet * t, rect.top - top);
+  // A pill reaching past the body's rounded corner tapers into the body side
+  // with an S-curve instead of meeting it at a right angle.
+  final taperTop = rect.top - f;
+  final taperBottom = rect.top + r;
+  final taperMid = (taperTop + taperBottom) / 2;
+  final rightTaper = right > rect.right - r;
+  final leftTaper = pillLeft < rect.left + r;
   final leftFillet = math.min(f, math.max(0.0, pillLeft - rect.left - r));
   final rightFillet = math.min(f, math.max(0.0, rect.right - r - right));
   final path = Path()
     ..moveTo(pillLeft, top)
-    ..lineTo(right, top)
-    ..lineTo(right, rect.top - rightFillet);
-  if (rightFillet > 0) {
-    path.arcToPoint(
-      Offset(right + rightFillet, rect.top),
-      radius: Radius.circular(rightFillet),
-      clockwise: false,
-    );
+    ..lineTo(right, top);
+  if (rightTaper) {
+    path
+      ..lineTo(right, taperTop)
+      ..cubicTo(right, taperMid, rect.right, taperMid, rect.right, taperBottom);
+  } else {
+    path.lineTo(right, rect.top - rightFillet);
+    if (rightFillet > 0) {
+      path.arcToPoint(
+        Offset(right + rightFillet, rect.top),
+        radius: Radius.circular(rightFillet),
+        clockwise: false,
+      );
+    }
+    path
+      ..lineTo(rect.right - r, rect.top)
+      ..quadraticBezierTo(rect.right, rect.top, rect.right, rect.top + r);
   }
-  if (right <= rect.right - r) path.lineTo(rect.right - r, rect.top);
   path
-    ..quadraticBezierTo(rect.right, rect.top, rect.right, rect.top + r)
     ..lineTo(rect.right, rect.bottom - r)
     ..quadraticBezierTo(rect.right, rect.bottom, rect.right - r, rect.bottom)
     ..lineTo(rect.left + r, rect.bottom)
     ..quadraticBezierTo(rect.left, rect.bottom, rect.left, rect.bottom - r)
-    ..lineTo(rect.left, rect.top + r)
-    ..quadraticBezierTo(
-      rect.left,
-      rect.top,
-      pillLeft >= rect.left + r ? rect.left + r : pillLeft,
-      rect.top,
-    );
-  if (pillLeft >= rect.left + r) path.lineTo(pillLeft - leftFillet, rect.top);
+    ..lineTo(rect.left, rect.top + r);
+  if (leftTaper) {
+    return path
+      ..cubicTo(rect.left, taperMid, pillLeft, taperMid, pillLeft, taperTop)
+      ..lineTo(pillLeft, top)
+      ..close();
+  }
+  path
+    ..quadraticBezierTo(rect.left, rect.top, rect.left + r, rect.top)
+    ..lineTo(pillLeft - leftFillet, rect.top);
   if (leftFillet > 0) {
     path.arcToPoint(
       Offset(pillLeft, rect.top - leftFillet),
@@ -69,6 +87,93 @@ Path attachedCardPath(
   return path
     ..lineTo(pillLeft, top)
     ..close();
+}
+
+/// A card's content: a [header] that stays put and [children] that scroll
+/// below it once the popup reaches its maximum height.
+class BarCardSections extends StatelessWidget {
+  const BarCardSections({
+    super.key,
+    this.header,
+    required this.children,
+    this.spacing = 16,
+  });
+
+  final Widget? header;
+  final List<Widget> children;
+  final double spacing;
+
+  @override
+  Widget build(BuildContext context) => _PinnedHeader(
+    children: [
+      if (header case final header?)
+        Padding(padding: const .fromLTRB(24, 24, 24, 0), child: header)
+      else
+        const SizedBox.shrink(),
+      MediaQuery(
+        // Material scrollbars inset their track by the MediaQuery padding.
+        data: MediaQuery.of(context)
+            .copyWith(padding: const .only(right: 4, bottom: 24)),
+        child: SingleChildScrollView(
+          padding: .fromLTRB(24, header == null ? 24 : spacing, 24, 24),
+          child: Column(
+            crossAxisAlignment: .stretch,
+            spacing: spacing,
+            children: children,
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+/// Lays out a fixed first child above a second child that gets the remaining
+/// height, or its natural height under unbounded constraints.
+class _PinnedHeader extends MultiChildRenderObjectWidget {
+  const _PinnedHeader({required super.children});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderPinnedHeader();
+}
+
+class _PinnedHeaderData extends ContainerBoxParentData<RenderBox> {}
+
+class _RenderPinnedHeader extends RenderBox
+    with
+        ContainerRenderObjectMixin<RenderBox, _PinnedHeaderData>,
+        RenderBoxContainerDefaultsMixin<RenderBox, _PinnedHeaderData> {
+  @override
+  void setupParentData(RenderBox child) {
+    if (child.parentData is! _PinnedHeaderData) {
+      child.parentData = _PinnedHeaderData();
+    }
+  }
+
+  @override
+  void performLayout() {
+    final header = firstChild!;
+    final body = childAfter(header)!;
+    final width = BoxConstraints.tightFor(width: constraints.maxWidth);
+    header.layout(width, parentUsesSize: true);
+    final top = header.size.height;
+    body.layout(
+      width.copyWith(maxHeight: math.max(0.0, constraints.maxHeight - top)),
+      parentUsesSize: true,
+    );
+    (body.parentData! as _PinnedHeaderData).offset = Offset(0, top);
+    size = constraints.constrain(
+      Size(constraints.maxWidth, top + body.size.height),
+    );
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) =>
+      defaultPaint(context, offset);
+
+  @override
+  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) =>
+      defaultHitTestChildren(result, position: position);
 }
 
 class BarCardSurface extends StatelessWidget {
@@ -147,21 +252,15 @@ class BarCardSurface extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) => Padding(
             padding: insetsFor(pill, constraints.maxWidth, bottom: bottom),
-            // Strip the outer card scrollbar's shadow insets so inner scrollables
-            // inside the card keep their scrollbars aligned with the content.
+            // Strip the popup's shadow insets so scrollables inside the card
+            // keep their scrollbars aligned with the content.
             child: MediaQuery.removePadding(
               context: context,
               removeLeft: true,
               removeTop: true,
               removeRight: true,
               removeBottom: true,
-              child: Material(
-                type: .transparency,
-                child: SingleChildScrollView(
-                  padding: const .all(24),
-                  child: child,
-                ),
-              ),
+              child: Material(type: .transparency, child: child),
             ),
           ),
         ),

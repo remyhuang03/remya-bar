@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:material_ui/material_ui.dart';
 
 import '../features/popups/bar_card_surface.dart';
@@ -24,6 +25,27 @@ class BarPillCard {
   final Color? seedColor;
   final bool openOnTap;
   final bool hoverOpens;
+}
+
+/// Card kinds whose pills open their card on click rather than on hover.
+class BarCardTriggers extends InheritedWidget {
+  const BarCardTriggers({
+    super.key,
+    required this.clickKinds,
+    required super.child,
+  });
+
+  final Set<String> clickKinds;
+
+  /// Whether [kind] opens on click, or null without a configured trigger.
+  static bool? clickOf(BuildContext context, String kind) => context
+      .dependOnInheritedWidgetOfExactType<BarCardTriggers>()
+      ?.clickKinds
+      .contains(kind);
+
+  @override
+  bool updateShouldNotify(BarCardTriggers oldWidget) =>
+      !setEquals(clickKinds, oldWidget.clickKinds);
 }
 
 class BarPillState {
@@ -83,6 +105,9 @@ class _BarPillState extends State<BarPill> {
   Widget build(BuildContext context) {
     final card = widget.card;
     final popup = card == null ? null : BarPopup.maybeOf(context);
+    final click = card == null
+        ? null
+        : BarCardTriggers.clickOf(context, card.kind);
     return Center(
       widthFactor: 1,
       heightFactor: 1,
@@ -97,8 +122,8 @@ class _BarPillState extends State<BarPill> {
                 loadData: card.loadData,
                 dataChanges: card.dataChanges,
                 seedColor: card.seedColor,
-                openOnTap: card.openOnTap,
-                hoverOpens: card.hoverOpens,
+                openOnTap: card.openOnTap || click == true,
+                hoverOpens: click == null ? card.hoverOpens : !click,
                 onTap: widget.onTap,
                 builder: _buildPill,
               ),

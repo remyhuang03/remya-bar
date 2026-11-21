@@ -62,9 +62,10 @@ class BarDetailCard extends StatelessWidget {
               onSettings: () => onAction(const {'action': 'weather.settings'}),
             ),
             'battery' => BatteryCard(data: data, onAction: onAction),
-            'notifications' => NotificationCenterCard(
-              data: data,
-              onAction: onAction,
+            'notifications' => BarCardSections(
+              children: [
+                NotificationCenterCard(data: data, onAction: onAction),
+              ],
             ),
             'datetime' => DatetimeCard(
               data: data,
@@ -72,7 +73,7 @@ class BarDetailCard extends StatelessWidget {
                   ? () => onAction(const {'action': 'datetime.settings'})
                   : null,
             ),
-            _ => const Text('Unavailable'),
+            _ => const BarCardSections(children: [Text('Unavailable')]),
           },
         );
 }

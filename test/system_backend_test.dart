@@ -147,6 +147,7 @@ void main() {
     backend = SystemBackend(settings: settings)..start();
     api.updates.add([_player('Paused')]);
     await _flush();
+    settings.reads = 0;
     backend.mediaOutput = {'name': 'speaker', 'percent': 20.0};
   });
 
@@ -333,4 +334,73 @@ void main() {
       );
     },
   );
+
+  test('hardware sampling gates on layout and holdHardware, and refreshes battery on power signal', () async {
+    // Remove both resources and battery from layout: timer stops.
+    settings.layout = Completer<Map<String, dynamic>>()
+      ..complete({
+        'value': const BarLayout(
+          groups: [
+            ['clock', 'sidebar'],
+          ],
+        ).toJson(),
+        'revision': 'a' * 64,
+      });
+    settings.updates.add((topic: barLayoutSettingId, value: {}));
+    await _flush();
+    await _flush();
+    api.hardwareCalls.clear();
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    expect(api.hardwareCalls, isEmpty);
+
+    // Holding hardware starts sampling; releasing stops it.
+    final owner = Object();
+    backend.holdHardware(owner);
+    await _flush();
+    expect(api.hardwareCalls, hasLength(1));
+    backend.releaseHardware(owner);
+    api.hardwareCalls.clear();
+    await Future<void>.delayed(const Duration(milliseconds: 1100));
+    expect(api.hardwareCalls, isEmpty);
+
+    // Battery-only layout refreshes immediately on Core power change signal.
+    settings.layout = Completer<Map<String, dynamic>>()
+      ..complete({
+        'value': const BarLayout(
+          groups: [
+            ['battery', 'sidebar'],
+          ],
+        ).toJson(),
+        'revision': 'b' * 64,
+      });
+    settings.updates.add((topic: barLayoutSettingId, value: {}));
+    await _flush();
+    await _flush();
+    api.hardwareCalls.clear();
+    settings.updates.add((topic: 'power', value: {}));
+    await _flush();
+    expect(api.hardwareCalls, hasLength(1));
+  });
+
+  test('sound reads on start and empty-to-non-empty player transition, not hardware ticks', () async {
+    SystemRustLib.dispose();
+    final localSettings = _Settings();
+    final localApi = _MediaApi();
+    SystemRustLib.initMock(api: localApi);
+    final localBackend = SystemBackend(settings: localSettings)..start();
+    addTearDown(() async {
+      localBackend.dispose();
+      await localApi.updates.close();
+    });
+    await _flush();
+    expect(localSettings.reads, 1);
+
+    // Transition from empty to non-empty triggers one read; subsequent player updates do not.
+    localApi.updates.add([_player('Paused')]);
+    await _flush();
+    expect(localSettings.reads, 2);
+    localApi.updates.add([_player('Playing')]);
+    await _flush();
+    expect(localSettings.reads, 2);
+  });
 }
