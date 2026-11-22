@@ -85,6 +85,31 @@ void main() {
     }
   });
 
+  testWidgets('panel growth resizes the window once, then fits it', (
+    tester,
+  ) async {
+    final calls = await _popup(tester, const Size(420, 900));
+    List<int> heights() => [
+      for (final call in calls)
+        if (call.method == 'resize') call.arguments['height'] as int,
+    ];
+    await _content(tester, 'notifications', {'dnd': false}, opening: true);
+    final initial = heights();
+    expect(initial, hasLength(1));
+
+    await _content(tester, 'notifications', {
+      'dnd': true,
+      'quietReason': 'manual',
+    }, settle: false);
+    await tester.pump();
+    expect(heights().skip(1), [16777216]);
+
+    await tester.pumpAndSettle(const Duration(milliseconds: 50));
+    final fitted = heights().skip(1).toList();
+    expect(fitted, hasLength(2));
+    expect(fitted.last, greaterThan(initial.single));
+  });
+
   testWidgets('notification popup clears hidden content and can reopen', (
     tester,
   ) async {

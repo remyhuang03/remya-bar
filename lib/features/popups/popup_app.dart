@@ -113,6 +113,8 @@ class _BarPopupAppState extends State<BarPopupApp>
   final _navigator = GlobalKey<NavigatorState>();
   late final _panelRoutes = _PanelRoutes(_panelRouteChanged);
   double _panelHeight = sidebarSize.height;
+  double? _panelWindowHeight;
+  Timer? _panelSettle;
   bool _hasPanelRoute = false;
   String? _kind;
   int _contentGeneration = 0;
@@ -139,6 +141,8 @@ class _BarPopupAppState extends State<BarPopupApp>
           _data = const {};
           _actionError = null;
           _hasPanelRoute = false;
+          _panelSettle?.cancel();
+          _panelWindowHeight = null;
         });
         return;
       }
@@ -223,6 +227,7 @@ class _BarPopupAppState extends State<BarPopupApp>
   @override
   void dispose() {
     widget.channel.setMethodCallHandler(null);
+    _panelSettle?.cancel();
     _emergence.dispose();
     super.dispose();
   }
@@ -289,7 +294,13 @@ class _BarPopupAppState extends State<BarPopupApp>
             )
           : _kind == 'sidebar' || _kind == 'notifications'
           ? Align(
-              alignment: _kind == 'notifications' ? .topLeft : .topRight,
+              // The window outgrows the card while its content animates.
+              alignment: switch ((_kind == 'notifications', _bottom)) {
+                (true, false) => .topLeft,
+                (true, true) => .bottomLeft,
+                (false, false) => .topRight,
+                (false, true) => .bottomRight,
+              },
               child: TweenAnimationBuilder<double>(
                 key: ValueKey(_opening),
                 duration: const Duration(milliseconds: 350),
@@ -453,16 +464,34 @@ class _BarPopupAppState extends State<BarPopupApp>
     }
   }
 
+  // Animated content reports a new height every frame. After each resize GTK
+  // blocks until Flutter renders that exact size, which per-frame resizes
+  // never reach, so it stalls up to 100 ms. Grow to the output limit once and
+  // fit the card after its height settles.
   void _resizePanel(double height) {
     _panelHeight = height;
-    if (!_hasPanelRoute) _resize(height);
+    if (_hasPanelRoute) return;
+    _panelSettle?.cancel();
+    final shown = _panelWindowHeight;
+    if (shown == null) return _resizeWindow(height);
+    if (height > shown) _resizeWindow(double.infinity);
+    _panelSettle = Timer(const Duration(milliseconds: 150), () {
+      if (!_hasPanelRoute) _resizeWindow(_panelHeight);
+    });
+  }
+
+  void _resizeWindow(double height) {
+    _panelWindowHeight = height;
+    // The runner clamps the request to the output's usable height.
+    _resize(height.isFinite ? height : 16777216);
   }
 
   void _panelRouteChanged(bool overlay) {
     if (_hasPanelRoute == overlay) return;
     _hasPanelRoute = overlay;
     if (_kind == 'sidebar' || _kind == 'notifications') {
-      _resize(overlay ? sidebarSize.height : _panelHeight);
+      _panelSettle?.cancel();
+      _resizeWindow(overlay ? sidebarSize.height : _panelHeight);
     }
   }
 
