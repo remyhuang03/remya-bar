@@ -212,7 +212,7 @@ static gboolean check_monitor_lifecycle(gpointer data) {
 
 // These protocol/state checks do not initialize GTK or map a desktop surface.
 static void check_popup_content() {
-  for (const char* kind : {"media", "battery", "datetime", "resources"}) {
+  for (const char* kind : {"media", "battery", "datetime", "resources", "weather"}) {
     g_assert_true(is_card(kind));
     BarPopup popup{nullptr};
     popup.pill_left = 81;
@@ -246,10 +246,8 @@ static void check_popup_content() {
       g_assert_cmpint(popup.pill_width, ==, 140);
     }
     popup.dismissing = true;
-    popup.hide_timer = g_timeout_add(10000, [](gpointer) -> gboolean {
-      g_assert_not_reached();
-      return G_SOURCE_REMOVE;
-    }, nullptr);
+    schedule_hide(&popup);
+    g_assert_cmpuint(popup.hide_timer, ==, 0);
     popup.dismiss_timer = g_timeout_add(10000, [](gpointer) -> gboolean {
       g_assert_not_reached();
       return G_SOURCE_REMOVE;
@@ -261,6 +259,10 @@ static void check_popup_content() {
     g_assert_cmpuint(popup.dismiss_timer, ==, 0);
     g_assert_null(g_main_context_find_source_by_id(nullptr, fallback));
     g_assert_false(fl_value_get_bool(fl_value_lookup_string(popup.content, "opening")));
+    schedule_hide(&popup);
+    g_assert_cmpuint(popup.hide_timer, !=, 0);
+    popup.enter();
+    g_assert_cmpuint(popup.hide_timer, ==, 0);
   }
   for (const char* kind : {"tooltip", "tray-menu", "workspace-overview", "sidebar"})
     g_assert_false(is_card(kind));
