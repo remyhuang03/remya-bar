@@ -145,7 +145,9 @@ class BarPreferences {
     final [notifications as Map, quiet as Map, priority as Map] = values;
     return NotificationPreferences(
       doNotDisturb: notifications['do-not-disturb'] as bool,
+      clearCritical: notifications['clear-critical'] as bool? ?? false,
       popupDuration: notifications['popup-duration'] as int,
+      toastOnRight: notifications['toast-side'] == 'right',
       sounds: notifications['sounds'] as bool,
       schedule: quiet['enabled'] as bool,
       scheduleStart: quiet['start'] as String,
@@ -273,10 +275,18 @@ class BarPreferences {
             _range(value['gamma-min'], 10, 90);
       case 'notifications':
         valid =
-            _object(value, {'do-not-disturb', 'popup-duration', 'sounds'}) &&
+            _object(
+              value,
+              {'do-not-disturb', 'popup-duration', 'sounds'},
+              optional: {'clear-critical', 'toast-side'},
+            ) &&
             (value as Map)['do-not-disturb'] is bool &&
             value['sounds'] is bool &&
-            _range(value['popup-duration'], 1, 60);
+            (!value.containsKey('clear-critical') ||
+                value['clear-critical'] is bool) &&
+            (!value.containsKey('toast-side') ||
+                const ['left', 'right'].contains(value['toast-side'])) &&
+            _range(value['popup-duration'], 1, 600);
       case 'quiet-schedule':
         valid =
             _object(value, {

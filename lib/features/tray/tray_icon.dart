@@ -4,9 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
 class TrayIcon extends StatefulWidget {
-  const TrayIcon({super.key, required this.data, required this.size});
+  const TrayIcon({
+    super.key,
+    required this.data,
+    required this.size,
+    this.width,
+    this.fit = .contain,
+  });
   final Map<Object?, Object?> data;
   final double size;
+  final double? width;
+  final BoxFit fit;
 
   Uint8List? get argb => data['argb'] as Uint8List?;
 
@@ -89,9 +97,9 @@ class _TrayIconState extends State<TrayIcon> {
         ? fallback
         : RawImage(
             image: image,
-            width: size,
+            width: widget.width ?? size,
             height: size,
-            fit: .contain,
+            fit: widget.fit,
             filterQuality: .medium,
           );
     return ClipRRect(
@@ -101,9 +109,9 @@ class _TrayIconState extends State<TrayIcon> {
               (image == null || image.width < pixels || image.height < pixels)
           ? Image.memory(
               bytes,
-              width: size,
+              width: widget.width ?? size,
               height: size,
-              fit: .contain,
+              fit: widget.fit,
               filterQuality: .medium,
               gaplessPlayback: true,
               errorBuilder: (_, _, _) => raw,

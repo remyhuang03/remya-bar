@@ -644,7 +644,9 @@
       "default": {
         "do-not-disturb": false,
         "popup-duration": 5,
-        "sounds": true
+        "toast-side": "left",
+        "sounds": true,
+        "clear-critical": false
       },
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -656,9 +658,15 @@
           "popup-duration": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 60
+            "maximum": 600
+          },
+          "toast-side": {
+            "enum": ["left", "right"]
           },
           "sounds": {
+            "type": "boolean"
+          },
+          "clear-critical": {
             "type": "boolean"
           }
         },

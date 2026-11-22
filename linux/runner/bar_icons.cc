@@ -54,8 +54,10 @@ std::string lookup_icon(const std::string& app_id, GList* applications) {
 }
 
 void icon_method(FlMethodChannel*, FlMethodCall* call, gpointer) {
-  const bool tray = g_strcmp0(fl_method_call_get_name(call), "lookupTray") == 0;
-  if (!tray && g_strcmp0(fl_method_call_get_name(call), "lookup") != 0) {
+  const char* method = fl_method_call_get_name(call);
+  const bool tray = g_strcmp0(method, "lookupTray") == 0;
+  const bool names = g_strcmp0(method, "lookupNames") == 0;
+  if (!tray && !names && g_strcmp0(method, "lookup") != 0) {
     fl_method_call_respond_not_implemented(call, nullptr);
     return;
   }
@@ -64,7 +66,7 @@ void icon_method(FlMethodChannel*, FlMethodCall* call, gpointer) {
     fl_method_call_respond_error(call, "invalid-arguments", "Expected application identifiers", nullptr, nullptr);
     return;
   }
-  GList* applications = tray ? nullptr : g_app_info_get_all();
+  GList* applications = tray || names ? nullptr : g_app_info_get_all();
   g_autoptr(FlValue) result = fl_value_new_map();
   for (size_t index = 0; index < fl_value_get_length(args); ++index) {
     FlValue* item = fl_value_get_list_value(args, index);
@@ -114,6 +116,18 @@ void icon_method(FlMethodChannel*, FlMethodCall* call, gpointer) {
     if (fl_value_get_type(item) != FL_VALUE_TYPE_STRING) continue;
     const std::string app_id = fl_value_get_string(item);
     if (app_id.empty() || app_id.size() > 256 || app_id.find_first_of("/\\\n\r") != std::string::npos) continue;
+    if (names) {
+      // The hint omits the file suffix, including IDs such as org.telegram.desktop.
+      g_autoptr(GDesktopAppInfo) app = g_desktop_app_info_new((app_id + ".desktop").c_str());
+      if (app == nullptr && g_str_has_suffix(app_id.c_str(), ".desktop")) {
+        app = g_desktop_app_info_new(app_id.c_str());
+      }
+      if (app != nullptr) {
+        fl_value_set_string_take(result, app_id.c_str(),
+            fl_value_new_string(g_app_info_get_name(G_APP_INFO(app))));
+      }
+      continue;
+    }
     const auto path = lookup_icon(app_id, applications);
     if (!path.empty()) {
       fl_value_set_string_take(result, app_id.c_str(), fl_value_new_string(path.c_str()));

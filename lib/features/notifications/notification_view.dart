@@ -1,20 +1,26 @@
-import 'dart:io';
-
-import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../widgets/percent_text.dart';
-import '../../widgets/wave_progress.dart';
 import '../popups/popup_measure.dart';
-import '../tray/tray_icon.dart';
+import 'notification_flow.dart';
+import 'notification_group.dart';
+import 'notification_tile.dart';
 
-typedef NotificationAction = ValueChanged<Map<String, Object?>>;
+/// Manual choices survive closing the native popup for the bar session.
+class NotificationExpansion {
+  final rows = <int, bool>{};
+  final groups = <(int, Object?), bool>{};
 
-/// The popup kind of the notification stack surface.
-const notificationToastsKind = 'notification-toasts';
+  void retain(List<Map> items) {
+    final ids = items.map((item) => item['id']).toSet();
+    final groupsBySection = items
+        .map((item) => (item['urgency'] as int? ?? 1, item['group']))
+        .toSet();
+    rows.removeWhere((id, _) => !ids.contains(id));
+    groups.removeWhere((group, _) => !groupsBySection.contains(group));
+  }
+}
 
-/// The notification center panel and center widget.
 class NotificationCenterCard extends StatefulWidget {
   const NotificationCenterCard({
     super.key,
@@ -22,793 +28,687 @@ class NotificationCenterCard extends StatefulWidget {
     required this.onAction,
     this.onHeight,
     this.tasks,
+    this.expansion,
+    this.actionError,
   });
 
   final Map<String, Object?> data;
   final NotificationAction onAction;
   final ValueChanged<double>? onHeight;
   final Widget? tasks;
+  final NotificationExpansion? expansion;
+  final String? actionError;
 
   @override
   State<NotificationCenterCard> createState() => _NotificationCenterCardState();
 }
 
 class _NotificationCenterCardState extends State<NotificationCenterCard> {
+  late final _expansion = widget.expansion ?? NotificationExpansion();
+  final _focus = <Object, FocusNode>{};
+  final _panelFocus = FocusNode();
+  bool _keyboard = false;
+  final _scroll = ScrollController();
+  List<Object> _visibleRows = [];
+  Object? _tabRow;
+  bool _initialFocus = true;
   double? _topHeight;
-  double? _bodyHeight;
-
-  void _reportHeight(double pad) {
-    final top = _topHeight;
-    final body = _bodyHeight;
-    final onHeight = widget.onHeight;
-    if (top == null || body == null || onHeight == null) return;
-    onHeight(top + body + pad * 2 + 16);
-  }
+  double? _listHeight;
+  double? _footerHeight;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final items = [
-      for (final item in widget.data['notifications'] as List? ?? const [])
-        if (item is Map) item,
-    ];
-    final groups = <Object?, List<Map>>{};
-    for (final item in items) {
-      (groups[item['group']] ??= []).add(item);
+  void initState() {
+    super.initState();
+    FocusManager.instance.addEarlyKeyEventHandler(_onKeyEvent);
+  }
+
+  KeyEventResult _onKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent && _panelFocus.hasFocus && !_keyboard) {
+      setState(() => _keyboard = true);
     }
-    final dnd = widget.data['dnd'];
-    final error = widget.data['serviceError'];
-    final panel = widget.onHeight != null;
-
-    Widget content(double pad) {
-      final headerAndDnd = Column(
-        mainAxisSize: .min,
-        crossAxisAlignment: .stretch,
-        spacing: 12,
-        children: [
-          Row(
-            spacing: 10,
-            children: [
-              Expanded(
-                child: Text(
-                  'Notifications',
-                  maxLines: 1,
-                  overflow: .ellipsis,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontSize: 24,
-                    height: 1.25,
-                    fontWeight: .bold,
-                    color: _emphasis(theme),
-                  ),
-                ),
-              ),
-              if (items.isNotEmpty)
-                _Chip(
-                  '${items.length}',
-                  color: colors.primary,
-                  foreground: colors.onPrimary,
-                ),
-              if (items.isNotEmpty)
-                Expanded(
-                  child: Align(
-                    alignment: .centerRight,
-                    child: TextButton(
-                      onPressed: () => widget.onAction(const {
-                        'action': 'notification.clear',
-                      }),
-                      child: const Text('Clear All', textAlign: .end),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          if (dnd is bool)
-            _DndTile(
-              value: dnd,
-              quietReason: widget.data['quietReason'],
-              onChanged: (value) => widget.onAction({
-                'action': 'notification.dnd',
-                'value': value,
-              }),
-            ),
-        ],
-      );
-      final body = Column(
-        mainAxisSize: .min,
-        crossAxisAlignment: .stretch,
-        spacing: 16,
-        children: [
-          if (error is String)
-            Text(
-              error,
-              style: theme.textTheme.bodyMedium?.copyWith(color: colors.error),
-            ),
-          if (error == null && items.isEmpty)
-            Padding(
-              padding: const .symmetric(vertical: 16),
-              child: Text(
-                'No notifications',
-                textAlign: .center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-            ),
-          for (final group in groups.values)
-            Column(
-              crossAxisAlignment: .stretch,
-              spacing: 2,
-              children: [
-                for (final (index, item) in group.indexed)
-                  NotificationTile(
-                    data: item,
-                    onAction: widget.onAction,
-                    // Later group members drop the repeated app header.
-                    showMeta: index == 0,
-                    dismissIds: index == 0
-                        ? [for (final item in group) item['id']]
-                        : null,
-                    radius: BorderRadius.vertical(
-                      top: Radius.circular(index == 0 ? 20 : 6),
-                      bottom: Radius.circular(
-                        index == group.length - 1 ? 20 : 6,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          if (widget.tasks case final tasks?) ...[
-            Divider(height: 1, color: colors.outlineVariant),
-            tasks,
-          ],
-        ],
-      );
-      return Padding(
-        padding: .symmetric(vertical: pad),
-        child: Column(
-          mainAxisSize: .min,
-          crossAxisAlignment: .stretch,
-          spacing: 16,
-          children: [
-            Padding(
-              padding: .symmetric(horizontal: pad),
-              child: PopupMeasure(
-                onHeight: (height) {
-                  _topHeight = height;
-                  _reportHeight(pad);
-                },
-                child: headerAndDnd,
-              ),
-            ),
-            Flexible(
-              fit: .loose,
-              child: SingleChildScrollView(
-                primary: false,
-                padding: .symmetric(horizontal: pad),
-                child: PopupMeasure(
-                  onHeight: (height) {
-                    _bodyHeight = height;
-                    _reportHeight(pad);
-                  },
-                  child: body,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (!panel) return content(0);
-
-    return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): () =>
-            widget.onAction(const {'action': 'close'}),
-      },
-      child: Focus(
-        autofocus: true,
-        child: Material(
-          color: colors.surfaceContainer,
-          shape: RoundedRectangleBorder(
-            borderRadius: .circular(32),
-            side: BorderSide(color: colors.surfaceContainerHighest),
-          ),
-          clipBehavior: .antiAlias,
-          child: LayoutBuilder(
-            builder: (context, constraints) =>
-                content(constraints.maxWidth < 340 ? 12.0 : 24.0),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DndTile extends StatelessWidget {
-  const _DndTile({
-    required this.value,
-    required this.quietReason,
-    required this.onChanged,
-  });
-
-  final bool value;
-  final Object? quietReason;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    return Material(
-      color: colors.surfaceContainerHighest,
-      borderRadius: .circular(20),
-      clipBehavior: .antiAlias,
-      child: InkWell(
-        onTap: () => onChanged(!value),
-        child: Padding(
-          padding: const .fromLTRB(16, 12, 16, 12),
-          child: Row(
-            spacing: 12,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: .start,
-                  spacing: 2,
-                  children: [
-                    Text(
-                      'Do not disturb',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: .w500,
-                        color: _emphasis(theme),
-                      ),
-                    ),
-                    Text(
-                      switch (quietReason) {
-                        'schedule' => 'On by schedule',
-                        'fullscreen' => 'On while an app is full screen',
-                        _ => 'Critical notifications still show',
-                      },
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 12,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Semantics(
-                label: 'Do not disturb',
-                toggled: value,
-                excludeSemantics: true,
-                child: Switch(
-                  padding: .zero,
-                  materialTapTargetSize: .shrinkWrap,
-                  value: value,
-                  onChanged: onChanged,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The popup stack, newest first, at the top left of the output focused when
-/// the stack starts.
-class NotificationToasts extends StatelessWidget {
-  const NotificationToasts({
-    super.key,
-    required this.data,
-    required this.onAction,
-  });
-
-  static const width = 372.0;
-
-  /// Room for the shadow around the tiles.
-  static const insets = EdgeInsets.fromLTRB(16, 0, 16, 24);
-
-  final Map<String, Object?> data;
-  final NotificationAction onAction;
-
-  @override
-  Widget build(BuildContext context) => MouseRegion(
-    onEnter: (_) =>
-        onAction(const {'action': 'notifications.hover', 'value': true}),
-    onExit: (_) =>
-        onAction(const {'action': 'notifications.hover', 'value': false}),
-    child: Padding(
-      padding: insets,
-      child: Column(
-        mainAxisSize: .min,
-        crossAxisAlignment: .stretch,
-        spacing: 8,
-        children: [
-          for (final item in data['notifications'] as List? ?? const [])
-            if (item is Map)
-              TweenAnimationBuilder<double>(
-                key: ValueKey(item['id']),
-                duration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : const Duration(milliseconds: 350),
-                curve: Easing.emphasizedDecelerate,
-                tween: Tween(begin: 0, end: 1),
-                builder: (context, progress, child) => Opacity(
-                  opacity: progress,
-                  child: FractionalTranslation(
-                    translation: Offset(progress - 1, 0),
-                    child: child,
-                  ),
-                ),
-                child: DecoratedBox(
-                  decoration: const BoxDecoration(
-                    borderRadius: .all(.circular(20)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x4D000000),
-                        offset: Offset(0, 6),
-                        blurRadius: 16,
-                      ),
-                    ],
-                  ),
-                  child: NotificationTile(data: item, onAction: onAction),
-                ),
-              ),
-        ],
-      ),
-    ),
-  );
-}
-
-/// One notification in the Urgency=Low, Normal or Critical design variant.
-class NotificationTile extends StatelessWidget {
-  const NotificationTile({
-    super.key,
-    required this.data,
-    required this.onAction,
-    this.showMeta = true,
-    this.dismissIds,
-    this.radius,
-  });
-
-  final Map data;
-  final NotificationAction onAction;
-  final bool showMeta;
-
-  /// Notifications closed by this tile's close button; defaults to itself.
-  final List<Object?>? dismissIds;
-  final BorderRadius? radius;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final urgency = data['urgency'];
-    final critical = urgency == 2;
-    final low = urgency == 0;
-    final id = data['id'];
-    final background = critical
-        ? colors.errorContainer
-        : low
-        ? colors.surfaceContainerHigh
-        : colors.surfaceContainerHighest;
-    final foreground = critical
-        ? colors.onErrorContainer
-        : colors.onSurfaceVariant;
-    final summaryColor = critical
-        ? colors.onErrorContainer
-        : low
-        ? colors.onSurface
-        : _emphasis(theme);
-    final meta = theme.textTheme.bodySmall?.copyWith(
-      fontSize: 12,
-      height: 1.2,
-      color: foreground,
-    );
-    final summary = '${data['summary'] ?? ''}';
-    final body = data['body'] as List? ?? const [];
-    final actions = [
-      for (final action in data['actions'] as List? ?? const [])
-        if (action case [final String key, final String label]) (key, label),
-    ];
-    final progress = data['progress'];
-    final image = _NotificationImage(data: data);
-    final hasImage = data['imageArgb'] != null || data['image'] != null;
-    final card = Padding(
-      padding: critical
-          ? const .fromLTRB(20, 20, 16, 20)
-          : .fromLTRB(16, low ? 12 : 16, 12, low ? 12 : 16),
-      child: Column(
-        crossAxisAlignment: .stretch,
-        spacing: 12,
-        children: [
-          if (showMeta)
-            Row(
-              spacing: 8,
-              children: [
-                _AppBadge(
-                  data: data,
-                  color: critical
-                      ? colors.error
-                      : low
-                      ? colors.surfaceContainerHighest
-                      : colors.secondaryContainer,
-                  foreground: critical
-                      ? colors.onError
-                      : colors.onSecondaryContainer,
-                ),
-                Expanded(
-                  child: Row(
-                    spacing: 8,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          '${data['appName'] ?? ''}'.isEmpty
-                              ? 'Notification'
-                              : '${data['appName']}',
-                          maxLines: 1,
-                          overflow: .ellipsis,
-                          style: meta?.copyWith(fontWeight: .w500),
-                        ),
-                      ),
-                      Text('·', style: meta),
-                      Text(_age(data['received']), style: meta),
-                      if (critical)
-                        _Chip(
-                          'Critical',
-                          color: colors.error,
-                          foreground: colors.onError,
-                          fontSize: 11,
-                        ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Dismiss',
-                  iconSize: 18,
-                  visualDensity: .compact,
-                  constraints: const .tightFor(width: 32, height: 32),
-                  padding: .zero,
-                  color: foreground,
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () {
-                    for (final target in dismissIds ?? [id]) {
-                      onAction({
-                        'action': 'notification.dismiss',
-                        'id': target,
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
-          Padding(
-            padding: const .only(right: 4),
-            child: Row(
-              crossAxisAlignment: .start,
-              spacing: 12,
-              children: [
-                if (hasImage) image,
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: .start,
-                    spacing: 2,
-                    children: [
-                      if (summary.isNotEmpty)
-                        Text(
-                          summary,
-                          maxLines: 1,
-                          overflow: .ellipsis,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            fontSize: low ? 14 : 16,
-                            height: 1.2,
-                            fontWeight: .w500,
-                            color: summaryColor,
-                          ),
-                        ),
-                      if (body.isNotEmpty)
-                        _NotificationBody(
-                          runs: body,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontSize: low ? 13 : 14,
-                            height: low ? 18 / 13 : 20 / 14,
-                            color: foreground,
-                          ),
-                          link: colors.primary,
-                          onLink: (href) => onAction({
-                            'action': 'notification.link',
-                            'href': href,
-                          }),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (progress is int)
-            Padding(
-              padding: const .only(right: 4),
-              child: Row(
-                spacing: 12,
-                children: [
-                  Expanded(
-                    child: Semantics(
-                      label: 'Progress $progress%',
-                      child: SizedBox(
-                        height: 12,
-                        child: CustomPaint(
-                          painter: WaveProgressPainter(
-                            fraction: progress / 100,
-                            active: critical ? colors.error : colors.primary,
-                            track: critical
-                                ? colors.onErrorContainer.withValues(alpha: .2)
-                                : colors.secondaryContainer,
-                            thickness: 4,
-                            amplitude: 4,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  PercentText(
-                    '$progress',
-                    style: meta?.copyWith(fontWeight: .w500),
-                  ),
-                ],
-              ),
-            ),
-          if (actions.isNotEmpty)
-            Padding(
-              padding: const .only(right: 4),
-              child: Wrap(
-                alignment: .end,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final (index, (key, label)) in actions.indexed)
-                    FilledButton.tonal(
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(0, 32),
-                        padding: const .symmetric(horizontal: 12),
-                        visualDensity: .compact,
-                        tapTargetSize: .shrinkWrap,
-                        textStyle: theme.textTheme.labelLarge?.copyWith(
-                          fontSize: 14,
-                        ),
-                        backgroundColor: critical
-                            ? index == 0
-                                  ? colors.error
-                                  : colors.error.withValues(alpha: .24)
-                            : colors.secondaryContainer,
-                        foregroundColor: critical
-                            ? index == 0
-                                  ? colors.onError
-                                  : colors.onErrorContainer
-                            : colors.onSecondaryContainer,
-                      ),
-                      onPressed: () => onAction({
-                        'action': 'notification.invoke',
-                        'id': id,
-                        'key': key,
-                      }),
-                      child: Text(label, maxLines: 1, overflow: .ellipsis),
-                    ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-    return Material(
-      color: background,
-      borderRadius: radius ?? .circular(critical ? 28 : 20),
-      clipBehavior: .antiAlias,
-      child: data['default'] == true
-          ? InkWell(
-              onTap: () => onAction({
-                'action': 'notification.invoke',
-                'id': id,
-                'key': 'default',
-              }),
-              child: card,
-            )
-          : card,
-    );
-  }
-}
-
-class _Chip extends StatelessWidget {
-  const _Chip(
-    this.label, {
-    required this.color,
-    required this.foreground,
-    this.fontSize = 12,
-  });
-
-  final String label;
-  final Color color;
-  final Color foreground;
-  final double fontSize;
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: ShapeDecoration(color: color, shape: const StadiumBorder()),
-    child: Padding(
-      padding: const .symmetric(horizontal: 8, vertical: 2),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          fontSize: fontSize,
-          height: 1.2,
-          fontWeight: .w500,
-          color: foreground,
-        ),
-      ),
-    ),
-  );
-}
-
-class _AppBadge extends StatelessWidget {
-  const _AppBadge({
-    required this.data,
-    required this.color,
-    required this.foreground,
-  });
-
-  final Map data;
-  final Color color;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    final fallback = Icon(
-      Icons.chat_bubble_outline_rounded,
-      size: 16,
-      color: foreground,
-    );
-    final icon = data['icon'];
-    final path = data['iconPath'];
-    return Container(
-      width: 24,
-      height: 24,
-      alignment: .center,
-      decoration: ShapeDecoration(color: color, shape: const CircleBorder()),
-      child: SizedBox.square(
-        dimension: 16,
-        child: icon is Uint8List
-            ? Image.memory(icon, errorBuilder: (_, _, _) => fallback)
-            : path is String
-            ? Image.file(File(path), errorBuilder: (_, _, _) => fallback)
-            : fallback,
-      ),
-    );
-  }
-}
-
-class _NotificationImage extends StatelessWidget {
-  const _NotificationImage({required this.data});
-
-  final Map data;
-
-  @override
-  Widget build(BuildContext context) {
-    final image = data['image'];
-    return ClipRRect(
-      borderRadius: .circular(16),
-      child: SizedBox.square(
-        dimension: 48,
-        child: data['imageArgb'] is Uint8List
-            ? TrayIcon(
-                data: {
-                  'argb': data['imageArgb'],
-                  'width': data['imageWidth'],
-                  'height': data['imageHeight'],
-                },
-                size: 48,
-              )
-            : image is Uint8List
-            ? Image.memory(image, fit: .cover, gaplessPlayback: true)
-            : const SizedBox.shrink(),
-      ),
-    );
-  }
-}
-
-/// Body runs with bold, italic, underline and links, clipped to three lines.
-class _NotificationBody extends StatefulWidget {
-  const _NotificationBody({
-    required this.runs,
-    required this.style,
-    required this.link,
-    required this.onLink,
-  });
-
-  final List runs;
-  final TextStyle? style;
-  final Color link;
-  final ValueChanged<String> onLink;
-
-  @override
-  State<_NotificationBody> createState() => _NotificationBodyState();
-}
-
-class _NotificationBodyState extends State<_NotificationBody> {
-  final _recognizers = <TapGestureRecognizer>[];
-
-  void _clear() {
-    for (final recognizer in _recognizers) {
-      recognizer.dispose();
-    }
-    _recognizers.clear();
-  }
-
-  TapGestureRecognizer _recognizer(String href) {
-    final recognizer = TapGestureRecognizer()
-      ..onTap = () => widget.onLink(href);
-    _recognizers.add(recognizer);
-    return recognizer;
+    return .ignored;
   }
 
   @override
   void dispose() {
-    _clear();
+    FocusManager.instance.removeEarlyKeyEventHandler(_onKeyEvent);
+    _panelFocus.dispose();
+    _scroll.dispose();
+    for (final node in _focus.values) {
+      node.dispose();
+    }
     super.dispose();
   }
 
+  FocusNode _rowFocus(Object id) =>
+      _focus.putIfAbsent(id, () => FocusNode(debugLabel: 'Notification $id'));
+
+  void _focusRow(Object id, {bool up = false}) {
+    final node = _focus[id];
+    node?.requestFocus();
+    if (node?.context case final context?) {
+      Scrollable.ensureVisible(
+        context,
+        alignmentPolicy: up ? .keepVisibleAtStart : .keepVisibleAtEnd,
+      );
+    }
+  }
+
+  void _moveFocus(int direction) {
+    if (_visibleRows.isEmpty) return;
+    final current = _visibleRows.indexWhere(
+      (id) => _focus[id]?.hasFocus == true,
+    );
+    final index = (current + direction).clamp(0, _visibleRows.length - 1);
+    _focusRow(_visibleRows[index], up: direction < 0);
+  }
+
+  void _rowFocused(Object id, bool focused) {
+    if (focused && _tabRow != id && mounted) {
+      setState(() => _tabRow = id);
+    }
+  }
+
+  Widget _traversal(Object id, Widget child, {Key? key}) => FocusTraversalGroup(
+    key: key,
+    descendantsAreTraversable:
+        _tabRow == id ||
+        (_tabRow == null && (widget.onHeight == null || _focus.isEmpty)),
+    child: child,
+  );
+
+  void _updateFocus(List<Object> rows) {
+    final focused = _visibleRows.indexWhere(
+      (id) => _focus[id]?.hasFocus == true,
+    );
+    final removed = focused >= 0 && !rows.contains(_visibleRows[focused]);
+    _visibleRows = rows;
+    if (rows.isEmpty || (!_initialFocus && !removed)) return;
+    _initialFocus = false;
+    final next = rows[removed ? focused.clamp(0, rows.length - 1) : 0];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _visibleRows.contains(next)) _focusRow(next);
+    });
+  }
+
+  void _reportHeight(double pad) {
+    if ((_topHeight, _listHeight, _footerHeight) case (
+      final top?,
+      final list?,
+      final footer?,
+    )) {
+      widget.onHeight?.call(top + list + footer + pad * 2 + 32);
+    }
+  }
+
+  void _clear([int? urgency, Object? group]) => widget.onAction({
+    'action': 'notification.clear',
+    'urgency': ?urgency,
+    'group': ?group,
+  });
+
   @override
   Widget build(BuildContext context) {
-    _clear();
-    return Text.rich(
-      TextSpan(
+    final items = (widget.data['notifications'] as List? ?? const [])
+        .whereType<Map>()
+        .toList();
+    final error = widget.data['serviceError'] as String?;
+    if (error == null) _expansion.retain(items);
+    final sections = <int, Map<Object?, List<Map>>>{2: {}, 1: {}, 0: {}};
+    for (final item in items) {
+      final groups = sections[item['urgency']] ?? sections[1]!;
+      (groups[item['group']] ??= []).add(item);
+    }
+    final first = sections.values
+        .expand((groups) => groups.values)
+        .firstOrNull
+        ?.first['id'];
+    final focusOrder = <Object>[];
+    Widget tile(
+      Map item,
+      int urgency,
+      Object? group, {
+      required bool child,
+      required BorderRadius radius,
+    }) {
+      final id = item['id'] as int;
+      final rowKey = (urgency, group, id, child);
+      focusOrder.add(rowKey);
+      final expanded =
+          urgency == 2 || (_expansion.rows[id] ?? (!child && id == first));
+      return _traversal(
+        rowKey,
+        key: ValueKey(id),
+        NotificationTile(
+          data: item,
+          expanded: expanded,
+          onToggle: urgency == 2
+              ? null
+              : () => setState(() => _expansion.rows[id] = !expanded),
+          focusNode: _rowFocus(rowKey),
+          showFocusIndicator: _keyboard,
+          onFocusChange: (focused) => _rowFocused(rowKey, focused),
+          radius: radius,
+          onAction: widget.onAction,
+          onDismissSection: () => _clear(urgency, child ? group : null),
+        ),
+      );
+    }
+
+    Widget section(int urgency, Map<Object?, List<Map>> groups) {
+      final children = <Widget>[];
+      for (final (index, entry) in groups.entries.indexed) {
+        final MapEntry(key: group, value: members) = entry;
+        final radius = BorderRadius.vertical(
+          top: Radius.circular(index == 0 ? 28 : 4),
+          bottom: Radius.circular(index == groups.length - 1 ? 28 : 4),
+        );
+        if (members.length == 1) {
+          children.add(
+            tile(members.first, urgency, group, child: false, radius: radius),
+          );
+          continue;
+        }
+        final key = (urgency, group);
+        final expanded =
+            urgency == 2 ||
+            (_expansion.groups[key] ?? (members.first['id'] == first));
+        focusOrder.add(key);
+        children.add(
+          NotificationGroup(
+            key: ValueKey(key),
+            items: members,
+            expanded: expanded,
+            radius: radius,
+            focusNode: _rowFocus(key),
+            showFocusIndicator: _keyboard,
+            traversable:
+                _tabRow == key || (_tabRow == null && widget.onHeight == null),
+            onFocusChange: (focused) => _rowFocused(key, focused),
+            onToggle: urgency == 2
+                ? null
+                : () => setState(() => _expansion.groups[key] = !expanded),
+            onDismiss: members.any((item) => item['resident'] != true)
+                ? () => _clear(urgency, group)
+                : null,
+            onDismissSection: () => _clear(urgency),
+            children: [
+              if (expanded)
+                for (final item in members)
+                  tile(
+                    item,
+                    urgency,
+                    group,
+                    child: true,
+                    radius: BorderRadius.zero,
+                  ),
+            ],
+          ),
+        );
+      }
+      return Column(
+        crossAxisAlignment: .stretch,
         children: [
-          for (final run in widget.runs)
-            if (run is Map)
-              TextSpan(
-                text: '${run['text'] ?? ''}',
-                mouseCursor: '${run['href'] ?? ''}'.isEmpty
-                    ? null
-                    : SystemMouseCursors.click,
-                recognizer: '${run['href'] ?? ''}'.isEmpty
-                    ? null
-                    : _recognizer(run['href'] as String),
-                style: TextStyle(
-                  fontWeight: run['bold'] == true ? .w600 : null,
-                  fontStyle: run['italic'] == true ? .italic : null,
-                  color: '${run['href'] ?? ''}'.isEmpty ? null : widget.link,
-                  decoration:
-                      run['underline'] == true ||
-                          '${run['href'] ?? ''}'.isNotEmpty
-                      ? .underline
-                      : null,
-                ),
-              ),
+          if (urgency == 0)
+            _SilentHeader(
+              onClear:
+                  groups.values
+                      .expand((items) => items)
+                      .any((item) => item['resident'] != true)
+                  ? () => _clear(0)
+                  : null,
+            ),
+          NotificationFlow(spacing: 2, children: children),
         ],
+      );
+    }
+
+    final dnd = widget.data['dnd'] as bool?;
+    final quiet = widget.data['quietReason'];
+    final status = switch ((quiet, widget.data['quietUntilMinutes'])) {
+      ('schedule', final int minutes) =>
+        'Do not disturb · until ${_scheduleTime(minutes)}',
+      ('schedule', _) => 'Do not disturb · schedule',
+      ('fullscreen', _) => 'Do not disturb · fullscreen app',
+      ('manual', _) => 'Do not disturb',
+      _ => switch (items.length) {
+        0 => 'You’re all caught up',
+        1 => '1 notification',
+        final count => '$count notifications',
+      },
+    };
+    final panel = widget.onHeight != null;
+    final body = Column(
+      mainAxisSize: .min,
+      crossAxisAlignment: .stretch,
+      spacing: 16,
+      children: [
+        if (quiet != null)
+          const _StatusBanner(
+            message:
+                'Notifications arrive silently. Critical alerts still show.',
+          ),
+        if (error != null)
+          _StatusBanner(
+            message: error,
+            error: true,
+            onRetry: () =>
+                widget.onAction(const {'action': 'notification.retry'}),
+          )
+        else if (items.isEmpty)
+          const _EmptyNotifications(),
+        if (widget.actionError case final message?)
+          _StatusBanner(message: message, error: true),
+        if (error == null)
+          NotificationFlow(
+            spacing: 16,
+            children: [
+              for (final MapEntry(key: urgency, value: groups)
+                  in sections.entries)
+                if (groups.isNotEmpty)
+                  KeyedSubtree(
+                    key: ValueKey(urgency),
+                    child: section(urgency, groups),
+                  ),
+            ],
+          ),
+        if (widget.tasks case final tasks?) ...[
+          const Divider(height: 1),
+          tasks,
+        ],
+      ],
+    );
+    if (panel) {
+      _updateFocus(focusOrder);
+    } else {
+      _visibleRows = focusOrder;
+    }
+
+    _focus.removeWhere((id, node) {
+      if (focusOrder.contains(id) || node.context != null) return false;
+      node.dispose();
+      return true;
+    });
+    final clearCritical = widget.data['clearCritical'] == true;
+    final canClear = items.any(
+      (item) =>
+          item['resident'] != true && (clearCritical || item['urgency'] != 2),
+    );
+    final criticalRemains = items.any(
+      (item) => item['urgency'] == 2 && item['resident'] != true,
+    );
+    final colors = Theme.of(context).colorScheme;
+    return CallbackShortcuts(
+      bindings: {
+        if (panel)
+          const SingleActivator(LogicalKeyboardKey.escape): () =>
+              widget.onAction(const {'action': 'close'}),
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () => _moveFocus(-1),
+        const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+            _moveFocus(1),
+      },
+      child: Focus(
+        focusNode: _panelFocus,
+        autofocus: panel,
+        child: Listener(
+          onPointerDown: (_) {
+            if (_keyboard) setState(() => _keyboard = false);
+          },
+          child: Material(
+            type: panel ? .card : .transparency,
+            color: panel ? colors.surfaceContainer : null,
+            shape: panel
+                ? RoundedRectangleBorder(
+                    borderRadius: .circular(32),
+                    side: BorderSide(color: colors.surfaceContainerHighest),
+                  )
+                : null,
+            clipBehavior: panel ? .antiAlias : .none,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final pad = !panel
+                    ? 0.0
+                    : (constraints.maxWidth < 340 ? 12.0 : 24.0);
+                return Padding(
+                  padding: .symmetric(vertical: pad),
+                  child: Column(
+                    mainAxisSize: .min,
+                    crossAxisAlignment: .stretch,
+                    spacing: 16,
+                    children: [
+                      Padding(
+                        padding: .symmetric(horizontal: pad),
+                        child: PopupMeasure(
+                          onHeight: (height) {
+                            _topHeight = height;
+                            _reportHeight(pad);
+                          },
+                          child: _NotificationHeader(
+                            status: status,
+                            onSettings: () => widget.onAction(const {
+                              'action': 'notification.settings',
+                            }),
+                          ),
+                        ),
+                      ),
+                      Flexible(
+                        child: _NotificationScroll(
+                          controller: _scroll,
+                          pad: pad,
+                          child: PopupMeasure(
+                            onHeight: (height) {
+                              _listHeight = height;
+                              _reportHeight(pad);
+                            },
+                            child: body,
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: .symmetric(horizontal: pad),
+                        child: PopupMeasure(
+                          onHeight: (height) {
+                            _footerHeight = height;
+                            _reportHeight(pad);
+                          },
+                          child: _NotificationFooter(
+                            dnd: dnd,
+                            showClear: items.isNotEmpty,
+                            onDnd: (value) => widget.onAction({
+                              'action': 'notification.dnd',
+                              'value': value,
+                            }),
+                            onClear: canClear ? _clear : null,
+                            clearHint: criticalRemains && !clearCritical
+                                ? 'Critical notifications must be dismissed individually'
+                                : 'Resident notifications must be dismissed individually',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
       ),
-      maxLines: 3,
-      overflow: .ellipsis,
-      style: widget.style,
     );
   }
 }
 
-Color _emphasis(ThemeData theme) => theme.brightness == .dark
-    ? theme.colorScheme.primaryFixed
-    : theme.colorScheme.onSurface;
+class _NotificationHeader extends StatelessWidget {
+  const _NotificationHeader({required this.status, required this.onSettings});
 
-/// Short receive age: now, 5m, 2h, 3d.
-String _age(Object? received) {
-  if (received is! int) return '';
-  final seconds = DateTime.now()
-      .difference(DateTime.fromMillisecondsSinceEpoch(received))
-      .inSeconds;
-  return switch (seconds) {
-    < 60 => 'now',
-    < 3600 => '${seconds ~/ 60}m',
-    < 86400 => '${seconds ~/ 3600}h',
-    _ => '${seconds ~/ 86400}d',
-  };
+  final String status;
+  final VoidCallback onSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Row(
+      spacing: 8,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: .start,
+            spacing: 2,
+            children: [
+              Text(
+                'Notifications',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  height: 30 / 24,
+                  fontWeight: .bold,
+                  color: colors.primary,
+                ),
+              ),
+              Text(status, style: _supporting(theme)),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: 'Settings',
+          onPressed: onSettings,
+          icon: const Icon(Icons.settings_outlined, size: 20),
+        ),
+      ],
+    );
+  }
+}
+
+class _NotificationFooter extends StatelessWidget {
+  const _NotificationFooter({
+    required this.dnd,
+    required this.showClear,
+    required this.onDnd,
+    required this.onClear,
+    required this.clearHint,
+  });
+
+  final bool? dnd;
+  final bool showClear;
+  final ValueChanged<bool> onDnd;
+  final VoidCallback? onClear;
+  final String clearHint;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final clear = FilledButton.tonal(
+      onPressed: onClear,
+      child: const Text('Clear all'),
+    );
+    return Wrap(
+      alignment: .spaceBetween,
+      crossAxisAlignment: .center,
+      spacing: 8,
+      runSpacing: 4,
+      children: [
+        Semantics(
+          toggled: dnd,
+          child: FilledButton.icon(
+            style: dnd == true
+                ? null
+                : FilledButton.styleFrom(
+                    backgroundColor: colors.secondaryContainer,
+                    foregroundColor: colors.onSecondaryContainer,
+                  ),
+            onPressed: dnd == null ? null : () => onDnd(!dnd!),
+            icon: const Icon(Icons.do_not_disturb_on_outlined, size: 20),
+            label: const Text('Do not disturb'),
+          ),
+        ),
+        if (showClear)
+          onClear == null ? Tooltip(message: clearHint, child: clear) : clear,
+      ],
+    );
+  }
+}
+
+class _SilentHeader extends StatelessWidget {
+  const _SilentHeader({this.onClear});
+
+  final VoidCallback? onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 48),
+      child: Padding(
+        padding: const .fromLTRB(16, 0, 4, 0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Silent',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Clear section',
+              onPressed: onClear,
+              icon: const Icon(Icons.close_rounded, size: 20),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBanner extends StatelessWidget {
+  const _StatusBanner({
+    required this.message,
+    this.error = false,
+    this.onRetry,
+  });
+
+  final String message;
+  final bool error;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Material(
+      color: error ? colors.errorContainer : colors.surfaceContainerHigh,
+      borderRadius: .circular(20),
+      child: Padding(
+        padding: const .symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          spacing: 12,
+          children: [
+            Icon(
+              error
+                  ? Icons.error_outline_rounded
+                  : Icons.do_not_disturb_on_outlined,
+              size: 20,
+              color: error ? colors.onErrorContainer : colors.primary,
+            ),
+            Expanded(
+              child: Text(
+                message,
+                style: _supporting(theme)?.copyWith(
+                  color: error
+                      ? colors.onErrorContainer
+                      : colors.onSurfaceVariant,
+                ),
+              ),
+            ),
+            if (onRetry != null)
+              TextButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyNotifications extends StatelessWidget {
+  const _EmptyNotifications();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Padding(
+      padding: const .symmetric(vertical: 32),
+      child: Column(
+        spacing: 12,
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: colors.surfaceContainerHigh,
+            child: Icon(
+              Icons.notifications_none_rounded,
+              size: 24,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          Text('No notifications', style: theme.textTheme.labelLarge),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationScroll extends StatefulWidget {
+  const _NotificationScroll({
+    required this.controller,
+    required this.pad,
+    required this.child,
+  });
+
+  final ScrollController controller;
+  final double pad;
+  final Widget child;
+
+  @override
+  State<_NotificationScroll> createState() => _NotificationScrollState();
+}
+
+class _NotificationScrollState extends State<_NotificationScroll> {
+  bool _top = false;
+  bool _bottom = false;
+
+  bool _metrics(ScrollMetrics metrics) {
+    final top = metrics.extentBefore > 0;
+    final bottom = metrics.extentAfter > 0;
+    if (top != _top || bottom != _bottom) {
+      setState(() {
+        _top = top;
+        _bottom = bottom;
+      });
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: [
+      NotificationListener<ScrollMetricsNotification>(
+        onNotification: (event) => _metrics(event.metrics),
+        child: NotificationListener<ScrollUpdateNotification>(
+          onNotification: (event) => _metrics(event.metrics),
+          child: SingleChildScrollView(
+            controller: widget.controller,
+            primary: false,
+            padding: .symmetric(horizontal: widget.pad),
+            child: widget.child,
+          ),
+        ),
+      ),
+      if (_top)
+        Positioned(
+          top: 0,
+          left: widget.pad,
+          right: widget.pad,
+          child: const Divider(height: 1),
+        ),
+      if (_bottom)
+        Positioned(
+          bottom: 0,
+          left: widget.pad,
+          right: widget.pad,
+          child: const Divider(height: 1),
+        ),
+    ],
+  );
+}
+
+TextStyle? _supporting(ThemeData theme) => theme.textTheme.bodySmall?.copyWith(
+  color: theme.colorScheme.onSurfaceVariant,
+  fontSize: 13,
+  height: 18 / 13,
+);
+
+String _scheduleTime(int minutes) {
+  final hours = (minutes ~/ 60).toString().padLeft(2, '0');
+  final minute = (minutes % 60).toString().padLeft(2, '0');
+  return '$hours:$minute';
 }

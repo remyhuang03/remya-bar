@@ -444,12 +444,6 @@ static void my_application_startup(GApplication* application) {
           if (g_strcmp0(signal_name, "ToggleSidebar") == 0) {
             if (!g_variant_is_of_type(parameters, G_VARIANT_TYPE("(s)"))) return;
             g_hash_table_iter_init(&iterator, self->bar_windows);
-            bool closed = false;
-            while (g_hash_table_iter_next(&iterator, nullptr, &value)) {
-              closed |= close_bar_sidebar(FL_VIEW(gtk_bin_get_child(GTK_BIN(value))));
-            }
-            if (closed) return;
-            g_hash_table_iter_init(&iterator, self->bar_windows);
             while (g_hash_table_iter_next(&iterator, nullptr, &value)) {
               auto* view = gtk_bin_get_child(GTK_BIN(value));
               auto* channel = FL_METHOD_CHANNEL(g_object_get_data(G_OBJECT(view), "window-channel"));

@@ -203,7 +203,30 @@ extension _PopupActions on _RemyaBarAppState {
       case 'notification.dismiss' when id is int:
         await backend.dismiss(id);
       case 'notification.clear':
-        await backend.dismiss(null);
+        await backend.clear(
+          urgency: args['urgency'] as int?,
+          group: args['group'] as String?,
+        );
+      case 'notification.retry':
+        await backend.retry();
+      case 'notification.settings':
+        await openBarSettings(page: 'notifications');
+      case 'notification.open':
+        if (!_notificationsOpen) {
+          final scale = MediaQueryData.fromView(View.of(context)).textScaler
+              .scale(1);
+          // Finish responding to the toast before opening the panel hides it.
+          unawaited(
+            Future<void>(() async {
+              if (mounted && !_notificationsOpen) {
+                await _toggleNotifications(
+                  _RemyaBarAppState._popupAnchor,
+                  scale,
+                );
+              }
+            }),
+          );
+        }
       case 'notification.invoke' when id is int && args['key'] is String:
         await backend.invoke(id, args['key'] as String);
       case 'notification.dnd' when value is bool:

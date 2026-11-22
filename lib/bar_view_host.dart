@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_ui/remya_ui.dart';
 
+import 'features/notifications/notification_view.dart';
 import 'features/popups/bar_popup.dart';
 import 'features/popups/popup_app.dart';
 import 'features/settings/bar_settings_entry.dart';
@@ -33,6 +34,7 @@ class _BarViewHostState extends State<BarViewHost> with WidgetsBindingObserver {
   List<FlutterView> _views = const [];
   Map<int, _ViewRole> _roles = const {};
   final _bars = <int, Widget>{};
+  final _notificationExpansion = NotificationExpansion();
   int _revision = -1;
   int _settingsRequest = 0;
   ({int id, String page})? _settings;
@@ -148,7 +150,10 @@ class _BarViewHostState extends State<BarViewHost> with WidgetsBindingObserver {
   Widget _buildView(int viewId, _ViewRole role) => switch (role) {
     // Other views opening or closing do not invalidate a bar's subtree.
     .bar => _bars.putIfAbsent(viewId, () => widget.buildBar(viewId)),
-    .popup => BarPopupApp(channel: BarPopup.viewChannel(viewId)),
+    .popup => BarPopupApp(
+      channel: BarPopup.viewChannel(viewId),
+      notificationExpansion: _notificationExpansion,
+    ),
     .settings => BarSettingsEntry(
       page: _settings?.id == viewId ? _settings!.page : '',
       request: _settingsRequest,

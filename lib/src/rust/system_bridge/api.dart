@@ -88,6 +88,10 @@ Future<void> notificationsConfigure({
   preferences: preferences,
 );
 
+/// Retries taking the notification service name without replacing its owner.
+Future<void> notificationsRetry() =>
+    SystemRustLib.instance.api.crateApiNotificationsRetry();
+
 /// Reports whether an output shows a full screen window.
 Future<void> notificationsFullscreen({
   required String output,
@@ -105,9 +109,15 @@ Future<bool> notificationsClaimPopups({required String output}) =>
 Future<void> notificationsHover({required bool hovered}) =>
     SystemRustLib.instance.api.crateApiNotificationsHover(hovered: hovered);
 
-/// Dismisses one notification, or all of them when `id` is null.
+/// Dismisses one notification, or runs the global clear when `id` is null.
 Future<void> notificationDismiss({int? id}) =>
     SystemRustLib.instance.api.crateApiNotificationDismiss(id: id);
+
+/// Clears history by urgency and sender, or runs the global clear without filters.
+Future<void> notificationsClear({int? urgency, String? group}) => SystemRustLib
+    .instance
+    .api
+    .crateApiNotificationsClear(urgency: urgency, group: group);
 
 Future<void> notificationInvoke({required int id, required String action}) =>
     SystemRustLib.instance.api.crateApiNotificationInvoke(
@@ -370,6 +380,10 @@ class NotificationCenter {
   /// `fullscreen`.
   final String quietReason;
 
+  /// Local time in minutes after midnight when scheduled Do Not Disturb ends.
+  final int? quietUntilMinutes;
+  final bool clearCritical;
+
   /// The output that shows the popup stack, if any.
   final String? popupHost;
 
@@ -380,6 +394,8 @@ class NotificationCenter {
     required this.notifications,
     this.doNotDisturb,
     required this.quietReason,
+    this.quietUntilMinutes,
+    required this.clearCritical,
     this.popupHost,
     this.error,
   });
@@ -389,6 +405,8 @@ class NotificationCenter {
       notifications.hashCode ^
       doNotDisturb.hashCode ^
       quietReason.hashCode ^
+      quietUntilMinutes.hashCode ^
+      clearCritical.hashCode ^
       popupHost.hashCode ^
       error.hashCode;
 
@@ -400,6 +418,8 @@ class NotificationCenter {
           notifications == other.notifications &&
           doNotDisturb == other.doNotDisturb &&
           quietReason == other.quietReason &&
+          quietUntilMinutes == other.quietUntilMinutes &&
+          clearCritical == other.clearCritical &&
           popupHost == other.popupHost &&
           error == other.error;
 }
@@ -408,6 +428,7 @@ class NotificationCenter {
 /// days are ISO weekdays (1 Monday) on which the schedule starts.
 class NotificationPreferences {
   final bool doNotDisturb;
+  final bool clearCritical;
   final int timeoutSeconds;
   final bool sounds;
   final bool schedule;
@@ -420,6 +441,7 @@ class NotificationPreferences {
 
   const NotificationPreferences({
     required this.doNotDisturb,
+    required this.clearCritical,
     required this.timeoutSeconds,
     required this.sounds,
     required this.schedule,
@@ -434,6 +456,7 @@ class NotificationPreferences {
   @override
   int get hashCode =>
       doNotDisturb.hashCode ^
+      clearCritical.hashCode ^
       timeoutSeconds.hashCode ^
       sounds.hashCode ^
       schedule.hashCode ^
@@ -450,6 +473,7 @@ class NotificationPreferences {
       other is NotificationPreferences &&
           runtimeType == other.runtimeType &&
           doNotDisturb == other.doNotDisturb &&
+          clearCritical == other.clearCritical &&
           timeoutSeconds == other.timeoutSeconds &&
           sounds == other.sounds &&
           schedule == other.schedule &&
@@ -504,6 +528,9 @@ class NotificationSnapshot {
 
   /// Whether the notification is currently shown as a popup.
   final bool popup;
+
+  /// Sequence of the most recent heads-up alert, independent of history order.
+  final int popupSequence;
   final bool transient;
   final bool resident;
 
@@ -527,6 +554,7 @@ class NotificationSnapshot {
     required this.imagePath,
     this.progress,
     required this.popup,
+    required this.popupSequence,
     required this.transient,
     required this.resident,
     required this.category,
@@ -550,6 +578,7 @@ class NotificationSnapshot {
       imagePath.hashCode ^
       progress.hashCode ^
       popup.hashCode ^
+      popupSequence.hashCode ^
       transient.hashCode ^
       resident.hashCode ^
       category.hashCode;
@@ -575,6 +604,7 @@ class NotificationSnapshot {
           imagePath == other.imagePath &&
           progress == other.progress &&
           popup == other.popup &&
+          popupSequence == other.popupSequence &&
           transient == other.transient &&
           resident == other.resident &&
           category == other.category;

@@ -363,9 +363,12 @@ pub struct NotificationSnapshot {
     /// Whether the notification is currently shown as a popup.
     #[serde(skip)]
     pub popup: bool,
+    /// Sequence of the most recent heads-up alert, independent of history order.
+    #[serde(skip)]
+    pub popup_sequence: u32,
     #[serde(skip)]
     pub transient: bool,
-    #[serde(skip)]
+    #[serde(default)]
     pub resident: bool,
     /// The freedesktop `category` hint, such as `call.incoming`.
     pub category: String,
@@ -380,6 +383,9 @@ pub struct NotificationCenter {
     /// Why Do Not Disturb is in effect: empty, `manual`, `schedule` or
     /// `fullscreen`.
     pub quiet_reason: String,
+    /// Local time in minutes after midnight when scheduled Do Not Disturb ends.
+    pub quiet_until_minutes: Option<u32>,
+    pub clear_critical: bool,
     /// The output that shows the popup stack, if any.
     pub popup_host: Option<String>,
     /// Set while the bar does not own the notification service name.
@@ -402,6 +408,7 @@ pub struct NotificationPriorityApp {
 #[derive(Clone, Debug, PartialEq)]
 pub struct NotificationPreferences {
     pub do_not_disturb: bool,
+    pub clear_critical: bool,
     pub timeout_seconds: u32,
     pub sounds: bool,
     pub schedule: bool,
@@ -415,6 +422,11 @@ pub struct NotificationPreferences {
 
 pub async fn notifications_configure(preferences: NotificationPreferences) {
     crate::notifications::configure(preferences).await;
+}
+
+/// Retries taking the notification service name without replacing its owner.
+pub async fn notifications_retry() {
+    crate::notifications::retry();
 }
 
 /// Reports whether an output shows a full screen window.
@@ -432,9 +444,14 @@ pub async fn notifications_hover(hovered: bool) {
     crate::notifications::hover(hovered).await;
 }
 
-/// Dismisses one notification, or all of them when `id` is null.
+/// Dismisses one notification, or runs the global clear when `id` is null.
 pub async fn notification_dismiss(id: Option<u32>) -> Result<(), String> {
     crate::notifications::dismiss(id).await
+}
+
+/// Clears history by urgency and sender, or runs the global clear without filters.
+pub async fn notifications_clear(urgency: Option<u8>, group: Option<String>) -> Result<(), String> {
+    crate::notifications::clear(urgency, group.as_deref()).await
 }
 
 pub async fn notification_invoke(id: u32, action: String) -> Result<(), String> {

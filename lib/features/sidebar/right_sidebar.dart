@@ -153,7 +153,6 @@ class _RightSidebarState extends State<RightSidebar> {
 
   String? _detail;
   bool _power = false;
-  bool _expandedControls = false;
   int _pendingActions = 0;
   bool get _busy => _pendingActions > 0;
   String? _error;
@@ -559,8 +558,8 @@ class _RightSidebarState extends State<RightSidebar> {
     final colors = theme.colorScheme;
     final edit = _draft != null;
     final tasks = widget.tasks;
-    final collapsed = tasks != null && !edit && !_expandedControls;
     final large = _tiles.where(_large.containsKey).toList();
+    final small = _tiles.where(_small.containsKey).toList();
     final brightness = _map(widget.data['brightness']);
     final hidden = [
       ..._large.keys,
@@ -606,18 +605,9 @@ class _RightSidebarState extends State<RightSidebar> {
           ],
         ),
       ),
-      if (large.isNotEmpty || edit)
-        _grid(2, collapsed ? large.take(2).toList() : large, _largeTile),
-      if (!collapsed && (_tiles.any(_small.containsKey) || edit))
-        _grid(5, _tiles.where(_small.containsKey).toList(), _smallTile),
+      if (large.isNotEmpty || edit) _grid(2, large, _largeTile),
+      if (small.isNotEmpty || edit) _grid(5, small, _smallTile),
       if (tasks != null && !edit) ...[
-        Align(
-          alignment: .centerLeft,
-          child: TextButton(
-            onPressed: () => setState(() => _expandedControls = collapsed),
-            child: Text(collapsed ? 'Show all controls' : 'Collapse controls'),
-          ),
-        ),
         Divider(height: 1, color: colors.outlineVariant),
         tasks,
       ],

@@ -73,7 +73,7 @@ class SystemRustLib
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -504542853;
+  int get rustContentHash => -1455412574;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -125,6 +125,8 @@ abstract class SystemRustLibApi extends BaseApi {
 
   Future<bool> crateApiNotificationsClaimPopups({required String output});
 
+  Future<void> crateApiNotificationsClear({int? urgency, String? group});
+
   Future<void> crateApiNotificationsConfigure({
     required NotificationPreferences preferences,
   });
@@ -135,6 +137,8 @@ abstract class SystemRustLibApi extends BaseApi {
   });
 
   Future<void> crateApiNotificationsHover({required bool hovered});
+
+  Future<void> crateApiNotificationsRetry();
 
   Future<ResourceDetails> crateApiResourceDetailsDefault();
 
@@ -519,6 +523,37 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       );
 
   @override
+  Future<void> crateApiNotificationsClear({int? urgency, String? group}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_box_autoadd_u_8(urgency, serializer);
+          sse_encode_opt_String(group, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 11,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiNotificationsClearConstMeta,
+        argValues: [urgency, group],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNotificationsClearConstMeta => const TaskConstMeta(
+    debugName: "notifications_clear",
+    argNames: ["urgency", "group"],
+  );
+
+  @override
   Future<void> crateApiNotificationsConfigure({
     required NotificationPreferences preferences,
   }) {
@@ -533,7 +568,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 12,
             port: port_,
           );
         },
@@ -568,7 +603,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 13,
             port: port_,
           );
         },
@@ -599,7 +634,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 14,
             port: port_,
           );
         },
@@ -620,6 +655,33 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   );
 
   @override
+  Future<void> crateApiNotificationsRetry() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 15,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiNotificationsRetryConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNotificationsRetryConstMeta =>
+      const TaskConstMeta(debugName: "notifications_retry", argNames: []);
+
+  @override
   Future<ResourceDetails> crateApiResourceDetailsDefault() {
     return handler.executeNormal(
       NormalTask(
@@ -628,7 +690,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 16,
             port: port_,
           );
         },
@@ -656,7 +718,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 17,
             port: port_,
           );
         },
@@ -686,7 +748,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 18,
             port: port_,
           );
         },
@@ -719,7 +781,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 17,
+              funcId: 19,
               port: port_,
             );
           },
@@ -751,7 +813,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 18,
+              funcId: 20,
               port: port_,
             );
           },
@@ -786,7 +848,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 19,
+              funcId: 21,
               port: port_,
             );
           },
@@ -822,7 +884,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 22,
             port: port_,
           );
         },
@@ -851,7 +913,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 23,
             port: port_,
           );
         },
@@ -883,7 +945,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 24,
             port: port_,
           );
         },
@@ -917,7 +979,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 25,
             port: port_,
           );
         },
@@ -951,7 +1013,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 26,
             port: port_,
           );
         },
@@ -987,7 +1049,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1023,7 +1085,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1361,14 +1423,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   NotificationCenter dco_decode_notification_center(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return NotificationCenter(
       notifications: dco_decode_list_notification_snapshot(arr[0]),
       doNotDisturb: dco_decode_opt_box_autoadd_bool(arr[1]),
       quietReason: dco_decode_String(arr[2]),
-      popupHost: dco_decode_opt_String(arr[3]),
-      error: dco_decode_opt_String(arr[4]),
+      quietUntilMinutes: dco_decode_opt_box_autoadd_u_32(arr[3]),
+      clearCritical: dco_decode_bool(arr[4]),
+      popupHost: dco_decode_opt_String(arr[5]),
+      error: dco_decode_opt_String(arr[6]),
     );
   }
 
@@ -1376,19 +1440,20 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   NotificationPreferences dco_decode_notification_preferences(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 10)
-      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
     return NotificationPreferences(
       doNotDisturb: dco_decode_bool(arr[0]),
-      timeoutSeconds: dco_decode_u_32(arr[1]),
-      sounds: dco_decode_bool(arr[2]),
-      schedule: dco_decode_bool(arr[3]),
-      scheduleStartMinutes: dco_decode_u_32(arr[4]),
-      scheduleEndMinutes: dco_decode_u_32(arr[5]),
-      scheduleDays: dco_decode_list_prim_u_32_strict(arr[6]),
-      fullscreen: dco_decode_bool(arr[7]),
-      priorityCalls: dco_decode_bool(arr[8]),
-      priorityApps: dco_decode_list_notification_priority_app(arr[9]),
+      clearCritical: dco_decode_bool(arr[1]),
+      timeoutSeconds: dco_decode_u_32(arr[2]),
+      sounds: dco_decode_bool(arr[3]),
+      schedule: dco_decode_bool(arr[4]),
+      scheduleStartMinutes: dco_decode_u_32(arr[5]),
+      scheduleEndMinutes: dco_decode_u_32(arr[6]),
+      scheduleDays: dco_decode_list_prim_u_32_strict(arr[7]),
+      fullscreen: dco_decode_bool(arr[8]),
+      priorityCalls: dco_decode_bool(arr[9]),
+      priorityApps: dco_decode_list_notification_priority_app(arr[10]),
     );
   }
 
@@ -1408,8 +1473,8 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   NotificationSnapshot dco_decode_notification_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 19)
-      throw Exception('unexpected arr length: expect 19 but see ${arr.length}');
+    if (arr.length != 20)
+      throw Exception('unexpected arr length: expect 20 but see ${arr.length}');
     return NotificationSnapshot(
       id: dco_decode_u_32(arr[0]),
       appName: dco_decode_String(arr[1]),
@@ -1427,9 +1492,10 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       imagePath: dco_decode_String(arr[13]),
       progress: dco_decode_opt_box_autoadd_i_32(arr[14]),
       popup: dco_decode_bool(arr[15]),
-      transient: dco_decode_bool(arr[16]),
-      resident: dco_decode_bool(arr[17]),
-      category: dco_decode_String(arr[18]),
+      popupSequence: dco_decode_u_32(arr[16]),
+      transient: dco_decode_bool(arr[17]),
+      resident: dco_decode_bool(arr[18]),
+      category: dco_decode_String(arr[19]),
     );
   }
 
@@ -2178,12 +2244,16 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     var var_notifications = sse_decode_list_notification_snapshot(deserializer);
     var var_doNotDisturb = sse_decode_opt_box_autoadd_bool(deserializer);
     var var_quietReason = sse_decode_String(deserializer);
+    var var_quietUntilMinutes = sse_decode_opt_box_autoadd_u_32(deserializer);
+    var var_clearCritical = sse_decode_bool(deserializer);
     var var_popupHost = sse_decode_opt_String(deserializer);
     var var_error = sse_decode_opt_String(deserializer);
     return NotificationCenter(
       notifications: var_notifications,
       doNotDisturb: var_doNotDisturb,
       quietReason: var_quietReason,
+      quietUntilMinutes: var_quietUntilMinutes,
+      clearCritical: var_clearCritical,
       popupHost: var_popupHost,
       error: var_error,
     );
@@ -2195,6 +2265,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_doNotDisturb = sse_decode_bool(deserializer);
+    var var_clearCritical = sse_decode_bool(deserializer);
     var var_timeoutSeconds = sse_decode_u_32(deserializer);
     var var_sounds = sse_decode_bool(deserializer);
     var var_schedule = sse_decode_bool(deserializer);
@@ -2208,6 +2279,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     );
     return NotificationPreferences(
       doNotDisturb: var_doNotDisturb,
+      clearCritical: var_clearCritical,
       timeoutSeconds: var_timeoutSeconds,
       sounds: var_sounds,
       schedule: var_schedule,
@@ -2251,6 +2323,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     var var_imagePath = sse_decode_String(deserializer);
     var var_progress = sse_decode_opt_box_autoadd_i_32(deserializer);
     var var_popup = sse_decode_bool(deserializer);
+    var var_popupSequence = sse_decode_u_32(deserializer);
     var var_transient = sse_decode_bool(deserializer);
     var var_resident = sse_decode_bool(deserializer);
     var var_category = sse_decode_String(deserializer);
@@ -2271,6 +2344,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
       imagePath: var_imagePath,
       progress: var_progress,
       popup: var_popup,
+      popupSequence: var_popupSequence,
       transient: var_transient,
       resident: var_resident,
       category: var_category,
@@ -3164,6 +3238,8 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_list_notification_snapshot(self.notifications, serializer);
     sse_encode_opt_box_autoadd_bool(self.doNotDisturb, serializer);
     sse_encode_String(self.quietReason, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.quietUntilMinutes, serializer);
+    sse_encode_bool(self.clearCritical, serializer);
     sse_encode_opt_String(self.popupHost, serializer);
     sse_encode_opt_String(self.error, serializer);
   }
@@ -3175,6 +3251,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_bool(self.doNotDisturb, serializer);
+    sse_encode_bool(self.clearCritical, serializer);
     sse_encode_u_32(self.timeoutSeconds, serializer);
     sse_encode_bool(self.sounds, serializer);
     sse_encode_bool(self.schedule, serializer);
@@ -3218,6 +3295,7 @@ class SystemRustLibApiImpl extends SystemRustLibApiImplPlatform
     sse_encode_String(self.imagePath, serializer);
     sse_encode_opt_box_autoadd_i_32(self.progress, serializer);
     sse_encode_bool(self.popup, serializer);
+    sse_encode_u_32(self.popupSequence, serializer);
     sse_encode_bool(self.transient, serializer);
     sse_encode_bool(self.resident, serializer);
     sse_encode_String(self.category, serializer);

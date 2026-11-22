@@ -67,7 +67,9 @@ class _BarApplicationState extends State<_BarApplication> {
   final _aiUsage = AiUsageBackend();
   final _account = AccountProfileController();
   final _notifications = NotificationBackend();
-  final _notificationSettings = NotificationSettings();
+  late final _notificationSettings = NotificationSettings(
+    onToastSideChanged: _notifications.setToastOnRight,
+  );
   final _tray = TrayBackend();
   final _osdSettings = SettingsClient();
   late final _debugSettings = _debugExecutable(

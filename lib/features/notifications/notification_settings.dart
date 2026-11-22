@@ -8,11 +8,12 @@ import '../../src/rust/system_bridge/api.dart' as api;
 import '../settings/bar_preferences.dart';
 import '../system/system_backend.dart' show SystemBackend;
 
-/// Applies Core preferences to the process-wide Rust notification server.
+/// Applies Core preferences to the process-wide notification service and UI.
 class NotificationSettings {
   NotificationSettings({
     SettingsClient? client,
     Future<void> Function(NotificationPreferences)? configure,
+    this.onToastSideChanged,
   }) : _client = client ?? SettingsClient(),
        _ownsClient = client == null,
        _configure = configure ?? _configureRust;
@@ -20,6 +21,7 @@ class NotificationSettings {
   final SettingsClient _client;
   final bool _ownsClient;
   final Future<void> Function(NotificationPreferences) _configure;
+  final ValueChanged<bool>? onToastSideChanged;
   late final _preferences = BarPreferences(client: _client);
   StreamSubscription<SettingsChange>? _changes;
   StreamSubscription<bool>? _availability;
@@ -55,7 +57,9 @@ class NotificationSettings {
       try {
         final preferences = await _preferences.readNotifications();
         if (_disposed) return;
-        if (!_dirty) await _configure(preferences);
+        if (_dirty) continue;
+        onToastSideChanged?.call(preferences.toastOnRight);
+        await _configure(preferences);
       } catch (error) {
         if (_disposed) return;
         debugPrint('Notification preferences: $error');
@@ -84,6 +88,7 @@ class NotificationSettings {
     await api.notificationsConfigure(
       preferences: api.NotificationPreferences(
         doNotDisturb: preferences.doNotDisturb,
+        clearCritical: preferences.clearCritical,
         timeoutSeconds: preferences.popupDuration,
         sounds: preferences.sounds,
         schedule: preferences.schedule,

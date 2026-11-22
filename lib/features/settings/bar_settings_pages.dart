@@ -371,20 +371,28 @@ class BarSettingsPage extends StatelessWidget {
               'do-not-disturb',
               'Do not disturb',
               'Hide notification popups and sounds. Critical and priority '
-                  'notifications still show; history keeps everything.',
+                  'notifications still show.',
             ),
             settingTile(
               'Popup duration',
               detail:
                   'How long popups stay when the sender does not set a '
                   'duration. Critical notifications stay until closed.',
-              control: SettingChoice<int>(
-                selected: notifications['popup-duration'] as int,
-                choices: {
-                  for (final seconds in const [3, 5, 8, 10, 15, 30])
-                    seconds: '$seconds seconds',
-                },
-                onSelected: _edit<int>('notifications', 'popup-duration'),
+              control: SettingNumberField(
+                value: notifications['popup-duration'] as int,
+                min: 1,
+                max: 600,
+                suffix: 's',
+                onChanged: _edit<int>('notifications', 'popup-duration'),
+              ),
+            ),
+            settingTile(
+              'Popup position',
+              detail: 'Which side of the screen shows notification popups.',
+              control: SettingChoice<String>(
+                selected: notifications['toast-side'] as String? ?? 'left',
+                choices: const {'left': 'Left', 'right': 'Right'},
+                onSelected: _edit<String>('notifications', 'toast-side'),
               ),
             ),
             toggle(
@@ -394,6 +402,12 @@ class BarSettingsPage extends StatelessWidget {
               'Play sounds',
               'Play the sound a notification requests, or the theme\'s '
                   'message sound. Senders can ask for silence.',
+            ),
+            settingSwitch(
+              'Clear all also removes critical notifications',
+              'Resident notifications must be dismissed individually.',
+              notifications['clear-critical'] as bool? ?? false,
+              _edit<bool>('notifications', 'clear-critical'),
             ),
           ],
         ),

@@ -18,7 +18,8 @@ import 'features/sidebar/right_sidebar.dart';
 import 'features/sidebar/sidebar_backend.dart';
 import 'features/sidebar/sidebar_app_launcher.dart';
 import 'features/notifications/notification_backend.dart';
-import 'features/notifications/notification_view.dart';
+import 'features/notifications/notification_flow.dart';
+import 'features/notifications/notification_toasts.dart';
 import 'features/osd/osd_controller.dart';
 import 'features/osd/osd_slider.dart';
 import 'features/system/system_backend.dart';
@@ -294,6 +295,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
       ],
       'dnd': backend?.doNotDisturb,
       'quietReason': backend?.quietReason,
+      'quietUntilMinutes': backend?.quietUntilMinutes,
+      'clearCritical': backend?.clearCritical,
       'serviceError': backend?.error,
       'scale': scale,
       'reservedHeight': ?reservedHeight,
@@ -469,6 +472,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   }
 
   bool _showingToasts = false;
+  Timer? _toastExit;
   bool _syncingToasts = false;
   bool _toastsDirty = false;
   bool _showingOsd = false;
@@ -540,7 +544,8 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
     }
     _syncingToasts = true;
     try {
-      if (backend.popups.isNotEmpty &&
+      final popups = backend.popups;
+      if (popups.isNotEmpty &&
           backend.popupHost == null &&
           output != null &&
           !_fullscreen) {
@@ -550,13 +555,25 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
           backend.claimPopups(this);
         }
       }
-      final popups = backend.popups.take(4).toList();
-      final visible =
-          popups.isNotEmpty &&
-          backend.popupHost == this &&
+      final ownsStack =
+          backend.popupHost == this && !_notificationsOpen && !_fullscreen;
+      if (popups.isEmpty &&
+          _showingToasts &&
           !_notificationsOpen &&
-          !_fullscreen;
-      if (!visible) {
+          !_fullscreen) {
+        if (_toastExit?.isActive == true) return;
+        if (_toastExit == null) {
+          _toastExit = Timer(
+            NotificationFlow.exitDuration + const Duration(milliseconds: 50),
+            () => unawaited(_syncToasts()),
+          );
+          await _showToasts(const []);
+          return;
+        }
+      }
+      _toastExit?.cancel();
+      _toastExit = null;
+      if (!ownsStack || popups.isEmpty) {
         if (_showingToasts) {
           _showingToasts = false;
           await _popup.hide(kind: notificationToastsKind);
@@ -565,21 +582,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         return;
       }
       if (!mounted) return;
-      final request = _showingToasts ? _popup.update : _popup.show;
-      _showingToasts = true;
-      await request(
-        kind: notificationToastsKind,
-        anchor: const Rect.fromLTWH(0, 0, 1, 1),
-        size: Size(
-          NotificationToasts.width + NotificationToasts.insets.horizontal,
-          200,
-        ),
-        data: {
-          'notifications': [for (final item in popups) backend.toData(item)],
-          'scale': MediaQuery.textScalerOf(context).scale(1),
-        },
-        theme: widget.preferences.theme,
-      );
+      await _showToasts(popups.map(backend.toData).toList());
     } catch (error) {
       debugPrint('Notification popups: $error');
     } finally {
@@ -589,6 +592,29 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
         unawaited(_syncToasts());
       }
     }
+  }
+
+  Future<void> _showToasts(List<Map<String, Object?>> popups) {
+    final request = _showingToasts ? _popup.update : _popup.show;
+    _showingToasts = true;
+    return request(
+      kind: notificationToastsKind,
+      anchor: _popupAnchor,
+      size: const Size(
+        NotificationToasts.width + 2 * NotificationToasts.horizontalInset,
+        200,
+      ),
+      data: {
+        'notifications': popups.take(NotificationToasts.visibleCount).toList(),
+        'onRight': widget.notifications?.toastOnRight ?? false,
+        'overflow': (popups.length - NotificationToasts.visibleCount).clamp(
+          0,
+          popups.length,
+        ),
+        'scale': MediaQuery.textScalerOf(context).scale(1),
+      },
+      theme: widget.preferences.theme,
+    );
   }
 
   void _applyWorkspaceCount() {
@@ -615,6 +641,7 @@ class _RemyaBarAppState extends State<RemyaBarApp> {
   @override
   void dispose() {
     _fullscreenRetry?.cancel();
+    _toastExit?.cancel();
     widget.notifications?.removeListener(_onNotificationsChanged);
     widget.osd?.removeListener(_syncOsd);
     widget.notifications?.releaseOutput(this);

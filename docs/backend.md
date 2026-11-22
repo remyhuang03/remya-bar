@@ -151,23 +151,32 @@ windows, views and channels without cooling the shared engine.
 
 ## Notifications and tray
 
-`remya_bar_system` owns `org.freedesktop.Notifications` process-wide. Subscription
-uses `DoNotQueue`, retries every five seconds when occupied, reports an error and
-never replaces another daemon. Capabilities are `actions body body-markup
-body-hyperlinks icon-static persistence`; ActivationToken is not sent.
+`remya_bar_system` owns `org.freedesktop.Notifications` process-wide. It requests
+the bus name with `DoNotQueue` and retries every five seconds when another
+daemon owns it. The notification card's Retry button requests an immediate
+attempt. Capabilities are `actions sound body body-markup body-hyperlinks
+icon-static persistence`.
 
-IDs skip zero and live IDs; replacement updates in place. Images validate
+IDs skip zero and live IDs. Replacement updates in place and starts a new
+heads-up alert only when the title changes. Images validate
 rowstride and are capped at 128 px. Body markup allows only bold, italic,
 underline and http/https/mailto links; malformed markup falls back to raw text.
-The nonstandard `value` hint supplies progress. Timeout -1 uses Bar's configured
-duration; zero and Critical never expire. Hover pauses timers. Expiry retains
-history except for transient entries (reason 1); explicit close uses reason 3,
-user dismissal reason 2. Actions close unless resident. History retains 200 items.
+The nonstandard `value` hint supplies progress. Low urgency goes to Silent
+history. Timeout -1 uses Bar's configured duration (5 seconds by default,
+configurable from 1 to 600 seconds). Positive durations have a two-second
+minimum, while zero and Critical keep the toast open. Hover pauses timers.
+Expiry retains history except for transient entries and sends reason 1 when
+removing them. Explicit app closure sends reason 3 and user dismissal sends
+reason 2. Actions close unless resident. History retains 200 items.
 
 History and the next ID commit transactionally to
 `$XDG_STATE_HOME/remya/bar/notifications.sqlite3` with absolute HOME fallback.
-Transient entries stay in memory. Restored entries never replay popups, sounds
-or actions belonging to the old daemon. Tests use isolated state roots and buses.
+Transient entries stay in memory. Restored entries retain the resident flag.
+Bulk removal clears matching history entries in one transaction and preserves
+resident entries. Global clearing also preserves Critical notifications by
+default. Settings → Notifications can include Critical entries in global clear.
+Restored entries never replay popups, sounds or actions belonging to the old
+daemon. Tests use isolated state roots and buses.
 The application applies Core's notification preferences to Rust in order.
 All outputs observe the same applied Do Not Disturb setting. Rust sleeps until
 the next schedule boundary, recomputed when preferences change. Critical,
@@ -175,10 +184,16 @@ priority-call and priority-app
 notifications bypass suppression. Sound uses `canberra-gtk-play` unless disabled
 or suppressed; replacements stay silent.
 
-The bell toggles the left notification panel, mutually exclusive with the right
-sidebar. Toasts use a separate non-focusable overlay. The focused output claims
-the popup stack until empty, preventing duplicates across racing outputs; it hides
-the stack while that output's notification panel is open.
+The bell opens notification history in a card on the left. The notification
+card and right sidebar each open on one output at a time and sit 8 px from
+the bar. Opening either panel on another output closes its previous copy.
+The focused output claims the heads-up stack until it empties. A separate overlay shows up to three
+alerts and an overflow link on the configured side, left by default. The gap is
+16 px below a top bar or 24 px above a bottom bar. Changing Popup position in
+Settings → Notifications moves an active stack immediately. The stack is hidden
+while that output's notification card is open. Closing either panel or the toast
+stack unmaps its surface and clears the Flutter content. Each output retains
+those native views so in-flight GTK keyboard callbacks can finish safely.
 
 The tray registers a StatusNotifierHost and supplies a watcher only if absent.
 Visible tray widgets share one D-Bus signal subscription (`StatusNotifierItem`,

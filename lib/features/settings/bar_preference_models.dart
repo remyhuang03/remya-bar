@@ -316,7 +316,9 @@ typedef PriorityApp = ({String id, String name});
 class NotificationPreferences {
   const NotificationPreferences({
     this.doNotDisturb = false,
+    this.clearCritical = false,
     this.popupDuration = 5,
+    this.toastOnRight = false,
     this.sounds = true,
     this.schedule = false,
     this.scheduleStart = '22:00',
@@ -328,7 +330,9 @@ class NotificationPreferences {
   });
 
   final bool doNotDisturb;
+  final bool clearCritical;
   final int popupDuration;
+  final bool toastOnRight;
   final bool sounds;
   final bool schedule;
   final String scheduleStart;

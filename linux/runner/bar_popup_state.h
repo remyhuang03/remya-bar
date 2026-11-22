@@ -55,6 +55,7 @@ struct BarPopup {
   int drag_left = 0;
   int drag_bottom = 0;
   guint hide_timer = 0;
+  guint unmap_idle = 0;
   bool ready = false;
   bool visible = false;
   bool sidebar = false;
@@ -64,6 +65,7 @@ struct BarPopup {
   bool toast = false;
   bool osd = false;
   bool is_panel() const { return sidebar || notifications; }
+  bool retains_view() const { return is_panel() || toast; }
   // Gap from the bar edge; tooltips compute their own from the pill.
   int edge_margin() const { return osd || toast || is_panel() ? 8 : tray || tooltip ? 2 : 0; }
   std::vector<GtkWidget*> dismiss_windows;
@@ -85,6 +87,9 @@ struct BarPopup {
   void cancel_hide() {
     if (hide_timer != 0) g_source_remove(hide_timer);
     hide_timer = 0;
+  }
+  void cancel_unmap() {
+    g_clear_handle_id(&unmap_idle, g_source_remove);
   }
   void cancel_dismiss() {
     if (dismiss_timer != 0) g_source_remove(dismiss_timer);
@@ -136,13 +141,28 @@ struct BarPopup {
       report_keyboard_visibility(owner);
     }
     keyboard.reset();
-    destroy_window();
+    if (window != nullptr && retains_view()) {
+      clear_dismiss_windows();
+      end_pending_actions();
+      if (unmap_idle == 0 && gtk_widget_get_visible(window)) {
+        // Keep the FlView alive for pending key callbacks and unmap after GTK draws.
+        unmap_idle = g_idle_add_full(G_PRIORITY_HIGH_IDLE, [](gpointer data) -> gboolean {
+          auto* popup = static_cast<BarPopup*>(data);
+          popup->unmap_idle = 0;
+          gtk_widget_hide(popup->window);
+          if (popup->ready) {
+            fl_method_channel_invoke_method(popup->channel, "closed", nullptr, nullptr,
+                                            nullptr, nullptr);
+          }
+          return G_SOURCE_REMOVE;
+        }, this, nullptr);
+      }
+    } else {
+      destroy_window();
+    }
     g_clear_pointer(&content, fl_value_unref);
   }
-  void destroy_window() {
-    cancel_hide();
-    cancel_dismiss();
-    clear_dismiss_windows();
+  void end_pending_actions() {
     if (pending_actions != nullptr) {
       for (guint index = 0; index < pending_actions->len; ++index) {
         auto* call = FL_METHOD_CALL(pending_actions->pdata[index]);
@@ -151,6 +171,13 @@ struct BarPopup {
       g_ptr_array_set_size(pending_actions, 0);
       g_clear_pointer(&pending_actions, g_ptr_array_unref);
     }
+  }
+  void destroy_window() {
+    cancel_hide();
+    cancel_unmap();
+    cancel_dismiss();
+    clear_dismiss_windows();
+    end_pending_actions();
     if (channel != nullptr) {
       g_autofree gchar* name = popup_channel_name(view_id);
       fl_binary_messenger_set_message_handler_on_channel(

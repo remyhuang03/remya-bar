@@ -8,6 +8,7 @@ import 'package:remya_ui/remya_ui.dart';
 import '../../bar_theme.dart';
 import '../keyboard/keyboard_panel.dart';
 import '../ai_usage/ai_usage_data.dart';
+import '../notifications/notification_toasts.dart';
 import '../notifications/notification_view.dart';
 import '../osd/osd_slider.dart';
 import '../settings/bar_settings_entry.dart';
@@ -22,9 +23,14 @@ import 'popup_measure.dart';
 import '../sidebar/right_sidebar.dart';
 
 class BarPopupApp extends StatefulWidget {
-  const BarPopupApp({super.key, required this.channel});
+  const BarPopupApp({
+    super.key,
+    required this.channel,
+    this.notificationExpansion,
+  });
 
   final MethodChannel channel;
+  final NotificationExpansion? notificationExpansion;
 
   @override
   State<BarPopupApp> createState() => _BarPopupAppState();
@@ -123,6 +129,17 @@ class _BarPopupAppState extends State<BarPopupApp>
     widget.channel.setMethodCallHandler((call) async {
       if (call.method == 'dismiss') {
         _send(_dismiss());
+        return;
+      }
+      if (call.method == 'closed') {
+        setState(() {
+          _contentGeneration++;
+          _kind = null;
+          _theme = null;
+          _data = const {};
+          _actionError = null;
+          _hasPanelRoute = false;
+        });
         return;
       }
       if (call.method != 'content') throw MissingPluginException();
@@ -287,9 +304,10 @@ class _BarPopupAppState extends State<BarPopupApp>
                   builder: (context, _) => _kind == 'notifications'
                       ? NotificationCenterCard(
                           data: details,
-                          onAction: (action) => widget.channel
-                              .invokeMethod<void>('action', action),
+                          onAction: _action,
                           onHeight: _resizePanel,
+                          expansion: widget.notificationExpansion,
+                          actionError: _actionError,
                           tasks: _tasksBlock(notifications: true),
                         )
                       : RightSidebar(
@@ -369,6 +387,7 @@ class _BarPopupAppState extends State<BarPopupApp>
           ),
           notificationToastsKind => NotificationToasts(
             data: details,
+            bottom: _bottom,
             onAction: _action,
           ),
           osdKind => Material(
@@ -456,6 +475,15 @@ class _BarPopupAppState extends State<BarPopupApp>
     try {
       await widget.channel.invokeMethod<void>('action', action);
       if (mounted && _kind == kind && _data['token'] == token) {
+        if (kind == 'notifications' &&
+            ((action['action'] == 'notification.invoke' &&
+                    action['key'] == 'default') ||
+                action['action'] == 'notification.settings')) {
+          await widget.channel.invokeMethod<void>('action', const {
+            'action': 'close',
+          });
+          return;
+        }
         setState(() => _actionError = null);
       }
     } catch (error) {

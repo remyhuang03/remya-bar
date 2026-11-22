@@ -130,9 +130,11 @@ void main() {
       final client = _Client();
       addTearDown(client.close);
       final applied = <NotificationPreferences>[];
+      final toastSides = <bool>[];
       final configure = Completer<void>();
       final settings = NotificationSettings(
         client: client,
+        onToastSideChanged: toastSides.add,
         configure: (next) async {
           applied.add(next);
           await configure.future;
@@ -154,15 +156,19 @@ void main() {
 
       client.external('notifications', {
         'do-not-disturb': false,
-        'popup-duration': 7,
+        'popup-duration': 600,
         'sounds': true,
+        'clear-critical': true,
+        'toast-side': 'right',
       });
       await pumpEventQueue();
       expect(applied.map((value) => value.popupDuration), [6]);
       configure.complete();
       await pumpEventQueue();
-      expect(applied.map((value) => value.popupDuration), [6, 7]);
+      expect(applied.map((value) => value.popupDuration), [6, 600]);
       expect(applied.map((value) => value.doNotDisturb), [true, false]);
+      expect(applied.map((value) => value.clearCritical), [false, true]);
+      expect(toastSides, [false, true]);
     },
   );
 

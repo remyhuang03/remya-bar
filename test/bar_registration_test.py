@@ -26,6 +26,12 @@ class RegistrationTest(unittest.TestCase):
         for key, values in {
             'folded-apps': [['a\n'], [''], [' '], ['a', 'a'], ['a' * 257]],
             'sidebar-layout': [['vpn'], ['audio', 'audio']],
+            'notifications': [
+                {**settings['notifications']['default'], 'popup-duration': 0},
+                {**settings['notifications']['default'], 'popup-duration': 601},
+                {**settings['notifications']['default'], 'clear-critical': 'true'},
+                {**settings['notifications']['default'], 'toast-side': 'center'},
+            ],
             'ai-ring': [{**settings['ai-ring']['default'], 'pinned': ['a', 'b', 'c', 'd']}],
             'tasks': [
                 {**settings['tasks']['default'], 'preview-rows': 4},
@@ -48,6 +54,16 @@ class RegistrationTest(unittest.TestCase):
             for value in values:
                 with self.subTest(key=key, value=value):
                     self.assertFalse(validator.is_valid(value))
+
+    def test_notifications_accept_old_values_and_full_duration_range(self):
+        setting = self.registration['settings']['notifications']
+        old = {key: value for key, value in setting['default'].items()
+               if key not in ('clear-critical', 'toast-side')}
+        validator = Draft202012Validator(setting['schema'])
+        validator.validate(old)
+        validator.validate({
+            **old, 'popup-duration': 600, 'clear-critical': True, 'toast-side': 'right',
+        })
 
     def test_tasks_accepts_old_saved_sync_preferences(self):
         setting = self.registration['settings']['tasks']

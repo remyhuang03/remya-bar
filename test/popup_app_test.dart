@@ -85,6 +85,29 @@ void main() {
     }
   });
 
+  testWidgets('notification popup clears hidden content and can reopen', (
+    tester,
+  ) async {
+    await _popup(tester, const Size(420, 600));
+    await _content(tester, 'notifications', {'dnd': false}, opening: true);
+    expect(find.text('No notifications'), findsOneWidget);
+
+    final reply = await tester.binding.defaultBinaryMessenger
+        .handlePlatformMessage(
+          _channel.name,
+          const StandardMethodCodec().encodeMethodCall(
+            const MethodCall('closed'),
+          ),
+          (_) {},
+        );
+    const StandardMethodCodec().decodeEnvelope(reply!);
+    await tester.pumpAndSettle();
+    expect(find.text('No notifications'), findsNothing);
+
+    await _content(tester, 'notifications', {'dnd': false}, opening: true);
+    expect(find.text('No notifications'), findsOneWidget);
+  });
+
   double progress(WidgetTester tester) => tester
       .widget<BarCardSurface>(find.byType(BarCardSurface))
       .emergence

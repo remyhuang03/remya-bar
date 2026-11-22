@@ -30,6 +30,19 @@ class NotificationBackend extends ChangeNotifier {
     null || '' => null,
     final reason => reason,
   };
+  bool get clearCritical => center?.clearCritical ?? false;
+
+  bool _toastOnRight = false;
+  bool get toastOnRight => _toastOnRight;
+
+  void setToastOnRight(bool value) {
+    if (_toastOnRight == value) return;
+    _toastOnRight = value;
+    notifyListeners();
+  }
+
+  int? get quietUntilMinutes => center?.quietUntilMinutes;
+
   final _fullscreenOutputs = <Object, String>{};
   Future<void> _fullscreenWrites = Future.value();
   Object? _popupHost;
@@ -48,12 +61,22 @@ class NotificationBackend extends ChangeNotifier {
     retryOnIdle: true,
   );
 
+  late final _appNames = BarIconCache<String>(
+    lookup: (keys) async =>
+        await barIconChannel.invokeMapMethod<String, String>(
+          'lookupNames',
+          keys,
+        ) ??
+        {},
+    onChanged: notifyListeners,
+  );
+
   List<api.NotificationSnapshot> get history => [
     ...?center?.notifications.where((item) => !item.transient),
   ];
-  List<api.NotificationSnapshot> get popups => [
-    ...?center?.notifications.where((item) => item.popup),
-  ];
+  List<api.NotificationSnapshot> get popups =>
+      [...?center?.notifications.where((item) => item.popup)]
+        ..sort((a, b) => b.popupSequence.compareTo(a.popupSequence));
   String? get error =>
       center == null ? 'Notification service starting' : center!.error;
 
@@ -132,10 +155,16 @@ class NotificationBackend extends ChangeNotifier {
   }
 
   void claimPopups(Object owner) {
-    if (_popupHost == null && popups.isNotEmpty) _popupHost = owner;
+    if (_popupHost == null &&
+        center?.notifications.any((item) => item.popup) == true) {
+      _popupHost = owner;
+    }
   }
 
-  Future<void> dismiss(int? id) => api.notificationDismiss(id: id);
+  Future<void> dismiss(int id) => api.notificationDismiss(id: id);
+  Future<void> clear({int? urgency, String? group}) =>
+      api.notificationsClear(urgency: urgency, group: group);
+  Future<void> retry() => api.notificationsRetry();
   Future<void> invoke(int id, String action) =>
       api.notificationInvoke(id: id, action: action);
   Future<void> hover(bool hovered) => api.notificationsHover(hovered: hovered);
@@ -145,28 +174,44 @@ class NotificationBackend extends ChangeNotifier {
   void _resolveIcons(List<api.NotificationSnapshot> items) {
     final names = <String>{};
     final entries = <String>{};
+    final desktopEntries = <String>{};
     for (final item in items.reversed) {
       for (final name in [item.appIcon, item.imagePath]) {
         final resolved = _iconName(name);
         if (resolved != null) names.add(resolved);
       }
-      if (item.appIcon.isEmpty && item.desktopEntry.isNotEmpty) {
+      if (item.desktopEntry.isNotEmpty) {
         entries.add(item.desktopEntry);
+        desktopEntries.add(item.desktopEntry);
       }
     }
     _iconBytes.resolve(names);
     _iconPaths.resolve(entries);
+    _appNames.resolve(desktopEntries);
   }
 
   /// Popup view data; images travel as PNG bytes or raw ARGB.
   Map<String, Object?> toData(api.NotificationSnapshot item) {
     final icon = _iconName(item.appIcon);
-    final image = _iconName(item.imagePath);
-    final iconIsFile = icon != null && icon.startsWith('/');
+    final image = _iconBytes[_iconName(item.imagePath)];
+    final iconBytes = _iconBytes[icon];
+    final iconPath = _iconPaths[item.desktopEntry];
+    final png = image == null ? null : ByteData.sublistView(image);
+    final squareImage = item.imageArgb.isNotEmpty
+        ? item.imageWidth == item.imageHeight
+        : png != null &&
+              png.lengthInBytes >= 24 &&
+              png.getUint32(16) == png.getUint32(20);
+    final isMessage = item.category == 'im' || item.category.startsWith('im.');
+    final desktop = '${item.desktopEntry} ${item.appName}'.toLowerCase();
+    final avatar = isMessage || (squareImage && _chatApp.hasMatch(desktop));
     return {
       'id': item.id,
-      'appName': item.appName,
+      'appName': _appNames[item.desktopEntry] ?? item.appName,
       'group': item.desktopEntry.isNotEmpty ? item.desktopEntry : item.appName,
+      'resident': item.resident,
+      'category': item.category,
+      'avatar': avatar,
       'summary': item.summary,
       'body': [
         for (final run in item.body)
@@ -185,18 +230,17 @@ class NotificationBackend extends ChangeNotifier {
       'urgency': item.urgency,
       'received': item.receivedUnixMs,
       'progress': item.progress,
-      'icon': iconIsFile ? null : _iconBytes[icon],
-      'iconPath': item.appIcon.isEmpty ? _iconPaths[item.desktopEntry] : null,
+      'icon': iconBytes,
+      'iconPath': iconBytes == null ? iconPath : null,
+      'iconSymbolic': iconBytes != null
+          ? _symbolicIcon(icon)
+          : _symbolicIcon(iconPath),
       if (item.imageArgb.isNotEmpty) ...{
         'imageArgb': item.imageArgb,
         'imageWidth': item.imageWidth,
         'imageHeight': item.imageHeight,
       } else
-        'image': image != null
-            ? _iconBytes[image]
-            : iconIsFile
-            ? _iconBytes[icon]
-            : null,
+        'image': image,
     };
   }
 
@@ -210,10 +254,18 @@ class NotificationBackend extends ChangeNotifier {
     unawaited(_subscription?.cancel());
     _iconBytes.dispose();
     _iconPaths.dispose();
+    _appNames.dispose();
     if (_ownsSettings) unawaited(_settings.close());
     super.dispose();
   }
 }
+
+final _chatApp = RegExp(
+  r'(^|[. _-])(telegram|discord|slack|signal|element|whatsapp|wechat|teams)([. _-]|$)',
+);
+
+bool _symbolicIcon(String? name) =>
+    name != null && (name.endsWith('-symbolic') || name.contains('-symbolic.'));
 
 Future<Map<String, Uint8List>> _lookupIconBytes(List<String> names) async {
   final bytes = await barIconChannel.invokeMapMethod<String, Uint8List>(
