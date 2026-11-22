@@ -1,9 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:remya_ui/settings_ui.dart';
 
-import '../ai_usage/ai_quota_ring.dart';
 import '../ai_usage/ai_usage_data.dart';
+import '../ai_usage/ai_quota_ring.dart';
 import '../weather/weather_settings.dart';
+import 'bar_calendar_settings.dart';
 import 'bar_pill_layout.dart';
 import 'bar_preference_models.dart';
 import 'bar_priority_apps.dart';
@@ -20,6 +21,7 @@ const _pageKeys = {
     'keyboard-preview',
   ],
   'osd': ['osd'],
+  'calendar': ['calendar'],
   'notifications': [
     'notifications',
     'quiet-schedule',
@@ -63,6 +65,7 @@ class BarSettingsPage extends StatelessWidget {
         'layout' => _layout(context),
         'osd' => _osd(),
         'weather' => const [WeatherSettings()],
+        'calendar' => [BarCalendarSettings(controller: controller)],
         'notifications' => _notifications(context),
         _ => _aiRing(context),
       },

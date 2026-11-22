@@ -68,8 +68,9 @@ class BarDetailCard extends StatelessWidget {
               ],
             ),
             'datetime' => DatetimeCard(
-              data: data,
-              onSettings: remyaSettingsInstalled()
+              onSettings: () => onAction(const {'action': 'calendar.settings'}),
+              onClose: () => onAction(const {'action': 'close'}),
+              onDateTimeSettings: remyaSettingsInstalled()
                   ? () => onAction(const {'action': 'datetime.settings'})
                   : null,
             ),

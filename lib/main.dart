@@ -14,6 +14,7 @@ import 'features/settings/bar_live_pills.dart';
 import 'features/account/account_profile_controller.dart';
 import 'features/ai_usage/ai_usage_backend.dart';
 import 'features/hyprland/hyprland_backend.dart';
+import 'features/clock/calendar_integration.dart';
 import 'features/notifications/notification_backend.dart';
 import 'features/notifications/notification_settings.dart';
 import 'features/osd/osd_controller.dart';
@@ -101,10 +102,12 @@ class _BarApplicationState extends State<_BarApplication> {
     _notifications.start();
     _notificationSettings.start();
     unawaited(TasksIntegration.shared.start());
+    unawaited(CalendarIntegration.shared.start());
   }
 
   @override
   void dispose() {
+    CalendarIntegration.shared.dispose();
     TasksIntegration.shared.dispose();
     unawaited(_notificationSettings.close());
     unawaited(_osdSettings.close());

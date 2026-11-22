@@ -139,6 +139,42 @@ void main() {
     );
   });
 
+  test('Calendar validates week starts and isolates visibility by account', () {
+    expect(_defaults()['calendar'], calendarDefaults);
+    for (final start in ['system', 'monday', 'sunday']) {
+      expect(
+        () => BarPreferences.validate('calendar', {
+          ...calendarDefaults,
+          'week-start': start,
+        }),
+        returnsNormally,
+      );
+    }
+    final preferences = {
+      ...calendarDefaults,
+      'calendar-account': 'subject',
+      'hidden-calendars': ['original'],
+      'shown-calendars': ['extra'],
+    };
+    BarPreferences.validate('calendar', preferences);
+    expect(barCalendarVisible(preferences, 'subject', 'original', true), false);
+    expect(barCalendarVisible(preferences, 'subject', 'extra', false), true);
+    expect(barCalendarVisible(preferences, 'other', 'original', true), true);
+    expect(barCalendarVisible(preferences, 'other', 'extra', false), false);
+    for (final invalid in [
+      {'week-start': 'tuesday'},
+      {'calendar-account': ''},
+      {
+        'shown-calendars': ['original'],
+      },
+    ]) {
+      expect(
+        () => BarPreferences.validate('calendar', {...preferences, ...invalid}),
+        throwsFormatException,
+      );
+    }
+  });
+
   test('folded apps replace the fresh value with its revision and retain on conflict', () async {
     final client = _Client(_defaults());
     addTearDown(client.close);

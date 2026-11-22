@@ -406,6 +406,12 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   const bool tray = overview || g_strcmp0(kind, "tray-menu") == 0;
   const bool card = is_card(kind);
   const bool weather = is_weather_card(kind);
+  const bool calendar = g_strcmp0(kind, "datetime") == 0;
+  FlValue* details = calendar ? fl_value_lookup_string(args, "data") : nullptr;
+  FlValue* activated = details != nullptr && fl_value_get_type(details) == FL_VALUE_TYPE_MAP
+      ? fl_value_lookup_string(details, "activated") : nullptr;
+  const bool focus_calendar = activated != nullptr &&
+      fl_value_get_type(activated) == FL_VALUE_TYPE_BOOL && fl_value_get_bool(activated);
   const bool tooltip = g_strcmp0(kind, "tooltip") == 0;
   const bool toast = g_strcmp0(kind, "notification-toasts") == 0;
   const bool osd = g_strcmp0(kind, "osd") == 0;
@@ -577,6 +583,11 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
     state->cancel_hide();
     state->cancel_dismiss();
     replace_content(state, args, false);
+    if (focus_calendar) {
+      gtk_layer_set_keyboard_mode(GTK_WINDOW(state->window),
+                                  GTK_LAYER_SHELL_KEYBOARD_MODE_EXCLUSIVE);
+      gtk_widget_grab_focus(GTK_WIDGET(state->view));
+    }
     send_content(state);
     fl_method_call_respond_success(call, nullptr, nullptr);
     return;
@@ -647,6 +658,12 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
         ? CLAMP(fl_value_get_int(reserved), 40, monitor.height) : 40;
     state->vertical_insets += notifications ? 32 : 16;
   }
+  if (calendar) {
+    // The generic card includes 64 px of transparent vertical shadow room.
+    state->vertical_insets = MAX(0, gtk_widget_get_allocated_height(GTK_WIDGET(owner)) + 32 - 64);
+  } else if (!panel) {
+    state->vertical_insets = 56;
+  }
   width = MIN(width, MAX(1, monitor.width - (panel ? 2 * kSidebarRightMargin : 16)));
   height = MIN(height, MAX(1, monitor.height - state->vertical_insets));
   if (tooltip) {
@@ -670,14 +687,14 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   replace_content(state, args, true);
   state->visible = true;
   state->owner_hovered = true;  // Shown from a hover or tap on the anchor.
-  if (weather || notifications) {
+  if (weather || notifications || focus_calendar) {
     gtk_window_set_focus_on_map(GTK_WINDOW(state->window), TRUE);
     gtk_layer_set_keyboard_mode(GTK_WINDOW(state->window),
                                 GTK_LAYER_SHELL_KEYBOARD_MODE_EXCLUSIVE);
   }
   gtk_widget_show_all(state->window);
   if (card) state->card_state(true);
-  if (tray || weather || notifications) gtk_widget_grab_focus(GTK_WIDGET(state->view));
+  if (tray || weather || notifications || focus_calendar) gtk_widget_grab_focus(GTK_WIDGET(state->view));
   send_content(state);
   fl_method_call_respond_success(call, nullptr, nullptr);
 }

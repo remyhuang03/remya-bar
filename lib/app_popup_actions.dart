@@ -184,6 +184,9 @@ extension _PopupActions on _RemyaBarAppState {
     } else if (action == 'weather.settings') {
       await _popup.hide(kind: 'weather');
       await openBarSettings(page: 'weather');
+    } else if (action == 'calendar.settings') {
+      await _popup.hide(kind: 'datetime');
+      await openBarSettings(page: 'calendar');
     } else if (action == 'datetime.settings') {
       const page = 'date-time';
       await (widget.onOpenSettingsPage ??

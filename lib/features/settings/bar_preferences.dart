@@ -193,6 +193,42 @@ class BarPreferences {
         valid = value == 'top' || value == 'bottom';
       case 'clock-seconds' || 'keyboard-preview':
         valid = value is bool;
+      case 'calendar-last-view':
+        valid = const {'month', 'week'}.contains(value);
+      case 'calendar':
+        valid = _object(value, calendarDefaults.keys.toSet());
+        if (valid) {
+          final map = value as Map;
+          final account = map['calendar-account'];
+          final hidden = map['hidden-calendars'];
+          final shown = map['shown-calendars'];
+          valid =
+              const {
+                'month',
+                'week',
+                'remember',
+              }.contains(map['default-view']) &&
+              const {
+                'system',
+                'monday',
+                'sunday',
+              }.contains(map['week-start']) &&
+              map['agenda-range'] is int &&
+              const {7, 14, 30}.contains(map['agenda-range']) &&
+              const [
+                'show-week-numbers',
+                'show-declined',
+                'fold-finished',
+                'show-seconds',
+              ].every((key) => map[key] is bool) &&
+              (account == '' || _text(account)) &&
+              _strings(hidden, _text) &&
+              _strings(shown, _text) &&
+              (hidden as List).length <= 2000 &&
+              (shown as List).length <= 2000 &&
+              (hidden.isEmpty && shown.isEmpty || _text(account)) &&
+              !hidden.any(shown.contains);
+        }
       case barWeatherLocationKey:
         valid =
             value is Map &&
@@ -385,6 +421,33 @@ class BarPreferences {
     }
     if (!valid) throw FormatException('Invalid Bar preference: $key');
   }
+}
+
+const calendarDefaults = <String, Object>{
+  'default-view': 'remember',
+  'week-start': 'system',
+  'show-week-numbers': true,
+  'agenda-range': 14,
+  'show-declined': false,
+  'fold-finished': true,
+  'show-seconds': true,
+  'calendar-account': '',
+  'hidden-calendars': <String>[],
+  'shown-calendars': <String>[],
+};
+
+/// Apply explicit visibility choices for the connected account only.
+bool barCalendarVisible(
+  Map preferences,
+  String? accountId,
+  String id,
+  bool selected,
+) {
+  if (accountId == null || preferences['calendar-account'] != accountId) {
+    return selected;
+  }
+  return (preferences['shown-calendars'] as List).contains(id) ||
+      selected && !(preferences['hidden-calendars'] as List).contains(id);
 }
 
 const weatherDefaults = <String, Object>{

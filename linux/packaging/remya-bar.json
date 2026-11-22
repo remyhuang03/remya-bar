@@ -27,6 +27,11 @@
       "keywords": ["forecast", "location", "temperature"]
     },
     {
+      "id": "calendar",
+      "title": "Calendar",
+      "keywords": ["Google Calendar", "agenda", "first day of week", "week starts on"]
+    },
+    {
       "id": "ai-ring",
       "title": "AI quota rings",
       "keywords": []
@@ -52,6 +57,63 @@
     }
   ],
   "settings": {
+    "calendar": {
+      "title": "Calendar preferences",
+      "page": "calendar",
+      "keywords": ["Google Calendar", "agenda", "first day of week", "week starts on"],
+      "default": {
+        "default-view": "remember",
+        "week-start": "system",
+        "show-week-numbers": true,
+        "agenda-range": 14,
+        "show-declined": false,
+        "fold-finished": true,
+        "show-seconds": true,
+        "calendar-account": "",
+        "hidden-calendars": [],
+        "shown-calendars": []
+      },
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "default-view": {"enum": ["month", "week", "remember"]},
+          "week-start": {"enum": ["system", "monday", "sunday"]},
+          "show-week-numbers": {"type": "boolean"},
+          "agenda-range": {"type": "integer", "enum": [7, 14, 30]},
+          "show-declined": {"type": "boolean"},
+          "fold-finished": {"type": "boolean"},
+          "show-seconds": {"type": "boolean"},
+          "calendar-account": {"type": "string", "maxLength": 256},
+          "hidden-calendars": {"$ref": "#/$defs/calendar-ids"},
+          "shown-calendars": {"$ref": "#/$defs/calendar-ids"}
+        },
+        "$defs": {
+          "calendar-ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 2000,
+            "items": {"type": "string", "minLength": 1, "maxLength": 256}
+          }
+        },
+        "required": [
+          "default-view", "week-start", "show-week-numbers", "agenda-range",
+          "show-declined", "fold-finished", "show-seconds", "calendar-account",
+          "hidden-calendars", "shown-calendars"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "calendar-last-view": {
+      "title": "Last calendar view",
+      "page": "calendar",
+      "keywords": [],
+      "default": "month",
+      "schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "enum": ["month", "week"]
+      }
+    },
     "tasks": {
       "title": "Google Tasks preferences",
       "page": "tasks",

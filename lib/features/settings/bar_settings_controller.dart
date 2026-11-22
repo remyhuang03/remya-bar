@@ -14,6 +14,7 @@ const barSettingsKeys = [
   'keyboard-preview',
   'folded-apps',
   'osd',
+  'calendar',
   'notifications',
   'quiet-schedule',
   'priority-notifications',

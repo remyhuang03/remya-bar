@@ -213,45 +213,47 @@ void main() {
     expect(calls.where((call) => call.method == 'hidden'), isEmpty);
   });
 
-  testWidgets('datetime uses the snapshot offset and keeps the browsed month', (
+  testWidgets('calendar browses months, folds to a week and opens settings', (
     tester,
   ) async {
-    final calls = await _popup(tester, const Size(500, 737));
-    final utc = DateTime.utc(2021, 1, 1, 4, 30, 8);
-    Map<String, Object?> data(DateTime time) => {
-      'unixMillis': time.millisecondsSinceEpoch,
-      'utcOffsetSeconds': -5 * Duration.secondsPerHour,
-    };
-
-    await _content(tester, 'datetime', data(utc));
-    expect(find.text('December 2020'), findsOneWidget);
-    expect(find.text('Thursday'), findsOneWidget);
-    expect(find.text('December 31, 2020'), findsOneWidget);
-    expect(find.text('UTC-05:00'), findsOneWidget);
-    expect(find.text('53'), findsOneWidget);
-    expect(find.text('366'), findsOneWidget);
-    expect(find.text('04:30'), findsOneWidget);
-    expect(find.text('23:30 :08', findRichText: true), findsOneWidget);
+    final calls = await _popup(tester, const Size(500, 944));
+    final now = DateTime.now();
+    final next = DateTime(now.year, now.month + 1);
+    const labels = DefaultMaterialLocalizations();
+    final month = labels.formatMonthYear(now);
+    final nextMonth = labels.formatMonthYear(next);
+    await _content(tester, 'datetime', const {});
+    expect(find.text('Calendar'), findsOneWidget);
+    expect(find.text(month), findsOneWidget);
+    expect(find.text('Today'), findsNothing);
 
     await tester.tap(find.byTooltip('Next month'));
     await tester.pumpAndSettle();
-    expect(find.text('January 2021'), findsOneWidget);
-    await _content(
-      tester,
-      'datetime',
-      data(utc.add(const Duration(seconds: 1))),
-    );
-    expect(find.text('January 2021'), findsOneWidget);
-    await tester.tap(find.byTooltip('Previous month'));
-    await tester.pumpAndSettle();
-    expect(find.text('December 2020'), findsOneWidget);
+    expect(find.text(nextMonth), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
+    await _content(tester, 'datetime', const {});
+    expect(find.text(nextMonth), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Date and time settings'));
+    await tester.tap(find.text(nextMonth));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Next week'), findsOneWidget);
+    await tester.tap(find.text('Today'));
+    await tester.pumpAndSettle();
+    expect(find.text(month), findsOneWidget);
+    expect(find.text('Today'), findsNothing);
+
+    await tester.tap(find.byTooltip('Calendar settings'));
+    await tester.pumpAndSettle();
+    expect(calls.lastWhere((call) => call.method == 'action').arguments, {
+      'action': 'calendar.settings',
+    });
+    await tester.tap(find.textContaining(RegExp(r'^UTC[+-]')));
     await tester.pumpAndSettle();
     expect(calls.lastWhere((call) => call.method == 'action').arguments, {
       'action': 'datetime.settings',
     });
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('popup text and container use the owning Flutter theme', (

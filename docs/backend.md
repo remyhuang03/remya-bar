@@ -359,8 +359,8 @@ applications own assignment changes.
 
 One wall-clock timer serves visible bar clocks. It aligns to the second while
 any clock displays seconds, otherwise to the minute. Fullscreen and removed
-views release their demand. The datetime card browses months independently of
-live time and opens system settings through the public opener.
+views release their demand. The Calendar card uses the same clock and opens the
+system Date & time settings through the public opener.
 Battery and resource samples are shared across views. Only system batteries count.
 Low charge takes precedence over energy-saver color. Battery policy comes from Core.
 
@@ -397,3 +397,18 @@ on an isolated bus; preserve installed desktop state.
 without suspending. `fvm dart run test/hyprland_ipc_smoke.dart` needs real request
 and event endpoints; create a window/layer to produce an event within 20 seconds.
 A canceled bridge stream may emit a final failed-post diagnostic during disposal.
+
+## Calendar
+
+Bar’s clock pill opens the Calendar card. The view uses the local civil day
+for its month and week grids and for the agenda. Week-start, default view,
+week numbers, agenda range, event filters and calendar visibility are Bar app
+preferences. The last manually chosen view is stored separately. Calendar
+visibility overrides are scoped to the Google account that set them.
+
+The card and Settings call Core’s read-only Google Calendar interface. Core
+owns OAuth, Secret Service, fixed HTTPS endpoints and the private calendar
+cache. Bar watches Core’s Google account invalidation, network reconnection
+and logind resume, and schedules refresh while the card is open and in the
+background. The agenda retains cached events during a refresh failure. Google
+Calendar handles creating, editing and responding to events in the browser.

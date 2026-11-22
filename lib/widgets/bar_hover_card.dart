@@ -78,6 +78,7 @@ class _BarHoverCardState extends State<BarHoverCard> {
       ...(widget.loadData?.call() ?? widget.data),
       if (widget.seedColor case final seed?)
         'cardSeed': seed.toARGB32() & 0xFFFFFF,
+      if (activated && widget.kind == 'datetime') 'activated': true,
       'scale': MediaQuery.textScalerOf(context).scale(1),
     };
     final theme = BarPopupScope.themeOf(context);

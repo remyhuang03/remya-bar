@@ -42,6 +42,12 @@ const barSettingsPages = [
     category: RemyaSettingsCategory.system,
   ),
   (
+    id: 'calendar',
+    title: 'Calendar',
+    icon: Icons.calendar_month_rounded,
+    category: RemyaSettingsCategory.system,
+  ),
+  (
     id: 'notifications',
     title: 'Notifications',
     icon: Icons.notifications_rounded,

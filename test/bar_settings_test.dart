@@ -584,6 +584,37 @@ void main() {
     expect(installed({'XDG_DATA_HOME': '${root.path}/data'}), isFalse);
   });
 
+  testWidgets('Calendar settings apply a new first weekday immediately', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final client = _Client();
+    final controller = BarSettingsController(client: client);
+    final preferences = SettingsThemeController.service(client: client);
+    addTearDown(client.close);
+    addTearDown(controller.dispose);
+    addTearDown(preferences.dispose);
+    await controller.start();
+    await tester.pumpWidget(
+      BarSettingsEntry(
+        page: 'calendar',
+        request: 1,
+        preferences: preferences,
+        controller: controller,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Week starts on'), findsOneWidget);
+    final sunday = find.text('Sunday');
+    await tester.ensureVisible(sunday);
+    await tester.tap(sunday);
+    await tester.pumpAndSettle();
+    expect(client.values['calendar']['week-start'], 'sunday');
+    expect(client.values['calendar-last-view'], 'month');
+  });
+
   testWidgets('Google account requests identity only and supports disconnect', (
     tester,
   ) async {

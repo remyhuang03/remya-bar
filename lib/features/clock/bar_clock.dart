@@ -5,9 +5,8 @@ import 'package:material_ui/material_ui.dart';
 import '../../widgets/bar_pill.dart';
 import 'clock_capsule.dart';
 
-final _clock = BarClockSource();
+final barClockSource = BarClockSource();
 
-@visibleForTesting
 class BarClockSource {
   BarClockSource({DateTime Function()? now}) : _now = now ?? DateTime.now;
 
@@ -77,7 +76,7 @@ class _BarClockState extends State<BarClock> {
     if (visible) {
       _subscribe();
     } else {
-      _clock.detach(_update);
+      barClockSource.detach(_update);
     }
   }
 
@@ -88,13 +87,13 @@ class _BarClockState extends State<BarClock> {
   }
 
   void _subscribe() =>
-      _now = _clock.attach(_update, seconds: widget.showSeconds);
+      _now = barClockSource.attach(_update, seconds: widget.showSeconds);
 
   void _update(DateTime now) => setState(() => _now = now);
 
   @override
   void dispose() {
-    _clock.detach(_update);
+    barClockSource.detach(_update);
     super.dispose();
   }
 
@@ -102,12 +101,8 @@ class _BarClockState extends State<BarClock> {
   Widget build(BuildContext context) => BarPill(
     card: BarPillCard(
       kind: 'datetime',
-      size: const Size(420, 673),
+      size: const Size(420, 880),
       openOnTap: true,
-      data: {
-        'unixMillis': _now.millisecondsSinceEpoch,
-        'utcOffsetSeconds': _now.timeZoneOffset.inSeconds,
-      },
     ),
     builder: (context, state) => ClockCapsule(
       time: _now,
