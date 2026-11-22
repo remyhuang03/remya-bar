@@ -8,6 +8,7 @@ import 'package:remya_client/remya_client.dart';
 import 'package:remya_ui/remya_ui.dart';
 
 import 'app.dart';
+import 'bar_binding.dart';
 import 'bar_view_host.dart';
 import 'features/settings/bar_live_pills.dart';
 import 'features/account/account_profile_controller.dart';
@@ -25,7 +26,7 @@ import 'features/tray/tray_backend.dart';
 import 'features/weather/weather_controller.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  BarBinding.ensureInitialized();
   final root = await barRepositoryRoot();
   final preferences = barThemeController(root);
   final identity = loadAiIdentity().catchError(
