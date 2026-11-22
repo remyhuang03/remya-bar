@@ -319,23 +319,23 @@ class _NotificationTileState extends State<NotificationTile> {
           liveRegion: widget.toast && !MediaQuery.supportsAnnounceOf(context),
           label: notificationAccessibleName(context, data),
           onTap: hasPrimaryAction ? _activate : null,
-          child: AnimatedSize(
-            duration: reducedMotion
-                ? Duration.zero
-                : notificationSpatialDuration,
-            curve: notificationSpatialCurve,
-            alignment: .topCenter,
+          child: Stack(
             clipBehavior: .none,
-            child: Stack(
-              clipBehavior: .none,
-              children: [
-                Material(
-                  color: background,
-                  borderRadius: widget.radius,
-                  animationDuration: reducedMotion
+            children: [
+              Material(
+                color: background,
+                borderRadius: widget.radius,
+                animationDuration: reducedMotion
+                    ? Duration.zero
+                    : const Duration(milliseconds: 150),
+                clipBehavior: .antiAlias,
+                // Inside the card so its shape follows the content height.
+                child: AnimatedSize(
+                  duration: reducedMotion
                       ? Duration.zero
-                      : const Duration(milliseconds: 150),
-                  clipBehavior: .antiAlias,
+                      : notificationSpatialDuration,
+                  curve: notificationSpatialCurve,
+                  alignment: .topCenter,
                   child: Stack(
                     children: [
                       InkWell(
@@ -361,19 +361,19 @@ class _NotificationTileState extends State<NotificationTile> {
                     ],
                   ),
                 ),
-                if (showFocus)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: CustomPaint(
-                        foregroundPainter: _FocusOutline(
-                          borderRadius: widget.radius,
-                          color: colors.secondary,
-                        ),
+              ),
+              if (showFocus)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: CustomPaint(
+                      foregroundPainter: _FocusOutline(
+                        borderRadius: widget.radius,
+                        color: colors.secondary,
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),

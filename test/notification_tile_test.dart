@@ -1,13 +1,86 @@
 import 'dart:ui';
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:remya_bar/features/notifications/notification_group.dart';
 import 'package:remya_bar/features/notifications/notification_tile.dart';
 import 'package:remya_bar/features/notifications/notification_toasts.dart';
 
 void main() {
+  testWidgets('row card and its group follow a fold frame by frame', (
+    tester,
+  ) async {
+    var expanded = false;
+    const item = {
+      'id': 1,
+      'appName': 'Mail',
+      'summary': 'One message',
+      'body': [
+        {'text': 'First line\nSecond line'},
+      ],
+    };
+    final focus = FocusNode();
+    addTearDown(focus.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Align(
+          alignment: .topCenter,
+          child: SizedBox(
+            width: 372,
+            child: StatefulBuilder(
+              builder: (context, setState) => NotificationGroup(
+                items: const [item, item],
+                expanded: true,
+                radius: .circular(28),
+                focusNode: focus,
+                showFocusIndicator: false,
+                traversable: true,
+                onFocusChange: (_) {},
+                onToggle: () {},
+                onDismiss: null,
+                onDismissSection: () {},
+                children: [
+                  NotificationTile(
+                    key: const ValueKey(1),
+                    data: item,
+                    onAction: (_) {},
+                    expanded: expanded,
+                    onToggle: () => setState(() => expanded = !expanded),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final card = find.descendant(
+      of: find.byType(NotificationTile),
+      matching: find.byType(Material),
+    );
+    final group = tester.renderObject<RenderAnimatedSize>(
+      find
+          .descendant(
+            of: find.byType(NotificationGroup),
+            matching: find.byType(AnimatedSize),
+          )
+          .first,
+    );
+    final folded = tester.getSize(card.first).height;
+    await tester.tap(find.byTooltip('Expand'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 60));
+    final midway = tester.getSize(card.first).height;
+    expect(group.size, group.child!.size);
+    await tester.pumpAndSettle();
+    final unfolded = tester.getSize(card.first).height;
+    expect(midway, inExclusiveRange(folded, unfolded));
+    expect(group.size, group.child!.size);
+  });
+
   testWidgets('row stays compact when the dismiss segment appears', (
     tester,
   ) async {
