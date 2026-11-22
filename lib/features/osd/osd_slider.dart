@@ -53,9 +53,13 @@ class OsdCapsuleSlider extends StatelessWidget {
     this.muted = false,
     this.preMuteValue,
     this.max = osdVolumeMax,
+    this.onDrag,
   });
 
-  factory OsdCapsuleSlider.fromData(Map<String, Object?> data) {
+  factory OsdCapsuleSlider.fromData(
+    Map<String, Object?> data, {
+    void Function(OsdType type, int? value, {bool start})? onDrag,
+  }) {
     final type = OsdType.fromName(data['type']) ?? .volume;
     final rawValue = data['value'];
     final value = rawValue is num ? rawValue.round() : 0;
@@ -67,6 +71,7 @@ class OsdCapsuleSlider extends StatelessWidget {
       muted: type == .volume && data['muted'] == true,
       preMuteValue: rawPreMute is num ? rawPreMute.round() : null,
       max: rawMax is num && rawMax >= 100 ? rawMax.round() : osdVolumeMax,
+      onDrag: onDrag,
     );
   }
 
@@ -77,6 +82,7 @@ class OsdCapsuleSlider extends StatelessWidget {
 
   /// Volume track end; values above 100 are Boost. Ignored for brightness.
   final int max;
+  final void Function(OsdType type, int? value, {bool start})? onDrag;
 
   static const _capsuleHeight = 48.0;
   static const _tagHeight = 28.0;
@@ -125,6 +131,12 @@ class OsdCapsuleSlider extends StatelessWidget {
     final right = 196 * width / osdSize.width;
     double position(num value) =>
         (44 + 150 * value / maxValue) * width / osdSize.width;
+    int levelAt(Offset offset) =>
+        ((offset.dx - position(0)) /
+                (position(maxValue) - position(0)) *
+                maxValue)
+            .round()
+            .clamp(0, maxValue);
     final thumb = position(shown);
     final threshold = position(100);
     final filledEnd = isBoost
@@ -298,6 +310,27 @@ class OsdCapsuleSlider extends StatelessWidget {
               ),
             ),
           ),
+          if (onDrag case final drag?)
+            Positioned(
+              key: ValueKey(type),
+              top: _tagHeight,
+              left: 0,
+              right: 0,
+              height: _capsuleHeight,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  behavior: .opaque,
+                  dragStartBehavior: .down,
+                  onHorizontalDragDown: (details) =>
+                      drag(type, levelAt(details.localPosition), start: true),
+                  onHorizontalDragUpdate: (details) =>
+                      drag(type, levelAt(details.localPosition)),
+                  onHorizontalDragEnd: (_) => drag(type, null),
+                  onHorizontalDragCancel: () => drag(type, null),
+                ),
+              ),
+            ),
         ],
       ),
     );

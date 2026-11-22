@@ -18,6 +18,37 @@ void main() {
       home: Scaffold(body: Center(child: slider)),
     );
 
+    testWidgets('mouse drag follows the track and clamps beyond its ends', (
+      tester,
+    ) async {
+      final input = <(OsdType, int?, bool)>[];
+      await tester.pumpWidget(
+        wrap(
+          OsdCapsuleSlider(
+            type: .volume,
+            value: 55,
+            max: 110,
+            onDrag: (type, value, {start = false}) =>
+                input.add((type, value, start)),
+          ),
+        ),
+      );
+      final origin = tester.getTopLeft(find.byType(OsdCapsuleSlider));
+      final mouse = await tester.startGesture(
+        origin + const Offset(119, 52),
+        kind: .mouse,
+      );
+      await mouse.moveTo(origin + const Offset(220, 52));
+      await mouse.moveTo(origin + const Offset(-20, 52));
+      await mouse.up();
+      expect(input, [
+        (OsdType.volume, 55, true),
+        (OsdType.volume, 110, false),
+        (OsdType.volume, 0, false),
+        (OsdType.volume, null, false),
+      ]);
+    });
+
     testWidgets(
       'renders Volume Normal, Muted, and Boost regimes with spec geometry',
       (tester) async {
@@ -168,6 +199,48 @@ void main() {
     tearDown(() async {
       controller.dispose();
       await settings.close();
+    });
+
+    testWidgets('volume drag keeps OSD open, coalesces writes and unmutes', (
+      tester,
+    ) async {
+      settings.emitSound(percent: 60, muted: true);
+      await tester.pump();
+
+      controller.drag(.volume, 65, start: true);
+      controller.drag(.volume, 80, start: false);
+      controller.drag(.volume, 90, start: false);
+      expect(controller.state?.value, 90);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 40));
+      expect((settings.volumePercent, settings.volumeMuted), (90, false));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(controller.visible, isTrue);
+      controller.drag(.volume, null, start: false);
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(controller.visible, isFalse);
+    });
+
+    testWidgets('brightness drag stays in the displayed range', (tester) async {
+      settings.emitBrightness(percent: 60);
+      await tester.pump();
+      controller.drag(.brightness, 0, start: true);
+      await tester.pump();
+      expect((settings.brightnessPercent, settings.gammaPercent), (0, 100));
+      controller.drag(.brightness, null, start: false);
+      await tester.pump(const Duration(milliseconds: 40));
+
+      settings.emitGamma('eDP-1', 90);
+      await tester.pump();
+      controller.drag(.gamma, 0, start: true);
+      await tester.pump();
+      expect(settings.gammaPercent, controller.preferences.gammaMin);
+      controller.drag(.gamma, 100, start: false);
+      await tester.pump(const Duration(milliseconds: 40));
+      expect((settings.brightnessPercent, settings.gammaPercent), (0, 100));
+      expect(controller.state?.type, OsdType.gamma);
+      controller.drag(.gamma, null, start: false);
+      await tester.pump(const Duration(milliseconds: 80));
     });
 
     test('initial load stays hidden and passive sound changes show and auto-dismiss OSD', () async {

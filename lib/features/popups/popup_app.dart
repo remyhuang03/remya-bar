@@ -392,7 +392,17 @@ class _BarPopupAppState extends State<BarPopupApp>
           ),
           osdKind => Material(
             type: .transparency,
-            child: OsdCapsuleSlider.fromData(details),
+            child: OsdCapsuleSlider.fromData(
+              details,
+              onDrag: (type, value, {start = false}) => _send(
+                widget.channel.invokeMethod<void>('action', {
+                  'action': 'osd.drag',
+                  'type': type.name,
+                  'value': value,
+                  'start': start,
+                }),
+              ),
+            ),
           ),
           'tray-menu' => TrayMenuPopup(
             key: ValueKey(_data['token']),

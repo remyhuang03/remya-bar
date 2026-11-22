@@ -235,8 +235,10 @@ until readback catches up or 1.5 seconds pass.
 
 OSD follows Core change signals, reloads its baseline on reconnect/output changes,
 and reconciles predicted key presses with readback. Brightness feedback targets
-the affected output. Volume feedback targets the focused output. The overlay
-has no focus or input region.
+the affected output. Volume feedback targets the focused output. The capsule
+accepts pointer drags without taking keyboard focus and stays visible until
+the drag ends. Dragging brightness adjusts the displayed hardware or software
+range. The optional label above the capsule lets clicks pass through.
 Shortcuts at `/top/remya/bar`, interface `top.remya.bar.Shortcuts`, are VolumeUp,
 VolumeDown, VolumeMute, BrightnessUp, BrightnessDown and ToggleSidebar. Repeats
 coalesce without skipping the hardware/gamma boundary. Signals are scoped to the

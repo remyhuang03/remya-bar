@@ -67,7 +67,7 @@ class OsdController extends ChangeNotifier {
   String? _output;
   int _outputRevision = 0;
   int _serviceRevision = 0;
-  final _shortcuts = <_ShortcutBatch>[];
+  final _shortcuts = <_OsdChange>[];
   bool _drainingShortcuts = false;
   String? _volumeOutput;
   int? _volumePercent;
@@ -87,6 +87,7 @@ class OsdController extends ChangeNotifier {
   bool _writingVolume = false;
   String? _writingBrightnessOutput;
   Timer? _hideTimer;
+  OsdType? _dragType;
   StreamSubscription<SettingsChange>? _changes;
   StreamSubscription<bool>? _serviceChanges;
 
@@ -337,10 +338,57 @@ class OsdController extends ChangeNotifier {
       pending.count++;
       return pending.done.future;
     }
-    final batch = _ShortcutBatch(action, _outputRevision, _serviceRevision);
+    final batch = _OsdChange(_outputRevision, _serviceRevision, action: action);
     _shortcuts.add(batch);
     if (!_drainingShortcuts) unawaited(_drainShortcuts());
     return batch.done.future;
+  }
+
+  void drag(OsdType type, int? value, {required bool start}) {
+    final current = state;
+    if (current == null || current.type != type) return;
+    if (start) _dragType = type;
+    if (_dragType != type) return;
+    if (value == null) {
+      _dragType = null;
+      _show(current);
+      return;
+    }
+
+    final target = switch (type) {
+      .volume => value.clamp(0, current.max),
+      .brightness => value.clamp(0, 100),
+      .gamma => value.clamp(preferences.gammaMin, 100),
+    };
+    if (target == current.value && (!current.muted || target == 0)) {
+      _show(current);
+      return;
+    }
+    final next = OsdState(
+      type: type,
+      value: target,
+      muted: type == .volume && target == 0,
+      max: current.max,
+    );
+    if (type != .volume) {
+      final (hardware, gamma) = _brightnessPreview ?? (_hwBrightness, _gamma);
+      _brightnessPreview = type == .brightness
+          ? (target, gamma)
+          : (hardware, target);
+    }
+    _show(next);
+    final pending = _shortcuts.lastOrNull;
+    if (pending != null &&
+        pending.level?.type == type &&
+        pending.output == _outputRevision &&
+        pending.service == _serviceRevision) {
+      pending.level = next;
+    } else {
+      _shortcuts.add(
+        _OsdChange(_outputRevision, _serviceRevision, level: next),
+      );
+    }
+    if (!_drainingShortcuts) unawaited(_drainShortcuts());
   }
 
   /// Shows the result of a key press at once, before Core confirms it.
@@ -440,17 +488,31 @@ class OsdController extends ChangeNotifier {
       final batch = _shortcuts.removeAt(0);
       try {
         if (!_disposed && _serviceRevision == batch.service) {
-          switch (batch.action) {
-            case 'VolumeUp':
-              await _changeVolume(preferences.volumeStep * batch.count);
-            case 'VolumeDown':
-              await _changeVolume(-preferences.volumeStep * batch.count);
-            case 'VolumeMute':
-              await _changeVolume(null);
-            case 'BrightnessUp' when _outputRevision == batch.output:
-              await _adjustBrightness(preferences.brightnessStep, batch.count);
-            case 'BrightnessDown' when _outputRevision == batch.output:
-              await _adjustBrightness(-preferences.brightnessStep, batch.count);
+          if (batch.level case final level?) {
+            if (level.type == .volume) {
+              await _changeVolume(null, level: level.value);
+            } else if (_outputRevision == batch.output) {
+              await _adjustBrightness(0, 1, level: level);
+            }
+          } else {
+            switch (batch.action) {
+              case 'VolumeUp':
+                await _changeVolume(preferences.volumeStep * batch.count);
+              case 'VolumeDown':
+                await _changeVolume(-preferences.volumeStep * batch.count);
+              case 'VolumeMute':
+                await _changeVolume(null);
+              case 'BrightnessUp' when _outputRevision == batch.output:
+                await _adjustBrightness(
+                  preferences.brightnessStep,
+                  batch.count,
+                );
+              case 'BrightnessDown' when _outputRevision == batch.output:
+                await _adjustBrightness(
+                  -preferences.brightnessStep,
+                  batch.count,
+                );
+            }
           }
         }
         batch.done.complete();
@@ -479,18 +541,16 @@ class OsdController extends ChangeNotifier {
     );
   }
 
-  Future<void> _changeVolume(int? delta) async {
+  Future<void> _changeVolume(int? delta, {int? level}) async {
     final revision = _serviceRevision;
     if (_volumePercent == null) await _refreshSound();
     final current = _volumePercent;
     if (_disposed || _serviceRevision != revision || current == null) return;
     _writingVolume = true;
     try {
-      final (:target, :mute) = _volumePlan(
-        current,
-        _volumeMuted == true || current == 0,
-        delta,
-      );
+      final (:target, :mute) = level == null
+          ? _volumePlan(current, _volumeMuted == true || current == 0, delta)
+          : (target: level, mute: level == 0);
       Future<bool> write(String id, Map<String, Object?> value) async {
         final sound = await _settings.changeSound(id, value);
         if (_disposed || _serviceRevision != revision) return false;
@@ -519,7 +579,11 @@ class OsdController extends ChangeNotifier {
     }
   }
 
-  Future<void> _adjustBrightness(int delta, int count) async {
+  Future<void> _adjustBrightness(
+    int delta,
+    int count, {
+    OsdState? level,
+  }) async {
     final revision = _outputRevision;
     bool isCurrent() => !_disposed && _outputRevision == revision;
     final output = _output;
@@ -534,12 +598,21 @@ class OsdController extends ChangeNotifier {
     try {
       while (count > 0 && isCurrent()) {
         final hardware = _hwBrightness;
-        final plan = _brightnessPlan(hardware, _gamma, delta, count);
+        final plan = level == null
+            ? _brightnessPlan(hardware, _gamma, delta, count)
+            : (
+                type: level.type,
+                current: level.type == .gamma ? _gamma : hardware,
+                target: level.value,
+                steps: 1,
+              );
         if (plan == null) return;
+        final current = plan.current;
+        if (current == null) return;
         if (plan.steps == 0) {
           if (_shortcuts.isEmpty) {
             _brightnessPreview = null;
-            _show(_brightnessState(plan.type, plan.current, hardware));
+            _show(_brightnessState(plan.type, current, hardware));
           }
           return;
         }
@@ -551,7 +624,7 @@ class OsdController extends ChangeNotifier {
           target: plan.target,
           mode: software
               ? .software
-              : delta < 0
+              : (level == null ? delta < 0 : plan.target < current)
               ? .hardwareOnly
               : .hardware,
           isCurrent: isCurrent,
@@ -569,7 +642,11 @@ class OsdController extends ChangeNotifier {
         // Intermediate and superseded readbacks would step backwards.
         if (count == 0 && _shortcuts.isEmpty) {
           _brightnessPreview = null;
-          _show(_brightnessState(plan.type, actual, _hwBrightness));
+          _show(
+            level == null
+                ? _brightnessState(plan.type, actual, _hwBrightness)
+                : OsdState(type: plan.type, value: actual),
+          );
         }
       }
     } catch (error) {
@@ -591,7 +668,10 @@ class OsdController extends ChangeNotifier {
     final changed = state != next;
     state = next;
     _hideTimer?.cancel();
-    _hideTimer = Timer(timeout, dismiss);
+    if (_dragType != next.type) {
+      _dragType = null;
+      _hideTimer = Timer(timeout, dismiss);
+    }
     if (changed) notifyListeners();
   }
 
@@ -599,6 +679,7 @@ class OsdController extends ChangeNotifier {
     if (_disposed || state == null) return;
     _hideTimer?.cancel();
     _hideTimer = null;
+    _dragType = null;
     state = null;
     notifyListeners();
   }
@@ -614,12 +695,13 @@ class OsdController extends ChangeNotifier {
   }
 }
 
-class _ShortcutBatch {
-  _ShortcutBatch(this.action, this.output, this.service);
+class _OsdChange {
+  _OsdChange(this.output, this.service, {this.action, this.level});
 
-  final String action;
+  final String? action;
   final int output;
   final int service;
+  OsdState? level;
   final done = Completer<void>();
   int count = 1;
 }

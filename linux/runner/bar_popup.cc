@@ -610,7 +610,11 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
       gtk_window_resize(GTK_WINDOW(state->window), state->width, height);
     }
     if (osd) {
-      auto* input = cairo_region_create();
+      // Match the capsule below the optional tag in osd_slider.dart.
+      const int capsule_height = MIN(height, 48);
+      const cairo_rectangle_int_t capsule{
+          0, height - capsule_height, state->width, capsule_height};
+      auto* input = cairo_region_create_rectangle(&capsule);
       gtk_widget_input_shape_combine_region(state->window, input);
       cairo_region_destroy(input);
     }

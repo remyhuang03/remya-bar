@@ -34,6 +34,14 @@ extension _PopupActions on _RemyaBarAppState {
           widget.system?.releaseHardware(this);
         }
       }
+    } else if (action == 'osd.drag') {
+      final type = OsdType.fromName(args['type']);
+      final value = args['value'];
+      final start = args['start'];
+      if (type == null || (value != null && value is! int) || start is! bool) {
+        throw const FormatException('Invalid OSD drag');
+      }
+      widget.osd?.drag(type, value as int?, start: start);
     } else if (action == 'keyboard.visibility' && args['open'] is bool) {
       BarPopup.setKeyboardVisibility(args['open'] as bool);
     } else if (action == 'sidebar.closed') {
