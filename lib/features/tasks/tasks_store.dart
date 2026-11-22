@@ -151,6 +151,11 @@ class TasksStore extends ChangeNotifier {
     }
   }
 
+  Future<void> cancelAuthorization() async {
+    await _client.cancelGoogleAuthorization();
+    await _accountChanged();
+  }
+
   Future<void> disconnect() async {
     if (_disconnecting) return;
     _disconnecting = true;

@@ -103,6 +103,15 @@ class TasksSettings extends StatelessWidget {
                                 : 'Connect Google Tasks',
                           ),
                         ),
+                      if (connecting)
+                        OutlinedButton(
+                          onPressed: () => _runTaskAction(
+                            context,
+                            'Couldn’t cancel Google sign-in',
+                            store.cancelAuthorization,
+                          ),
+                          child: const Text('Cancel sign-in'),
+                        ),
                       if (accountId != null &&
                           (connected || store.pendingCount > 0))
                         OutlinedButton(

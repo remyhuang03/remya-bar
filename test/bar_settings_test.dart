@@ -83,6 +83,9 @@ class _Client extends SettingsClient {
       requestedGoogleAccess = jsonDecode(arguments[1]) as Map<String, dynamic>;
       return google = {...google, 'pending': true};
     }
+    if (arguments.first == 'google-account.cancel') {
+      return google = {...google, 'pending': false};
+    }
     if (arguments.first == 'google-account.disconnect') {
       return google = {
         ...google,
@@ -607,6 +610,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(client.requestedGoogleAccess, {'calendar': false, 'tasks': false});
     expect(find.text('Continue in your browser'), findsOneWidget);
+    await tester.tap(find.text('Cancel sign-in'));
+    await tester.pumpAndSettle();
+    expect(find.text('Continue in your browser'), findsNothing);
+    expect(client.google['pending'], false);
+    await tester.tap(find.text('Connect'));
+    await tester.pumpAndSettle();
+    expect(client.google['pending'], true);
 
     client.completeGoogleSignIn(calendar: false, tasks: false);
     await tester.pumpAndSettle();

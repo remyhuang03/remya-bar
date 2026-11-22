@@ -143,6 +143,13 @@ class _BarGoogleAccountState extends State<BarGoogleAccount> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  if (pending)
+                    OutlinedButton(
+                      onPressed: _busy
+                          ? null
+                          : () => _run(widget.client.cancelGoogleAuthorization),
+                      child: const Text('Cancel sign-in'),
+                    ),
                   if (status?.configured == true && !pending && email == null)
                     FilledButton(
                       onPressed: _busy
