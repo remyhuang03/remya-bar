@@ -99,6 +99,12 @@ hl.bind(
 )
 ```
 
+The notification panel and the Quick Settings sidebar resize with their content and animate their own opening. Hyprland animates a layer's resize with its `layersIn` curve, which makes the panels squash and overshoot whenever they grow or fold, so turn off compositor animations for these two layers:
+
+```lua
+hl.layer_rule({ match = { namespace = "^top\\.remya\\.bar/(notifications-panel|sidebar)$" }, no_anim = true })
+```
+
 ## ✨ Features
 
 ### Status Bar Pills
