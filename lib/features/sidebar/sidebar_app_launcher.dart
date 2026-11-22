@@ -9,6 +9,9 @@ Future<void> openRemyaScreenCapture({
 Future<void> openRemyaClipboard() =>
     _openApp('remya_launcher', const ['--clipboard']);
 
+Future<void> openRemyaCharacters() =>
+    _openApp('remya_launcher', const ['--characters']);
+
 Future<void> _openApp(
   String name,
   List<String> arguments, [

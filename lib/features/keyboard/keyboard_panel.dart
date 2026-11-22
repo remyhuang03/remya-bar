@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../popups/bar_popup_button.dart';
+import '../sidebar/sidebar_app_launcher.dart';
 
 part 'keyboard_key.dart';
 
@@ -29,10 +30,18 @@ enum _Modifier {
 enum _KeyState { idle, latched, locked }
 
 class KeyboardPanel extends StatefulWidget {
-  const KeyboardPanel({super.key, required this.data, required this.channel});
+  const KeyboardPanel({
+    super.key,
+    required this.data,
+    required this.channel,
+    this.onOpenCharacters = openRemyaCharacters,
+    this.onOpenClipboard = openRemyaClipboard,
+  });
 
   final Map<String, Object?> data;
   final MethodChannel channel;
+  final Future<void> Function() onOpenCharacters;
+  final Future<void> Function() onOpenClipboard;
 
   @override
   State<KeyboardPanel> createState() => _KeyboardPanelState();
@@ -103,6 +112,16 @@ class _KeyboardPanelState extends State<KeyboardPanel> {
         setState(() => _error = 'Could not complete keyboard action');
       }
       debugPrint('Virtual keyboard $action: $error');
+    }
+  }
+
+  Future<void> _openLauncher(Future<void> Function() open) async {
+    try {
+      await open();
+      if (mounted && _error != null) setState(() => _error = null);
+    } catch (error) {
+      if (mounted) setState(() => _error = 'Could not open Remya Launcher');
+      debugPrint('Remya Launcher: $error');
     }
   }
 
@@ -386,11 +405,15 @@ class _KeyboardPanelState extends State<KeyboardPanel> {
             ),
           ),
         ),
-        const BarPopupButton(_KeyboardIcon('emoji'), 'Emoji unavailable', null),
-        const BarPopupButton(
-          _KeyboardIcon('clipboard'),
-          'Clipboard unavailable',
-          null,
+        BarPopupButton(
+          const _KeyboardIcon('emoji'),
+          'Characters',
+          () => _openLauncher(widget.onOpenCharacters),
+        ),
+        BarPopupButton(
+          const _KeyboardIcon('clipboard'),
+          'Clipboard',
+          () => _openLauncher(widget.onOpenClipboard),
         ),
         Expanded(
           child: Center(

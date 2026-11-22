@@ -88,6 +88,20 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('toolbar opens the matching Launcher scope', (tester) async {
+    final opened = <String>[];
+    await tester.pumpWidget(
+      _keyboard(
+        onOpenCharacters: () async => opened.add('characters'),
+        onOpenClipboard: () async => opened.add('clipboard'),
+      ),
+    );
+    await tester.tap(find.byTooltip('Characters'));
+    await tester.tap(find.byTooltip('Clipboard'));
+    expect(opened, ['characters', 'clipboard']);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('refreshes on open and on refresh signal', (tester) async {
     var deviceReads = 0;
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(_channel, (
@@ -123,7 +137,10 @@ void main() {
   });
 }
 
-Widget _keyboard() {
+Widget _keyboard({
+  Future<void> Function()? onOpenCharacters,
+  Future<void> Function()? onOpenClipboard,
+}) {
   final labels = List.generate(
     4,
     (layer) => List<String>.filled(128, '')..[30] = layer.isOdd ? 'A' : 'a',
@@ -131,6 +148,8 @@ Widget _keyboard() {
   return MaterialApp(
     home: KeyboardPanel(
       channel: _channel,
+      onOpenCharacters: onOpenCharacters ?? () async {},
+      onOpenClipboard: onOpenClipboard ?? () async {},
       data: {
         'device': {
           'config': {'group': 0, 'layout': 'us'},
