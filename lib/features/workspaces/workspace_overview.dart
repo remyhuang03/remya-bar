@@ -39,7 +39,7 @@ class WorkspaceOverview extends StatelessWidget {
             ),
             for (final row in workspaces)
               if (row case {
-                'id': final int id,
+                'address': final String address,
                 'name': final String name,
                 'owner': final String owner,
                 'count': final int count,
@@ -53,8 +53,10 @@ class WorkspaceOverview extends StatelessWidget {
                   subtitle: Text(
                     '$owner\n$count ${count == 1 ? 'window' : 'windows'}',
                   ),
-                  onTap: () =>
-                      onAction({'action': 'workspace.switch', 'id': id}),
+                  onTap: () => onAction({
+                    'action': 'workspace.switch',
+                    'address': address,
+                  }),
                 ),
           ],
         ),

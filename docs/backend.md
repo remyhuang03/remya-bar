@@ -85,7 +85,9 @@ workspace, monitor, window and fullscreen events into one snapshot request
 sequence, with one refresh in flight and an 80 ms event window. Its 30-second
 reconciliation covers missed events. Results from an obsolete connection
 generation are discarded. Each output projects its own active window, workspace
-slots and fullscreen state. Fullscreen requires a mapped, visible client in
+slots and fullscreen state. Workspace addresses identify named and special
+workspaces across snapshots and actions. Numbered slots retain their numeric IDs.
+Fullscreen requires a mapped, visible client in
 the active workspace or current special workspace with the fullscreen mode
 bit set. Failed reads keep the last valid snapshot but hide the workspace pill
 until recovery. Bar's shared workspace count drives the snapshot and actions.

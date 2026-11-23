@@ -40,9 +40,6 @@ abstract class HyprlandRustLibApiImplPlatform
   HyprlandWindow dco_decode_box_autoadd_hyprland_window(dynamic raw);
 
   @protected
-  int dco_decode_box_autoadd_i_32(dynamic raw);
-
-  @protected
   HyprlandMonitor dco_decode_hyprland_monitor(dynamic raw);
 
   @protected
@@ -90,9 +87,6 @@ abstract class HyprlandRustLibApiImplPlatform
   HyprlandWindow? dco_decode_opt_box_autoadd_hyprland_window(dynamic raw);
 
   @protected
-  int? dco_decode_opt_box_autoadd_i_32(dynamic raw);
-
-  @protected
   int dco_decode_u_32(dynamic raw);
 
   @protected
@@ -119,9 +113,6 @@ abstract class HyprlandRustLibApiImplPlatform
   HyprlandWindow sse_decode_box_autoadd_hyprland_window(
     SseDeserializer deserializer,
   );
-
-  @protected
-  int sse_decode_box_autoadd_i_32(SseDeserializer deserializer);
 
   @protected
   HyprlandMonitor sse_decode_hyprland_monitor(SseDeserializer deserializer);
@@ -181,9 +172,6 @@ abstract class HyprlandRustLibApiImplPlatform
   );
 
   @protected
-  int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer);
-
-  @protected
   int sse_decode_u_32(SseDeserializer deserializer);
 
   @protected
@@ -215,9 +203,6 @@ abstract class HyprlandRustLibApiImplPlatform
     HyprlandWindow self,
     SseSerializer serializer,
   );
-
-  @protected
-  void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_hyprland_monitor(
@@ -299,9 +284,6 @@ abstract class HyprlandRustLibApiImplPlatform
     HyprlandWindow? self,
     SseSerializer serializer,
   );
-
-  @protected
-  void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);

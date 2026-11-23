@@ -185,7 +185,7 @@ fn wire__crate__api__hyprland_switch_workspace_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_output_name = <String>::sse_decode(&mut deserializer);
-            let api_workspace_id = <i32>::sse_decode(&mut deserializer);
+            let api_workspace_address = <String>::sse_decode(&mut deserializer);
             let api_slot_count = <u8>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
@@ -193,7 +193,7 @@ fn wire__crate__api__hyprland_switch_workspace_impl(
                     (move || async move {
                         let output_ok = crate::api::hyprland_switch_workspace(
                             api_output_name,
-                            api_workspace_id,
+                            api_workspace_address,
                             api_slot_count,
                         )
                         .await?;
@@ -328,8 +328,8 @@ impl SseDecode for crate::api::HyprlandMonitor {
         let mut var_outputNumber = <u32>::sse_decode(deserializer);
         let mut var_x = <i32>::sse_decode(deserializer);
         let mut var_y = <i32>::sse_decode(deserializer);
-        let mut var_activeWorkspaceId = <i32>::sse_decode(deserializer);
-        let mut var_specialWorkspaceId = <Option<i32>>::sse_decode(deserializer);
+        let mut var_activeWorkspaceAddress = <String>::sse_decode(deserializer);
+        let mut var_specialWorkspaceAddress = <Option<String>>::sse_decode(deserializer);
         let mut var_specialWorkspaceName = <Option<String>>::sse_decode(deserializer);
         let mut var_fullscreen = <bool>::sse_decode(deserializer);
         let mut var_currentWindow = <Option<crate::api::HyprlandWindow>>::sse_decode(deserializer);
@@ -340,8 +340,8 @@ impl SseDecode for crate::api::HyprlandMonitor {
             output_number: var_outputNumber,
             x: var_x,
             y: var_y,
-            active_workspace_id: var_activeWorkspaceId,
-            special_workspace_id: var_specialWorkspaceId,
+            active_workspace_address: var_activeWorkspaceAddress,
+            special_workspace_address: var_specialWorkspaceAddress,
             special_workspace_name: var_specialWorkspaceName,
             fullscreen: var_fullscreen,
             current_window: var_currentWindow,
@@ -384,13 +384,13 @@ impl SseDecode for crate::api::HyprlandWindow {
         let mut var_address = <String>::sse_decode(deserializer);
         let mut var_title = <String>::sse_decode(deserializer);
         let mut var_appId = <String>::sse_decode(deserializer);
-        let mut var_workspaceId = <i32>::sse_decode(deserializer);
+        let mut var_workspaceAddress = <Option<String>>::sse_decode(deserializer);
         let mut var_monitorName = <String>::sse_decode(deserializer);
         return crate::api::HyprlandWindow {
             address: var_address,
             title: var_title,
             app_id: var_appId,
-            workspace_id: var_workspaceId,
+            workspace_address: var_workspaceAddress,
             monitor_name: var_monitorName,
         };
     }
@@ -399,13 +399,13 @@ impl SseDecode for crate::api::HyprlandWindow {
 impl SseDecode for crate::api::HyprlandWorkspace {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_id = <i32>::sse_decode(deserializer);
+        let mut var_address = <String>::sse_decode(deserializer);
         let mut var_name = <String>::sse_decode(deserializer);
         let mut var_monitorName = <String>::sse_decode(deserializer);
         let mut var_windowCount = <u32>::sse_decode(deserializer);
         let mut var_windows = <Vec<crate::api::HyprlandWindow>>::sse_decode(deserializer);
         return crate::api::HyprlandWorkspace {
-            id: var_id,
+            address: var_address,
             name: var_name,
             monitor_name: var_monitorName,
             window_count: var_windowCount,
@@ -541,17 +541,6 @@ impl SseDecode for Option<crate::api::HyprlandWindow> {
     }
 }
 
-impl SseDecode for Option<i32> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<i32>::sse_decode(deserializer));
-        } else {
-            return None;
-        }
-    }
-}
-
 impl SseDecode for u32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -612,8 +601,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::HyprlandMonitor {
             self.output_number.into_into_dart().into_dart(),
             self.x.into_into_dart().into_dart(),
             self.y.into_into_dart().into_dart(),
-            self.active_workspace_id.into_into_dart().into_dart(),
-            self.special_workspace_id.into_into_dart().into_dart(),
+            self.active_workspace_address.into_into_dart().into_dart(),
+            self.special_workspace_address.into_into_dart().into_dart(),
             self.special_workspace_name.into_into_dart().into_dart(),
             self.fullscreen.into_into_dart().into_dart(),
             self.current_window.into_into_dart().into_dart(),
@@ -673,7 +662,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::HyprlandWindow {
             self.address.into_into_dart().into_dart(),
             self.title.into_into_dart().into_dart(),
             self.app_id.into_into_dart().into_dart(),
-            self.workspace_id.into_into_dart().into_dart(),
+            self.workspace_address.into_into_dart().into_dart(),
             self.monitor_name.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -689,7 +678,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::HyprlandWindow> for crate::ap
 impl flutter_rust_bridge::IntoDart for crate::api::HyprlandWorkspace {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.id.into_into_dart().into_dart(),
+            self.address.into_into_dart().into_dart(),
             self.name.into_into_dart().into_dart(),
             self.monitor_name.into_into_dart().into_dart(),
             self.window_count.into_into_dart().into_dart(),
@@ -771,8 +760,8 @@ impl SseEncode for crate::api::HyprlandMonitor {
         <u32>::sse_encode(self.output_number, serializer);
         <i32>::sse_encode(self.x, serializer);
         <i32>::sse_encode(self.y, serializer);
-        <i32>::sse_encode(self.active_workspace_id, serializer);
-        <Option<i32>>::sse_encode(self.special_workspace_id, serializer);
+        <String>::sse_encode(self.active_workspace_address, serializer);
+        <Option<String>>::sse_encode(self.special_workspace_address, serializer);
         <Option<String>>::sse_encode(self.special_workspace_name, serializer);
         <bool>::sse_encode(self.fullscreen, serializer);
         <Option<crate::api::HyprlandWindow>>::sse_encode(self.current_window, serializer);
@@ -804,7 +793,7 @@ impl SseEncode for crate::api::HyprlandWindow {
         <String>::sse_encode(self.address, serializer);
         <String>::sse_encode(self.title, serializer);
         <String>::sse_encode(self.app_id, serializer);
-        <i32>::sse_encode(self.workspace_id, serializer);
+        <Option<String>>::sse_encode(self.workspace_address, serializer);
         <String>::sse_encode(self.monitor_name, serializer);
     }
 }
@@ -812,7 +801,7 @@ impl SseEncode for crate::api::HyprlandWindow {
 impl SseEncode for crate::api::HyprlandWorkspace {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <i32>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.address, serializer);
         <String>::sse_encode(self.name, serializer);
         <String>::sse_encode(self.monitor_name, serializer);
         <u32>::sse_encode(self.window_count, serializer);
@@ -917,16 +906,6 @@ impl SseEncode for Option<crate::api::HyprlandWindow> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::api::HyprlandWindow>::sse_encode(value, serializer);
-        }
-    }
-}
-
-impl SseEncode for Option<i32> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <i32>::sse_encode(value, serializer);
         }
     }
 }

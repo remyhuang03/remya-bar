@@ -180,7 +180,9 @@ class _WorkspaceSlotState extends State<WorkspaceSlot>
   ]).animate(_bounce);
 
   Future<void> _activate(bool remote) async {
-    final switched = await widget.backend.switchWorkspace(widget.slot.id);
+    final switched = await widget.backend.switchWorkspace(
+      widget.slot.id.toString(),
+    );
     if (mounted && switched && remote) _bounce.forward(from: 0);
   }
 
@@ -199,7 +201,8 @@ class _WorkspaceSlotState extends State<WorkspaceSlot>
         .where((m) => m.name == slot.owner)
         .firstOrNull;
     final other = slot.owner != null && slot.owner != widget.output.name;
-    final visible = other && owner?.activeWorkspaceId == slot.id;
+    final visible =
+        other && owner?.activeWorkspaceAddress == slot.id.toString();
     final showOwner = other && owner != null && backend.monitors.length > 1;
     final outputName = owner == null
         ? slot.owner ?? widget.output.name

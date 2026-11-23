@@ -88,7 +88,7 @@ void main() {
               outputNumber: 0,
               x: 0,
               y: 0,
-              activeWorkspaceId: 1,
+              activeWorkspaceAddress: '1',
               workspaceSlots: [],
             ),
           ],
@@ -363,7 +363,7 @@ void main() {
             outputNumber: 1,
             x: 0,
             y: 0,
-            activeWorkspaceId: 1,
+            activeWorkspaceAddress: '1',
             workspaceSlots: [
               HyprlandWorkspaceSlot(
                 id: 1,
@@ -541,14 +541,14 @@ void main() {
             outputNumber: 1,
             x: 0,
             y: 0,
-            activeWorkspaceId: 1,
+            activeWorkspaceAddress: '1',
             currentWindow: hasWindow
                 ? const HyprlandWindow(
                     address: '0x1',
                     title:
                         'A very long window title that must not widen the slot',
                     appId: 'kitty',
-                    workspaceId: 1,
+                    workspaceAddress: '1',
                     monitorName: 'DP-1',
                   )
                 : null,

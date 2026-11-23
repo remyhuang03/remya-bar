@@ -18,7 +18,7 @@ const _window = HyprlandWindow(
   address: '0xa',
   title: 'Report',
   appId: 'editor',
-  workspaceId: 3,
+  workspaceAddress: '3',
   monitorName: 'DP-1',
 );
 
@@ -107,7 +107,7 @@ const _snapshot = HyprlandSnapshot(
       outputNumber: 1,
       x: 1920,
       y: 0,
-      activeWorkspaceId: 3,
+      activeWorkspaceAddress: '3',
       currentWindow: _window,
       workspaceSlots: _slots,
     ),
@@ -117,34 +117,34 @@ const _snapshot = HyprlandSnapshot(
       outputNumber: 2,
       x: 0,
       y: 0,
-      activeWorkspaceId: 2,
+      activeWorkspaceAddress: '2',
       workspaceSlots: [],
     ),
   ],
   workspaces: [
     HyprlandWorkspace(
-      id: 1,
+      address: '1',
       name: '1',
       monitorName: 'DP-1',
       windowCount: 0,
       windows: [],
     ),
     HyprlandWorkspace(
-      id: 2,
+      address: '2',
       name: '2',
       monitorName: 'DP-2',
       windowCount: 0,
       windows: [],
     ),
     HyprlandWorkspace(
-      id: 3,
+      address: '3',
       name: 'Writing',
       monitorName: 'DP-1',
       windowCount: 1,
       windows: [_window],
     ),
     HyprlandWorkspace(
-      id: -1337,
+      address: 'Notes',
       name: 'Notes',
       monitorName: 'DP-2',
       windowCount: 0,
@@ -225,8 +225,8 @@ void main() {
                 outputNumber: output.outputNumber,
                 x: output.x,
                 y: output.y,
-                activeWorkspaceId: output.activeWorkspaceId,
-                specialWorkspaceId: output.specialWorkspaceId,
+                activeWorkspaceAddress: output.activeWorkspaceAddress,
+                specialWorkspaceAddress: output.specialWorkspaceAddress,
                 specialWorkspaceName: output.specialWorkspaceName,
                 currentWindow: output.currentWindow,
                 workspaceSlots: [
@@ -371,7 +371,7 @@ void main() {
             outputNumber: 1,
             x: 0,
             y: 0,
-            activeWorkspaceId: 1,
+            activeWorkspaceAddress: '1',
             workspaceSlots: [],
           ),
           HyprlandMonitor(
@@ -380,7 +380,7 @@ void main() {
             outputNumber: 2,
             x: 0,
             y: 0,
-            activeWorkspaceId: 2,
+            activeWorkspaceAddress: '2',
             workspaceSlots: [],
           ),
         ],
@@ -406,7 +406,10 @@ void main() {
     addTearDown(backend.dispose);
     await backend.refresh();
     expect(backend.output?.name, 'DP-1');
-    expect(backend.workspaces.map((workspace) => workspace.id), [1, 3]);
+    expect(backend.workspaces.map((workspace) => workspace.address), [
+      '1',
+      '3',
+    ]);
     expect(backend.currentWindow?.title, 'Report');
     fail = true;
     await backend.refresh();
@@ -451,17 +454,17 @@ void main() {
   testWidgets(
     'eight fixed slots show global occupancy and empty targets remain clickable',
     (tester) async {
-      final activations = <(String, int)>[];
+      final activations = <(String, String)>[];
       final backend = HyprlandBackend(
         outputName: 'DP-1',
         readSnapshot: ({required slotCount}) async => _snapshot,
         activateWorkspace:
             ({
               required outputName,
-              required workspaceId,
+              required workspaceAddress,
               required slotCount,
             }) async {
-              activations.add((outputName, workspaceId));
+              activations.add((outputName, workspaceAddress));
             },
       );
       addTearDown(backend.dispose);
@@ -494,19 +497,19 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('workspace-1')));
       await tester.pump();
-      expect(activations, [('DP-1', 1)]);
+      expect(activations, [('DP-1', '1')]);
       await tester.tap(find.byKey(const ValueKey('workspace-4')));
       await tester.pump();
       await tester.tap(find.byKey(const ValueKey('workspace-2')));
       await tester.pump();
-      await backend.switchWorkspace(-1337);
-      await backend.switchWorkspace(-1);
-      await backend.switchWorkspace(42);
+      await backend.switchWorkspace('Notes');
+      await backend.switchWorkspace('missing');
+      await backend.switchWorkspace('42');
       expect(activations, [
-        ('DP-1', 1),
-        ('DP-1', 4),
-        ('DP-1', 2),
-        ('DP-1', -1337),
+        ('DP-1', '1'),
+        ('DP-1', '4'),
+        ('DP-1', '2'),
+        ('DP-1', 'Notes'),
       ]);
       expect(tester.takeException(), isNull);
     },
@@ -585,6 +588,17 @@ void main() {
             .map((call) => call.arguments['kind']),
         ['tooltip', workspaceOverviewKind],
       );
+      final overview = calls.firstWhere(
+        (call) => call.arguments['kind'] == workspaceOverviewKind,
+      );
+      final rows = overview.arguments['data']['workspaces'] as List;
+      expect(rows.singleWhere((row) => row['address'] == 'Notes'), {
+        'address': 'Notes',
+        'name': 'Notes',
+        'owner': 'DP-2',
+        'count': 0,
+        'active': false,
+      });
       expect(
         calls.first.arguments['data']['message'],
         'Workspace Writing · Display 1 (DP-1)\neditor',
@@ -716,7 +730,7 @@ void main() {
             outputNumber: 1,
             x: 1920,
             y: 0,
-            activeWorkspaceId: 14,
+            activeWorkspaceAddress: '14',
             workspaceSlots: [
               for (var id = 9; id <= 16; id++)
                 HyprlandWorkspaceSlot(
@@ -764,8 +778,8 @@ void main() {
               outputNumber: 1,
               x: 1920,
               y: 0,
-              activeWorkspaceId: 3,
-              specialWorkspaceId: -99,
+              activeWorkspaceAddress: '3',
+              specialWorkspaceAddress: 'special:scratchpad',
               specialWorkspaceName: 'special:scratchpad',
               workspaceSlots: [
                 ..._slots.take(2),

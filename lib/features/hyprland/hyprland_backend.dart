@@ -310,7 +310,7 @@ class HyprlandBackend extends ChangeNotifier {
   final bool _ownsStore;
   final Future<void> Function({
     required String outputName,
-    required int workspaceId,
+    required String workspaceAddress,
     required int slotCount,
   })
   activateWorkspace;
@@ -336,6 +336,7 @@ class HyprlandBackend extends ChangeNotifier {
   bool _superHeld = false;
   String? error;
   HyprlandMonitor? output;
+  String? get activeWorkspaceName => _activeWorkspaceName;
   String? _activeWorkspaceName;
   List<(String, int)> _outputLabels = const [];
   Map<String, String?> _visibleIcons = const {};
@@ -366,9 +367,12 @@ class HyprlandBackend extends ChangeNotifier {
         (_store._snapshot != null && next == null
             ? 'Output unavailable'
             : null);
-    final nextName = next != null && next.activeWorkspaceId < 0
+    final nextName =
+        next != null && !next.workspaceSlots.any((slot) => slot.active)
         ? allWorkspaces
-              .where((workspace) => workspace.id == next.activeWorkspaceId)
+              .where(
+                (workspace) => workspace.address == next.activeWorkspaceAddress,
+              )
               .firstOrNull
               ?.name
         : null;
@@ -418,16 +422,17 @@ class HyprlandBackend extends ChangeNotifier {
     ),
   );
 
-  Future<bool> switchWorkspace(int id) async {
-    if (id == 0 ||
-        !(allWorkspaces.any((workspace) => workspace.id == id) ||
-            workspaceSlots.any((slot) => slot.id == id))) {
+  Future<bool> switchWorkspace(String address) async {
+    if (!(allWorkspaces.any((workspace) => workspace.address == address) ||
+        workspaceSlots.any(
+          (slot) => slot.id > 0 && slot.id.toString() == address,
+        ))) {
       return false;
     }
     return _workspaceAction(
       (name, count) => activateWorkspace(
         outputName: name,
-        workspaceId: id,
+        workspaceAddress: address,
         slotCount: count,
       ),
     );
@@ -490,8 +495,8 @@ bool _sameOutput(HyprlandMonitor? first, HyprlandMonitor? second) {
   Object metadata(HyprlandMonitor monitor) => (
     monitor.name,
     monitor.outputNumber,
-    monitor.activeWorkspaceId,
-    monitor.specialWorkspaceId,
+    monitor.activeWorkspaceAddress,
+    monitor.specialWorkspaceAddress,
     monitor.specialWorkspaceName,
     monitor.currentWindow,
     monitor.fullscreen,

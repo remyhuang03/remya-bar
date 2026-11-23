@@ -134,10 +134,10 @@ extension _PopupActions on _RemyaBarAppState {
         throw StateError('Sidebar is closed');
       }
       await sidebar.perform(args, _sidebarOutput);
-    } else if (action == 'workspace.switch' && args['id'] is int) {
+    } else if (action == 'workspace.switch' && args['address'] is String) {
       final backend = widget.hyprland;
       if (backend == null ||
-          !await backend.switchWorkspace(args['id'] as int)) {
+          !await backend.switchWorkspace(args['address'] as String)) {
         throw StateError('Workspace unavailable');
       }
       await _popup.hide(kind: workspaceOverviewKind);

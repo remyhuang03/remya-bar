@@ -2,12 +2,35 @@ use crate::api::{
     HyprlandMonitor, HyprlandSnapshot, HyprlandWindow, HyprlandWorkspace, HyprlandWorkspaceSlot,
 };
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Deserialize)]
 struct WorkspaceRef {
     id: Option<i32>,
+    address: Option<String>,
     name: Option<String>,
+}
+
+impl WorkspaceRef {
+    fn resolve_address(&mut self, legacy_addresses: &HashMap<i32, String>) {
+        self.address = self
+            .address
+            .take()
+            .filter(|address| !address.is_empty())
+            .or_else(|| {
+                let id = self.id.filter(|id| *id != 0)?;
+                legacy_addresses.get(&id).cloned().or_else(|| {
+                    if id > 0 {
+                        Some(id.to_string())
+                    } else {
+                        self.name
+                            .clone()
+                            .filter(|name| !name.is_empty())
+                            .or_else(|| Some(id.to_string()))
+                    }
+                })
+            });
+    }
 }
 
 #[derive(Deserialize)]
@@ -25,8 +48,8 @@ struct Monitor {
 
 #[derive(Deserialize)]
 struct Workspace {
-    id: i32,
-    name: String,
+    #[serde(flatten)]
+    reference: WorkspaceRef,
     monitor: String,
     windows: u32,
     lastwindow: String,
@@ -66,14 +89,29 @@ pub fn parse(
 ) -> Result<HyprlandSnapshot, String> {
     let mut monitors: Vec<Monitor> =
         serde_json::from_str(monitors).map_err(|error| error.to_string())?;
-    let workspaces: Vec<Workspace> =
+    let mut workspaces: Vec<Workspace> =
         serde_json::from_str(workspaces).map_err(|error| error.to_string())?;
-    let clients: Vec<Client> = serde_json::from_str(clients).map_err(|error| error.to_string())?;
+    let mut clients: Vec<Client> =
+        serde_json::from_str(clients).map_err(|error| error.to_string())?;
     let active: ActiveWindow =
         serde_json::from_str(active_window).map_err(|error| error.to_string())?;
+    let mut legacy_addresses = HashMap::new();
+    for workspace in &mut workspaces {
+        workspace.reference.resolve_address(&legacy_addresses);
+        if let (Some(id), Some(address)) = (workspace.reference.id, &workspace.reference.address) {
+            legacy_addresses.insert(id, address.clone());
+        }
+    }
+    for monitor in &mut monitors {
+        monitor.active_workspace.resolve_address(&legacy_addresses);
+        monitor.special_workspace.resolve_address(&legacy_addresses);
+    }
+    for client in &mut clients {
+        client.workspace.resolve_address(&legacy_addresses);
+    }
     if monitors.iter().any(|monitor| {
         monitor.name.is_empty()
-            || monitor.active_workspace.id.is_none()
+            || monitor.active_workspace.address.is_none()
             || monitors
                 .iter()
                 .filter(|other| other.name == monitor.name)
@@ -87,7 +125,7 @@ pub fn parse(
         address: client.address.clone(),
         title: client.title.clone(),
         app_id: client.class.clone(),
-        workspace_id: client.workspace.id.unwrap_or_default(),
+        workspace_address: client.workspace.address.clone(),
         monitor_name: monitors
             .iter()
             .find(|monitor| monitor.id == client.monitor)
@@ -102,25 +140,28 @@ pub fn parse(
             .iter()
             .enumerate()
             .map(|(index, monitor)| {
-                let active_id = monitor.active_workspace.id.unwrap();
-                let special_id = monitor.special_workspace.id.filter(|id| *id != 0);
+                let active_address = monitor.active_workspace.address.as_deref().unwrap();
+                let special_address = monitor.special_workspace.address.as_deref();
                 let visible = |client: &&Client| {
                     client.monitor == monitor.id
                         && client.mapped
                         && !client.hidden
-                        && (client.workspace.id == Some(active_id)
-                            || special_id.is_some() && client.workspace.id == special_id)
+                        && (client.workspace.address.as_deref() == Some(active_address)
+                            || special_address.is_some()
+                                && client.workspace.address.as_deref() == special_address)
                 };
-                let selected_id = special_id.unwrap_or(active_id);
+                let selected_address = special_address.unwrap_or(active_address);
                 let last_window = workspaces
                     .iter()
-                    .find(|workspace| workspace.id == selected_id)
+                    .find(|workspace| {
+                        workspace.reference.address.as_deref() == Some(selected_address)
+                    })
                     .map(|workspace| workspace.lastwindow.as_str());
                 let current_window = clients.iter().filter(visible).min_by_key(|client| {
                     (
                         active.address.as_deref() != Some(client.address.as_str()),
                         last_window != Some(client.address.as_str()),
-                        client.workspace.id != Some(selected_id),
+                        client.workspace.address.as_deref() != Some(selected_address),
                         client.focus_history < 0,
                         client.focus_history,
                     )
@@ -130,46 +171,80 @@ pub fn parse(
                     output_number: index as u32 + 1,
                     x: monitor.x,
                     y: monitor.y,
-                    active_workspace_id: active_id,
-                    special_workspace_id: special_id,
+                    active_workspace_address: active_address.into(),
+                    special_workspace_address: special_address.map(str::to_owned),
                     special_workspace_name: monitor
                         .special_workspace
                         .name
                         .clone()
-                        .filter(|name| !name.is_empty()),
+                        .filter(|name| !name.is_empty())
+                        .or_else(|| {
+                            special_address
+                                .and_then(|address| address.strip_prefix("special:"))
+                                .map(str::to_owned)
+                        }),
                     fullscreen: clients
                         .iter()
                         .filter(visible)
                         .any(|client| client.fullscreen.as_u64().is_some_and(|mode| mode & 2 != 0)),
                     current_window: current_window.map(window),
-                    workspace_slots: slots(active_id, slot_count, &workspaces, &clients, urgent),
+                    workspace_slots: slots(
+                        numeric_workspace_id(active_address).unwrap_or_default(),
+                        slot_count,
+                        &workspaces,
+                        &clients,
+                        urgent,
+                    ),
                 }
             })
             .collect(),
         workspaces: {
             let mut result: Vec<_> = workspaces
                 .iter()
-                .filter(|workspace| {
-                    workspace.id != 0
-                        && workspace.workspace_type.as_deref() != Some("special")
-                        && !workspace.name.starts_with("special:")
-                })
-                .map(|workspace| HyprlandWorkspace {
-                    id: workspace.id,
-                    name: workspace.name.clone(),
-                    monitor_name: workspace.monitor.clone(),
-                    window_count: workspace.windows,
-                    windows: clients
-                        .iter()
-                        .filter(|client| client.workspace.id == Some(workspace.id) && client.mapped)
-                        .map(window)
-                        .collect(),
+                .filter_map(|workspace| {
+                    let address = workspace.reference.address.as_deref()?;
+                    if workspace.workspace_type.as_deref() == Some("special")
+                        || address.starts_with("special:")
+                    {
+                        return None;
+                    }
+                    Some(HyprlandWorkspace {
+                        address: address.into(),
+                        name: workspace
+                            .reference
+                            .name
+                            .clone()
+                            .unwrap_or_else(|| address.into()),
+                        monitor_name: workspace.monitor.clone(),
+                        window_count: workspace.windows,
+                        windows: clients
+                            .iter()
+                            .filter(|client| {
+                                client.workspace.address.as_deref() == Some(address)
+                                    && client.mapped
+                            })
+                            .map(window)
+                            .collect(),
+                    })
                 })
                 .collect();
-            result.sort_by_key(|workspace| workspace.id);
+            result.sort_by(|a, b| {
+                a.address
+                    .parse::<i32>()
+                    .ok()
+                    .cmp(&b.address.parse::<i32>().ok())
+                    .then_with(|| a.address.cmp(&b.address))
+            });
             result
         },
     })
+}
+
+fn numeric_workspace_id(address: &str) -> Option<i32> {
+    address
+        .parse::<i32>()
+        .ok()
+        .filter(|id| *id > 0 && id.to_string() == address)
 }
 
 fn slots(
@@ -189,10 +264,15 @@ fn slots(
     (0..count)
         .map(|offset| {
             let id = start.checked_add(offset).unwrap_or_default();
-            let workspace = workspaces.iter().find(|workspace| workspace.id == id);
+            let address = id.to_string();
+            let workspace = workspaces
+                .iter()
+                .find(|workspace| workspace.reference.address.as_deref() == Some(address.as_str()));
             let mut windows: Vec<_> = clients
                 .iter()
-                .filter(|client| client.mapped && client.workspace.id == Some(id))
+                .filter(|client| {
+                    client.mapped && client.workspace.address.as_deref() == Some(address.as_str())
+                })
                 .collect();
             windows.sort_by_key(|client| {
                 std::cmp::Reverse(
@@ -208,7 +288,7 @@ fn slots(
             HyprlandWorkspaceSlot {
                 id,
                 name: workspace
-                    .map(|workspace| workspace.name.clone())
+                    .and_then(|workspace| workspace.reference.name.clone())
                     .unwrap_or_else(|| {
                         if id == 0 {
                             "—".into()
@@ -251,33 +331,37 @@ fn output(snapshot: &HyprlandSnapshot, name: &str) -> Result<String, String> {
 pub fn switch_command(
     snapshot: &HyprlandSnapshot,
     output_name: &str,
-    id: i32,
+    address: &str,
 ) -> Result<String, String> {
     let owner = output(snapshot, output_name)?;
     let workspace = snapshot
         .workspaces
         .iter()
-        .find(|workspace| workspace.id == id);
+        .find(|workspace| workspace.address == address);
+    let numeric_id = numeric_workspace_id(address);
     let (prefix, selector) = match workspace {
         // Existing workspaces stay on their monitor; focusing them never moves them.
         Some(workspace) => (
             output(snapshot, &workspace.monitor_name).unwrap_or_default(),
-            if id > 0 {
-                id.to_string()
+            if numeric_id.is_some() {
+                address.to_owned()
             } else {
-                format!("name:{}", workspace.name)
+                format!("name:{address}")
             },
         ),
-        None if id > 0
+        None if numeric_id.is_some()
             && snapshot
                 .monitors
                 .iter()
                 .find(|monitor| monitor.name == output_name)
                 .is_some_and(|monitor| {
-                    monitor.workspace_slots.iter().any(|slot| slot.id == id)
+                    monitor
+                        .workspace_slots
+                        .iter()
+                        .any(|slot| Some(slot.id) == numeric_id)
                 }) =>
         {
-            (owner, id.to_string())
+            (owner, address.to_owned())
         }
         None => return Err("Workspace target is outside the current group".into()),
     };
@@ -311,7 +395,7 @@ pub fn special_command(snapshot: &HyprlandSnapshot, output_name: &str) -> Result
         .find(|monitor| monitor.name == output_name)
         .ok_or("Output unavailable")?;
     let special = monitor
-        .special_workspace_name
+        .special_workspace_address
         .as_deref()
         .and_then(|name| name.strip_prefix("special:"))
         .filter(|name| !name.is_empty())
@@ -438,9 +522,9 @@ mod tests {
             state
                 .workspaces
                 .iter()
-                .map(|workspace| workspace.id)
+                .map(|workspace| workspace.address.as_str())
                 .collect::<Vec<_>>(),
-            [1, 2, 3]
+            ["1", "2", "3"]
         );
         assert_eq!(state.workspaces[1].windows[0].monitor_name, "DP-2");
     }
@@ -462,7 +546,42 @@ mod tests {
             8,
         ).unwrap();
         assert_eq!(state.workspaces.len(), 1);
-        assert_eq!(state.workspaces[0].id, -1337);
+        assert_eq!(state.workspaces[0].address, "Writing");
+        assert_eq!(
+            state.monitors[0].current_window.as_ref().unwrap().title,
+            "Scratch"
+        );
+    }
+
+    #[test]
+    fn workspace_addresses_restore_named_and_special_workspaces() {
+        let state = parse(
+            r#"[{"id":0,"name":"DP-1","x":0,"y":0,"activeWorkspace":{"address":"Writing","name":"Writing"},"specialWorkspace":{"address":"special:scratch","name":"scratch"}}]"#,
+            r#"[{"address":"Writing","type":"normal","name":"Writing","monitor":"DP-1","windows":1,"lastwindow":"0xa"},{"address":"special:scratch","type":"special","name":"scratch","monitor":"DP-1","windows":1,"lastwindow":"0xb"}]"#,
+            r#"[{"address":"0xa","title":"Draft","class":"editor","workspace":{"address":"Writing"},"monitor":0,"mapped":true,"hidden":false,"focusHistoryID":1},{"address":"0xb","title":"Scratch","class":"terminal","workspace":{"address":"special:scratch"},"monitor":0,"mapped":true,"hidden":false,"focusHistoryID":0}]"#,
+            "{}",
+            &HashSet::new(),
+            8,
+        ).unwrap();
+        assert_eq!(state.workspaces[0].windows[0].title, "Draft");
+        assert_eq!(state.monitors[0].active_workspace_address, "Writing");
+        assert!(
+            state.monitors[0]
+                .workspace_slots
+                .iter()
+                .all(|slot| !slot.active)
+        );
+        assert!(
+            switch_command(&state, "DP-1", "Writing")
+                .unwrap()
+                .contains("workspace = \"name:Writing\"")
+        );
+        assert!(switch_command(&state, "DP-1", "special:scratch").is_err());
+        assert!(
+            special_command(&state, "DP-1")
+                .unwrap()
+                .contains("toggle_special(\"scratch\")")
+        );
         assert_eq!(
             state.monitors[0].current_window.as_ref().unwrap().title,
             "Scratch"
@@ -474,10 +593,10 @@ mod tests {
         assert!(parse("{}", "[]", "[]", "{}", &HashSet::new(), 8).is_err());
         assert!(parse("[]", "[]", "[]", "invalid", &HashSet::new(), 8).is_err());
         let state = snapshot(false, 2);
-        assert!(switch_command(&state, "DP-1\n", 1).is_err());
-        assert!(switch_command(&state, "DP-1", 0).is_err());
-        assert!(switch_command(&state, "DP-1", 42).is_err());
-        let command = switch_command(&state, "DP-1", 4).unwrap();
+        assert!(switch_command(&state, "DP-1\n", "1").is_err());
+        assert!(switch_command(&state, "DP-1", "0").is_err());
+        assert!(switch_command(&state, "DP-1", "42").is_err());
+        let command = switch_command(&state, "DP-1", "4").unwrap();
         assert!(command.contains("monitor = \"DP-1\""));
         assert!(command.contains("workspace = \"4\""));
         assert!(quoted("DP-\"1").unwrap().contains(r#"DP-\"1"#));
@@ -508,15 +627,15 @@ mod tests {
         assert!(slots[1].urgent);
         assert!(slots[1].occupied);
         assert!(!slots[0].occupied);
-        let command = switch_command(&state, "DP-1", 10).unwrap();
+        let command = switch_command(&state, "DP-1", "10").unwrap();
         assert!(command.contains("monitor = \"DP-2\""));
         assert!(command.contains("workspace = \"10\""));
         assert!(
-            switch_command(&state, "DP-1", 15)
+            switch_command(&state, "DP-1", "15")
                 .unwrap()
                 .contains("monitor = \"DP-1\"")
         );
-        assert!(switch_command(&state, "DP-1", 17).is_err());
+        assert!(switch_command(&state, "DP-1", "17").is_err());
         let ids = |active, count| {
             super::slots(active, count, &[], &[], &HashSet::new())
                 .iter()
@@ -526,7 +645,7 @@ mod tests {
         assert_eq!(ids(7, 5), (6..=10).collect::<Vec<_>>());
         assert_eq!(ids(10, 10), (1..=10).collect::<Vec<_>>());
         assert!(
-            switch_command(&state, "DP-1", -1337)
+            switch_command(&state, "DP-1", "Writing")
                 .unwrap()
                 .contains("workspace = \"name:Writing\"")
         );

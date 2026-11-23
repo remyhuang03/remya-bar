@@ -17,11 +17,11 @@ Future<HyprlandSnapshot> hyprlandSnapshot({required int slotCount}) =>
 
 Future<void> hyprlandSwitchWorkspace({
   required String outputName,
-  required int workspaceId,
+  required String workspaceAddress,
   required int slotCount,
 }) => HyprlandRustLib.instance.api.crateApiHyprlandSwitchWorkspace(
   outputName: outputName,
-  workspaceId: workspaceId,
+  workspaceAddress: workspaceAddress,
   slotCount: slotCount,
 );
 
@@ -54,8 +54,8 @@ class HyprlandMonitor {
   final int outputNumber;
   final int x;
   final int y;
-  final int activeWorkspaceId;
-  final int? specialWorkspaceId;
+  final String activeWorkspaceAddress;
+  final String? specialWorkspaceAddress;
   final String? specialWorkspaceName;
   final bool fullscreen;
   final HyprlandWindow? currentWindow;
@@ -66,8 +66,8 @@ class HyprlandMonitor {
     required this.outputNumber,
     required this.x,
     required this.y,
-    required this.activeWorkspaceId,
-    this.specialWorkspaceId,
+    required this.activeWorkspaceAddress,
+    this.specialWorkspaceAddress,
     this.specialWorkspaceName,
     required this.fullscreen,
     this.currentWindow,
@@ -80,8 +80,8 @@ class HyprlandMonitor {
       outputNumber.hashCode ^
       x.hashCode ^
       y.hashCode ^
-      activeWorkspaceId.hashCode ^
-      specialWorkspaceId.hashCode ^
+      activeWorkspaceAddress.hashCode ^
+      specialWorkspaceAddress.hashCode ^
       specialWorkspaceName.hashCode ^
       fullscreen.hashCode ^
       currentWindow.hashCode ^
@@ -96,8 +96,8 @@ class HyprlandMonitor {
           outputNumber == other.outputNumber &&
           x == other.x &&
           y == other.y &&
-          activeWorkspaceId == other.activeWorkspaceId &&
-          specialWorkspaceId == other.specialWorkspaceId &&
+          activeWorkspaceAddress == other.activeWorkspaceAddress &&
+          specialWorkspaceAddress == other.specialWorkspaceAddress &&
           specialWorkspaceName == other.specialWorkspaceName &&
           fullscreen == other.fullscreen &&
           currentWindow == other.currentWindow &&
@@ -160,14 +160,14 @@ class HyprlandWindow {
   final String address;
   final String title;
   final String appId;
-  final int workspaceId;
+  final String? workspaceAddress;
   final String monitorName;
 
   const HyprlandWindow({
     required this.address,
     required this.title,
     required this.appId,
-    required this.workspaceId,
+    this.workspaceAddress,
     required this.monitorName,
   });
 
@@ -176,7 +176,7 @@ class HyprlandWindow {
       address.hashCode ^
       title.hashCode ^
       appId.hashCode ^
-      workspaceId.hashCode ^
+      workspaceAddress.hashCode ^
       monitorName.hashCode;
 
   @override
@@ -187,19 +187,19 @@ class HyprlandWindow {
           address == other.address &&
           title == other.title &&
           appId == other.appId &&
-          workspaceId == other.workspaceId &&
+          workspaceAddress == other.workspaceAddress &&
           monitorName == other.monitorName;
 }
 
 class HyprlandWorkspace {
-  final int id;
+  final String address;
   final String name;
   final String monitorName;
   final int windowCount;
   final List<HyprlandWindow> windows;
 
   const HyprlandWorkspace({
-    required this.id,
+    required this.address,
     required this.name,
     required this.monitorName,
     required this.windowCount,
@@ -208,7 +208,7 @@ class HyprlandWorkspace {
 
   @override
   int get hashCode =>
-      id.hashCode ^
+      address.hashCode ^
       name.hashCode ^
       monitorName.hashCode ^
       windowCount.hashCode ^
@@ -219,7 +219,7 @@ class HyprlandWorkspace {
       identical(this, other) ||
       other is HyprlandWorkspace &&
           runtimeType == other.runtimeType &&
-          id == other.id &&
+          address == other.address &&
           name == other.name &&
           monitorName == other.monitorName &&
           windowCount == other.windowCount &&

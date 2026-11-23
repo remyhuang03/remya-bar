@@ -47,31 +47,40 @@ class _BarWorkspacesState extends State<BarWorkspaces> {
     final slots = backend.workspaceSlots;
     final workspaces = {
       for (final workspace in backend.allWorkspaces)
-        workspace.id: {
-          'id': workspace.id,
+        workspace.address: {
+          'address': workspace.address,
           'name': workspace.name,
           'owner': workspace.monitorName,
           'count': workspace.windowCount,
-          'active': workspace.id == backend.output?.activeWorkspaceId,
+          'active': workspace.address == backend.output?.activeWorkspaceAddress,
         },
-      for (final slot in slots)
-        if (slot.id != 0 && !backend.allWorkspaces.any((w) => w.id == slot.id))
-          slot.id: {
-            'id': slot.id,
-            'name': slot.name,
-            'owner': backend.output!.name,
-            'count': 0,
-            'active': slot.active,
-          },
     };
-    final ids = workspaces.keys.toList()..sort();
+    for (final slot in slots) {
+      if (slot.id == 0) continue;
+      final address = slot.id.toString();
+      workspaces.putIfAbsent(
+        address,
+        () => {
+          'address': address,
+          'name': slot.name,
+          'owner': backend.output!.name,
+          'count': 0,
+          'active': slot.active,
+        },
+      );
+    }
+    final addresses = workspaces.keys.toList()
+      ..sort((a, b) {
+        final number = (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0);
+        return number == 0 ? a.compareTo(b) : number;
+      });
     try {
       await popup.show(
         kind: workspaceOverviewKind,
         anchor: box.localToGlobal(Offset.zero) & box.size,
         size: const Size(320, 392),
         data: {
-          'workspaces': [for (final id in ids) workspaces[id]],
+          'workspaces': [for (final address in addresses) workspaces[address]],
         },
         theme: BarPopupScope.themeOf(context),
       );
@@ -94,17 +103,13 @@ class _BarWorkspacesState extends State<BarWorkspaces> {
             output.workspaceSlots.isEmpty) {
           return const SizedBox.shrink();
         }
-        final special = output.specialWorkspaceId == null
+        final special = output.specialWorkspaceAddress == null
             ? null
             : output.specialWorkspaceName?.replaceFirst('special:', '') ??
                   'Special';
-        final named = output.activeWorkspaceId < 0
-            ? backend.allWorkspaces
-                  .where((item) => item.id == output.activeWorkspaceId)
-                  .firstOrNull
-                  ?.name
-            : null;
-        final overlay = backend.superHeld || _hovered ? null : special ?? named;
+        final overlay = backend.superHeld || _hovered
+            ? null
+            : special ?? backend.activeWorkspaceName;
         final colors = Theme.of(context).colorScheme;
         return MouseRegion(
           onEnter: (_) => setState(() => _hovered = true),

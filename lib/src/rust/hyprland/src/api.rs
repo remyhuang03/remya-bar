@@ -47,13 +47,13 @@ pub struct HyprlandWindow {
     pub address: String,
     pub title: String,
     pub app_id: String,
-    pub workspace_id: i32,
+    pub workspace_address: Option<String>,
     pub monitor_name: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HyprlandWorkspace {
-    pub id: i32,
+    pub address: String,
     pub name: String,
     pub monitor_name: String,
     pub window_count: u32,
@@ -78,8 +78,8 @@ pub struct HyprlandMonitor {
     pub output_number: u32,
     pub x: i32,
     pub y: i32,
-    pub active_workspace_id: i32,
-    pub special_workspace_id: Option<i32>,
+    pub active_workspace_address: String,
+    pub special_workspace_address: Option<String>,
     pub special_workspace_name: Option<String>,
     pub fullscreen: bool,
     pub current_window: Option<HyprlandWindow>,
@@ -103,7 +103,7 @@ pub async fn hyprland_snapshot(slot_count: u8) -> Result<HyprlandSnapshot, Strin
     let clients = hyprland_request("j/clients".into()).await?;
     let active_window = hyprland_request("j/activewindow".into()).await?;
     let urgent = hyprland_request(
-        "repl local ids = {}; for _, ws in ipairs(hl.get_workspaces()) do if ws.has_urgent then table.insert(ids, ws.id) end end; return 'urgent:' .. table.concat(ids, ',')".into(),
+        "repl local ids = {}; for _, ws in ipairs(hl.get_workspaces()) do if ws.has_urgent and ws.id then table.insert(ids, ws.id) end end; return 'urgent:' .. table.concat(ids, ',')".into(),
     ).await?;
     let urgent = urgent
         .trim()
@@ -127,11 +127,12 @@ pub async fn hyprland_snapshot(slot_count: u8) -> Result<HyprlandSnapshot, Strin
 
 pub async fn hyprland_switch_workspace(
     output_name: String,
-    workspace_id: i32,
+    workspace_address: String,
     slot_count: u8,
 ) -> Result<(), String> {
     let snapshot = hyprland_snapshot(slot_count).await?;
-    let command = crate::workspace_state::switch_command(&snapshot, &output_name, workspace_id)?;
+    let command =
+        crate::workspace_state::switch_command(&snapshot, &output_name, &workspace_address)?;
     dispatch_workspace_command(command).await
 }
 
