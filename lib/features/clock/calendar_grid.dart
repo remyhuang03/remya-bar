@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
@@ -40,6 +42,9 @@ class CalendarGrid extends StatefulWidget {
 class _CalendarGridState extends State<CalendarGrid> {
   final _focus = FocusNode(debugLabel: 'Calendar grid');
   Duration? _lastWheel;
+  ({DateTime day, Offset position, PointerDeviceKind kind})? _lastClick;
+  Timer? _doubleClickWindow;
+  bool _showKeyboardFocus = false;
 
   DateTime _period(int step) => widget.week
       ? calendarDaysFrom(widget.selected, step * 7)
@@ -68,6 +73,7 @@ class _CalendarGridState extends State<CalendarGrid> {
       _ => null,
     };
     if (next != null) {
+      if (!_showKeyboardFocus) setState(() => _showKeyboardFocus = true);
       widget.onSelect(next);
       return .handled;
     }
@@ -88,8 +94,34 @@ class _CalendarGridState extends State<CalendarGrid> {
     }
   }
 
+  void _click(DateTime day, TapUpDetails details) {
+    final first = _lastClick;
+    final doubleClick =
+        first != null &&
+        first.day == day &&
+        first.kind == details.kind &&
+        (first.position - details.globalPosition).distance <= kDoubleTapSlop;
+    _doubleClickWindow?.cancel();
+    if (_showKeyboardFocus) setState(() => _showKeyboardFocus = false);
+    _focus.requestFocus();
+    widget.onSelect(day);
+    if (doubleClick) {
+      _lastClick = null;
+      widget.onOpenDay(day);
+    } else {
+      _lastClick = (
+        day: day,
+        position: details.globalPosition,
+        kind: details.kind,
+      );
+      // Match completed taps without delaying single selection in the gesture arena.
+      _doubleClickWindow = Timer(kDoubleTapTimeout, () => _lastClick = null);
+    }
+  }
+
   @override
   void dispose() {
+    _doubleClickWindow?.cancel();
     _focus.dispose();
     super.dispose();
   }
@@ -215,7 +247,9 @@ class _CalendarGridState extends State<CalendarGrid> {
                 focusNode: _focus,
                 autofocus: true,
                 onKeyEvent: _key,
-                onFocusChange: (_) => setState(() {}),
+                onFocusChange: (focused) => setState(() {
+                  if (!focused) _showKeyboardFocus = true;
+                }),
                 child: Column(
                   children: [
                     for (var row = 0; row < rows; row++)
@@ -278,19 +312,12 @@ class _CalendarGridState extends State<CalendarGrid> {
       outside: !widget.week && day.month != widget.selected.month,
       selected: day == widget.selected,
       today: day == widget.today,
-      focused:
-          _focus.hasFocus &&
-          day == widget.selected &&
-          FocusManager.instance.highlightMode == FocusHighlightMode.traditional,
+      focused: _showKeyboardFocus && _focus.hasFocus && day == widget.selected,
       onSelect: () {
         _focus.requestFocus();
         widget.onSelect(day);
       },
-      onOpen: () {
-        _focus.requestFocus();
-        widget.onSelect(day);
-        widget.onOpenDay(day);
-      },
+      onClick: (details) => _click(day, details),
     );
   }
 }
@@ -305,7 +332,7 @@ class _DayCell extends StatelessWidget {
     required this.today,
     required this.focused,
     required this.onSelect,
-    required this.onOpen,
+    required this.onClick,
   });
 
   final DateTime day;
@@ -316,12 +343,32 @@ class _DayCell extends StatelessWidget {
   final bool today;
   final bool focused;
   final VoidCallback onSelect;
-  final VoidCallback onOpen;
+  final GestureTapUpCallback onClick;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final date = MaterialLocalizations.of(context).formatFullDate(day);
+    final shape = today
+        ? MaterialShapeBorder(shape: MaterialShapes.cookie9Sided)
+        : CircleBorder(
+            side: selected
+                ? BorderSide(color: colors.primary, width: 1.5)
+                : .none,
+          );
+    final (color, weight) = switch ((today, selected, outside, day.weekday)) {
+      (true, _, _, _) => (colors.onPrimary, FontWeight.w700),
+      (_, true, _, _) => (colors.primary, FontWeight.w600),
+      (_, _, true, _) => (
+        colors.onSurface.withValues(alpha: .38),
+        FontWeight.w400,
+      ),
+      (_, _, _, DateTime.saturday || DateTime.sunday) => (
+        colors.onSurfaceVariant,
+        FontWeight.w400,
+      ),
+      _ => (colors.onSurface, FontWeight.w400),
+    };
     return Semantics(
       label:
           '$date, $count ${count == 1 ? 'event' : 'events'}'
@@ -333,8 +380,7 @@ class _DayCell extends StatelessWidget {
         excludeFromSemantics: true,
         canRequestFocus: false,
         borderRadius: .circular(18),
-        onTap: onSelect,
-        onDoubleTap: onOpen,
+        onTapUp: onClick,
         child: ExcludeSemantics(
           child: Column(
             mainAxisAlignment: .center,
@@ -349,31 +395,21 @@ class _DayCell extends StatelessWidget {
                         : selected
                         ? colors.primary.withValues(alpha: .12)
                         : null,
-                    shape: today
-                        ? MaterialShapeBorder(
-                            shape: MaterialShapes.cookie9Sided,
-                          )
-                        : CircleBorder(
-                            side: selected
-                                ? BorderSide(color: colors.primary, width: 1.5)
-                                : .none,
-                          ),
+                    shape: shape,
                   ),
                   child: CustomPaint(
                     foregroundPainter: focused
-                        ? _DayFocus(colors.secondary)
+                        ? _DayFocus(colors.secondary, shape)
                         : null,
                     child: Center(
                       child: Text(
                         '${day.day}',
-                        style: TextStyle(
+                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                           fontSize: 14,
-                          color: today
-                              ? colors.onPrimary
-                              : outside
-                              ? colors.onSurface.withValues(alpha: .38)
-                              : colors.onSurface,
-                          fontWeight: today ? .w700 : .w400,
+                          height: 18 / 14,
+                          letterSpacing: 0,
+                          color: color,
+                          fontWeight: weight,
                         ),
                       ),
                     ),
@@ -406,13 +442,13 @@ class _DayCell extends StatelessWidget {
 }
 
 class _DayFocus extends CustomPainter {
-  const _DayFocus(this.color);
+  const _DayFocus(this.color, this.shape);
   final Color color;
+  final ShapeBorder shape;
 
   @override
-  void paint(Canvas canvas, Size size) => canvas.drawCircle(
-    size.center(.zero),
-    size.shortestSide / 2 + 1,
+  void paint(Canvas canvas, Size size) => canvas.drawPath(
+    shape.getOuterPath((Offset.zero & size).inflate(3)),
     Paint()
       ..color = color
       ..style = .stroke
@@ -420,5 +456,6 @@ class _DayFocus extends CustomPainter {
   );
 
   @override
-  bool shouldRepaint(_DayFocus oldDelegate) => oldDelegate.color != color;
+  bool shouldRepaint(_DayFocus oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.shape != shape;
 }

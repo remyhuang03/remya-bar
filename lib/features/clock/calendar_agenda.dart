@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'calendar_events.dart';
@@ -39,7 +40,7 @@ class CalendarAgenda extends StatefulWidget {
 }
 
 class CalendarAgendaState extends State<CalendarAgenda> {
-  final _scroll = ScrollController();
+  final _scroll = ScrollController(keepScrollOffset: false);
   final _focus = FocusScopeNode(traversalEdgeBehavior: .parentScope);
   final _firstItem = FocusNode(debugLabel: 'First event on selected day');
   bool _expanded = false;
@@ -72,19 +73,8 @@ class CalendarAgendaState extends State<CalendarAgenda> {
     if (oldWidget.rangeDays != widget.rangeDays ||
         oldWidget.selectedDay != widget.selectedDay) {
       _days = widget.rangeDays;
-      if (_scroll.hasClients && _scroll.offset > 0) {
-        if (MediaQuery.disableAnimationsOf(context)) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _scroll.hasClients) _scroll.jumpTo(0);
-          });
-        } else {
-          _scroll.animateTo(
-            0,
-            duration: const Duration(milliseconds: 250),
-            curve: Easing.emphasizedDecelerate,
-          );
-        }
-      }
+      _startFade = false;
+      _endFade = false;
     }
   }
 
@@ -158,6 +148,8 @@ class CalendarAgendaState extends State<CalendarAgenda> {
           return false;
         },
         child: CustomScrollView(
+          // A new range starts at the top before its first layout.
+          key: ValueKey((widget.selectedDay, widget.rangeDays)),
           controller: _scroll,
           slivers: [
             for (final MapEntry(:key, :value) in groups.entries)

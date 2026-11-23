@@ -121,6 +121,10 @@ void main() {
       expect(find.text('Declined event'), findsNothing);
       expect(find.text('Now'), findsOneWidget);
       expect(find.text('10:00 – 11:00 · 30 min left'), findsOneWidget);
+      await tester.tap(find.text('Join'));
+      expect(joined?.title, 'Lecture');
+      expect(opened, isNull);
+      joined = null;
       state.currentState!.focusFirstEvent();
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.keyJ);
@@ -251,8 +255,11 @@ void main() {
     expect(position.pixels, 86);
 
     update(() => selected = DateTime.utc(2026, 11, 24));
-    await tester.pumpAndSettle();
-    expect(position.pixels, 0);
+    await tester.pump();
+    expect(
+      tester.state<ScrollableState>(find.byType(Scrollable)).position.pixels,
+      0,
+    );
     expect(find.text('Tue'), findsOneWidget);
     expect(find.text('Tomorrow'), findsOneWidget);
     expect(tester.takeException(), isNull);

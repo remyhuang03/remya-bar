@@ -96,6 +96,7 @@ class _EventTileState extends State<_EventTile> {
     final join = widget.onJoin;
     final open = widget.onOpen;
     final showChip = widget.live || widget.soon;
+    final verticalPadding = event.allDay ? (join == null ? 7.0 : 2.0) : 9.0;
     return MenuAnchor(
       childFocusNode: widget.focusNode,
       menuChildren: [
@@ -168,9 +169,9 @@ class _EventTileState extends State<_EventTile> {
                           child: Padding(
                             padding: .fromLTRB(
                               14,
-                              event.allDay ? 7 : 9,
-                              (join != null ? 38 : 0) + 10,
-                              event.allDay ? 7 : 9,
+                              verticalPadding,
+                              10,
+                              verticalPadding,
                             ),
                             child: Row(
                               spacing: 8,
@@ -219,6 +220,8 @@ class _EventTileState extends State<_EventTile> {
                                       live: widget.live,
                                     ),
                                   ),
+                                if (join != null)
+                                  _JoinMeetingButton(onPressed: join),
                               ],
                             ),
                           ),
@@ -226,25 +229,6 @@ class _EventTileState extends State<_EventTile> {
                       ),
                     ),
                   ),
-                  if (join != null)
-                    Positioned.fill(
-                      left: null,
-                      right: 4,
-                      child: Center(
-                        child: IconButton(
-                          tooltip: 'Join meeting',
-                          onPressed: join,
-                          iconSize: 20,
-                          padding: .zero,
-                          constraints: const BoxConstraints.tightFor(
-                            width: 36,
-                            height: 32,
-                          ),
-                          color: Colors.white,
-                          icon: const Icon(Icons.videocam_outlined),
-                        ),
-                      ),
-                    ),
                   if (widget.live)
                     Positioned(
                       left: 0,
@@ -284,6 +268,38 @@ class _EventTileState extends State<_EventTile> {
     if (day == endDay) return 'until $end';
     return 'Continues all day';
   }
+}
+
+class _JoinMeetingButton extends StatelessWidget {
+  const _JoinMeetingButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    label: 'Join meeting',
+    child: TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        backgroundColor: Colors.white.withValues(alpha: .22),
+        foregroundColor: Colors.white,
+        minimumSize: const Size(65, 28),
+        padding: const .fromLTRB(8, 0, 12, 0),
+        shape: const StadiumBorder(),
+        tapTargetSize: .shrinkWrap,
+        visualDensity: .standard,
+        textStyle: _agendaType(context, 12, 16, Colors.white, .w600),
+      ),
+      child: Row(
+        mainAxisSize: .min,
+        spacing: 4,
+        children: [
+          SvgPicture.asset('assets/icons/datetime/videocam.svg'),
+          const ExcludeSemantics(child: Text('Join')),
+        ],
+      ),
+    ),
+  );
 }
 
 class _TileOutline extends CustomPainter {
