@@ -270,6 +270,29 @@ fvm dart format lib/src/rust/hyprland_bridge lib/src/rust/system_bridge
 cargo fmt --all
 ```
 
+### NixOS development
+
+Use sibling Bar and Core checkouts. Follow `../remya-core/docs/nixos-debug.md`
+for the guest Hyprland session and isolated XDG roots. With those roots set,
+copy the Bar registration before starting Core.
+
+```sh
+install -Dm644 linux/packaging/remya-bar.json "$XDG_DATA_HOME/remya/apps/remya-bar.json"
+```
+
+From the Bar checkout in that session, enter the shell and run the debug bar.
+
+```sh
+nix-shell -I nixpkgs=channel:nixos-unstable
+fvm install --no-setup --skip-pub-get
+fvm flutter precache --linux
+fvm flutter pub get --enforce-lockfile
+GDK_BACKEND=wayland fvm flutter run -d linux --no-start-paused
+```
+
+Check the bar surface and a workspace change, then stop the debug process
+and check that Hyprland releases the reserved space.
+
 ### Validation & Local Installation
 
 ```bash
