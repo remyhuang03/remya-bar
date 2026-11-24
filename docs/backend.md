@@ -219,6 +219,10 @@ Sidebar sound, brightness, network, Bluetooth, power, night light, appearance an
 account controls use Core's owning APIs. Core's feature documents define system
 policy and permissions. Bar requests `power.idle-daemon start` on startup.
 Do Not Disturb and sidebar layout remain Bar preferences.
+The default sidebar includes a compact Power Saver toggle and hides the
+on-screen keyboard tile, which is available in the layout editor. The toggle
+selects Core's power-saver profile or returns to balanced. Saved layouts may
+contain the retired large `dnd` and `power` tile IDs, which the sidebar omits.
 
 Writes run FIFO; queued volume/brightness values coalesce per action and target.
 Predictions reconcile with confirmed results, and refresh reads wait for the

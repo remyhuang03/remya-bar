@@ -119,8 +119,6 @@ class _RightSidebarState extends State<RightSidebar> {
     'bluetooth': ('Bluetooth', Icons.bluetooth_rounded),
     'audio': ('Audio', Icons.headphones_rounded),
     'night-light': ('Night Light', Icons.dark_mode_rounded),
-    'dnd': ('Do Not Disturb', Icons.do_not_disturb_on_rounded),
-    'power': ('Power', Icons.bolt_rounded),
   };
 
   static const _small = {
@@ -131,9 +129,10 @@ class _RightSidebarState extends State<RightSidebar> {
     'dark': ('Dark mode', Icons.dark_mode_rounded),
     'dnd-quick': ('Do Not Disturb', Icons.do_not_disturb_on_rounded),
     'airplane': ('Airplane mode', Icons.flight_rounded),
-    'keyboard': ('On-screen keyboard', Icons.keyboard_rounded),
+    'power-saver': ('Power Saver', Icons.energy_savings_leaf_rounded),
     'clipboard': ('Clipboard', Icons.content_paste_rounded),
     'mic-mute': ('Mic mute', Icons.mic_off_rounded),
+    'keyboard': ('On-screen keyboard', Icons.keyboard_rounded),
   };
 
   static const _powerActions = {
@@ -148,7 +147,6 @@ class _RightSidebarState extends State<RightSidebar> {
     'internet': 'Wi-Fi',
     'bluetooth': 'Bluetooth',
     'audio': 'Audio',
-    'power': 'Power',
   };
 
   String? _detail;
@@ -172,8 +170,9 @@ class _RightSidebarState extends State<RightSidebar> {
   List<String>? get _saved =>
       (widget.data['layout'] as List?)?.whereType<String>().toList();
   List<String> get _tiles =>
-      _draft ?? _saved ?? [..._large.keys, ..._small.keys];
-  List<String> get _profiles => _rowsOf<String>(_powerSystem['profiles']);
+      _draft ??
+      _saved ??
+      [..._large.keys, ..._small.keys.where((id) => id != 'keyboard')];
   String? _adapterId;
   Map? get _adapter {
     final adapters = _rowsOf<Map>(_bluetooth['adapters']);
@@ -616,7 +615,7 @@ class _RightSidebarState extends State<RightSidebar> {
           crossAxisAlignment: .stretch,
           spacing: 8,
           children: [
-            const Text('Hidden — drag up to add'),
+            const Text('Hidden · Click or drag to add'),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -758,21 +757,41 @@ class _RightSidebarState extends State<RightSidebar> {
         runSpacing: 8,
         children: [
           for (final id in ids) SizedBox(width: width, child: buildTile(id)),
-          if (_draft != null && ids.isEmpty)
+          if (_draft != null && (columns == 5 || ids.isEmpty))
             DragTarget<String>(
               onWillAcceptWithDetails: (drag) =>
                   !_busy && (_large.containsKey(drag.data) == (columns == 2)),
               onAcceptWithDetails: (drag) => _place(drag.data, null),
-              builder: (_, candidates, _) => SizedBox(
-                height: 40,
-                child: Center(
-                  child: Text(
-                    candidates.isEmpty
-                        ? 'Drag here to restore'
-                        : 'Drop to restore',
+              builder: (context, candidates, _) {
+                if (ids.isEmpty) {
+                  return SizedBox(
+                    height: 40,
+                    child: Center(
+                      child: Text(
+                        candidates.isEmpty
+                            ? 'Drag here to restore'
+                            : 'Drop to restore',
+                      ),
+                    ),
+                  );
+                }
+                final colors = Theme.of(context).colorScheme;
+                return Tooltip(
+                  message: 'Drop at end',
+                  child: CustomPaint(
+                    foregroundPainter: _TileOutline(
+                      candidates.isEmpty
+                          ? colors.outlineVariant
+                          : colors.primary,
+                    ),
+                    child: SizedBox(
+                      width: width,
+                      height: 52,
+                      child: Icon(Icons.add, color: colors.onSurfaceVariant),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
         ],
       );
@@ -786,15 +805,12 @@ class _RightSidebarState extends State<RightSidebar> {
     final audio =
         _output != null && _map(_output?['preferences'])['muted'] != true;
     final night = _night['enabled'] == true;
-    final profile = _powerSystem['profile'] as String?;
-    final saver = profile == 'power-saver';
     final primary = _rowsOf<Map>(_network['active'])
         .where((item) => item['uuid'] == _network['primary_uuid'])
         .firstOrNull;
     final connected = _rowsOf<Map>(_bluetooth['devices'])
         .where((item) => item['connected'] == true)
         .length;
-    final dnd = _dnd;
     final (bool active, String subtitle, VoidCallback? toggle) = switch (id) {
       'internet' => (
         wifi,
@@ -849,26 +865,6 @@ class _RightSidebarState extends State<RightSidebar> {
             ? () => _send('sidebar.night-light', value: !night)
             : null,
       ),
-      'power' => (
-        saver,
-        profile == null ? 'Unavailable' : _profileLabel(profile),
-        _powerState['conflict'] != true &&
-                _profiles.contains(saver ? 'balanced' : 'power-saver')
-            ? () => _send(
-                'sidebar.profile',
-                value: saver ? 'balanced' : 'power-saver',
-              )
-            : null,
-      ),
-      'dnd' => (
-        dnd == true,
-        dnd == null
-            ? 'Unavailable'
-            : dnd
-            ? 'On'
-            : 'Off',
-        dnd == null ? null : () => _send('sidebar.dnd', value: !dnd),
-      ),
       _ => (false, 'Not implemented', null),
     };
     final detail = _detailTitles.containsKey(id) ? () => _view(id) : null;
@@ -890,12 +886,16 @@ class _RightSidebarState extends State<RightSidebar> {
     final mode = _map(_map(widget.data['theme'])['theme'])['theme_mode'];
     final awake = _map(widget.data['keep-awake'])['value'];
     final airplane = _map(widget.data['airplane']);
+    final profile = _powerSystem['profile'] as String?;
+    final saver = profile == 'power-saver';
+    final nextProfile = saver ? 'balanced' : 'power-saver';
     final bool? selected = switch (id) {
       'caffeine' when awake is bool => awake,
       'dark' when mode == 'light' || mode == 'dark' => mode == 'dark',
       'dnd-quick' => _dnd,
       'airplane' when airplane['available'] == true =>
         airplane['enabled'] as bool?,
+      'power-saver' when profile != null => saver,
       'keyboard' => widget.data['keyboardOpen'] as bool?,
       'mic-mute' => _map(input?['preferences'])['muted'] as bool?,
       _ => null,
@@ -936,6 +936,12 @@ class _RightSidebarState extends State<RightSidebar> {
                 'sidebar.airplane',
                 value: !selected,
               ),
+              'power-saver'
+                  when selected != null &&
+                      _powerState['conflict'] != true &&
+                      _rowsOf<String>(_powerSystem['profiles'])
+                          .contains(nextProfile) =>
+                () => _send('sidebar.profile', value: nextProfile),
               'keyboard' when selected != null && !_busy => () => _send(
                 'sidebar.keyboard',
                 value: !selected,
@@ -967,13 +973,6 @@ class _RightSidebarState extends State<RightSidebar> {
 Map _map(Object? value) => value is Map ? value : const {};
 List<T> _rowsOf<T>(Object? value) =>
     value is List ? value.whereType<T>().toList() : [];
-
-String _profileLabel(String id) => switch (id) {
-  'power-saver' => 'Power Saver',
-  'balanced' => 'Balanced',
-  'performance' => 'Performance',
-  _ => id,
-};
 
 String _uptime(Object? seconds) {
   if (seconds is! num || !seconds.isFinite || seconds < 0) {

@@ -466,7 +466,7 @@ void main() {
           data: {
             'account': {'username': 'Tester'},
             'uptimeSeconds': 3600,
-            'layout': ['internet', 'power', 'audio', 'caffeine'],
+            'layout': ['internet', 'power', 'dnd', 'audio', 'caffeine'],
             'brightness': {'output': 'eDP-1', 'percent': 50},
             'network': {
               'available': true,
@@ -506,10 +506,45 @@ void main() {
     await showSidebar(tester, [], tasks: const Text('Sidebar Tasks'));
 
     expect(find.text('Audio'), findsOneWidget);
+    expect(find.text('Power'), findsNothing);
+    expect(find.text('Do Not Disturb'), findsNothing);
     expect(find.byIcon(Icons.coffee_rounded), findsOneWidget);
     expect(find.text('Sidebar Tasks'), findsOneWidget);
     expect(find.text('Show all controls'), findsNothing);
     expect(find.text('Collapse controls'), findsNothing);
+  });
+
+  testWidgets('default sidebar can enable and disable Power Saver', (
+    tester,
+  ) async {
+    final actions = <Map<String, Object?>>[];
+    final saver = find.byWidgetPredicate(
+      (widget) => widget is Tooltip && widget.message == 'Power Saver',
+    );
+    for (final profile in ['balanced', 'power-saver']) {
+      await showSidebar(
+        tester,
+        actions,
+        overrides: {
+          'layout': null,
+          'keyboardOpen': false,
+          'power': {
+            'system': {
+              'profile': profile,
+              'profiles': ['balanced', 'power-saver'],
+            },
+          },
+        },
+      );
+      expect(find.byIcon(Icons.keyboard_rounded), findsNothing);
+      await tester.ensureVisible(saver);
+      await tester.tap(saver);
+      await tester.pumpAndSettle();
+    }
+    expect(actions, [
+      {'action': 'sidebar.profile', 'target': null, 'value': 'power-saver'},
+      {'action': 'sidebar.profile', 'target': null, 'value': 'balanced'},
+    ]);
   });
 
   testWidgets('compact toggles send the inverse of live Settings state', (
@@ -623,12 +658,47 @@ void main() {
     await tester.pumpAndSettle();
     expect(actions.single, {
       'action': 'sidebar.layout',
-      'target': ['internet', 'power', 'audio', 'caffeine'],
-      'value': ['power', 'audio', 'caffeine'],
+      'target': ['internet', 'power', 'dnd', 'audio', 'caffeine'],
+      'value': ['power', 'dnd', 'audio', 'caffeine'],
     });
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
     await tester.pumpAndSettle();
     expect(actions.last, {'action': 'close'});
+  });
+
+  testWidgets('drop a hidden tool after two filled rows', (tester) async {
+    final actions = <Map<String, Object?>>[];
+    const layout = [
+      'caffeine',
+      'record',
+      'screenshot',
+      'picker',
+      'dark',
+      'dnd-quick',
+      'airplane',
+      'power-saver',
+      'clipboard',
+      'mic-mute',
+    ];
+    await showSidebar(tester, actions, overrides: {'layout': layout});
+    await tester.tap(find.byTooltip('Edit layout'));
+    await tester.pumpAndSettle();
+    final keyboard = find.byTooltip('Restore On-screen keyboard');
+    final end = find.byTooltip('Drop at end');
+    await tester.ensureVisible(keyboard);
+    await tester.pumpAndSettle();
+    final target = tester.getCenter(end);
+    await tester.drag(keyboard, target - tester.getCenter(keyboard));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Restore On-screen keyboard'), findsNothing);
+    expect(tester.getCenter(find.byIcon(Icons.keyboard_rounded)), target);
+    await tester.tap(find.byTooltip('Finish editing'));
+    await tester.pumpAndSettle();
+    expect(actions.single, {
+      'action': 'sidebar.layout',
+      'target': layout,
+      'value': [...layout, 'keyboard'],
+    });
   });
 
   testWidgets(

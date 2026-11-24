@@ -615,8 +615,6 @@
         "bluetooth",
         "audio",
         "night-light",
-        "dnd",
-        "power",
         "caffeine",
         "record",
         "screenshot",
@@ -624,7 +622,7 @@
         "dark",
         "dnd-quick",
         "airplane",
-        "keyboard",
+        "power-saver",
         "clipboard",
         "mic-mute"
       ],
@@ -646,13 +644,14 @@
             "dark",
             "dnd-quick",
             "airplane",
+            "power-saver",
             "keyboard",
             "clipboard",
             "mic-mute"
           ]
         },
         "uniqueItems": true,
-        "maxItems": 16
+        "maxItems": 17
       }
     },
     "osd": {

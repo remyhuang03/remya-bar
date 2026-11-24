@@ -21,8 +21,8 @@ const sidebarTileIds = [
   'bluetooth',
   'audio',
   'night-light',
-  'dnd',
-  'power',
+  'dnd', // Retired tile retained for validation of saved layouts.
+  'power', // Retired tile retained for validation of saved layouts.
   'caffeine',
   'record',
   'screenshot',
@@ -30,6 +30,7 @@ const sidebarTileIds = [
   'dark',
   'dnd-quick',
   'airplane',
+  'power-saver',
   'keyboard',
   'clipboard',
   'mic-mute',

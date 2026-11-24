@@ -65,7 +65,6 @@ class _SidebarDetailState extends State<_SidebarDetail> {
       'internet' => _wifi(),
       'bluetooth' => _bluetooth(),
       'audio' => _audio(),
-      'power' => _power(),
       _ => const _DetailSections(top: []),
     };
     return Column(
@@ -541,41 +540,6 @@ class _SidebarDetailState extends State<_SidebarDetail> {
       bottom: [
         if (_settings('sound-volume') case final open?)
           Align(alignment: .centerLeft, child: _button('Sound settings', open)),
-      ],
-    );
-  }
-
-  _DetailSections _power() {
-    final power = _map(widget.data['power']);
-    final system = _map(power['system']);
-    final profiles = _rowsOf<String>(system['profiles']);
-    return _DetailSections(
-      top: [
-        Text(profiles.isEmpty ? 'Power modes unavailable' : 'Power mode'),
-        if (power['conflict'] == true)
-          const Text('Resolve the power mode conflict in Settings.'),
-      ],
-      items: [
-        for (final profile in profiles)
-          _DetailRow(
-            icon: switch (profile) {
-              'power-saver' => Icons.energy_savings_leaf_rounded,
-              'performance' => Icons.speed_rounded,
-              _ => Icons.bolt_rounded,
-            },
-            title: _profileLabel(profile),
-            subtitle: profile == system['profile']
-                ? 'Current mode'
-                : 'Available',
-            selected: profile == system['profile'],
-            onTap: power['conflict'] == true || profile == system['profile']
-                ? null
-                : () => widget.send('sidebar.profile', value: profile),
-          ),
-      ],
-      bottom: [
-        if (_settings('power') case final open?)
-          Align(alignment: .centerLeft, child: _button('Power settings', open)),
       ],
     );
   }
