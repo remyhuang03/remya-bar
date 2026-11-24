@@ -341,7 +341,9 @@ class _CalendarBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final textStyle = theme.textTheme.bodySmall;
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: .circular(16),
@@ -356,10 +358,17 @@ class _CalendarBanner extends StatelessWidget {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(fontSize: 12, color: colors.onErrorContainer),
+                style: textStyle?.copyWith(color: colors.onErrorContainer),
               ),
             ),
-            TextButton(onPressed: onAction, child: Text(action)),
+            TextButton(
+              onPressed: onAction,
+              style: TextButton.styleFrom(
+                foregroundColor: colors.onErrorContainer,
+                textStyle: textStyle?.copyWith(fontWeight: .w500),
+              ),
+              child: Text(action),
+            ),
           ],
         ),
       ),
