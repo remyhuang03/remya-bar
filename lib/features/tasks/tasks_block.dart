@@ -205,80 +205,98 @@ class _TasksBlockState extends State<TasksBlock> {
       return due != 0 ? due : order[a.key]!.compareTo(order[b.key]!);
     });
 
+    final nonEmpty = groups.entries.where((group) => group.value.isNotEmpty);
     final local = MaterialLocalizations.of(context);
     final email = store.account?.email;
     final theme = Theme.of(context);
     return [
-      for (final MapEntry(key: group, value: rows) in groups.entries)
-        if (group != _TaskGroup.workingOn || rows.isNotEmpty) ...[
-          if (group == _TaskGroup.upcoming ||
-              (group == _TaskGroup.today &&
-                  groups[_TaskGroup.workingOn]!.isNotEmpty))
-            const SizedBox(height: 16),
-          Semantics(
-            header: true,
-            child: Text(
-              group.label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: .w500,
-                height: 18 / 13,
-              ),
+      for (final (index, MapEntry(key: group, value: rows))
+          in nonEmpty.indexed) ...[
+        if (index > 0) const SizedBox(height: 16),
+        Semantics(
+          header: true,
+          child: Text(
+            group.label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: .w500,
+              height: 18 / 13,
             ),
           ),
-          if (rows.isNotEmpty) const SizedBox(height: 8),
-          for (final (index, task) in rows.indexed)
-            _TaskRow(
-              key: ValueKey(task.key),
-              task: task,
-              dueLabel: local.formatFullDate(task.scheduled!),
-              dateLabel: group == _TaskGroup.upcoming
-                  ? _upcomingLabel(task.scheduled!, today)
-                  : null,
-              first: index == 0,
-              last: index == rows.length - 1,
-              workingOn: group == _TaskGroup.workingOn,
-              showBookmark: preferences.workingOnEnabled,
-              onBookmark: preferences.workingOnEnabled && !task.completed
-                  ? () => unawaited(
-                      _act(
-                        () => store.toggleWorkingOn(task),
-                        'Couldn’t update Working on.',
-                      ),
-                    )
-                  : null,
-              onComplete:
-                  !task.assigned && (!task.completed || task.completionUndoable)
-                  ? () => unawaited(
-                      _act(
-                        () => store.setCompleted(task, !task.completed),
-                        'Couldn’t update this task.',
-                      ),
-                    )
-                  : null,
-              onOpen: googleBrowserLink(task.webViewLink) == null
-                  ? null
-                  : () => unawaited(
-                      _act(
-                        () => openGoogleTask(task, email: email),
-                        'Couldn’t open this task.',
-                      ),
+        ),
+        const SizedBox(height: 8),
+        for (final (index, task) in rows.indexed)
+          _TaskRow(
+            key: ValueKey(task.key),
+            task: task,
+            dueLabel: local.formatFullDate(task.scheduled!),
+            dateLabel: group == _TaskGroup.upcoming
+                ? _upcomingLabel(task.scheduled!, today)
+                : null,
+            first: index == 0,
+            last: index == rows.length - 1,
+            workingOn: group == _TaskGroup.workingOn,
+            showBookmark: preferences.workingOnEnabled,
+            onBookmark: preferences.workingOnEnabled && !task.completed
+                ? () => unawaited(
+                    _act(
+                      () => store.toggleWorkingOn(task),
+                      'Couldn’t update Working on.',
                     ),
-              onSource:
-                  !task.assigned || googleBrowserLink(task.sourceLink) == null
-                  ? null
-                  : () => unawaited(
-                      _act(
-                        () => openTaskSource(task, email: email),
-                        'Couldn’t open the source.',
-                      ),
+                  )
+                : null,
+            onComplete:
+                !task.assigned && (!task.completed || task.completionUndoable)
+                ? () => unawaited(
+                    _act(
+                      () => store.setCompleted(task, !task.completed),
+                      'Couldn’t update this task.',
                     ),
-            ),
-        ],
+                  )
+                : null,
+            onOpen: googleBrowserLink(task.webViewLink) == null
+                ? null
+                : () => unawaited(
+                    _act(
+                      () => openGoogleTask(task, email: email),
+                      'Couldn’t open this task.',
+                    ),
+                  ),
+            onSource:
+                !task.assigned || googleBrowserLink(task.sourceLink) == null
+                ? null
+                : () => unawaited(
+                    _act(
+                      () => openTaskSource(task, email: email),
+                      'Couldn’t open the source.',
+                    ),
+                  ),
+          ),
+      ],
     ];
   }
 
   Widget _list(List<Widget> items) {
+    if (items.isEmpty) {
+      if (_store.lastSync == null &&
+          switch (_store.state) {
+            .offline || .authRequired || .error => true,
+            _ => false,
+          }) {
+        return const SizedBox.shrink();
+      }
+      return Center(
+        child: Padding(
+          padding: const .symmetric(vertical: 24),
+          child: Text(
+            'No tasks',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      );
+    }
     if (!widget.scrollable) {
       return Column(crossAxisAlignment: .stretch, children: items);
     }

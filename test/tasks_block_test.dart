@@ -213,13 +213,32 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
     await tester.pumpAndSettle();
     expect(find.text('Due today'), findsOneWidget);
+    expect(find.text('Today'), findsNothing);
     expect(
       tester.getTopLeft(find.text('Due today')).dy,
-      lessThan(tester.getTopLeft(find.text('Today')).dy),
+      lessThan(tester.getTopLeft(find.text('Upcoming')).dy),
     );
 
     await tester.pumpWidget(const SizedBox.shrink());
     expect(store.openCards, isEmpty);
+  });
+
+  testWidgets('centers No tasks when no incomplete dated tasks match', (
+    tester,
+  ) async {
+    await _mount(tester, _Tasks([_task('No date', days: null)]));
+    final empty = find.text('No tasks');
+
+    expect(empty, findsOneWidget);
+    expect(find.text('Working on'), findsNothing);
+    expect(find.text('Today'), findsNothing);
+    expect(find.text('Upcoming'), findsNothing);
+    expect(
+      tester.getCenter(empty),
+      tester.getCenter(
+        find.ancestor(of: empty, matching: find.byType(Center)).first,
+      ),
+    );
   });
 
   testWidgets('scrolls the list beneath a fixed title and header menu', (
