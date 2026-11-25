@@ -62,7 +62,7 @@
       "page": "calendar",
       "keywords": ["Google Calendar", "agenda", "first day of week", "week starts on"],
       "default": {
-        "default-view": "remember",
+        "default-view": "week",
         "week-start": "system",
         "show-week-numbers": true,
         "agenda-range": 14,
@@ -108,113 +108,46 @@
       "title": "Last calendar view",
       "page": "calendar",
       "keywords": [],
-      "default": "month",
+      "default": "week",
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "enum": ["month", "week"]
       }
     },
-    "tasks": {
+    "tasks-clock": {
       "title": "Google Tasks preferences",
       "page": "tasks",
-      "keywords": [
-        "Google Tasks"
-      ],
+      "keywords": ["Google Tasks", "visible lists", "upcoming", "Working on"],
       "default": {
-        "default-list": "@default",
-        "default-list-account": "",
         "visible-lists": [],
         "visible-lists-account": "",
-        "initial-view": "today",
-        "sort": "manual",
-        "completed-expanded": false,
-        "show-assigned": true,
-        "today-includes-unscheduled": false,
-        "sidebar": true,
-        "notifications": false,
-        "preview-rows": 3
+        "upcoming-days": 7,
+        "working-on-enabled": true,
+        "working-on-limit": 3,
+        "show-assigned": true
       },
       "schema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
-          "default-list": {
-            "type": "string",
-            "maxLength": 256
-          },
-          "default-list-account": {
-            "type": "string",
-            "maxLength": 256
-          },
           "visible-lists": {
             "type": "array",
             "uniqueItems": true,
             "maxItems": 2000,
-            "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
-            }
+            "items": {"type": "string", "minLength": 1, "maxLength": 256}
           },
-          "visible-lists-account": {
-            "type": "string",
-            "maxLength": 256
-          },
-          "initial-view": {
-            "enum": [
-              "today",
-              "upcoming",
-              "all"
-            ]
-          },
-          "sort": {
-            "enum": [
-              "manual",
-              "date"
-            ]
-          },
-          "completed-expanded": {
-            "type": "boolean"
-          },
-          "show-assigned": {
-            "type": "boolean"
-          },
-          "today-includes-unscheduled": {
-            "type": "boolean"
-          },
-          "sidebar": {
-            "type": "boolean"
-          },
-          "notifications": {
-            "type": "boolean"
-          },
-          "preview-rows": {
-            "enum": [
-              3,
-              5,
-              8
-            ]
-          },
-          "automatic": {
-            "type": "boolean",
-            "deprecated": true,
-            "description": "Ignored. Accepted for existing saved Tasks preferences."
-          }
+          "visible-lists-account": {"type": "string", "maxLength": 256},
+          "upcoming-days": {"type": "integer", "enum": [3, 7, 14]},
+          "working-on-enabled": {"type": "boolean"},
+          "working-on-limit": {"type": "integer", "minimum": 1, "maximum": 3},
+          "show-assigned": {"type": "boolean"}
         },
         "required": [
-          "default-list",
-          "default-list-account",
-          "visible-lists",
-          "visible-lists-account",
-          "initial-view",
-          "sort",
-          "completed-expanded",
-          "show-assigned",
-          "today-includes-unscheduled",
-          "sidebar",
-          "notifications",
-          "preview-rows"
+          "visible-lists", "visible-lists-account", "upcoming-days",
+          "working-on-enabled", "working-on-limit", "show-assigned"
         ],
+        "if": {"properties": {"visible-lists": {"minItems": 1}}},
+        "then": {"properties": {"visible-lists-account": {"minLength": 1}}},
         "additionalProperties": false
       }
     },

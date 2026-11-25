@@ -4,6 +4,9 @@ import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../google/google_links.dart';
+import '../tasks/tasks_block.dart';
+import '../tasks/tasks_integration.dart';
 import 'bar_clock.dart';
 import 'calendar_agenda.dart';
 import 'calendar_clock_hero.dart';
@@ -11,16 +14,21 @@ import 'calendar_dates.dart';
 import 'calendar_grid.dart';
 import 'calendar_integration.dart';
 import 'calendar_links.dart';
+import 'clock_card_controls.dart';
 
 class DatetimeCard extends StatefulWidget {
   const DatetimeCard({
     super.key,
-    required this.onSettings,
+    required this.wide,
+    required this.onCalendarSettings,
+    required this.onTasksSettings,
     required this.onDateTimeSettings,
     required this.onClose,
   });
 
-  final VoidCallback onSettings;
+  final bool wide;
+  final VoidCallback onCalendarSettings;
+  final VoidCallback onTasksSettings;
   final VoidCallback? onDateTimeSettings;
   final VoidCallback onClose;
 
@@ -30,6 +38,7 @@ class DatetimeCard extends StatefulWidget {
 
 class _DatetimeCardState extends State<DatetimeCard> {
   final _integration = CalendarIntegration.shared;
+  final _tasksIntegration = TasksIntegration.shared;
   final _agenda = GlobalKey<CalendarAgendaState>();
   late DateTime _now;
   DateTime? _day;
@@ -105,7 +114,7 @@ class _DatetimeCardState extends State<DatetimeCard> {
 
   Future<void> _open(Uri? uri) async {
     try {
-      await openCalendarLink(uri);
+      await openGoogleBrowser(uri);
       if (mounted && _linkError != null) setState(() => _linkError = null);
     } catch (_) {
       if (mounted) setState(() => _linkError = 'Could not open this link.');
@@ -122,7 +131,9 @@ class _DatetimeCardState extends State<DatetimeCard> {
     _open(calendarLink('r/day/${day.year}/${day.month}/${day.day}', _email)),
   );
 
-  KeyEventResult _key(FocusNode node, KeyEvent event) {
+  void _refresh() => unawaited(_integration.refresh(force: true));
+
+  KeyEventResult _calendarKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent ||
         HardwareKeyboard.instance.isControlPressed ||
         HardwareKeyboard.instance.isAltPressed ||
@@ -139,14 +150,29 @@ class _DatetimeCardState extends State<DatetimeCard> {
       case LogicalKeyboardKey.keyG:
         _home();
       case LogicalKeyboardKey.keyR:
-        unawaited(_integration.refresh(force: true));
-      case LogicalKeyboardKey.escape:
-        widget.onClose();
+        _refresh();
       default:
         return .ignored;
     }
     return .handled;
   }
+
+  Widget _calendarFocus(Widget child) =>
+      Focus(canRequestFocus: false, onKeyEvent: _calendarKey, child: child);
+
+  Widget _tasks({required bool scrollable}) => FocusTraversalOrder(
+    order: const NumericFocusOrder(0),
+    child: ListenableBuilder(
+      listenable: _tasksIntegration.settings,
+      builder: (context, _) => TasksBlock(
+        store: _tasksIntegration.store,
+        preferences: _tasksIntegration.preferences,
+        onSettings: widget.onTasksSettings,
+        scrollable: scrollable,
+        now: _now,
+      ),
+    ),
+  );
 
   @override
   void dispose() {
@@ -158,7 +184,6 @@ class _DatetimeCardState extends State<DatetimeCard> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final prefs = _integration.preferences;
     final snapshot = _integration.snapshot(_window!);
     final events = [
@@ -173,37 +198,19 @@ class _DatetimeCardState extends State<DatetimeCard> {
         _linkError ??
         switch (snapshot.error) {
           'auth' => 'Google sign-in expired',
-          'offline' => switch (snapshot.syncedAt) {
-            final synced? =>
-              'Offline · synced at ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(synced.toLocal()))}',
-            _ => 'Offline',
-          },
+          'offline' => 'Offline',
           'unavailable' => 'Google Calendar unavailable',
           String() => 'Couldn’t refresh',
           _ => connected ? null : _integration.accountError,
         };
-    final Widget? agenda = connected
+    final Widget? placeholder = connected
         ? snapshot.loading
               ? const CalendarAgendaLoading()
               : snapshot.error != null && snapshot.syncedAt == null
-              ? const Center(child: Text('Calendar events unavailable'))
-              : CalendarAgenda(
-                  key: _agenda,
-                  selectedDay: _selected,
-                  now: _now,
-                  events: events,
-                  rangeDays: prefs['agenda-range'] as int,
-                  foldFinished: prefs['fold-finished'] == true,
-                  showDeclined: prefs['show-declined'] == true,
-                  onOpen: (event) => unawaited(
-                    _open(calendarEventLink(event.htmlLink, _email)),
-                  ),
-                  onJoin: (event) => unawaited(_open(event.meetingLink)),
-                  onHome: _home,
-                  onNew: _new,
-                )
+              ? const Text('Calendar events unavailable', textAlign: .center)
+              : null
         : _integration.hideConnectPrompt
-        ? null
+        ? const SizedBox.shrink()
         : _ConnectCalendar(
             pending: _integration.account?.pending == true,
             configured: _integration.account?.configured != false,
@@ -211,165 +218,196 @@ class _DatetimeCardState extends State<DatetimeCard> {
             onCancel: () => unawaited(_integration.cancelAuthorization()),
             onDismiss: _integration.dismissConnectPrompt,
           );
-    final header = [
-      Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Calendar',
-              style: TextStyle(
-                color: colors.primary,
-                fontSize: 24,
-                fontWeight: .w700,
-                height: 29 / 24,
-              ),
-            ),
-          ),
-          IconButton.filledTonal(
-            tooltip: 'New event',
-            onPressed: _new,
-            icon: const Icon(Icons.add),
-          ),
-          IconButton.filledTonal(
-            tooltip: 'Calendar settings',
-            onPressed: widget.onSettings,
-            icon: const Icon(Icons.settings_outlined),
-          ),
-        ],
-      ),
-      CalendarClockHero(
+    final hero = FocusTraversalOrder(
+      order: const NumericFocusOrder(2),
+      child: CalendarClockHero(
         showSeconds: prefs['show-seconds'] == true,
         onSettings: widget.onDateTimeSettings,
       ),
-      CalendarGrid(
-        today: _today,
-        selected: _selected,
-        firstWeekday: first,
-        cutoffWeekday: cutoff,
-        week: _weekView,
-        showWeekNumbers: prefs['show-week-numbers'] == true,
-        events: events,
-        onSelect: _select,
-        onOpenDay: _openDay,
-        onToggle: _toggle,
-        onAgenda: () => _agenda.currentState?.focusFirstEvent(),
-      ),
-      if (error != null)
-        _CalendarBanner(
-          message: error,
-          icon: _linkError != null
-              ? Icons.link_off
-              : snapshot.error == 'offline'
-              ? Icons.cloud_off_outlined
-              : Icons.error_outline,
-          action: _linkError != null
-              ? 'Dismiss'
-              : snapshot.error == 'auth'
-              ? _integration.account?.pending == true
-                    ? 'Cancel sign-in'
-                    : 'Reconnect'
-              : 'Retry',
-          onAction: _linkError != null
-              ? () => setState(() => _linkError = null)
-              : snapshot.error == 'auth'
-              ? _integration.account?.pending == true
-                    ? () => unawaited(_integration.cancelAuthorization())
-                    : () => unawaited(_integration.connect())
-              : !connected
-              ? _integration.retryAccount
-              : () => unawaited(_integration.refresh(force: true)),
-        ),
-    ];
-    return Focus(
-      canRequestFocus: false,
-      onKeyEvent: _key,
-      child: Padding(
-        padding: const .all(24),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (!connected) {
-              return SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: .stretch,
-                  spacing: 16,
-                  children: [...header, ?agenda],
-                ),
-              );
-            }
-            // Retain a reachable agenda when the output cannot fit pinned controls.
-            final minHeight =
-                (_weekView ? 112.0 : 292.0) +
-                48 +
-                98 +
-                48 +
-                160 +
-                (error == null ? 0 : 64);
-            final available = math.min(constraints.maxHeight, 880.0 - 48);
-            final body = SizedBox(
-              height: math.max(available, minHeight),
-              child: Column(
-                spacing: 16,
-                crossAxisAlignment: .stretch,
-                children: [
-                  ...header,
-                  Expanded(child: agenda!),
-                ],
-              ),
-            );
-            return available >= minHeight
-                ? body
-                : SingleChildScrollView(child: body);
-          },
-        ),
-      ),
     );
-  }
-}
+    final calendarHeader = Column(
+      crossAxisAlignment: .stretch,
+      mainAxisSize: .min,
+      spacing: 16,
+      children: [
+        ClockCardHeader(
+          title: 'Calendar',
+          newTooltip: 'New event',
+          googleLabel: 'Open in Google Calendar',
+          onNew: _new,
+          onGoogle: _home,
+          onRefresh: _refresh,
+          onSettings: widget.onCalendarSettings,
+        ),
+        CalendarGrid(
+          today: _today,
+          selected: _selected,
+          firstWeekday: first,
+          cutoffWeekday: cutoff,
+          week: _weekView,
+          showWeekNumbers: prefs['show-week-numbers'] == true,
+          events: events,
+          onSelect: _select,
+          onOpenDay: _openDay,
+          onToggle: _toggle,
+          onAgenda: () => _agenda.currentState?.focusFirstEvent(),
+          autofocus: false,
+        ),
+        if (error != null)
+          ClockCardStatusBanner(
+            message: error,
+            icon: _linkError != null
+                ? Icons.link_off
+                : snapshot.error == 'offline'
+                ? Icons.cloud_off_outlined
+                : Icons.error_outline,
+            action: _linkError != null
+                ? 'Dismiss'
+                : snapshot.error == 'auth'
+                ? _integration.account?.pending == true
+                      ? 'Cancel sign-in'
+                      : 'Reconnect'
+                : 'Retry',
+            onAction: _linkError != null
+                ? () => setState(() => _linkError = null)
+                : snapshot.error == 'auth'
+                ? _integration.account?.pending == true
+                      ? () => unawaited(_integration.cancelAuthorization())
+                      : () => unawaited(_integration.connect())
+                : !connected
+                ? _integration.retryAccount
+                : _refresh,
+          ),
+      ],
+    );
 
-class _CalendarBanner extends StatelessWidget {
-  const _CalendarBanner({
-    required this.message,
-    required this.icon,
-    required this.action,
-    required this.onAction,
-  });
+    Widget agenda({Widget? leading}) => CalendarAgenda(
+      key: _agenda,
+      selectedDay: _selected,
+      now: _now,
+      events: events,
+      rangeDays: prefs['agenda-range'] as int,
+      foldFinished: prefs['fold-finished'] == true,
+      showDeclined: prefs['show-declined'] == true,
+      onOpen: (event) =>
+          unawaited(_open(calendarEventLink(event.htmlLink, _email))),
+      onJoin: (event) =>
+          unawaited(_open(googleAuthUser(event.meetingLink, _email))),
+      leading: leading,
+      placeholder: placeholder,
+      onKeyEvent: leading == null ? null : _calendarKey,
+    );
 
-  final String message;
-  final IconData icon;
-  final String action;
-  final VoidCallback? onAction;
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): widget.onClose,
+      },
+      child: FocusTraversalGroup(
+        policy: OrderedTraversalPolicy(secondary: WidgetOrderTraversalPolicy()),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SizedBox(
+            height: math.min(clockCardMaxHeight, constraints.maxHeight),
+            child: Padding(
+              padding: const .all(24),
+              child: LayoutBuilder(
+                builder: (context, body) {
+                  final scale = MediaQuery.textScalerOf(context);
+                  final heroFits = body.maxHeight >= scale.scale(112);
+                  if (!widget.wide) {
+                    final scroll = FocusTraversalOrder(
+                      order: const NumericFocusOrder(1),
+                      child: agenda(
+                        leading: Column(
+                          crossAxisAlignment: .stretch,
+                          spacing: 16,
+                          children: [
+                            if (!heroFits) hero,
+                            _tasks(scrollable: false),
+                            _calendarFocus(calendarHeader),
+                            const SizedBox.shrink(),
+                          ],
+                        ),
+                      ),
+                    );
+                    return heroFits
+                        ? Column(
+                            crossAxisAlignment: .stretch,
+                            spacing: 16,
+                            children: [
+                              hero,
+                              Expanded(child: scroll),
+                            ],
+                          )
+                        : scroll;
+                  }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final textStyle = theme.textTheme.bodySmall;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: .circular(16),
-        color: colors.errorContainer,
-      ),
-      child: Padding(
-        padding: const .fromLTRB(14, 0, 6, 0),
-        child: Row(
-          spacing: 8,
-          children: [
-            Icon(icon, size: 18, color: colors.onErrorContainer),
-            Expanded(
-              child: Text(
-                message,
-                style: textStyle?.copyWith(color: colors.onErrorContainer),
+                  final calendarChrome =
+                      math.max(48.0, scale.scale(29)) +
+                      (_weekView ? 112 : 292) +
+                      math.max(0.0, scale.scale(14) - 18) +
+                      32 +
+                      (error == null
+                          ? 0
+                          : math.max(48.0, scale.scale(56)) + 16);
+                  return Row(
+                    crossAxisAlignment: .stretch,
+                    spacing: 24,
+                    children: [
+                      Expanded(
+                        child: heroFits
+                            ? Column(
+                                crossAxisAlignment: .stretch,
+                                spacing: 16,
+                                children: [
+                                  hero,
+                                  Expanded(
+                                    child: LayoutBuilder(
+                                      builder: (context, bounds) =>
+                                          bounds.maxHeight >= scale.scale(136)
+                                          ? _tasks(scrollable: true)
+                                          : SingleChildScrollView(
+                                              child: _tasks(scrollable: false),
+                                            ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : SingleChildScrollView(
+                                child: Column(
+                                  crossAxisAlignment: .stretch,
+                                  spacing: 16,
+                                  children: [hero, _tasks(scrollable: false)],
+                                ),
+                              ),
+                      ),
+                      Expanded(
+                        child: FocusTraversalOrder(
+                          order: const NumericFocusOrder(1),
+                          child: body.maxHeight > calendarChrome
+                              ? _calendarFocus(
+                                  Column(
+                                    crossAxisAlignment: .stretch,
+                                    spacing: 16,
+                                    children: [
+                                      calendarHeader,
+                                      Expanded(child: agenda()),
+                                    ],
+                                  ),
+                                )
+                              : agenda(
+                                  leading: Padding(
+                                    padding: const .only(bottom: 16),
+                                    child: _calendarFocus(calendarHeader),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
-            TextButton(
-              onPressed: onAction,
-              style: TextButton.styleFrom(
-                foregroundColor: colors.onErrorContainer,
-                textStyle: textStyle?.copyWith(fontWeight: .w500),
-              ),
-              child: Text(action),
-            ),
-          ],
+          ),
         ),
       ),
     );

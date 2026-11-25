@@ -323,6 +323,8 @@ class _BarPopupAppState extends State<BarPopupApp>
                       ),
               ),
             )
+          : _kind == 'datetime'
+          ? _content(details, textScale)
           : _ScrollUnlessCard(
               card: _card,
               child: PopupMeasure(

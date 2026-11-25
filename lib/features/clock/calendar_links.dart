@@ -1,10 +1,10 @@
-import 'dart:io';
+import '../google/google_links.dart';
 
 Uri calendarLink(String path, String? email, [Map<String, String>? query]) =>
-    Uri.https('calendar.google.com', '/calendar/$path', {
-      ...?query,
-      'authuser': ?email,
-    });
+    googleAuthUser(
+      Uri.https('calendar.google.com', '/calendar/$path', query),
+      email,
+    )!;
 
 Uri? calendarEventLink(Uri? event, [String? email]) {
   if (event == null ||
@@ -15,10 +15,9 @@ Uri? calendarEventLink(Uri? event, [String? email]) {
       (event.hasPort && event.port != 443)) {
     return null;
   }
-  return event.replace(
-    scheme: 'https',
-    host: 'calendar.google.com',
-    queryParameters: {...event.queryParameters, 'authuser': ?email},
+  return googleAuthUser(
+    event.replace(scheme: 'https', host: 'calendar.google.com'),
+    email,
   );
 }
 
@@ -46,15 +45,4 @@ Uri calendarNewEvent(
     'dates': '${format(start)}/${format(start.add(const Duration(hours: 1)))}',
     if (timezone != null && timezone.isNotEmpty) 'ctz': timezone,
   });
-}
-
-Future<void> openCalendarLink(Uri? uri) async {
-  if (uri == null ||
-      uri.scheme != 'https' ||
-      uri.host.isEmpty ||
-      uri.userInfo.isNotEmpty) {
-    throw StateError('Calendar link unavailable.');
-  }
-  final result = await Process.run('xdg-open', [uri.toString()]);
-  if (result.exitCode != 0) throw StateError('Could not open this link.');
 }

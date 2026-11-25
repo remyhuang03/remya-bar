@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 
 import '../../widgets/bar_pill.dart';
+import 'clock_card_controls.dart';
 import 'clock_capsule.dart';
 
 final barClockSource = BarClockSource();
@@ -101,7 +102,7 @@ class _BarClockState extends State<BarClock> {
   Widget build(BuildContext context) => BarPill(
     card: BarPillCard(
       kind: 'datetime',
-      size: const Size(420, 880),
+      size: const Size(clockCardWideWidth, clockCardMaxHeight),
       openOnTap: true,
     ),
     builder: (context, state) => ClockCapsule(

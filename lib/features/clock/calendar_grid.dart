@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +22,7 @@ class CalendarGrid extends StatefulWidget {
     required this.onOpenDay,
     required this.onToggle,
     required this.onAgenda,
+    this.autofocus = true,
   });
 
   final DateTime today;
@@ -34,6 +36,7 @@ class CalendarGrid extends StatefulWidget {
   final ValueChanged<DateTime> onOpenDay;
   final VoidCallback onToggle;
   final VoidCallback onAgenda;
+  final bool autofocus;
 
   @override
   State<CalendarGrid> createState() => _CalendarGridState();
@@ -193,8 +196,8 @@ class _CalendarGridState extends State<CalendarGrid> {
                       ),
                     ),
                     if (selected != widget.today)
-                      TextButton(
-                        style: TextButton.styleFrom(
+                      FilledButton.tonal(
+                        style: FilledButton.styleFrom(
                           padding: const .symmetric(horizontal: 8),
                           minimumSize: const Size(0, 32),
                           textStyle: const TextStyle(fontSize: 12),
@@ -223,7 +226,10 @@ class _CalendarGridState extends State<CalendarGrid> {
                 ),
               ),
               SizedBox(
-                height: 18,
+                height: math.max(
+                  18.0,
+                  MediaQuery.textScalerOf(context).scale(14),
+                ),
                 child: Row(
                   children: [
                     if (widget.showWeekNumbers)
@@ -245,7 +251,7 @@ class _CalendarGridState extends State<CalendarGrid> {
               ),
               Focus(
                 focusNode: _focus,
-                autofocus: true,
+                autofocus: widget.autofocus,
                 onKeyEvent: _key,
                 onFocusChange: (focused) => setState(() {
                   if (!focused) _showKeyboardFocus = true;

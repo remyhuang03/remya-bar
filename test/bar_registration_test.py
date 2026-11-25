@@ -33,10 +33,13 @@ class RegistrationTest(unittest.TestCase):
                 {**settings['notifications']['default'], 'toast-side': 'center'},
             ],
             'ai-ring': [{**settings['ai-ring']['default'], 'pinned': ['a', 'b', 'c', 'd']}],
-            'tasks': [
-                {**settings['tasks']['default'], 'preview-rows': 4},
-                {**settings['tasks']['default'], 'visible-lists': ['same', 'same']},
-                {**settings['tasks']['default'], 'automatic': 'false'},
+            'tasks-clock': [
+                {**settings['tasks-clock']['default'], 'upcoming-days': 5},
+                {**settings['tasks-clock']['default'], 'working-on-limit': 4},
+                {**settings['tasks-clock']['default'], 'visible-lists': ['same', 'same'],
+                 'visible-lists-account': 'account'},
+                {**settings['tasks-clock']['default'], 'visible-lists': ['visible']},
+                {**settings['tasks-clock']['default'], 'automatic': False},
             ],
             'resources': [
                 {**settings['resources']['default'], 'refresh-interval-ms': 250},
@@ -65,13 +68,18 @@ class RegistrationTest(unittest.TestCase):
             **old, 'popup-duration': 600, 'clear-critical': True, 'toast-side': 'right',
         })
 
-    def test_tasks_accepts_old_saved_sync_preferences(self):
-        setting = self.registration['settings']['tasks']
+    def test_tasks_clock_preference_options(self):
+        settings = self.registration['settings']
+        self.assertNotIn('tasks', settings)
+        setting = settings['tasks-clock']
         defaults = setting['default']
-        self.assertNotIn('automatic', defaults)
+        self.assertEqual(defaults['upcoming-days'], 7)
+        self.assertEqual(defaults['working-on-limit'], 3)
         validator = Draft202012Validator(setting['schema'])
-        for automatic in (False, True):
-            validator.validate({**defaults, 'automatic': automatic})
+        for days, limit in zip((3, 7, 14), (1, 2, 3)):
+            validator.validate({
+                **defaults, 'upcoming-days': days, 'working-on-limit': limit,
+            })
 
     def test_weather_location_boundaries(self):
         schema = self.registration['settings']['weather-location']['schema']

@@ -57,86 +57,105 @@ class _CalendarClockHeroState extends State<CalendarClockHero> {
         '${_pad(minutes ~/ 60)}:${_pad(minutes % 60)}';
     final date = const DefaultMaterialLocalizations().formatFullDate(local);
     final separator = date.indexOf(', ');
+    final clock = FittedBox(
+      fit: .scaleDown,
+      alignment: .centerLeft,
+      child: Text.rich(
+        TextSpan(
+          text: _clock(local),
+          children: [
+            if (widget.showSeconds)
+              TextSpan(
+                text: ' :${_pad(local.second)}',
+                style: TextStyle(
+                  color: foreground.withValues(alpha: .7),
+                  fontSize: 20,
+                  letterSpacing: 0,
+                ),
+              ),
+          ],
+        ),
+        style: _type(context, 56, foreground, .w500).copyWith(
+          letterSpacing: -1.92,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      ),
+    );
+    final dateDetails = [
+      Tooltip(
+        message: '${_clock(local.toUtc())} UTC',
+        child: Material(
+          color: colors.primary,
+          shape: const StadiumBorder(),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: widget.onSettings,
+            child: Padding(
+              padding: const .symmetric(horizontal: 10, vertical: 3),
+              child: Text(
+                zone,
+                semanticsLabel: widget.onSettings == null
+                    ? zone
+                    : '$zone, Date and time settings',
+                style: _type(context, 12, colors.onPrimary, .w500),
+              ),
+            ),
+          ),
+        ),
+      ),
+      Text(
+        date.substring(0, separator),
+        style: _type(context, 16, foreground, .w500),
+      ),
+      Tooltip(
+        message: 'Day $dayOfYear of the year',
+        child: Text(
+          date.substring(separator + 2),
+          style: _type(context, 12, foreground),
+        ),
+      ),
+    ];
     return Container(
       padding: const .symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: colors.primaryContainer,
         borderRadius: .circular(28),
       ),
-      child: Row(
-        mainAxisAlignment: .spaceBetween,
-        spacing: 8,
-        children: [
-          Flexible(
-            flex: 13,
-            child: FittedBox(
-              fit: .scaleDown,
-              alignment: .centerLeft,
-              child: Text.rich(
-                TextSpan(
-                  text: _clock(local),
-                  children: [
-                    if (widget.showSeconds)
-                      TextSpan(
-                        text: ' :${_pad(local.second)}',
-                        style: TextStyle(
-                          color: foreground.withValues(alpha: .7),
-                          fontSize: 20,
-                          letterSpacing: 0,
-                        ),
-                      ),
-                  ],
-                ),
-                style: _type(context, 56, foreground, .w500).copyWith(
-                  letterSpacing: -1.92,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-          ),
-          Flexible(
-            flex: 7,
-            child: Column(
-              crossAxisAlignment: .end,
-              spacing: 6,
-              children: [
-                Tooltip(
-                  message: '${_clock(local.toUtc())} UTC',
-                  child: Material(
-                    color: colors.primary,
-                    shape: const StadiumBorder(),
-                    child: InkWell(
-                      customBorder: const StadiumBorder(),
-                      onTap: widget.onSettings,
-                      child: Padding(
-                        padding: const .symmetric(horizontal: 10, vertical: 3),
-                        child: Text(
-                          zone,
-                          semanticsLabel: widget.onSettings == null
-                              ? zone
-                              : '$zone, Date and time settings',
-                          style: _type(context, 12, colors.onPrimary, .w500),
-                        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) =>
+            MediaQuery.textScalerOf(context).scale(16) > 24 ||
+                constraints.maxWidth < 270
+            ? Column(
+                crossAxisAlignment: .start,
+                spacing: 8,
+                children: [
+                  clock,
+                  Wrap(
+                    crossAxisAlignment: .center,
+                    spacing: 10,
+                    runSpacing: 6,
+                    children: dateDetails,
+                  ),
+                ],
+              )
+            : Row(
+                mainAxisAlignment: .spaceBetween,
+                spacing: 8,
+                children: [
+                  Flexible(flex: 12, child: clock),
+                  Flexible(
+                    flex: 8,
+                    child: DefaultTextStyle.merge(
+                      textAlign: .end,
+                      child: Column(
+                        crossAxisAlignment: .end,
+                        spacing: 6,
+                        children: dateDetails,
                       ),
                     ),
                   ),
-                ),
-                Text(
-                  date.substring(0, separator),
-                  style: _type(context, 16, foreground, .w500),
-                ),
-                Tooltip(
-                  message: 'Day $dayOfYear of the year',
-                  child: Text(
-                    date.substring(separator + 2),
-                    textAlign: .end,
-                    style: _type(context, 12, foreground),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+                ],
+              ),
       ),
     );
   }

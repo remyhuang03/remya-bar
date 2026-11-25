@@ -612,7 +612,7 @@ void main() {
     await tester.tap(sunday);
     await tester.pumpAndSettle();
     expect(client.values['calendar']['week-start'], 'sunday');
-    expect(client.values['calendar-last-view'], 'month');
+    expect(client.values['calendar-last-view'], 'week');
   });
 
   testWidgets('Google account requests identity only and supports disconnect', (

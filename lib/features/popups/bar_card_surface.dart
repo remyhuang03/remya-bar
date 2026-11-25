@@ -184,6 +184,7 @@ class BarCardSurface extends StatelessWidget {
     this.styleVariant = .tonalSpot,
     this.pill,
     this.emergence = const AlwaysStoppedAnimation(1),
+    this.bodyWidth,
   });
 
   final Widget child;
@@ -191,6 +192,7 @@ class BarCardSurface extends StatelessWidget {
   final DynamicSchemeVariant styleVariant;
   final Rect? pill;
   final Animation<double> emergence;
+  final double? bodyWidth;
 
   // The top inset is the neck; the other insets reserve shadow room.
   static const shadowInsets = EdgeInsets.fromLTRB(40, 12, 40, 52);
@@ -198,27 +200,33 @@ class BarCardSurface extends StatelessWidget {
   /// Near a screen edge the popup is clamped while the pill is not, so the body
   /// shifts into the shadow room to stay under its pill. A bottom bar puts the
   /// neck at the bottom.
-  static EdgeInsets insetsFor(Rect? pill, double width, {bool bottom = false}) {
-    final insets = _shifted(pill, width);
+  static EdgeInsets insetsFor(
+    Rect? pill,
+    double width, {
+    bool bottom = false,
+    double? bodyWidth,
+  }) {
+    final side = bodyWidth == null
+        ? shadowInsets.left
+        : ((width - bodyWidth) / 2).clamp(0.0, shadowInsets.left);
+    final insets = _shifted(pill, width, side);
     return bottom
         ? insets.copyWith(top: insets.bottom, bottom: insets.top)
         : insets;
   }
 
-  static EdgeInsets _shifted(Rect? pill, double width) {
-    if (pill == null) return shadowInsets;
-    final left = shadowInsets.left;
-    final right = width - shadowInsets.right;
+  static EdgeInsets _shifted(Rect? pill, double width, double side) {
+    final insets = shadowInsets.copyWith(left: side, right: side);
+    if (pill == null) return insets;
+    final left = side;
+    final right = width - side;
     final shift = pill.left < left
         ? pill.left - left
         : pill.right > right
         ? pill.right - right
         : 0.0;
-    final dx = shift.clamp(-left, shadowInsets.right);
-    return shadowInsets.copyWith(
-      left: left + dx,
-      right: shadowInsets.right - dx,
-    );
+    final dx = shift.clamp(-side, side);
+    return insets.copyWith(left: left + dx, right: side - dx);
   }
 
   static ColorScheme colors(
@@ -251,7 +259,12 @@ class BarCardSurface extends StatelessWidget {
         animation: emergence,
         child: LayoutBuilder(
           builder: (context, constraints) => Padding(
-            padding: insetsFor(pill, constraints.maxWidth, bottom: bottom),
+            padding: insetsFor(
+              pill,
+              constraints.maxWidth,
+              bottom: bottom,
+              bodyWidth: bodyWidth,
+            ),
             // Strip the popup's shadow insets so scrollables inside the card
             // keep their scrollbars aligned with the content.
             child: MediaQuery.removePadding(
@@ -266,7 +279,7 @@ class BarCardSurface extends StatelessWidget {
         ),
         builder: (context, child) {
           final progress = emergence.value.clamp(0.0, 1.0);
-          final clipper = _CardClipper(pill, progress, bottom);
+          final clipper = _CardClipper(pill, progress, bottom, bodyWidth);
           return CustomPaint(
             painter: _CardPainter(clipper, scheme.surfaceContainer),
             child: ClipPath(
@@ -284,10 +297,11 @@ class BarCardSurface extends StatelessWidget {
 }
 
 class _CardClipper extends CustomClipper<Path> {
-  const _CardClipper(this.pill, this.progress, this.bottom);
+  const _CardClipper(this.pill, this.progress, this.bottom, this.bodyWidth);
   final Rect? pill;
   final double progress;
   final bool bottom;
+  final double? bodyWidth;
 
   @override
   Path getClip(Size size) {
@@ -295,6 +309,7 @@ class _CardClipper extends CustomClipper<Path> {
     final body = BarCardSurface.insetsFor(
       pill,
       size.width,
+      bodyWidth: bodyWidth,
     ).deflateRect(Offset.zero & size);
     final anchor = pill;
     final path = anchor == null
@@ -316,7 +331,8 @@ class _CardClipper extends CustomClipper<Path> {
   bool shouldReclip(_CardClipper oldClipper) =>
       pill != oldClipper.pill ||
       progress != oldClipper.progress ||
-      bottom != oldClipper.bottom;
+      bottom != oldClipper.bottom ||
+      bodyWidth != oldClipper.bodyWidth;
 }
 
 class _CardPainter extends CustomPainter {

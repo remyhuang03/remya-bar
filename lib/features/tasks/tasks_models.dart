@@ -7,25 +7,15 @@ enum TasksSyncState {
   syncing,
   offline,
   authRequired,
-  conflict,
   error,
 }
 
 @immutable
 class TaskList {
-  const TaskList({
-    required this.id,
-    required this.title,
-    this.etag,
-    this.accountId,
-    this.pending = false,
-  });
+  const TaskList({required this.id, required this.title});
 
   final String id;
   final String title;
-  final String? etag;
-  final String? accountId;
-  final bool pending;
 }
 
 @immutable
@@ -34,12 +24,8 @@ class GoogleTask {
     required this.id,
     required this.listId,
     required this.title,
-    this.notes = '',
     this.position = '',
-    this.etag,
-    this.parent,
     this.sourceLink,
-    this.sourceKind,
     this.webViewLink,
     this.scheduled,
     this.completed = false,
@@ -47,19 +33,16 @@ class GoogleTask {
     this.deleted = false,
     this.assigned = false,
     this.pending = false,
-    this.error,
+    this.syncError = false,
+    this.completionUndoable = false,
     this.accountId,
   });
 
   final String id;
   final String listId;
   final String title;
-  final String notes;
   final String position;
-  final String? etag;
-  final String? parent;
   final String? sourceLink;
-  final String? sourceKind;
   final String? webViewLink;
   final DateTime? scheduled;
   final bool completed;
@@ -67,57 +50,11 @@ class GoogleTask {
   final bool deleted;
   final bool assigned;
   final bool pending;
-  final String? error;
+  final bool syncError;
+  final bool completionUndoable;
   final String? accountId;
 
-  Object get key => (listId, id);
-}
-
-@immutable
-class TasksConflictField {
-  const TasksConflictField(this.name, this.mine, this.google);
-
-  final String name;
-  final Object? mine;
-  final Object? google;
-}
-
-@immutable
-class TasksConflict {
-  const TasksConflict({
-    required this.id,
-    required this.title,
-    required this.message,
-    required this.fields,
-    required this.canKeepMine,
-    this.task,
-  });
-
-  final String id;
-  final String title;
-  final String message;
-  final List<TasksConflictField> fields;
-  final bool canKeepMine;
-  final GoogleTask? task;
-}
-
-@immutable
-class TasksIssue {
-  const TasksIssue({
-    required this.id,
-    required this.operation,
-    required this.title,
-    required this.message,
-    required this.ambiguous,
-    this.task,
-  });
-
-  final String id;
-  final String operation;
-  final String title;
-  final String message;
-  final bool ambiguous;
-  final GoogleTask? task;
+  (String, String) get key => (listId, id);
 }
 
 class TasksEditException implements Exception {
@@ -139,6 +76,3 @@ DateTime? googleScheduledDate(Object? value) {
   }
   return DateTime(parsed.year, parsed.month, parsed.day);
 }
-
-String googleScheduledDatePayload(DateTime date) =>
-    DateTime.utc(date.year, date.month, date.day).toIso8601String();

@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'calendar_events.dart';
+import 'clock_card_controls.dart';
 
 part 'calendar_event_tile.dart';
 
@@ -20,8 +21,9 @@ class CalendarAgenda extends StatefulWidget {
     required this.showDeclined,
     required this.onOpen,
     required this.onJoin,
-    required this.onHome,
-    this.onNew,
+    this.leading,
+    this.placeholder,
+    this.onKeyEvent,
   });
 
   final DateTime selectedDay;
@@ -32,8 +34,9 @@ class CalendarAgenda extends StatefulWidget {
   final bool showDeclined;
   final ValueChanged<CalendarEvent> onOpen;
   final ValueChanged<CalendarEvent> onJoin;
-  final VoidCallback onHome;
-  final VoidCallback? onNew;
+  final Widget? leading;
+  final Widget? placeholder;
+  final FocusOnKeyEventCallback? onKeyEvent;
 
   @override
   State<CalendarAgenda> createState() => CalendarAgendaState();
@@ -94,7 +97,8 @@ class CalendarAgendaState extends State<CalendarAgenda> {
   }
 
   void _extendIfNeeded() {
-    if (_days >= 60 ||
+    if (widget.placeholder != null ||
+        _days >= 60 ||
         !_scroll.hasClients ||
         _scroll.position.extentAfter > 56) {
       return;
@@ -140,18 +144,15 @@ class CalendarAgendaState extends State<CalendarAgenda> {
       ];
       if (offset == 0 || items.isNotEmpty) groups[day] = items;
     }
-    final scroll = ScrollConfiguration(
-      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-      child: NotificationListener<ScrollMetricsNotification>(
-        onNotification: (notification) {
-          _updateFade(notification.metrics);
-          return false;
-        },
-        child: CustomScrollView(
-          // A new range starts at the top before its first layout.
-          key: ValueKey((widget.selectedDay, widget.rangeDays)),
-          controller: _scroll,
-          slivers: [
+    final days = FocusScope(
+      node: _focus,
+      includeSemantics: false,
+      onKeyEvent: widget.onKeyEvent,
+      child: SliverMainAxisGroup(
+        slivers: [
+          if (widget.placeholder case final placeholder?)
+            SliverToBoxAdapter(child: placeholder)
+          else
             for (final MapEntry(:key, :value) in groups.entries)
               SliverLayoutBuilder(
                 key: ValueKey(key),
@@ -173,46 +174,46 @@ class CalendarAgendaState extends State<CalendarAgenda> {
                     canCollapseFinished: widget.foldFinished,
                     onOpen: widget.onOpen,
                     onJoin: widget.onJoin,
-                    onHome: widget.onHome,
-                    onNew: widget.onNew,
                   ),
                 ),
               ),
+        ],
+      ),
+    );
+    final scroll = ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: NotificationListener<ScrollMetricsNotification>(
+        onNotification: (notification) {
+          _updateFade(notification.metrics);
+          return false;
+        },
+        child: CustomScrollView(
+          // A standalone agenda resets to the selected day without moving its grid.
+          key: widget.leading == null
+              ? ValueKey((widget.selectedDay, widget.rangeDays))
+              : const ValueKey('shared-calendar-scroll'),
+          controller: _scroll,
+          slivers: [
+            if (widget.leading case final leading?)
+              SliverToBoxAdapter(child: leading),
+            days,
           ],
         ),
       ),
     );
-    return FocusScope(
-      node: _focus,
-      child: Listener(
-        onPointerSignal: (event) {
-          if (event is PointerScrollEvent &&
-              event.scrollDelta.dy > 0 &&
-              _scroll.hasClients &&
-              _scroll.position.extentAfter == 0) {
-            _extendIfNeeded();
-          }
-        },
-        child: ShaderMask(
-          blendMode: .dstIn,
-          shaderCallback: (bounds) {
-            final edge = bounds.height > 0
-                ? (32 / bounds.height).clamp(0.0, .5)
-                : 0.0;
-            return LinearGradient(
-              begin: .topCenter,
-              end: .bottomCenter,
-              colors: [
-                _startFade ? Colors.transparent : Colors.black,
-                Colors.black,
-                Colors.black,
-                _endFade ? Colors.transparent : Colors.black,
-              ],
-              stops: [0, edge, 1 - edge, 1],
-            ).createShader(bounds);
-          },
-          child: scroll,
-        ),
+    return Listener(
+      onPointerSignal: (event) {
+        if (event is PointerScrollEvent &&
+            event.scrollDelta.dy > 0 &&
+            _scroll.hasClients &&
+            _scroll.position.extentAfter == 0) {
+          _extendIfNeeded();
+        }
+      },
+      child: ClockCardScrollFade(
+        top: _startFade,
+        bottom: _endFade,
+        child: scroll,
       ),
     );
   }
@@ -233,8 +234,6 @@ class _AgendaDay extends StatelessWidget {
     required this.canCollapseFinished,
     required this.onOpen,
     required this.onJoin,
-    required this.onHome,
-    required this.onNew,
   });
 
   final DateTime day;
@@ -250,8 +249,6 @@ class _AgendaDay extends StatelessWidget {
   final VoidCallback onToggleFinished;
   final ValueChanged<CalendarEvent> onOpen;
   final ValueChanged<CalendarEvent> onJoin;
-  final VoidCallback onHome;
-  final VoidCallback? onNew;
 
   bool _running(CalendarEvent event) =>
       !event.allDay &&
@@ -312,8 +309,7 @@ class _AgendaDay extends StatelessWidget {
                 crossAxisAlignment: .stretch,
                 spacing: 2,
                 children: [
-                  if (items.isEmpty)
-                    _EmptyAgenda(days: emptyRange, onNew: onNew),
+                  if (items.isEmpty) _EmptyAgenda(days: emptyRange),
                   for (final (index, row) in rows.indexed)
                     if (row is CalendarEvent)
                       _EventTile(
@@ -328,24 +324,17 @@ class _AgendaDay extends StatelessWidget {
                         live: isToday && _running(row),
                         soon:
                             identical(row, next) && upcoming.inSeconds <= 3600,
-                        radius: .vertical(
-                          top: Radius.circular(
-                            index > 0 && rows[index - 1] is CalendarEvent
-                                ? 4
-                                : 16,
-                          ),
-                          bottom: Radius.circular(
-                            index + 1 < rows.length &&
-                                    rows[index + 1] is CalendarEvent
-                                ? 4
-                                : 16,
-                          ),
+                        radius: connectedClockRowRadius(
+                          first:
+                              index == 0 || rows[index - 1] is! CalendarEvent,
+                          last:
+                              index + 1 == rows.length ||
+                              rows[index + 1] is! CalendarEvent,
                         ),
                         onOpen: row.htmlLink == null ? null : () => onOpen(row),
                         onJoin: row.meetingLink == null
                             ? null
                             : () => onJoin(row),
-                        onHome: onHome,
                       )
                     else
                       row as Widget,
@@ -510,10 +499,9 @@ class _NowLine extends StatelessWidget {
 }
 
 class _EmptyAgenda extends StatelessWidget {
-  const _EmptyAgenda({required this.days, required this.onNew});
+  const _EmptyAgenda({required this.days});
 
   final int? days;
-  final VoidCallback? onNew;
 
   @override
   Widget build(BuildContext context) {
@@ -535,7 +523,7 @@ class _EmptyAgenda extends StatelessWidget {
             crossAxisAlignment: .start,
             children: [
               Text(
-                days == null ? 'No events' : 'Nothing scheduled',
+                'No events',
                 style: _agendaType(context, 14, 20, colors.onSurface, .w500),
               ),
               if (days case final range?)
@@ -546,12 +534,6 @@ class _EmptyAgenda extends StatelessWidget {
             ],
           ),
         ),
-        if (days != null && onNew != null)
-          FilledButton.tonalIcon(
-            onPressed: onNew,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('New event'),
-          ),
       ],
     );
   }
@@ -593,58 +575,48 @@ class _CalendarAgendaLoadingState extends State<CalendarAgendaLoading>
   Widget build(BuildContext context) {
     final color = Theme.of(context).colorScheme.surfaceContainerHigh;
     return Semantics(
-      label: 'Syncing Google Calendar',
-      liveRegion: true,
-      child: ClipRect(
-        child: OverflowBox(
-          alignment: .topCenter,
-          minHeight: 0,
-          maxHeight: double.infinity,
-          child: FadeTransition(
-            opacity: _pulse,
-            child: Column(
-              mainAxisSize: .min,
-              spacing: 12,
-              children: [
-                for (final count in [3, 2])
-                  Row(
-                    crossAxisAlignment: .start,
-                    spacing: 12,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: .circular(28),
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: .stretch,
-                          spacing: 2,
-                          children: [
-                            for (var index = 0; index < count; index++)
-                              Container(
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  borderRadius: .vertical(
-                                    top: Radius.circular(index == 0 ? 16 : 4),
-                                    bottom: Radius.circular(
-                                      index == count - 1 ? 16 : 4,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
+      label: 'Loading Calendar events',
+      child: FadeTransition(
+        opacity: _pulse,
+        child: Column(
+          mainAxisSize: .min,
+          spacing: 12,
+          children: [
+            for (final count in [3, 2])
+              Row(
+                crossAxisAlignment: .start,
+                spacing: 12,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: .circular(28),
+                    ),
                   ),
-              ],
-            ),
-          ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: .stretch,
+                      spacing: 2,
+                      children: [
+                        for (var index = 0; index < count; index++)
+                          Container(
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: color,
+                              borderRadius: connectedClockRowRadius(
+                                first: index == 0,
+                                last: index == count - 1,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+          ],
         ),
       ),
     );

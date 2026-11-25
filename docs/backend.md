@@ -16,9 +16,10 @@ Compiled bundles do not require sibling checkouts.
 ## Bar preferences and settings window
 
 [linux/packaging/remya-bar.json](../linux/packaging/remya-bar.json) owns schemas,
-defaults and pages (`layout`, `osd`, `notifications`, `ai-ring`, `tasks`). The
-`material-theme` and `account` pages use Core’s shared theme and avatar editors. An avatar saved in either the Bar Account page or Remya Settings
-updates Bar’s sidebar profile. The Account page also uses Core's Google OAuth
+defaults and pages, including `layout`, `osd`, `notifications`, `ai-ring`,
+`calendar` and `tasks`. The `material-theme` and `account` pages use Core’s
+shared theme and avatar editors. An avatar saved in either the Bar Account page
+or Remya Settings updates Bar’s sidebar profile. The Account page also uses Core's Google OAuth
 service for identity-only sign-in. Bar links to the [Remya Apps privacy policy](https://apps.remya.top/privacy),
 and allows users to disconnect the shared authorization. The profile picture
 can sync with Google after the user grants profile access. Core owns the tokens,
@@ -330,36 +331,32 @@ weather data, location search and icon sources. See
 
 ## Google Tasks
 
-Settings → Tasks → Connection requests Google Tasks read/write consent through
-[Core’s Google account service](../../remya-core/docs/google-account.md). The
-Account page requests identity only. Both pages show the shared connection.
-Disconnect can retain the account's local work or discard it by explicit choice.
-The Tasks settings page controls list visibility, quick-add destination, view
-defaults and placement. Its Connection section links to Google Tasks on the web.
-Set `@default` to use the Google default list. A missing explicit target requires
-a new choice.
+The clock card is the only Tasks surface. It groups scheduled, incomplete tasks
+as Working on, Today and Upcoming. Tasks and Calendar share the Google account,
+browser authorization and account selection in Google app links. Settings →
+Tasks requests the existing Tasks read/write grant, shows the last successful
+sync, and edits `tasks-clock` through BarPreferences. The setting owns the visible
+lists, Upcoming range, Working on switch and limit, and assigned-task
+visibility. Disconnect offers to keep or discard queued completion changes.
 
-One application-wide store serves all monitors, the right sidebar, the optional
-Tasks section in Notifications, and Settings. Notifications clear independently
-of tasks. The store follows Core account changes and associates saved drafts,
-pending operations and confirmed responses with the opaque Google account ID.
-The cache and edit journal live in the account's private directory under
-`$XDG_STATE_HOME/remya/bar/tasks/`, with the absolute HOME fallback. The journal
-includes task titles, notes, edit baselines and drafts. OAuth credentials and
-the authenticated API transport belong to Core.
+One store serves all outputs. It paginates all task lists and their tasks
+through Core. The card supports status changes and an eight-second undo.
+Assigned tasks remain read-only in Bar and can link to their source. Other
+edits open Google Tasks in the browser. The store compares the current remote
+status before writing and uses the remote status when it changed. Failures
+restore the confirmed row state, retain unsent changes and show a retry banner.
 
-Sync paginates the list directory and reads each list in sequence through Core.
-It runs automatically with two-minute polls and full refreshes every 30 minutes.
-The Tasks card can request a full refresh immediately. Older `automatic` values
-remain valid in saved preferences and have no effect on polling.
-Accounts with many lists poll less frequently to reduce API use. Sync retains
-prior data while refreshing, replays pending edits when the account is available, and
-offers a field-level comparison for concurrent changes. A write re-reads the
-item before patching, so a remote write can still race the patch. Creates with
-an uncertain outcome require review in Google Tasks before explicitly retrying
-or discarding. The UI treats Scheduled date as a calendar date independent of
-timezone. Google Tasks remains the entry point for advanced fields and source
-applications own assignment changes.
+Refresh runs when the clock card opens and its data is older than 60 seconds,
+every five minutes while any clock card is open, every 15 minutes in the
+background, and after resume or renewed connectivity. Failures back off for
+one, two, five and 15 minutes. Cached tasks remain visible during failures.
+The card shows progress for the first load without a cache.
+
+The account-specific cache, completion journal and Working on IDs live in
+private state under `$XDG_STATE_HOME/remya/bar/tasks/`, with the absolute HOME
+fallback. The completion queue is stored in `status-queue.json`. Working on IDs
+are atomically stored in a separate `working-on.json` file. Bookmarks belong to this device and use no Google API
+operations. Core owns OAuth tokens and the authenticated request transport.
 
 ## Local observations and keyboard
 
@@ -406,8 +403,12 @@ A canceled bridge stream may emit a final failed-post diagnostic during disposal
 
 ## Calendar
 
-Bar’s clock pill opens the Calendar card. The view uses the local civil day
-for its month and week grids and for the agenda. Week-start, default view,
+Bar’s clock pill opens the clock card with Tasks and Calendar. The card uses
+the owning output’s logical dimensions. On wide outputs, the task list and
+agenda scroll independently. Narrow outputs share the viewport below the
+clock. Calendar opens in week view by default. Expanding the month grid
+reduces the agenda viewport. The calendar uses the local civil day for its
+grids and agenda. Week-start, default view,
 week numbers, agenda range, event filters and calendar visibility are Bar app
 preferences. The last manually chosen view is stored separately. Calendar
 visibility overrides are scoped to the Google account that set them.

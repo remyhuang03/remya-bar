@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:remya_client/remya_client.dart';
 import 'package:remya_bar/features/settings/bar_preferences.dart';
 import 'package:remya_bar/features/settings/bar_theme_controller.dart';
+import 'package:remya_bar/features/tasks/tasks_preferences.dart';
 
 class _Client extends SettingsClient {
   _Client(this.values);
@@ -126,17 +127,36 @@ void main() {
     },
   );
 
-  test('Tasks accepts saved preferences from before automatic-only sync', () {
-    final defaults = _defaults()['tasks'] as Map<String, dynamic>;
-    expect(defaults, isNot(contains('automatic')));
-    expect(
-      () => BarPreferences.validate('tasks', {...defaults, 'automatic': false}),
-      returnsNormally,
-    );
-    expect(
-      () => BarPreferences.validate('tasks', {...defaults, 'automatic': 0}),
-      throwsFormatException,
-    );
+  test('Tasks clock preferences apply only to their account', () {
+    expect(_defaults().containsKey('tasks'), false);
+    expect(_defaults()[tasksClockPreferenceKey], tasksClockDefaults);
+    final value = {
+      ...tasksClockDefaults,
+      'visible-lists': ['selected-list'],
+      'visible-lists-account': 'account',
+    };
+    BarPreferences.validate(tasksClockPreferenceKey, value);
+    final preferences = TasksPreferences.fromJson(value);
+    expect(preferences.visibleListsFor('account'), ['selected-list']);
+    expect(preferences.visibleListsFor('other'), isEmpty);
+    expect(preferences.upcomingDays, 7);
+    expect(preferences.workingOnLimit, 3);
+    expect(preferences.workingOnEnabled, true);
+    for (final invalid in [
+      {'visible-lists-account': ''},
+      {'upcoming-days': 5},
+      {'working-on-limit': 0},
+      {'working-on-limit': 4},
+      {'automatic': true},
+    ]) {
+      expect(
+        () => BarPreferences.validate(tasksClockPreferenceKey, {
+          ...value,
+          ...invalid,
+        }),
+        throwsFormatException,
+      );
+    }
   });
 
   test('Calendar validates week starts and isolates visibility by account', () {

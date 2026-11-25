@@ -175,7 +175,7 @@ class _CalendarConnectionState extends State<_CalendarConnection> {
     if (await confirmGoogleDisconnect(context, TasksStore.shared) &&
         mounted &&
         accountId == widget.integration.account?.accountId) {
-      await _run(widget.client.disconnectGoogleAccount);
+      await _run(() => TasksStore.shared.disconnect(client: widget.client));
     }
   }
 

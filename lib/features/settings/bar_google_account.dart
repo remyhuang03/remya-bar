@@ -84,7 +84,7 @@ class _BarGoogleAccountState extends State<BarGoogleAccount> {
 
   Future<void> _disconnect() async {
     if (await confirmGoogleDisconnect(context, TasksStore.shared) && mounted) {
-      await _run(widget.client.disconnectGoogleAccount);
+      await _run(() => TasksStore.shared.disconnect(client: widget.client));
     }
   }
 

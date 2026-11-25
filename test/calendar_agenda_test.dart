@@ -108,7 +108,6 @@ void main() {
                   showDeclined: false,
                   onOpen: (event) => opened = event,
                   onJoin: (event) => joined = event,
-                  onHome: () {},
                 ),
               ),
             ),
@@ -184,7 +183,6 @@ void main() {
                 showDeclined: false,
                 onOpen: (_) {},
                 onJoin: (_) {},
-                onHome: () {},
               ),
             ),
           ),
@@ -192,7 +190,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Nothing scheduled'), findsOneWidget);
+    expect(find.text('No events'), findsOneWidget);
     await tester.sendEventToBinding(
       PointerScrollEvent(
         kind: .mouse,
@@ -235,7 +233,6 @@ void main() {
                     showDeclined: false,
                     onOpen: (_) {},
                     onJoin: (_) {},
-                    onHome: () {},
                   );
                 },
               ),

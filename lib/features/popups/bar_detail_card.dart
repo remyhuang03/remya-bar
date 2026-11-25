@@ -5,6 +5,7 @@ import '../settings/remya_settings_installed.dart';
 import '../ai_usage/ai_usage_card.dart';
 import '../ai_usage/ai_usage_data.dart';
 import '../battery/battery_card.dart';
+import '../clock/clock_card_controls.dart';
 import '../clock/datetime_card.dart';
 import '../media/media_preview.dart';
 import '../notifications/notification_view.dart';
@@ -34,49 +35,70 @@ class BarDetailCard extends StatelessWidget {
   final PopupAction onAction;
 
   @override
-  Widget build(BuildContext context) => kind == 'media'
-      ? MediaPreview(
-          data: data,
-          onAction: onAction,
-          styleVariant: styleVariant,
-          seedColor: seedColor,
-          pill: cardPill(data['pill']),
-          emergence: emergence,
-        )
-      : BarCardSurface(
-          seedColor: seedColor,
-          pill: cardPill(data['pill']),
-          emergence: emergence,
-          styleVariant: styleVariant,
-          child: switch (kind) {
-            'resources' => ResourceCard(
-              data: data,
-              onOpenMonitor: () =>
-                  onAction(const {'action': 'resources.monitor'}),
-            ),
-            aiUsageKind => AiUsageCard(
-              data: data,
-              onRefresh: () => onAction(const {'action': 'ai-usage.refresh'}),
-            ),
-            'weather' => WeatherCard(
-              onSettings: () => onAction(const {'action': 'weather.settings'}),
-            ),
-            'battery' => BatteryCard(data: data, onAction: onAction),
-            'notifications' => BarCardSections(
-              children: [
-                NotificationCenterCard(data: data, onAction: onAction),
-              ],
-            ),
-            'datetime' => DatetimeCard(
-              onSettings: () => onAction(const {'action': 'calendar.settings'}),
+  Widget build(BuildContext context) {
+    if (kind == 'media') {
+      return MediaPreview(
+        data: data,
+        onAction: onAction,
+        styleVariant: styleVariant,
+        seedColor: seedColor,
+        pill: cardPill(data['pill']),
+        emergence: emergence,
+      );
+    }
+    if (kind == 'datetime') {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          // The runner supplies a narrow or wide surface for the owning output.
+          final wide = constraints.maxWidth >= clockCardWideWidth;
+          return _surface(
+            bodyWidth: wide ? clockCardWideWidth : clockCardNarrowWidth,
+            child: DatetimeCard(
+              wide: wide,
+              onCalendarSettings: () =>
+                  onAction(const {'action': 'calendar.settings'}),
+              onTasksSettings: () =>
+                  onAction(const {'action': 'tasks.settings'}),
               onClose: () => onAction(const {'action': 'close'}),
               onDateTimeSettings: remyaSettingsInstalled()
                   ? () => onAction(const {'action': 'datetime.settings'})
                   : null,
             ),
-            _ => const BarCardSections(children: [Text('Unavailable')]),
-          },
-        );
+          );
+        },
+      );
+    }
+    return _surface(
+      child: switch (kind) {
+        'resources' => ResourceCard(
+          data: data,
+          onOpenMonitor: () => onAction(const {'action': 'resources.monitor'}),
+        ),
+        aiUsageKind => AiUsageCard(
+          data: data,
+          onRefresh: () => onAction(const {'action': 'ai-usage.refresh'}),
+        ),
+        'weather' => WeatherCard(
+          onSettings: () => onAction(const {'action': 'weather.settings'}),
+        ),
+        'battery' => BatteryCard(data: data, onAction: onAction),
+        'notifications' => BarCardSections(
+          children: [NotificationCenterCard(data: data, onAction: onAction)],
+        ),
+        _ => const BarCardSections(children: [Text('Unavailable')]),
+      },
+    );
+  }
+
+  BarCardSurface _surface({required Widget child, double? bodyWidth}) =>
+      BarCardSurface(
+        seedColor: seedColor,
+        pill: cardPill(data['pill']),
+        emergence: emergence,
+        styleVariant: styleVariant,
+        bodyWidth: bodyWidth,
+        child: child,
+      );
 }
 
 /// The pill rect a card popup is anchored under, from its `pill` payload.

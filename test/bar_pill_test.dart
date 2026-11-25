@@ -3,6 +3,7 @@ import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:remya_bar/features/clock/bar_clock.dart';
 import 'package:remya_bar/features/popups/bar_popup.dart';
 import 'package:remya_bar/features/popups/bar_card_surface.dart';
 import 'package:remya_bar/widgets/bar_hover_card.dart';
@@ -44,6 +45,27 @@ void main() {
   tearDown(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_popup.channel, null);
+  });
+
+  testWidgets('clock adds the surface insets once to its body size', (
+    tester,
+  ) async {
+    final calls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      _popup.channel,
+      (call) async {
+        calls.add(call);
+        return null;
+      },
+    );
+    await tester.pumpWidget(_host(const BarClock()));
+    await tester.tap(find.byType(BarClock));
+    await tester.pump();
+
+    final request = calls.where((call) => call.method == 'show').single;
+    expect(request.arguments, containsPair('kind', 'datetime'));
+    expect(request.arguments, containsPair('size', [896, 784]));
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('weather opens only on activation and toggles on another click', (

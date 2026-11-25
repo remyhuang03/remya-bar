@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:remya_client/remya_client.dart';
 
+import '../tasks/tasks_preferences.dart';
 import 'bar_preference_models.dart';
 
 export 'bar_preference_models.dart';
@@ -353,56 +354,22 @@ class BarPreferences {
           final ids = [for (final Map app in value['apps']) app['id']];
           valid = ids.toSet().length == ids.length;
         }
-      case 'tasks':
-        valid = _object(
-          value,
-          {
-            'default-list',
-            'default-list-account',
-            'visible-lists',
-            'visible-lists-account',
-            'initial-view',
-            'sort',
-            'completed-expanded',
-            'show-assigned',
-            'today-includes-unscheduled',
-            'sidebar',
-            'notifications',
-            'preview-rows',
-          },
-          optional: {'automatic'},
-        );
+      case tasksClockPreferenceKey:
+        valid = _object(value, tasksClockDefaults.keys.toSet());
         if (valid) {
           final map = value as Map;
-          final target = map['default-list'];
+          final lists = map['visible-lists'];
+          final account = map['visible-lists-account'];
           valid =
-              (target == '@default' ||
-                  (_text(map['default-list-account']) &&
-                      (target == '' || _text(target)))) &&
-              (map['default-list-account'] == '' ||
-                  _text(map['default-list-account'])) &&
-              (map['visible-lists-account'] == '' ||
-                  _text(map['visible-lists-account'])) &&
-              _strings(map['visible-lists'], _text) &&
-              (map['visible-lists'] as List).length <= 2000 &&
-              ((map['visible-lists'] as List).isEmpty ||
-                  _text(map['visible-lists-account'])) &&
-              const {
-                'today',
-                'upcoming',
-                'all',
-              }.contains(map['initial-view']) &&
-              const {'manual', 'date'}.contains(map['sort']) &&
-              map['preview-rows'] is int &&
-              const {3, 5, 8}.contains(map['preview-rows']) &&
-              (!map.containsKey('automatic') || map['automatic'] is bool) &&
-              const [
-                'completed-expanded',
-                'show-assigned',
-                'today-includes-unscheduled',
-                'sidebar',
-                'notifications',
-              ].every((field) => map[field] is bool);
+              (account == '' || _text(account)) &&
+              _strings(lists, _text) &&
+              (lists as List).length <= 2000 &&
+              (lists.isEmpty || _text(account)) &&
+              map['upcoming-days'] is int &&
+              const {3, 7, 14}.contains(map['upcoming-days']) &&
+              map['working-on-enabled'] is bool &&
+              _range(map['working-on-limit'], 1, 3) &&
+              map['show-assigned'] is bool;
         }
       case 'ai-ring':
         valid =
@@ -425,7 +392,7 @@ class BarPreferences {
 }
 
 const calendarDefaults = <String, Object>{
-  'default-view': 'remember',
+  'default-view': 'week',
   'week-start': 'system',
   'show-week-numbers': true,
   'agenda-range': 14,

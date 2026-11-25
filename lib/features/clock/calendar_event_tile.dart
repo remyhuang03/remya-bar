@@ -13,7 +13,6 @@ class _EventTile extends StatefulWidget {
     required this.radius,
     required this.onOpen,
     required this.onJoin,
-    required this.onHome,
   });
 
   final CalendarEvent event;
@@ -26,7 +25,6 @@ class _EventTile extends StatefulWidget {
   final BorderRadius radius;
   final VoidCallback? onOpen;
   final VoidCallback? onJoin;
-  final VoidCallback onHome;
 
   @override
   State<_EventTile> createState() => _EventTileState();
@@ -113,10 +111,6 @@ class _EventTileState extends State<_EventTile> {
                 Clipboard.setData(ClipboardData(text: event.location)),
             child: const Text('Copy location'),
           ),
-        MenuItemButton(
-          onPressed: widget.onHome,
-          child: const Text('Google Calendar home'),
-        ),
       ],
       builder: (context, menu, _) => CallbackShortcuts(
         bindings: {
@@ -135,12 +129,10 @@ class _EventTileState extends State<_EventTile> {
           onSecondaryTapUp: (details) =>
               menu.open(position: details.localPosition),
           child: CustomPaint(
-            foregroundPainter: _focused || dashed
-                ? _TileOutline(
-                    widget.radius,
-                    _focused ? colors.secondary : event.rawColor,
-                    dashed: dashed && !_focused,
-                  )
+            foregroundPainter: _focused
+                ? ClockCardRowFocus(widget.radius, colors.secondary)
+                : dashed
+                ? _TileOutline(widget.radius, event.rawColor)
                 : null,
             child: Material(
               color: fill,
@@ -237,7 +229,7 @@ class _EventTileState extends State<_EventTile> {
                       child: Container(
                         height: 3,
                         alignment: .centerLeft,
-                        color: const Color(0x2E000000),
+                        color: colors.shadow.withValues(alpha: .18),
                         child: FractionallySizedBox(
                           widthFactor:
                               widget.now
@@ -303,23 +295,18 @@ class _JoinMeetingButton extends StatelessWidget {
 }
 
 class _TileOutline extends CustomPainter {
-  const _TileOutline(this.radius, this.color, {required this.dashed});
+  const _TileOutline(this.radius, this.color);
 
   final BorderRadius radius;
   final Color color;
-  final bool dashed;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final outline = radius.toRRect(Offset.zero & size).deflate(dashed ? 1 : 2);
+    final outline = radius.toRRect(Offset.zero & size).deflate(1);
     final stroke = Paint()
       ..color = color
       ..style = .stroke
-      ..strokeWidth = dashed ? 1.5 : 2;
-    if (!dashed) {
-      canvas.drawRRect(outline, stroke);
-      return;
-    }
+      ..strokeWidth = 1.5;
     for (final edge in (Path()..addRRect(outline)).computeMetrics()) {
       for (var offset = 0.0; offset < edge.length; offset += 7) {
         canvas.drawPath(
@@ -332,7 +319,7 @@ class _TileOutline extends CustomPainter {
 
   @override
   bool shouldRepaint(_TileOutline old) =>
-      old.radius != radius || old.color != color || old.dashed != dashed;
+      old.radius != radius || old.color != color;
 }
 
 class _EventChip extends StatelessWidget {
@@ -346,7 +333,9 @@ class _EventChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const .symmetric(horizontal: 10, vertical: 4),
     decoration: BoxDecoration(
-      color: live ? Colors.white : const Color(0x24141414),
+      color: live
+          ? Colors.white
+          : Theme.of(context).colorScheme.shadow.withValues(alpha: .14),
       borderRadius: .circular(999),
     ),
     child: Text(

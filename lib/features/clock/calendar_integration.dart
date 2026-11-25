@@ -75,7 +75,7 @@ class CalendarIntegration extends ChangeNotifier {
   bool get connected => account?.calendar == true && account?.accountId != null;
   bool get weekByDefault => switch (preferences['default-view']) {
     'week' => true,
-    'remember' => settings.values['calendar-last-view'] == 'week',
+    'remember' => settings.values['calendar-last-view'] != 'month',
     _ => false,
   };
 

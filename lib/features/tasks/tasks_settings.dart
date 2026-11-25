@@ -3,7 +3,7 @@ import 'package:remya_ui/settings_ui.dart';
 
 import '../settings/bar_settings_tiles.dart';
 import 'tasks_integration.dart';
-import 'tasks_links.dart';
+import 'tasks_preferences.dart';
 import 'tasks_store.dart';
 
 class TasksSettings extends StatelessWidget {
@@ -22,60 +22,61 @@ class TasksSettings extends StatelessWidget {
         final accountId = status?.accountId;
         final connecting = status?.pending == true;
         final connected = status?.tasks == true;
-        final busy = settings.busy('tasks');
-        final lists = store.lists.where((list) => !list.pending).toList();
-        final targetLabel = preferences.defaultList == '@default'
-            ? 'Google default'
-            : lists
-                      .where((list) => list.id == preferences.defaultList)
-                      .firstOrNull
-                      ?.title ??
-                  'Choose a list';
+        final busy = settings.busy(tasksClockPreferenceKey);
+        final lists = store.lists;
+        final visible = preferences.visibleListsFor(accountId);
+        final lastSync = store.lastSync;
+        final local = MaterialLocalizations.of(context);
+
         void update(String field, Object value) =>
-            settings.update('tasks', field, value);
-        Widget toggle(String title, String field, bool value) => settingSwitch(
+            settings.update(tasksClockPreferenceKey, field, value);
+        Widget toggle(
+          String title,
+          String field,
+          bool value, {
+          String? detail,
+        }) => settingSwitch(
           title,
-          null,
+          detail,
           value,
           busy ? null : (next) => update(field, next),
         );
-        Widget choose<T extends Object>(
+        Widget choose(
           String title,
-          String field,
-          T selected,
-          Map<T, String> choices,
+          int selected,
+          Map<int, String> choices,
+          ValueChanged<int> onSelected,
         ) => settingTile(
           title,
-          control: SettingChoice<T>(
+          control: SettingChoice<int>(
             selected: selected,
             choices: choices,
-            onSelected: busy ? null : (next) => update(field, next),
+            onSelected: busy ? null : onSelected,
           ),
         );
         return Column(
           crossAxisAlignment: .stretch,
           spacing: 16,
           children: [
-            if (settings.error('tasks') case final error?)
+            if (settings.error(tasksClockPreferenceKey) case final error?)
               SettingsErrorCard(
                 message: error,
                 actionLabel: 'Reload',
-                onRetry: busy ? null : () => settings.reloadKey('tasks'),
+                onRetry: busy
+                    ? null
+                    : () => settings.reloadKey(tasksClockPreferenceKey),
               ),
             SettingsGroup(
-              title: 'Connection',
-              trailing: TextButton.icon(
-                onPressed: () => _runTaskAction(
-                  context,
-                  'Couldn’t open Google Tasks',
-                  openGoogleTasks,
-                ),
-                icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('Open in Google Tasks'),
-              ),
+              title: 'Google account',
               children: [
                 settingTile(
                   status?.email ?? 'Google Tasks',
+                  leading: Image.asset(
+                    'assets/icons/google.png',
+                    width: 20,
+                    height: 20,
+                    excludeFromSemantics: true,
+                  ),
                   detail: switch (status) {
                     null => 'Checking the Google connection…',
                     _ when connecting => 'Continue in your browser',
@@ -83,7 +84,7 @@ class TasksSettings extends StatelessWidget {
                       'Google sign-in is unavailable on this installation',
                     _ when connected && store.state != .authRequired =>
                       'Google Tasks can sync with this account.',
-                    _ => 'Allow Remya to view, edit and delete Google Tasks.',
+                    _ => 'Allow Remya to view tasks and update their completion status.',
                   },
                   control: Wrap(
                     spacing: 8,
@@ -112,8 +113,7 @@ class TasksSettings extends StatelessWidget {
                           ),
                           child: const Text('Cancel sign-in'),
                         ),
-                      if (accountId != null &&
-                          (connected || store.pendingCount > 0))
+                      if (accountId != null)
                         OutlinedButton(
                           onPressed: connecting
                               ? null
@@ -128,7 +128,9 @@ class TasksSettings extends StatelessWidget {
                                     await _runTaskAction(
                                       context,
                                       'Couldn’t update the Google connection',
-                                      store.disconnect,
+                                      () async {
+                                        await store.disconnect();
+                                      },
                                     );
                                   }
                                 },
@@ -139,9 +141,17 @@ class TasksSettings extends StatelessWidget {
                 ),
                 if ((status?.error ?? store.error) case final error?)
                   settingTile(error),
+                if (lastSync != null)
+                  settingTile(
+                    'Last synced',
+                    detail:
+                        '${local.formatMediumDate(lastSync)} · '
+                        '${local.formatTimeOfDay(TimeOfDay.fromDateTime(lastSync))}',
+                  ),
               ],
             ),
-            if (settings.values['tasks'] case final Map raw) ...[
+            if (settings.values[tasksClockPreferenceKey]
+                case final Map raw) ...[
               SettingsGroup(
                 title: 'Lists and view',
                 children: [
@@ -152,7 +162,7 @@ class TasksSettings extends StatelessWidget {
                           ? null
                           : () async {
                               final revision = settings.preferences.revision(
-                                'tasks',
+                                tasksClockPreferenceKey,
                               );
                               final selected = await showDialog<List<String>>(
                                 context: context,
@@ -160,14 +170,14 @@ class TasksSettings extends StatelessWidget {
                                   entries: {
                                     for (final row in lists) row.id: row.title,
                                   },
-                                  selected: preferences.visibleLists,
+                                  selected: visible,
                                 ),
                               );
                               if (selected == null ||
                                   store.account?.accountId != accountId) {
                                 return;
                               }
-                              await settings.write('tasks', {
+                              await settings.write(tasksClockPreferenceKey, {
                                 ...raw,
                                 'visible-lists': selected,
                                 'visible-lists-account': selected.isEmpty
@@ -176,91 +186,53 @@ class TasksSettings extends StatelessWidget {
                               }, revision: revision);
                             },
                       child: Text(
-                        preferences.visibleLists.isEmpty
+                        visible.isEmpty
                             ? 'All lists'
-                            : '${preferences.visibleLists.length} selected',
+                            : '${visible.length} selected',
                       ),
                     ),
                   ),
-                  settingTile(
-                    'Default list for new tasks',
-                    control: OutlinedButton(
-                      onPressed: busy || accountId == null || lists.isEmpty
-                          ? null
-                          : () async {
-                              final revision = settings.preferences.revision(
-                                'tasks',
-                              );
-                              final picked = await showDialog<String>(
-                                context: context,
-                                builder: (_) => _DefaultList(
-                                  entries: {
-                                    '@default': 'Google default',
-                                    for (final row in lists) row.id: row.title,
-                                  },
-                                ),
-                              );
-                              if (picked != null && context.mounted) {
-                                await _runTaskAction(
-                                  context,
-                                  'Couldn’t save the default list',
-                                  () => integration.setDefaultList(
-                                    picked,
-                                    accountId,
-                                    revision: revision,
-                                  ),
-                                );
-                              }
-                            },
-                      child: Text(targetLabel),
-                    ),
-                  ),
-                  choose(
-                    'Initial view',
-                    'initial-view',
-                    preferences.initialView,
-                    const {
-                      'today': 'Today',
-                      'upcoming': 'Upcoming',
-                      'all': 'All',
-                    },
-                  ),
-                  choose('Single-list sort', 'sort', preferences.sort, const {
-                    'manual': 'My order',
-                    'date': 'Scheduled date',
-                  }),
-                  toggle(
-                    'Expand completed tasks',
-                    'completed-expanded',
-                    preferences.completedExpanded,
-                  ),
+                  choose('Upcoming range', preferences.upcomingDays, const {
+                    3: '3 days',
+                    7: '7 days',
+                    14: '14 days',
+                  }, (value) => update('upcoming-days', value)),
                   toggle(
                     'Show assigned tasks',
                     'show-assigned',
                     preferences.showAssigned,
-                  ),
-                  toggle(
-                    'Include unscheduled tasks in Today',
-                    'today-includes-unscheduled',
-                    preferences.todayIncludesUnscheduled,
+                    detail: 'Assigned tasks are read-only in Remya Bar',
                   ),
                 ],
               ),
               SettingsGroup(
-                title: 'Placement',
+                title: 'Working on',
                 children: [
-                  toggle('Show in sidebar', 'sidebar', preferences.sidebar),
                   toggle(
-                    'Show in notifications',
-                    'notifications',
-                    preferences.notifications,
+                    'Working on',
+                    'working-on-enabled',
+                    preferences.workingOnEnabled,
+                    detail: 'On this device only',
                   ),
-                  choose(
-                    'Preview rows',
-                    'preview-rows',
-                    preferences.previewRows,
-                    const {3: '3', 5: '5', 8: '8'},
-                  ),
+                  if (preferences.workingOnEnabled)
+                    choose(
+                      'Task limit',
+                      preferences.workingOnLimit,
+                      const {1: '1', 2: '2', 3: '3'},
+                      (value) {
+                        if (value < store.workingOnIds.length) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Remove tasks from Working on first.',
+                              ),
+                            ),
+                          );
+                        } else {
+                          update('working-on-limit', value);
+                        }
+                      },
+                    ),
                 ],
               ),
             ],
@@ -301,7 +273,7 @@ Future<bool> confirmGoogleDisconnect(
   TasksStore store,
 ) async {
   final accountId = store.account?.accountId;
-  final count = store.pendingCount + store.draftCount;
+  final count = store.pendingCount;
   final action = await showDialog<String>(
     context: context,
     builder: (context) => AlertDialog(
@@ -309,7 +281,7 @@ Future<bool> confirmGoogleDisconnect(
       content: Text(
         count == 0
             ? 'This removes Google access for Remya Apps on this account.'
-            : 'This removes Google access for Remya Apps. You have tasks with local changes that have not synced.',
+            : 'This removes Google access for Remya Apps. You have task completions waiting to sync.',
       ),
       actions: [
         TextButton(
@@ -361,37 +333,6 @@ Future<bool> confirmGoogleDisconnect(
   return true;
 }
 
-class _DefaultList extends StatelessWidget {
-  const _DefaultList({required this.entries});
-
-  final Map<String, String> entries;
-
-  @override
-  Widget build(BuildContext context) {
-    final rows = entries.entries.toList();
-    return AlertDialog(
-      title: const Text('Default list for new tasks'),
-      content: SizedBox(
-        width: 360,
-        height: 320,
-        child: ListView.builder(
-          itemCount: rows.length,
-          itemBuilder: (context, index) => ListTile(
-            title: Text(rows[index].value),
-            onTap: () => Navigator.pop(context, rows[index].key),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-      ],
-    );
-  }
-}
-
 class _VisibleLists extends StatefulWidget {
   const _VisibleLists({required this.entries, required this.selected});
 
@@ -403,9 +344,9 @@ class _VisibleLists extends StatefulWidget {
 }
 
 class _VisibleListsState extends State<_VisibleLists> {
-  late final _selected = widget.selected
-      .where(widget.entries.containsKey)
-      .toSet();
+  late final _selected = widget.selected.isEmpty
+      ? widget.entries.keys.toSet()
+      : widget.selected.where(widget.entries.containsKey).toSet();
   String _query = '';
 
   @override
@@ -460,7 +401,12 @@ class _VisibleListsState extends State<_VisibleLists> {
         FilledButton(
           onPressed: _selected.isEmpty
               ? null
-              : () => Navigator.pop(context, _selected.toList()),
+              : () => Navigator.pop(
+                  context,
+                  _selected.length == widget.entries.length
+                      ? <String>[]
+                      : _selected.toList(),
+                ),
           child: const Text('Save'),
         ),
       ],

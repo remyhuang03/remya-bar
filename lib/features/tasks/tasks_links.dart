@@ -1,28 +1,17 @@
-import 'dart:io';
-
+import '../google/google_links.dart';
 import 'tasks_models.dart';
 
-const _googleTasksUrl = 'https://calendar.google.com/calendar/u/0/r/tasks';
+final _googleTasksPage = Uri.https('calendar.google.com', '/calendar/r/tasks');
 
-Uri? taskHttpsUrl(String? value) {
-  final uri = value == null ? null : Uri.tryParse(value);
-  return uri?.scheme == 'https' && uri!.host.isNotEmpty && uri.userInfo.isEmpty
-      ? uri
-      : null;
-}
+Future<void> openGoogleTasks({String? email}) =>
+    openGoogleBrowser(googleAuthUser(_googleTasksPage, email));
 
-Future<void> openTaskLink(String? value) async {
-  final uri = taskHttpsUrl(value);
-  if (uri != null) {
-    try {
-      final result = await Process.run('xdg-open', [uri.toString()]);
-      if (result.exitCode == 0) return;
-    } on ProcessException {
-      // The opener may be absent on a minimal desktop.
-    }
-  }
-  throw const TasksEditException('Couldn’t open this link.');
-}
+Future<void> openGoogleTask(GoogleTask task, {String? email}) =>
+    openGoogleBrowser(
+      googleAuthUser(googleBrowserLink(task.webViewLink), email),
+    );
 
-Future<void> openGoogleTasks([String? value]) =>
-    openTaskLink(taskHttpsUrl(value)?.toString() ?? _googleTasksUrl);
+Future<void> openTaskSource(GoogleTask task, {String? email}) =>
+    openGoogleBrowser(
+      googleAuthUser(googleBrowserLink(task.sourceLink), email),
+    );

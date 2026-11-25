@@ -171,7 +171,7 @@ void popup_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
       fl_method_call_respond_error(call, "invalid-arguments", "Invalid content height", nullptr, nullptr);
       return;
     }
-    if (state->visible) {
+    if (state->visible && g_strcmp0(kind_of(state->content), "datetime") != 0) {
       auto* owner = GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(state->owner)));
       GdkRectangle monitor;
       gdk_monitor_get_geometry(gtk_layer_get_monitor(owner), &monitor);
@@ -661,6 +661,8 @@ void owner_method(FlMethodChannel* channel, FlMethodCall* call, gpointer data) {
   if (calendar) {
     // The generic card includes 64 px of transparent vertical shadow room.
     state->vertical_insets = MAX(0, gtk_widget_get_allocated_height(GTK_WIDGET(owner)) + 32 - 64);
+    // The breakpoint uses the output, not the popup. The narrow card body is 420 px.
+    if (monitor.width < 864) width = MIN(width, 500);
   } else if (!panel) {
     state->vertical_insets = 56;
   }
