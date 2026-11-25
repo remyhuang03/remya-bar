@@ -27,7 +27,6 @@ class NotificationCenterCard extends StatefulWidget {
     required this.data,
     required this.onAction,
     this.onHeight,
-    this.tasks,
     this.expansion,
     this.actionError,
   });
@@ -35,7 +34,6 @@ class NotificationCenterCard extends StatefulWidget {
   final Map<String, Object?> data;
   final NotificationAction onAction;
   final ValueChanged<double>? onHeight;
-  final Widget? tasks;
   final NotificationExpansion? expansion;
   final String? actionError;
 
@@ -312,10 +310,6 @@ class _NotificationCenterCardState extends State<NotificationCenterCard> {
                   ),
             ],
           ),
-        if (widget.tasks case final tasks?) ...[
-          const Divider(height: 1),
-          tasks,
-        ],
       ],
     );
     if (panel) {

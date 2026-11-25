@@ -11,9 +11,6 @@ import '../ai_usage/ai_usage_data.dart';
 import '../notifications/notification_toasts.dart';
 import '../notifications/notification_view.dart';
 import '../osd/osd_slider.dart';
-import '../settings/bar_settings_entry.dart';
-import '../tasks/tasks_block.dart';
-import '../tasks/tasks_integration.dart';
 import '../tray/tray_menu_popup.dart';
 import '../workspaces/bar_workspaces.dart';
 import '../workspaces/workspace_overview.dart';
@@ -310,25 +307,20 @@ class _BarPopupAppState extends State<BarPopupApp>
                   translation: Offset(offset, 0),
                   child: child,
                 ),
-                child: ListenableBuilder(
-                  listenable: TasksIntegration.shared.settings,
-                  builder: (context, _) => _kind == 'notifications'
-                      ? NotificationCenterCard(
-                          data: details,
-                          onAction: _action,
-                          onHeight: _resizePanel,
-                          expansion: widget.notificationExpansion,
-                          actionError: _actionError,
-                          tasks: _tasksBlock(notifications: true),
-                        )
-                      : RightSidebar(
-                          data: details,
-                          onAction: (action) => widget.channel
-                              .invokeMethod<void>('action', action),
-                          onHeight: _resizePanel,
-                          tasks: _tasksBlock(notifications: false),
-                        ),
-                ),
+                child: _kind == 'notifications'
+                    ? NotificationCenterCard(
+                        data: details,
+                        onAction: _action,
+                        onHeight: _resizePanel,
+                        expansion: widget.notificationExpansion,
+                        actionError: _actionError,
+                      )
+                    : RightSidebar(
+                        data: details,
+                        onAction: (action) =>
+                            widget.channel.invokeMethod<void>('action', action),
+                        onHeight: _resizePanel,
+                      ),
               ),
             )
           : _ScrollUnlessCard(
@@ -432,37 +424,6 @@ class _BarPopupAppState extends State<BarPopupApp>
       ),
     ],
   );
-
-  Widget? _tasksBlock({required bool notifications}) {
-    final tasks = TasksIntegration.shared;
-    final enabled = notifications
-        ? tasks.preferences.notifications
-        : tasks.preferences.sidebar;
-    if (!enabled) return null;
-    return ListenableBuilder(
-      listenable: tasks.store,
-      builder: (context, _) {
-        final accountId = tasks.store.account?.accountId;
-        return TasksBlock(
-          key: ValueKey(accountId),
-          store: tasks.store,
-          preferences: tasks.preferences,
-          onSettings: () => _send(_openTasksSettings()),
-          onSetDefaultList: (id) {
-            if (accountId == null) throw StateError('Connect Google Tasks.');
-            return tasks.setDefaultList(id, accountId);
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _openTasksSettings() async {
-    await openBarSettings(page: 'tasks');
-    if (mounted) {
-      await widget.channel.invokeMethod<void>('action', {'action': 'close'});
-    }
-  }
 
   // Animated content reports a new height every frame. After each resize GTK
   // blocks until Flutter renders that exact size, which per-frame resizes

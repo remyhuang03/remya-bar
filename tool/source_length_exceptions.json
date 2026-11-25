@@ -1,7 +1,7 @@
 {
   "lib/features/sidebar/right_sidebar.dart": {
-    "reason": "Owns the sidebar overview, shared tile layout editing, and dispatch of quick controls across the overview and detail views.",
-    "sha256": "d89214e8e8647d08fc2d8314db73f3622f7ae60d6dde7625dd74e78fe00ef0e0"
+    "reason": "Keeps the sidebar overview, tile layout editing, and quick-control dispatch together. Tile controls and detail views are already split into parts.",
+    "sha256": "e3f1c576bc4356cb3bb5b1eda3aaf5e8096341edf6c969ff1d868b3c1c6e5967"
   },
   "lib/features/sidebar/sidebar_controls.dart": {
     "reason": "Keeps the sidebar-specific private controls, their rendering and their interaction helpers together for the owning sidebar.",
@@ -36,8 +36,8 @@
     "sha256": "1b2712ac5f737dbeed35aa5753445bc62f6a0efabb23f2522e607cf6cc6ad9d4"
   },
   "test/sidebar_test.dart": {
-    "reason": "Keeps Sidebar backend and widget regressions with their shared test harness.",
-    "sha256": "95ca95eeed949aab5c85a135642ef0f0f1bf962b5f379a11f5e7a6e48c214da9"
+    "reason": "Keeps Sidebar behavior and widget regressions with their shared test harness.",
+    "sha256": "b0c8d52fb87d1b2c24935c031c875d65ace770ed7184584bfc40119d7109b9df"
   },
   "test/workspaces_test.dart": {
     "reason": "Keep workspace projection, popup, and interaction tests with their shared Hyprland snapshot and test harness.",

@@ -162,31 +162,30 @@ void main() {
     expect(find.text('Summary 1'), findsNothing);
   });
 
-  testWidgets('clearing the notification history preserves the Tasks section', (
-    tester,
-  ) async {
-    var notifications = [_item(1, 'mail')];
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Material(
-          child: StatefulBuilder(
-            builder: (context, setState) => NotificationCenterCard(
-              data: {'notifications': notifications},
-              tasks: const Text('Review benchmarks'),
-              onAction: (action) {
-                expect(action, {'action': 'notification.clear'});
-                setState(() => notifications = []);
-              },
+  testWidgets(
+    'clearing notification history sends the notification clear action',
+    (tester) async {
+      var notifications = [_item(1, 'mail')];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Material(
+            child: StatefulBuilder(
+              builder: (context, setState) => NotificationCenterCard(
+                data: {'notifications': notifications},
+                onAction: (action) {
+                  expect(action, {'action': 'notification.clear'});
+                  setState(() => notifications = []);
+                },
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.tap(find.text('Clear all'));
-    await tester.pumpAndSettle();
-    expect(find.text('Summary 1'), findsNothing);
-    expect(find.text('Review benchmarks'), findsOneWidget);
-  });
+      );
+      await tester.tap(find.text('Clear all'));
+      await tester.pumpAndSettle();
+      expect(find.text('Summary 1'), findsNothing);
+    },
+  );
 
   testWidgets('center reports an unavailable service', (tester) async {
     await tester.pumpWidget(

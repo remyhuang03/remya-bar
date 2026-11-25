@@ -454,7 +454,6 @@ void main() {
     List<Map<String, Object?>> actions, {
     Map<String, Object?> overrides = const {},
     Future<void> Function(Map<String, Object?>)? onAction,
-    Widget? tasks,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(420, 663);
@@ -494,22 +493,20 @@ void main() {
           },
           onAction: onAction ?? (action) async => actions.add(action),
           onHeight: (_) {},
-          tasks: tasks,
         ),
       ),
     );
   }
 
-  testWidgets('Tasks and all configured controls appear together', (
+  testWidgets('configured controls appear together on the sidebar', (
     tester,
   ) async {
-    await showSidebar(tester, [], tasks: const Text('Sidebar Tasks'));
+    await showSidebar(tester, []);
 
     expect(find.text('Audio'), findsOneWidget);
     expect(find.text('Power'), findsNothing);
     expect(find.text('Do Not Disturb'), findsNothing);
     expect(find.byIcon(Icons.coffee_rounded), findsOneWidget);
-    expect(find.text('Sidebar Tasks'), findsOneWidget);
     expect(find.text('Show all controls'), findsNothing);
     expect(find.text('Collapse controls'), findsNothing);
   });

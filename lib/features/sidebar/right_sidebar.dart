@@ -101,13 +101,11 @@ class RightSidebar extends StatefulWidget {
     required this.data,
     required this.onAction,
     required this.onHeight,
-    this.tasks,
   });
 
   final Map<String, Object?> data;
   final Future<void> Function(Map<String, Object?>) onAction;
   final ValueChanged<double> onHeight;
-  final Widget? tasks;
 
   @override
   State<RightSidebar> createState() => _RightSidebarState();
@@ -556,7 +554,6 @@ class _RightSidebarState extends State<RightSidebar> {
   List<Widget> _overview(ThemeData theme) {
     final colors = theme.colorScheme;
     final edit = _draft != null;
-    final tasks = widget.tasks;
     final large = _tiles.where(_large.containsKey).toList();
     final small = _tiles.where(_small.containsKey).toList();
     final brightness = _map(widget.data['brightness']);
@@ -606,10 +603,6 @@ class _RightSidebarState extends State<RightSidebar> {
       ),
       if (large.isNotEmpty || edit) _grid(2, large, _largeTile),
       if (small.isNotEmpty || edit) _grid(5, small, _smallTile),
-      if (tasks != null && !edit) ...[
-        Divider(height: 1, color: colors.outlineVariant),
-        tasks,
-      ],
       if (edit) ...[
         Column(
           crossAxisAlignment: .stretch,
