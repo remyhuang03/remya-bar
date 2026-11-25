@@ -257,7 +257,6 @@ class TasksStore extends ChangeNotifier {
       if (!_preferences.workingOnEnabled ||
           current.completed ||
           current.hidden ||
-          current.scheduled == null ||
           !_listVisible(data, current.listId)) {
         throw const TasksEditException(
           'This task cannot be added to Working on.',

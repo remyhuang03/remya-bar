@@ -324,8 +324,10 @@ void main() {
   test(
     'stores Working on per account, enforces the cap, and prunes hidden lists',
     () async {
+      google.data['alice']!['one']!.remove('due');
       final store = open();
       await store.refresh();
+      expect(row(store).scheduled, isNull);
       store.setPreferences(const TasksPreferences(workingOnLimit: 1));
       await store.toggleWorkingOn(row(store));
       expect(store.workingOnIds, {'one'});

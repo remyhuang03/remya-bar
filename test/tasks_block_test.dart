@@ -164,16 +164,16 @@ void main() {
     expect(menu.hasPrimaryFocus, isTrue);
   });
 
-  testWidgets('groups only visible dated tasks and moves a bookmarked row', (
+  testWidgets('groups visible tasks and moves a bookmarked row', (
     tester,
   ) async {
     final store = _Tasks([
       _task('Focus now'),
       _task('Due today'),
+      _task('Without due date', days: null),
       _task('Due Tuesday', days: 1),
       _task('Due Friday', days: 4),
       _task('Too far', days: 8),
-      _task('Without due date', days: null),
       _task('Overdue', days: -1),
       _task('Already done', completed: true),
       _task('Hidden list', list: 'home'),
@@ -196,9 +196,12 @@ void main() {
     );
     expect(find.text('Tue'), findsOneWidget);
     expect(find.text('Fri 27'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Without due date')).dy,
+      greaterThan(tester.getTopLeft(find.text('Due Friday')).dy),
+    );
     for (final title in [
       'Too far',
-      'Without due date',
       'Overdue',
       'Already done',
       'Hidden list',
@@ -223,10 +226,51 @@ void main() {
     expect(store.openCards, isEmpty);
   });
 
-  testWidgets('centers No tasks when no incomplete dated tasks match', (
+  testWidgets('includes undated tasks outside the Upcoming range filter', (
     tester,
   ) async {
-    await _mount(tester, _Tasks([_task('No date', days: null)]));
+    final store = _Tasks([
+      _task('No date', days: null),
+      _task('Due Friday', days: 4),
+    ]);
+    await _mount(
+      tester,
+      store,
+      preferences: const TasksPreferences(upcomingDays: 3),
+    );
+    expect(find.text('Today'), findsNothing);
+    expect(find.text('No tasks'), findsNothing);
+    expect(find.text('Due Friday'), findsNothing);
+    final semantics = tester.ensureSemantics();
+    await tester.pump();
+    try {
+      expect(find.bySemanticsLabel('No date, not done'), findsOneWidget);
+    } finally {
+      semantics.dispose();
+    }
+    expect(
+      tester.getTopLeft(find.text('No date')).dy,
+      greaterThan(tester.getTopLeft(find.text('Upcoming')).dy),
+    );
+
+    await tester.tap(find.byTooltip('Working on'));
+    await tester.pumpAndSettle();
+    expect(find.text('Upcoming'), findsNothing);
+    expect(find.text('No date'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Remove from Working on'));
+    await tester.pumpAndSettle();
+    expect(find.text('Upcoming'), findsOneWidget);
+    expect(find.text('No date'), findsOneWidget);
+  });
+
+  testWidgets('centers No tasks when no incomplete tasks match', (
+    tester,
+  ) async {
+    await _mount(
+      tester,
+      _Tasks([_task('Already done', days: null, completed: true)]),
+    );
     final empty = find.text('No tasks');
 
     expect(empty, findsOneWidget);

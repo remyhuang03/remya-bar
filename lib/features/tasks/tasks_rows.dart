@@ -17,7 +17,7 @@ class _TaskRow extends StatefulWidget {
   });
 
   final GoogleTask task;
-  final String dueLabel;
+  final String? dueLabel;
   final String? dateLabel;
   final bool first;
   final bool last;
@@ -54,7 +54,7 @@ class _TaskRowState extends State<_TaskRow> {
     final bookmark = widget.workingOn ? 'Remove from Working on' : 'Working on';
     final semanticsLabel = [
       task.title,
-      'due ${widget.dueLabel}',
+      if (widget.dueLabel case final date?) 'due $date',
       task.completed ? 'done' : 'not done',
       if (widget.workingOn) 'Working on',
       if (task.assigned) 'assigned',

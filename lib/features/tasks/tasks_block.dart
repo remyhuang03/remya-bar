@@ -158,7 +158,7 @@ class _TasksBlockState extends State<TasksBlock> {
     }
     if (store.state == .disconnected) {
       return [
-        const Text('Connect Google Tasks to see your scheduled tasks.'),
+        const Text('Connect Google Tasks to see your tasks.'),
         Align(
           alignment: .centerLeft,
           child: FilledButton.tonal(
@@ -177,21 +177,23 @@ class _TasksBlockState extends State<TasksBlock> {
     };
     final workingOn = store.workingOnIds;
     for (final task in store.tasks) {
-      final date = task.scheduled;
-      if (date == null ||
-          task.deleted ||
+      if (task.deleted ||
           task.hidden ||
           (task.completed && !task.completionUndoable) ||
           (task.assigned && !preferences.showAssigned) ||
           (visibleLists.isNotEmpty && !visibleLists.contains(task.listId))) {
         continue;
       }
-      final days = calendarDay(date).difference(today).inDays;
+      final date = task.scheduled;
+      final days = date == null
+          ? null
+          : calendarDay(date).difference(today).inDays;
       if (preferences.workingOnEnabled && workingOn.contains(task.id)) {
         groups[_TaskGroup.workingOn]!.add(task);
       } else if (days == 0) {
         groups[_TaskGroup.today]!.add(task);
-      } else if (days > 0 && days <= preferences.upcomingDays) {
+      } else if (days == null ||
+          (days > 0 && days <= preferences.upcomingDays)) {
         groups[_TaskGroup.upcoming]!.add(task);
       }
     }
@@ -201,7 +203,12 @@ class _TasksBlockState extends State<TasksBlock> {
       for (final (index, task) in upcoming.indexed) task.key: index,
     };
     upcoming.sort((a, b) {
-      final due = a.scheduled!.compareTo(b.scheduled!);
+      final due = switch ((a.scheduled, b.scheduled)) {
+        (final a?, final b?) => a.compareTo(b),
+        (null, null) => 0,
+        (null, _) => 1,
+        (_, null) => -1,
+      };
       return due != 0 ? due : order[a.key]!.compareTo(order[b.key]!);
     });
 
@@ -229,8 +236,10 @@ class _TasksBlockState extends State<TasksBlock> {
           _TaskRow(
             key: ValueKey(task.key),
             task: task,
-            dueLabel: local.formatFullDate(task.scheduled!),
-            dateLabel: group == _TaskGroup.upcoming
+            dueLabel: task.scheduled == null
+                ? null
+                : local.formatFullDate(task.scheduled!),
+            dateLabel: group == _TaskGroup.upcoming && task.scheduled != null
                 ? _upcomingLabel(task.scheduled!, today)
                 : null,
             first: index == 0,

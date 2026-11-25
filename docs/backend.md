@@ -331,8 +331,9 @@ weather data, location search and icon sources. See
 
 ## Google Tasks
 
-The clock card is the only Tasks surface. It groups scheduled, incomplete tasks
-as Working on, Today and Upcoming. Tasks and Calendar share the Google account,
+The clock card is the only Tasks surface. It groups incomplete tasks as Working
+on, Today and Upcoming. Undated tasks appear after dated tasks in Upcoming and
+are included at every Upcoming range. Tasks and Calendar share the Google account,
 browser authorization and account selection in Google app links. Settings →
 Tasks requests the existing Tasks read/write grant, shows the last successful
 sync, and edits `tasks-clock` through BarPreferences. The setting owns the visible
