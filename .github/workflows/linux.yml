@@ -27,7 +27,7 @@ jobs:
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
-      CORE_REVISION: 7f1ef0863f115bff2b041c2df8cb03f3b7633090
+      CORE_REVISION: 68dc68674a70f5617b87ebcebbc62c19f2317732
     steps:
       - name: Restrict candidate builds to main
         if: github.event_name == 'workflow_dispatch'

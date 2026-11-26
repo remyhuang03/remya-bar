@@ -131,7 +131,8 @@ class _CalendarGridState extends State<CalendarGrid> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final labels = MaterialLocalizations.of(context);
     final selected = widget.selected;
     final first = widget.firstWeekday;
@@ -168,7 +169,7 @@ class _CalendarGridState extends State<CalendarGrid> {
                         child: TextButton(
                           style: TextButton.styleFrom(
                             padding: const .symmetric(horizontal: 10),
-                            textStyle: const TextStyle(
+                            textStyle: theme.textTheme.labelLarge?.copyWith(
                               fontSize: 16,
                               fontWeight: .w500,
                             ),
