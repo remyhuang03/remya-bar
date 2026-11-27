@@ -216,25 +216,25 @@ class _CalendarConnectionState extends State<_CalendarConnection> {
               if (status?.configured == true &&
                   !pending &&
                   (!authorized || expired))
-                FilledButton(
+                SettingsButton(
+                  variant: .filled,
                   onPressed: _busy
                       ? null
                       : () => _run(widget.client.connectGoogleCalendar),
-                  child: Text(
-                    expired ? 'Reconnect' : 'Connect Google Calendar',
-                  ),
+                  label: expired ? 'Reconnect' : 'Connect Google Calendar',
                 ),
               if (pending)
-                OutlinedButton(
+                SettingsButton(
                   onPressed: _busy
                       ? null
                       : () => _run(widget.client.cancelGoogleAuthorization),
-                  child: const Text('Cancel sign-in'),
+                  label: 'Cancel sign-in',
                 ),
               if (accountId != null && !pending)
-                OutlinedButton(
+                SettingsButton(
+                  variant: .destructive,
                   onPressed: _busy ? null : () => _disconnect(accountId),
-                  child: const Text('Disconnect'),
+                  label: 'Disconnect',
                 ),
             ],
           ),

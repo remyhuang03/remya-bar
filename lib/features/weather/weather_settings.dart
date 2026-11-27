@@ -95,13 +95,13 @@ class WeatherSettings extends StatelessWidget {
                           location.name,
                           weatherRegion(location),
                         ].where((label) => label.isNotEmpty).join(' · '),
-                  control: FilledButton.tonal(
+                  control: SettingsButton(
                     onPressed:
                         weather.locationRevision == null ||
                             weather.savingLocation
                         ? null
                         : () => _pick(context),
-                    child: Text(location == null ? 'Add location' : 'Change'),
+                    label: location == null ? 'Add location' : 'Change',
                   ),
                 ),
               ],
@@ -123,14 +123,14 @@ class WeatherSettings extends StatelessWidget {
                         crossAxisAlignment: .center,
                         children: [
                           if (!sameWeatherLocation(location, entry))
-                            TextButton(
+                            SettingsButton(
                               onPressed: weather.savingLocation
                                   ? null
                                   : () => weather.select(
                                       entry,
                                       weather.locationRevision!,
                                     ),
-                              child: const Text('Use location'),
+                              label: 'Use location',
                             ),
                           IconButton(
                             tooltip: 'Remove ${entry.name}',

@@ -150,7 +150,7 @@ class BarSettingsPage extends StatelessWidget {
     'workspaces' => [
       settingTile(
         'Workspaces shown',
-        control: SettingNumberField(
+        control: SettingsNumberField(
           value: layout.workspaceCount,
           min: 1,
           max: 10,
@@ -275,7 +275,7 @@ class BarSettingsPage extends StatelessWidget {
         for (final id in [...folded.cast<String>()]..sort())
           settingTile(
             id,
-            control: FilledButton.tonalIcon(
+            control: SettingsButton(
               onPressed: controller.busy('folded-apps')
                   ? null
                   : () => controller.write('folded-apps', [
@@ -283,7 +283,7 @@ class BarSettingsPage extends StatelessWidget {
                         if (other != id) other,
                     ]),
               icon: const Icon(Icons.push_pin_outlined),
-              label: const Text('Pin to tray'),
+              label: 'Pin to tray',
             ),
           ),
     ],
@@ -299,7 +299,7 @@ class BarSettingsPage extends StatelessWidget {
       String detail,
       int min,
       int max,
-    ) => SettingSliderTile(
+    ) => SettingsSliderTile(
       key: ValueKey(field),
       title: title,
       detail: detail,
@@ -381,7 +381,7 @@ class BarSettingsPage extends StatelessWidget {
               detail:
                   'How long popups stay when the sender does not set a '
                   'duration. Critical notifications stay until closed.',
-              control: SettingNumberField(
+              control: SettingsNumberField(
                 value: notifications['popup-duration'] as int,
                 min: 1,
                 max: 600,
@@ -585,10 +585,10 @@ class BarSettingsPage extends StatelessWidget {
                       : null,
                   actions: [
                     if (pinned.length < 3)
-                      TextButton.icon(
+                      SettingsButton(
                         onPressed: busy ? null : () => pin([...pinned, id]),
                         icon: const Icon(Icons.push_pin_outlined),
-                        label: const Text('Show in bar'),
+                        label: 'Show in bar',
                       ),
                   ],
                 ),
@@ -626,7 +626,7 @@ class BarSettingsPage extends StatelessWidget {
       SettingsGroup(
         title: 'Alerts',
         children: [
-          SettingSliderTile(
+          SettingsSliderTile(
             title: 'Low quota warning',
             detail: 'Warn when a window has this much quota or less left.',
             value: ring['low-percent'] as int,

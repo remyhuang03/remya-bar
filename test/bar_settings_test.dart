@@ -8,7 +8,6 @@ import 'package:remya_bar/features/settings/bar_pill_layout.dart';
 import 'package:remya_bar/features/settings/bar_preferences.dart';
 import 'package:remya_bar/features/settings/bar_settings_controller.dart';
 import 'package:remya_bar/features/settings/bar_settings_entry.dart';
-import 'package:remya_bar/features/settings/bar_settings_tiles.dart';
 import 'package:remya_bar/features/settings/remya_settings_installed.dart';
 import 'package:remya_client/remya_client.dart';
 import 'package:remya_ui/remya_ui.dart';
@@ -319,7 +318,7 @@ void main() {
       MaterialApp(
         home: Scaffold(
           body: Center(
-            child: SettingNumberField(
+            child: SettingsNumberField(
               value: 5,
               min: 1,
               max: 25,
@@ -657,7 +656,12 @@ void main() {
     await tester.tap(find.text('Disconnect'));
     await tester.pumpAndSettle();
     expect(find.text('Disconnect Google account?'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Disconnect'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Disconnect'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('bar@example.com'), findsNothing);
     expect(find.text('Connect'), findsOneWidget);

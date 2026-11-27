@@ -35,7 +35,7 @@
 ## Coding & UI
 - Apply setting changes immediately when the setting supports immediate application and doing so is appropriate; do not add an unnecessary Apply button.
 - For settings that require a system restart, show a global "Reboot to apply" status bar with Restart now and Later actions, and a local explanation beside the setting. State application restart or sign-in requirements accurately when a full reboot is unnecessary.
-- In settings, use `remya_ui` controls instead of their Material counterparts: `SettingsSegmentedButton` (solid connected segments, optional `SettingsSegment.icon`) or `SettingChoice` for single choices, never Material `SegmentedButton`.
+- Build settings controls from `remya_ui` as specified in Core's `docs/settings-controls.md` (choices, `SettingsButton` variants, sliders, number fields, metrics). Do not use Material `SegmentedButton`, dropdowns or `OutlinedButton` in settings rows.
 - Keep tooltips and other user-facing hints concise. Prefer a short name or status over an action sentence; use `Settings`, not `Open Remya Settings`. Put detailed diagnostics in logs or an appropriate detail view.
 - Let the native runner own initial window setup and respect Wayland compositor policy.
 

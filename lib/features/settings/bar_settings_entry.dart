@@ -291,10 +291,7 @@ class _WeatherAttribution extends StatelessWidget {
         settingTile(
           title,
           detail: detail,
-          control: TextButton(
-            onPressed: () => _open(url),
-            child: const Text('View'),
-          ),
+          control: SettingsButton(onPressed: () => _open(url), label: 'View'),
         ),
     ],
   );

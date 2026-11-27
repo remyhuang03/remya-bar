@@ -23,7 +23,7 @@ class BarPriorityApps extends StatelessWidget {
     settingTile(
       'Priority apps',
       detail: 'Apps whose notifications show during Do Not Disturb.',
-      control: FilledButton.tonalIcon(
+      control: SettingsButton(
         onPressed: onChanged == null
             ? null
             : () async {
@@ -37,7 +37,7 @@ class BarPriorityApps extends StatelessWidget {
                 if (app != null) onChanged?.call([...apps, app]);
               },
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Add app'),
+        label: 'Add app',
       ),
     ),
     if (apps.isEmpty) settingTile('No priority apps'),

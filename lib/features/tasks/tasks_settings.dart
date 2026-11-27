@@ -92,29 +92,29 @@ class TasksSettings extends StatelessWidget {
                       if (status?.configured == true &&
                           !connecting &&
                           (!connected || store.state == .authRequired))
-                        FilledButton(
+                        SettingsButton(
+                          variant: .filled,
                           onPressed: () => _runTaskAction(
                             context,
                             'Couldn’t update the Google connection',
                             store.connect,
                           ),
-                          child: Text(
-                            connected || store.state == .authRequired
-                                ? 'Reconnect'
-                                : 'Connect Google Tasks',
-                          ),
+                          label: connected || store.state == .authRequired
+                              ? 'Reconnect'
+                              : 'Connect Google Tasks',
                         ),
                       if (connecting)
-                        OutlinedButton(
+                        SettingsButton(
                           onPressed: () => _runTaskAction(
                             context,
                             'Couldn’t cancel Google sign-in',
                             store.cancelAuthorization,
                           ),
-                          child: const Text('Cancel sign-in'),
+                          label: 'Cancel sign-in',
                         ),
                       if (accountId != null)
-                        OutlinedButton(
+                        SettingsButton(
+                          variant: .destructive,
                           onPressed: connecting
                               ? null
                               : () async {
@@ -134,7 +134,7 @@ class TasksSettings extends StatelessWidget {
                                     );
                                   }
                                 },
-                          child: const Text('Disconnect'),
+                          label: 'Disconnect',
                         ),
                     ],
                   ),
@@ -157,7 +157,7 @@ class TasksSettings extends StatelessWidget {
                 children: [
                   settingTile(
                     'Visible lists',
-                    control: OutlinedButton(
+                    control: SettingsButton(
                       onPressed: busy || accountId == null || lists.isEmpty
                           ? null
                           : () async {
@@ -185,11 +185,9 @@ class TasksSettings extends StatelessWidget {
                                     : accountId,
                               }, revision: revision);
                             },
-                      child: Text(
-                        visible.isEmpty
-                            ? 'All lists'
-                            : '${visible.length} selected',
-                      ),
+                      label: visible.isEmpty
+                          ? 'All lists'
+                          : '${visible.length} selected',
                     ),
                   ),
                   choose('Upcoming range', preferences.upcomingDays, const {
